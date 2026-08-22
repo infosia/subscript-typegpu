@@ -48,7 +48,7 @@ question (P2 review M6), and the diagnostic sweep.
   the yawgpu chain). The result decides the uniform binding-size
   question: if Dawn rejects a `minBindingSize` below 16 for a
   uniform struct, LY11 gains the rule and the layout engine rounds
-  the uniform size; otherwise the tracking entry records the
+  the uniform size. Otherwise the tracking entry records the
   measurement and LY11 stands.
 - **EG6 — Timestamps, opt-in.** `ComputePipeline.dispatchTimed(...)`
   and a `TimestampPair` wrapper over the API layer's query set,
