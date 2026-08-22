@@ -1,4 +1,5 @@
 // expected-rule: K21
+// expected-message: cannot be written as a whole
 import { AtomicU32 } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
 @CStruct class Counter { value: AtomicU32; constructor(value: AtomicU32) { this.value = value; } }

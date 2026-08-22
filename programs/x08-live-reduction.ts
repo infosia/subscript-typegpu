@@ -1,5 +1,5 @@
 // program: x08-live-reduction
-// purpose: reduce 1024 integral f32 values in four workgroups and compare the atomic sum
+// purpose: reduce 1000 integral f32 values in four workgroups and compare the atomic sum
 // exercises: K20, K21, K22, K23, T15
 // questions: none
 
@@ -53,7 +53,7 @@ const partials: WorkgroupArray<f32> = workgroupArray<f32>(256);
 function reductionKernel(res: ReductionLayout, ctx: ComputeInvocation): void {
   const global: u32 = ctx.globalId.x;
   const local: u32 = ctx.localIndex;
-  partials[local] = global < 1024 ? res.input[global].value : 0.0;
+  partials[local] = global < 1000 ? res.input[global].value : 0.0;
   workgroupBarrier();
   let stride: u32 = 128;
   while (stride > 0) {
@@ -75,12 +75,14 @@ export const reduction: ComputePipelineSpec = computePipeline<ReductionLayout>(r
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
   if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
   if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  print("device:ready");
   {
     using adapter = adapterResult;
     using device = deviceResult;
-    const count: u32 = 1024;
+    const count: u32 = 1000;
     const inputBytes: u8[] = [];
     let byteIndex: u32 = 0;
     while (byteIndex < ReductionValue_STRIDE * count) {
@@ -127,6 +129,7 @@ export async function main(): Promise<void> {
       0,
       Context.bytesOf<ReductionCounter>(new ReductionCounter(new AtomicU32(0))),
     );
+    print("inputs:written");
     using pipeline = createComputePipeline(
       device,
       reduction_WGSL,
@@ -146,6 +149,7 @@ export async function main(): Promise<void> {
     output.copyTo(encoder, readback, 0, 1);
     using command = encoder.finishDefault();
     queue.submit([command]);
+    print("dispatch:submitted");
     const mapped: boolean = await readback.handle().mapAsync(
       GPUMapMode.READ,
       0,
@@ -156,6 +160,7 @@ export async function main(): Promise<void> {
       readBuffer<ReductionCounter>(readback, 0, 1),
       0,
     );
+    print("readback:mapped");
     if (result.total.load() !== expected) {
       print(`FAIL expected=${expected} got=${result.total.load()}`);
       return;

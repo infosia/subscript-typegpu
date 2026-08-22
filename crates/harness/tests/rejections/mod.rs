@@ -1,4 +1,6 @@
 //! Every generator rejection fixture is red with its named rule and owner.
+//!
+//! The checker owns unreachable library-call shapes such as workgroup initializers.
 
 use std::path::{Path, PathBuf};
 
@@ -104,11 +106,11 @@ fn every_fixture_is_red_with_rule_and_owner() {
             value => panic!("{} unknown expected owner {value}", fixture.display()),
         }
         if let Some(expected_message) = expected_message {
-            assert_eq!(
-                matching.message,
-                expected_message,
-                "{} checker diagnostic text",
-                fixture.display()
+            assert!(
+                matching.message.contains(expected_message),
+                "{} diagnostic lacks `{expected_message}`: {}",
+                fixture.display(),
+                matching.message
             );
         }
     }

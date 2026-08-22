@@ -16,7 +16,7 @@ fn reductionKernel(@builtin(global_invocation_id) globalId: vec3<u32>, @builtin(
   let global = globalId.x;
   let local = localIndex;
   var _g_conditional_0: f32;
-  if (global < 1024u) {
+  if (global < 1000u) {
     _g_conditional_0 = input[global].value;
   } else {
     _g_conditional_0 = 0.0f;

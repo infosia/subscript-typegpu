@@ -1,4 +1,5 @@
 // expected-rule: K22
+// expected-message: is not legal in a helper
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output!: MutStorage<Item>; }

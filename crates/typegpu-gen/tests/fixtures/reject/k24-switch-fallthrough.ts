@@ -1,4 +1,5 @@
 // expected-rule: K18
+// expected-message: switch case falls through with statements
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output!: MutStorage<Item>; }

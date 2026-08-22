@@ -371,13 +371,6 @@ fn kernel_globals(module: &Module, kernel: &Function) -> Result<Vec<KernelGlobal
                     KernelGlobalKind::WorkgroupArray(length),
                 )
             }
-            Some(("workgroupVar", _)) | Some(("workgroupArray", _)) => {
-                return Err(diagnostic(
-                    "K20",
-                    format!("workgroup variable `{}` has an initializer", global.name),
-                    global.pos.clone(),
-                ));
-            }
             _ => (
                 global.ty.clone(),
                 KernelGlobalKind::Constant(global.init.clone()),
@@ -551,6 +544,323 @@ fn constant_type(module: &Module, ty: &Type) -> bool {
     }
 }
 
+#[derive(Clone)]
+enum FoldedConstant {
+    Bool(bool),
+    I32(i32),
+    U32(u32),
+    F32(f32),
+    Construct {
+        constructor: String,
+        args: Vec<FoldedConstant>,
+    },
+}
+
+impl FoldedConstant {
+    fn snippet(&self) -> Snippet {
+        match self {
+            Self::Bool(value) => Snippet::atom(value.to_string()),
+            Self::I32(value) => {
+                if *value < 0 {
+                    Snippet::new(format!("{value}i"), 9)
+                } else {
+                    Snippet::atom(format!("{value}i"))
+                }
+            }
+            Self::U32(value) => Snippet::atom(format!("{value}u")),
+            Self::F32(value) => {
+                let mut text = value.to_string();
+                if !text.contains('.') && !text.contains('e') && !text.contains('E') {
+                    text.push_str(".0");
+                }
+                Snippet::atom(format!("{text}f"))
+            }
+            Self::Construct { constructor, args } => Snippet::atom(format!(
+                "{constructor}({})",
+                args.iter()
+                    .map(|arg| arg.snippet().text)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )),
+        }
+    }
+}
+
+fn constant_overflow(ty: &str, pos: &Pos) -> Diagnostic {
+    diagnostic(
+        "K19",
+        format!("module constant arithmetic overflows {ty}"),
+        pos.clone(),
+    )
+}
+
+fn fold_binary(
+    op: BinOp,
+    left: FoldedConstant,
+    right: FoldedConstant,
+    pos: &Pos,
+) -> Result<FoldedConstant, Diagnostic> {
+    macro_rules! checked_integer {
+        ($left:expr, $right:expr, $ty:literal, $variant:ident) => {{
+            let left = $left;
+            let right = $right;
+            let value = match op {
+                BinOp::Add => left.checked_add(right),
+                BinOp::Sub => left.checked_sub(right),
+                BinOp::Mul => left.checked_mul(right),
+                BinOp::Div if right == 0 => {
+                    return Err(diagnostic(
+                        "K19",
+                        "module constant divides by zero",
+                        pos.clone(),
+                    ));
+                }
+                BinOp::Div => left.checked_div(right),
+                BinOp::Rem if right == 0 => {
+                    return Err(diagnostic(
+                        "K19",
+                        "module constant divides by zero",
+                        pos.clone(),
+                    ));
+                }
+                BinOp::Rem => left.checked_rem(right),
+                BinOp::BitAnd => Some(left & right),
+                BinOp::BitOr => Some(left | right),
+                BinOp::Eq => return Ok(FoldedConstant::Bool(left == right)),
+                BinOp::Ne => return Ok(FoldedConstant::Bool(left != right)),
+                BinOp::Lt => return Ok(FoldedConstant::Bool(left < right)),
+                BinOp::Le => return Ok(FoldedConstant::Bool(left <= right)),
+                BinOp::Gt => return Ok(FoldedConstant::Bool(left > right)),
+                BinOp::Ge => return Ok(FoldedConstant::Bool(left >= right)),
+                _ => None,
+            }
+            .ok_or_else(|| constant_overflow($ty, pos))?;
+            Ok(FoldedConstant::$variant(value))
+        }};
+    }
+
+    match (left, right) {
+        (FoldedConstant::I32(left), FoldedConstant::I32(right)) => {
+            checked_integer!(left, right, "i32", I32)
+        }
+        (FoldedConstant::U32(left), FoldedConstant::U32(right)) => {
+            checked_integer!(left, right, "u32", U32)
+        }
+        (FoldedConstant::F32(left), FoldedConstant::F32(right)) => {
+            let value = match op {
+                BinOp::Add => left + right,
+                BinOp::Sub => left - right,
+                BinOp::Mul => left * right,
+                BinOp::Div if right == 0.0 => {
+                    return Err(diagnostic(
+                        "K19",
+                        "module constant divides by zero",
+                        pos.clone(),
+                    ));
+                }
+                BinOp::Div => left / right,
+                BinOp::Rem if right == 0.0 => {
+                    return Err(diagnostic(
+                        "K19",
+                        "module constant divides by zero",
+                        pos.clone(),
+                    ));
+                }
+                BinOp::Rem => left % right,
+                BinOp::Eq => return Ok(FoldedConstant::Bool(left == right)),
+                BinOp::Ne => return Ok(FoldedConstant::Bool(left != right)),
+                BinOp::Lt => return Ok(FoldedConstant::Bool(left < right)),
+                BinOp::Le => return Ok(FoldedConstant::Bool(left <= right)),
+                BinOp::Gt => return Ok(FoldedConstant::Bool(left > right)),
+                BinOp::Ge => return Ok(FoldedConstant::Bool(left >= right)),
+                _ => {
+                    return Err(diagnostic(
+                        "K19",
+                        "module constant uses an unsupported binary operator",
+                        pos.clone(),
+                    ));
+                }
+            };
+            if !value.is_finite() {
+                return Err(constant_overflow("f32", pos));
+            }
+            Ok(FoldedConstant::F32(value))
+        }
+        (FoldedConstant::Bool(left), FoldedConstant::Bool(right)) => match op {
+            BinOp::And => Ok(FoldedConstant::Bool(left && right)),
+            BinOp::Or => Ok(FoldedConstant::Bool(left || right)),
+            BinOp::Eq => Ok(FoldedConstant::Bool(left == right)),
+            BinOp::Ne => Ok(FoldedConstant::Bool(left != right)),
+            _ => Err(diagnostic(
+                "K19",
+                "module constant uses an unsupported boolean operator",
+                pos.clone(),
+            )),
+        },
+        _ => Err(diagnostic(
+            "K19",
+            "module constant binary operands are not foldable scalars",
+            pos.clone(),
+        )),
+    }
+}
+
+fn fold_constant_expr(
+    module: &Module,
+    globals: &BTreeMap<String, KernelGlobal>,
+    cache: &mut BTreeMap<String, FoldedConstant>,
+    visiting: &mut BTreeSet<String>,
+    expr: &Expr,
+) -> Result<FoldedConstant, Diagnostic> {
+    match &expr.kind {
+        ExprKind::Int(value) => match expr.ty {
+            Type::I32 => i32::try_from(*value)
+                .map(FoldedConstant::I32)
+                .map_err(|_| constant_overflow("i32", &expr.pos)),
+            Type::U32 => u32::try_from(*value)
+                .map(FoldedConstant::U32)
+                .map_err(|_| constant_overflow("u32", &expr.pos)),
+            _ => Err(diagnostic(
+                "K19",
+                "module constant integer has an unsupported type",
+                expr.pos.clone(),
+            )),
+        },
+        ExprKind::Float(value) if expr.ty == Type::F32 => {
+            let value = *value as f32;
+            if value.is_finite() {
+                Ok(FoldedConstant::F32(value))
+            } else {
+                Err(constant_overflow("f32", &expr.pos))
+            }
+        }
+        ExprKind::Bool(value) => Ok(FoldedConstant::Bool(*value)),
+        ExprKind::Global(name) => fold_global_constant(module, globals, cache, visiting, name),
+        ExprKind::Unary { op, operand } => {
+            let operand = fold_constant_expr(module, globals, cache, visiting, operand)?;
+            match (op, operand) {
+                (UnOp::Neg, FoldedConstant::I32(value)) => value
+                    .checked_neg()
+                    .map(FoldedConstant::I32)
+                    .ok_or_else(|| constant_overflow("i32", &expr.pos)),
+                (UnOp::Neg, FoldedConstant::F32(value)) => Ok(FoldedConstant::F32(-value)),
+                (UnOp::Not, FoldedConstant::Bool(value)) => Ok(FoldedConstant::Bool(!value)),
+                (UnOp::BitNot, FoldedConstant::I32(value)) => Ok(FoldedConstant::I32(!value)),
+                (UnOp::BitNot, FoldedConstant::U32(value)) => Ok(FoldedConstant::U32(!value)),
+                _ => Err(diagnostic(
+                    "K19",
+                    "module constant uses an unsupported unary operator",
+                    expr.pos.clone(),
+                )),
+            }
+        }
+        ExprKind::Binary { op, left, right } => fold_binary(
+            *op,
+            fold_constant_expr(module, globals, cache, visiting, left)?,
+            fold_constant_expr(module, globals, cache, visiting, right)?,
+            &expr.pos,
+        ),
+        ExprKind::Call {
+            callee: Callee::Func(name),
+            args,
+        } if function_declared_in(module, name, "typegpu-types.ts") => {
+            let constructor = mapping::free_function(name).ok_or_else(|| {
+                diagnostic(
+                    "K19",
+                    format!("module constant calls unsupported function `{name}`"),
+                    expr.pos.clone(),
+                )
+            })?;
+            if !constructor.starts_with("vec") {
+                return Err(diagnostic(
+                    "K19",
+                    format!("module constant calls non-vector factory `{name}`"),
+                    expr.pos.clone(),
+                ));
+            }
+            Ok(FoldedConstant::Construct {
+                constructor: constructor.to_owned(),
+                args: args
+                    .iter()
+                    .map(|arg| fold_constant_expr(module, globals, cache, visiting, arg))
+                    .collect::<Result<Vec<_>, _>>()?,
+            })
+        }
+        ExprKind::New { class, args } => {
+            let class = &module.classes[class.0];
+            if !class.is_value {
+                return Err(diagnostic(
+                    "K19",
+                    format!(
+                        "module constant constructs reference class `{}`",
+                        class.name
+                    ),
+                    expr.pos.clone(),
+                ));
+            }
+            Ok(FoldedConstant::Construct {
+                constructor: wgsl_type(module, &expr.ty, &expr.pos)?,
+                args: args
+                    .iter()
+                    .map(|arg| fold_constant_expr(module, globals, cache, visiting, arg))
+                    .collect::<Result<Vec<_>, _>>()?,
+            })
+        }
+        _ => Err(diagnostic(
+            "K19",
+            "module constant initializer is not evaluable",
+            expr.pos.clone(),
+        )),
+    }
+}
+
+fn fold_global_constant(
+    module: &Module,
+    globals: &BTreeMap<String, KernelGlobal>,
+    cache: &mut BTreeMap<String, FoldedConstant>,
+    visiting: &mut BTreeSet<String>,
+    name: &str,
+) -> Result<FoldedConstant, Diagnostic> {
+    if let Some(value) = cache.get(name) {
+        return Ok(value.clone());
+    }
+    let global = globals.get(name).ok_or_else(|| {
+        generator_diagnostic(
+            format!("global `{name}` disappeared from typed HIR"),
+            Pos::new("", 1, 1),
+        )
+    })?;
+    let KernelGlobalKind::Constant(init) = &global.kind else {
+        return Err(diagnostic(
+            "K19",
+            format!("module constant initializer reads variable `{name}`"),
+            global.pos.clone(),
+        ));
+    };
+    if !constant_type(module, &global.ty) {
+        return Err(diagnostic(
+            "K19",
+            format!(
+                "module constant `{name}` has unsupported type `{}`",
+                type_name(module, &global.ty)
+            ),
+            global.pos.clone(),
+        ));
+    }
+    if !visiting.insert(name.to_owned()) {
+        return Err(diagnostic(
+            "K19",
+            format!("module constant cycle includes `{name}`"),
+            global.pos.clone(),
+        ));
+    }
+    let value = fold_constant_expr(module, globals, cache, visiting, init);
+    visiting.remove(name);
+    let value = value?;
+    cache.insert(name.to_owned(), value.clone());
+    Ok(value)
+}
+
 fn constant_snippet(
     module: &Module,
     globals: &BTreeMap<String, KernelGlobal>,
@@ -673,11 +983,13 @@ fn emit_kernel_globals(module: &Module, globals: &[KernelGlobal]) -> Result<Stri
         .iter()
         .map(|global| (global.name.clone(), global.clone()))
         .collect::<BTreeMap<_, _>>();
+    let mut folded = BTreeMap::new();
+    let mut visiting = BTreeSet::new();
     let mut out = String::new();
     for global in globals {
         let name = mapping::ident(&global.name);
         match &global.kind {
-            KernelGlobalKind::Constant(init) => {
+            KernelGlobalKind::Constant(_) => {
                 if !constant_type(module, &global.ty) {
                     return Err(diagnostic(
                         "K19",
@@ -690,7 +1002,14 @@ fn emit_kernel_globals(module: &Module, globals: &[KernelGlobal]) -> Result<Stri
                     ));
                 }
                 let ty = wgsl_type(module, &global.ty, &global.pos)?;
-                let value = constant_snippet(module, &by_name, init)?;
+                let value = fold_global_constant(
+                    module,
+                    &by_name,
+                    &mut folded,
+                    &mut visiting,
+                    &global.name,
+                )?
+                .snippet();
                 out.push_str(&format!("const {name}: {ty} = {};\n", value.text));
             }
             KernelGlobalKind::Private(init) => {
@@ -702,7 +1021,16 @@ fn emit_kernel_globals(module: &Module, globals: &[KernelGlobal]) -> Result<Stri
                     ));
                 }
                 let ty = wgsl_type(module, &global.ty, &global.pos)?;
-                let value = constant_snippet(module, &by_name, init)?;
+                let value = constant_snippet(module, &by_name, init).map_err(|_| {
+                    diagnostic(
+                        "K20",
+                        format!(
+                            "private variable `{}` initializer is not evaluable",
+                            global.name
+                        ),
+                        init.pos.clone(),
+                    )
+                })?;
                 out.push_str(&format!("var<private> {name}: {ty} = {};\n", value.text));
             }
             KernelGlobalKind::WorkgroupVar => {
@@ -743,12 +1071,44 @@ fn barrier_call<'a>(module: &Module, expr: &'a Expr) -> Option<&'a str> {
     matches!(base, "workgroupBarrier" | "storageBarrier").then_some(base)
 }
 
+// K18 permits continue because WGSL targets the enclosing loop through a switch.
 fn case_terminates(body: &[Stmt]) -> bool {
     match body.last() {
         Some(Stmt::Break(_) | Stmt::Continue(_) | Stmt::Return { .. }) => true,
         Some(Stmt::Block(body)) => case_terminates(body),
         _ => false,
     }
+}
+
+fn validate_statement_subset(statements: &[Stmt]) -> Result<(), Diagnostic> {
+    for statement in statements {
+        match statement {
+            Stmt::ForOf { kind, pos, .. } if *kind != ForOfKind::FixedArrayValues => {
+                return Err(diagnostic(
+                    "K7",
+                    "statement is outside the current kernel subset",
+                    pos.clone(),
+                ));
+            }
+            Stmt::If { then, els, .. } => {
+                validate_statement_subset(then)?;
+                if let Some(els) = els {
+                    validate_statement_subset(els)?;
+                }
+            }
+            Stmt::While { body, .. } | Stmt::For { body, .. } | Stmt::ForOf { body, .. } => {
+                validate_statement_subset(body)?;
+            }
+            Stmt::Switch { cases, .. } => {
+                for case in cases {
+                    validate_statement_subset(&case.body)?;
+                }
+            }
+            Stmt::Block(body) => validate_statement_subset(body)?,
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone)]
@@ -876,7 +1236,7 @@ impl<'a> Emitter<'a> {
             ExprKind::Call {
                 callee: Callee::Method { recv, name },
                 args,
-            } if name == "get" && args.is_empty() => self.global_root(recv),
+            } if name == "get" && args.len() <= 1 => self.global_root(recv),
             _ => None,
         }
     }
@@ -890,10 +1250,19 @@ impl<'a> Emitter<'a> {
         })
     }
 
-    fn atomic_place(&mut self, recv: &Expr) -> Result<String, Diagnostic> {
-        let storage = self
-            .binding_root(recv)
-            .is_some_and(|binding| binding.kind == BindingKind::MutStorage);
+    fn atomic_place(&mut self, recv: &Expr) -> Result<Snippet, Diagnostic> {
+        let binding = self.binding_root(recv);
+        if binding
+            .as_ref()
+            .is_some_and(|binding| binding.kind != BindingKind::MutStorage)
+        {
+            return Err(diagnostic(
+                "K21",
+                "atomic method receiver is behind a uniform or read-only storage binding",
+                recv.pos.clone(),
+            ));
+        }
+        let storage = binding.is_some();
         let workgroup = self.global_root(recv).is_some_and(|global| {
             matches!(
                 global.kind,
@@ -914,11 +1283,11 @@ impl<'a> Emitter<'a> {
         {
             if name == "get" && args.is_empty() {
                 if let Some(global) = self.wrapper_ref(recv) {
-                    return Ok(mapping::ident(&global.name));
+                    return Ok(Snippet::atom(mapping::ident(&global.name)));
                 }
             }
         }
-        Ok(self.snippet(recv)?.text)
+        self.snippet(recv)
     }
 
     fn snippets(&mut self, args: &[Expr]) -> Result<(Vec<String>, Prelude), Diagnostic> {
@@ -1319,16 +1688,20 @@ impl<'a> Emitter<'a> {
             Callee::Method { recv, name } => {
                 if atomic_scalar(self.module, &recv.ty).is_some() {
                     let place = self.atomic_place(recv)?;
-                    let (args, prelude) = self.snippets(args)?;
+                    let (args, args_prelude) = self.snippets(args)?;
+                    let mut prelude = place.prelude;
+                    prelude.extend(args_prelude);
                     let text = match (name.as_str(), args.as_slice()) {
-                        ("load", []) => format!("atomicLoad(&{place})"),
-                        ("store", [value]) => format!("atomicStore(&{place}, {value})"),
-                        ("add", [value]) => format!("atomicAdd(&{place}, {value})"),
-                        ("sub", [value]) => format!("atomicSub(&{place}, {value})"),
-                        ("min", [value]) => format!("atomicMin(&{place}, {value})"),
-                        ("max", [value]) => format!("atomicMax(&{place}, {value})"),
+                        ("load", []) => format!("atomicLoad(&{})", place.text),
+                        ("store", [value]) => {
+                            format!("atomicStore(&{}, {value})", place.text)
+                        }
+                        ("add", [value]) => format!("atomicAdd(&{}, {value})", place.text),
+                        ("sub", [value]) => format!("atomicSub(&{}, {value})", place.text),
+                        ("min", [value]) => format!("atomicMin(&{}, {value})", place.text),
+                        ("max", [value]) => format!("atomicMax(&{}, {value})", place.text),
                         ("exchange", [value]) => {
-                            format!("atomicExchange(&{place}, {value})")
+                            format!("atomicExchange(&{}, {value})", place.text)
                         }
                         _ => {
                             return Err(diagnostic(
@@ -1794,7 +2167,7 @@ impl<'a> Emitter<'a> {
                         "default".to_owned()
                     };
                     labels.push(label);
-                    if case.body.is_empty() && case.test.is_some() {
+                    if case.body.is_empty() {
                         continue;
                     }
                     if !case.body.is_empty() && !case_terminates(&case.body) {
@@ -1807,7 +2180,15 @@ impl<'a> Emitter<'a> {
                     let selector = if labels.len() == 1 && labels[0] == "default" {
                         "default".to_owned()
                     } else {
-                        format!("case {}", labels.join(", "))
+                        let mut ordered = labels
+                            .iter()
+                            .filter(|label| label.as_str() != "default")
+                            .cloned()
+                            .collect::<Vec<_>>();
+                        if labels.iter().any(|label| label == "default") {
+                            ordered.push("default".to_owned());
+                        }
+                        format!("case {}", ordered.join(", "))
                     };
                     Self::line(out, indent + 1, &format!("{selector}: {{"));
                     self.switch_depth += 1;
@@ -1896,6 +2277,7 @@ enum UniformityTarget {
     Switch,
 }
 
+// K22 uses a conservative taint analysis that accepts no non-uniform barrier placement.
 struct BarrierValidator<'emitter, 'module> {
     emitter: &'emitter Emitter<'module>,
     locals: BTreeMap<String, UniformityTaint>,
@@ -1922,9 +2304,6 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
     }
 
     fn expression(&self, expr: &Expr) -> UniformityTaint {
-        if let Some(binding) = self.emitter.binding_root(expr) {
-            return UniformityTaint::NonUniform(format!("binding `{}`", binding.name));
-        }
         match &expr.kind {
             ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) => UniformityTaint::Uniform,
             ExprKind::Local(name) => self.locals.get(name).cloned().unwrap_or_else(|| {
@@ -1945,9 +2324,21 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
             }
             ExprKind::Unary { operand, .. }
             | ExprKind::Cast(operand)
-            | ExprKind::Length(operand)
-            | ExprKind::JsonResultValue(operand)
-            | ExprKind::Field { obj: operand, .. } => self.expression(operand),
+            | ExprKind::JsonResultValue(operand) => self.expression(operand),
+            ExprKind::Length(operand) => {
+                if self.emitter.binding_root(operand).is_some() {
+                    UniformityTaint::Uniform
+                } else {
+                    self.expression(operand)
+                }
+            }
+            ExprKind::Field { obj, .. } => {
+                if let Some(binding) = self.emitter.binding_ref(expr) {
+                    UniformityTaint::NonUniform(format!("binding `{}`", binding.name))
+                } else {
+                    self.expression(obj)
+                }
+            }
             ExprKind::Binary { left, right, .. } => {
                 self.expression(left).merge(self.expression(right))
             }
@@ -1970,7 +2361,31 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                     "helper result `{}`",
                     name.split('<').next().unwrap_or(name)
                 )),
-                Callee::Method { recv, .. } => self.expression(recv).merge(self.expressions(args)),
+                Callee::Method { recv, name }
+                    if args.is_empty()
+                        && name == "get"
+                        && self
+                            .emitter
+                            .binding_ref(recv)
+                            .is_some_and(|binding| binding.kind == BindingKind::Uniform) =>
+                {
+                    UniformityTaint::Uniform
+                }
+                Callee::Method { recv, name }
+                    if args.is_empty()
+                        && name == "length"
+                        && self.emitter.binding_root(recv).is_some() =>
+                {
+                    UniformityTaint::Uniform
+                }
+                Callee::Method { recv, .. } => {
+                    if let Some(binding) = self.emitter.binding_root(recv) {
+                        UniformityTaint::NonUniform(format!("binding `{}`", binding.name))
+                            .merge(self.expressions(args))
+                    } else {
+                        self.expression(recv).merge(self.expressions(args))
+                    }
+                }
                 Callee::Math(_) => self.expressions(args),
                 Callee::Value(value) => self.expression(value).merge(self.expressions(args)),
                 _ => UniformityTaint::NonUniform("call result".to_owned()),
@@ -1980,7 +2395,12 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                 self.expressions(&fields.iter().flatten().cloned().collect::<Vec<_>>())
             }
             ExprKind::Index { obj, index, .. } => {
-                self.expression(obj).merge(self.expression(index))
+                if let Some(binding) = self.emitter.binding_root(obj) {
+                    UniformityTaint::NonUniform(format!("binding `{}`", binding.name))
+                        .merge(self.expression(index))
+                } else {
+                    self.expression(obj).merge(self.expression(index))
+                }
             }
             ExprKind::Cond { cond, then, els } => self
                 .expression(cond)
@@ -2024,6 +2444,91 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
         self.record_assignment(target, taint);
     }
 
+    fn loop_exit_taint(
+        &self,
+        statements: &[Stmt],
+        control: UniformityTaint,
+        nested_loops: usize,
+        switches: usize,
+    ) -> UniformityTaint {
+        let mut result = UniformityTaint::Uniform;
+        for statement in statements {
+            let candidate = match statement {
+                Stmt::If {
+                    cond, then, els, ..
+                } => {
+                    let branch = control.clone().merge(self.expression(cond));
+                    let mut value =
+                        self.loop_exit_taint(then, branch.clone(), nested_loops, switches);
+                    if let Some(els) = els {
+                        value =
+                            value.merge(self.loop_exit_taint(els, branch, nested_loops, switches));
+                    }
+                    value
+                }
+                Stmt::While { cond, body, .. } => self.loop_exit_taint(
+                    body,
+                    control.clone().merge(self.expression(cond)),
+                    nested_loops + 1,
+                    switches,
+                ),
+                Stmt::For { cond, body, .. } => self.loop_exit_taint(
+                    body,
+                    control.clone().merge(
+                        cond.as_ref()
+                            .map_or(UniformityTaint::Uniform, |expr| self.expression(expr)),
+                    ),
+                    nested_loops + 1,
+                    switches,
+                ),
+                Stmt::ForOf { body, .. } => self.loop_exit_taint(
+                    body,
+                    UniformityTaint::NonUniform("`for...of` control".to_owned()),
+                    nested_loops + 1,
+                    switches,
+                ),
+                Stmt::Switch { disc, cases, .. } => {
+                    let branch = control.clone().merge(self.expression(disc));
+                    cases.iter().fold(UniformityTaint::Uniform, |value, case| {
+                        value.merge(self.loop_exit_taint(
+                            &case.body,
+                            branch.clone(),
+                            nested_loops,
+                            switches + 1,
+                        ))
+                    })
+                }
+                Stmt::Block(body) => {
+                    self.loop_exit_taint(body, control.clone(), nested_loops, switches)
+                }
+                Stmt::Break(_) if nested_loops == 0 && switches == 0 => control.clone(),
+                Stmt::Continue(_) if nested_loops == 0 => control.clone(),
+                _ => UniformityTaint::Uniform,
+            };
+            result = result.merge(candidate);
+        }
+        result
+    }
+
+    fn taint_loop_writes(&mut self, body: &[Stmt], step: Option<&Expr>, taint: UniformityTaint) {
+        if taint == UniformityTaint::Uniform {
+            return;
+        }
+        let mut written = BTreeSet::new();
+        written_locals(body, &mut written);
+        if let Some(step) = step {
+            written_locals_expr(step, &mut written);
+        }
+        for name in written {
+            let prior = self
+                .locals
+                .get(&name)
+                .cloned()
+                .unwrap_or(UniformityTaint::Uniform);
+            self.locals.insert(name, prior.merge(taint.clone()));
+        }
+    }
+
     fn collect_statements(&mut self, statements: &[Stmt], control: UniformityTaint) {
         for statement in statements {
             match statement {
@@ -2049,7 +2554,9 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                 Stmt::While { cond, body, .. } => loop {
                     let before = self.locals.clone();
                     let body_control = control.clone().merge(self.expression(cond));
-                    self.collect_statements(body, body_control);
+                    self.collect_statements(body, body_control.clone());
+                    let exit = self.loop_exit_taint(body, body_control, 0, 0);
+                    self.taint_loop_writes(body, None, exit);
                     if self.locals == before {
                         break;
                     }
@@ -2069,10 +2576,13 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                         let condition = cond
                             .as_ref()
                             .map_or(UniformityTaint::Uniform, |expr| self.expression(expr));
-                        self.collect_statements(body, control.clone().merge(condition));
+                        let loop_control = control.clone().merge(condition);
+                        self.collect_statements(body, loop_control.clone());
                         if let Some(step) = step {
-                            self.collect_assignment(step, control.clone());
+                            self.collect_assignment(step, loop_control.clone());
                         }
+                        let exit = self.loop_exit_taint(body, loop_control, 0, 0);
+                        self.taint_loop_writes(body, step.as_ref(), exit);
                         if self.locals == before {
                             break;
                         }
@@ -2270,6 +2780,44 @@ fn assigned_local(expr: &Expr) -> Option<&str> {
         ExprKind::Local(name) => Some(name),
         ExprKind::Field { obj, .. } | ExprKind::Index { obj, .. } => assigned_local(obj),
         _ => None,
+    }
+}
+
+fn written_locals_expr(expr: &Expr, out: &mut BTreeSet<String>) {
+    if let ExprKind::Assign { target, .. } = &expr.kind {
+        if let Some(name) = assigned_local(target) {
+            out.insert(name.to_owned());
+        }
+    }
+}
+
+fn written_locals(statements: &[Stmt], out: &mut BTreeSet<String>) {
+    for statement in statements {
+        match statement {
+            Stmt::Expr(expr) => written_locals_expr(expr, out),
+            Stmt::If { then, els, .. } => {
+                written_locals(then, out);
+                if let Some(els) = els {
+                    written_locals(els, out);
+                }
+            }
+            Stmt::While { body, .. } | Stmt::ForOf { body, .. } => {
+                written_locals(body, out);
+            }
+            Stmt::For { step, body, .. } => {
+                written_locals(body, out);
+                if let Some(step) = step {
+                    written_locals_expr(step, out);
+                }
+            }
+            Stmt::Switch { cases, .. } => {
+                for case in cases {
+                    written_locals(&case.body, out);
+                }
+            }
+            Stmt::Block(body) => written_locals(body, out),
+            _ => {}
+        }
     }
 }
 
@@ -2748,6 +3296,20 @@ pub(crate) fn emit(
         .ok_or_else(|| generator_diagnostic("kernel disappeared from HIR", pipeline.pos.clone()))?;
     let helpers = dependencies(module, kernel)?;
     let globals = kernel_globals(module, kernel)?;
+    validate_statement_subset(&kernel.body)?;
+    for binding in pipeline.layouts.iter().flat_map(|layout| &layout.bindings) {
+        if binding.kind != BindingKind::MutStorage && type_contains_atomic(module, &binding.item_ty)
+        {
+            return Err(diagnostic(
+                "K21",
+                format!(
+                    "binding `{}` places an atomic schema in uniform or read-only storage",
+                    binding.name
+                ),
+                binding.pos.clone(),
+            ));
+        }
+    }
     let mut emitter = Emitter::entry(
         module,
         &pipeline.layouts,
@@ -2771,6 +3333,7 @@ pub(crate) fn emit(
                 helper.pos.clone(),
             ));
         }
+        validate_statement_subset(&helper.body)?;
         for param in &helper.params {
             let takes_layout = class_name(module, &param.ty)
                 .is_some_and(|name| pipeline.layouts.iter().any(|layout| layout.name == name));

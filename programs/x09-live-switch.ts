@@ -59,8 +59,10 @@ export const liveSwitch: ComputePipelineSpec = computePipeline<SwitchLayout>(liv
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
   if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
   if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  print("device:ready");
   {
     using adapter = adapterResult;
     using device = deviceResult;
@@ -86,6 +88,7 @@ export async function main(): Promise<void> {
       [liveSwitch_LAYOUT0],
       [liveSwitch_WORKGROUP_X, liveSwitch_WORKGROUP_Y, liveSwitch_WORKGROUP_Z],
     );
+    print("pipeline:created");
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(device, nativeLayout, liveSwitch_LAYOUT0, [output.handle()]);
     using encoder = device.createCommandEncoderDefault();
@@ -93,6 +96,7 @@ export async function main(): Promise<void> {
     output.copyTo(encoder, readback, 0, count);
     using command = encoder.finishDefault();
     device.queue().submit([command]);
+    print("dispatch:submitted");
     const mapped: boolean = await readback.handle().mapAsync(
       GPUMapMode.READ,
       0,
@@ -103,6 +107,7 @@ export async function main(): Promise<void> {
       readBuffer<SwitchValue>(readback, 0, count),
       0,
     );
+    print("readback:mapped");
     let index: u32 = 0;
     while (index < count) {
       const mode: u32 = index % 4;
