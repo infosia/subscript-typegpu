@@ -438,9 +438,10 @@ Texture and sampler bindings, storage textures, `textureLoad`,
 `textureStore`, `textureSampleLevel` in compute, `textureSample` in
 fragment only, multiple bind groups.
 
-Exit: gate programs with WGSL goldens, one live sampled checkerboard
-that prints `PASS`, reds for a compute `textureSample` and a format
-and access mismatch.
+Exit: (1) `b10-texture` gate-green with its WGSL golden (TX6). (2)
+`x09-live-texture` and `x10-live-fragment-sample` print `PASS`
+against the host sampling body (TX7). (3) Every TX8 rejection has a
+red fixture. (4) Budgets hold.
 
 ### P6 — ergonomics and diagnostics (~5%)
 
