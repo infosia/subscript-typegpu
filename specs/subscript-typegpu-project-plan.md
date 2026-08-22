@@ -411,9 +411,10 @@ Vertex and fragment entries, IO structs with `@location` and
 `@builtin(position)`, vertex layouts from schemas, `RenderPipeline`,
 render pass encoding, indexed and instanced draws.
 
-Exit: (1) `b05-render` gate-green with WGSL goldens. (2) `x04` renders
-offscreen, reads back, and compares to a committed hash. (3) Budgets
-hold.
+Exit: (1) `b06-render` and `b07-draw-variants` gate-green with WGSL
+goldens. (2) `x05-live-triangle` and `x06-live-draw-variants` print
+`PASS` against the host rasterizer (RN14). (3) Every RN16 rejection
+has a red fixture. (4) Budgets hold.
 
 ### P4 — kernel depth (~10%)
 
