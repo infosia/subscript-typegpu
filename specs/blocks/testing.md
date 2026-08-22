@@ -94,9 +94,19 @@ principles" govern this block.
   differential test's wall time. An unknown argument is an error, not
   a silent default.
 - **T15 — Live is not the gate.** `tools/live.sh` runs `x` programs
-  on a real adapter through `ReloadSession` and ship AOT, never the
-  forking JIT runner. Results go to `specs/tracking/` with the date
-  and the commit. Phase exits need them. Test runs do not.
+  on a real adapter. It requires `SUBSCRIPT_TYPEGPU_BACKEND` in
+  `{metal, vulkan}` and `SUBSCRIPT_TYPEGPU_BACKEND_LIB`, and on macOS
+  with `metal` it refuses a library that does not link
+  `Metal.framework` (`otool -L`). It runs one `#[ignore]` harness
+  test, `live::every_x_program_passes_on_a_real_adapter`, with
+  `--ignored --exact --nocapture`. That test runs each `x` program
+  on the dev tier through `ReloadSession` in the test's own process
+  (never the forking JIT runner: Objective-C refuses to initialize
+  in a forked child) and on the ship tier through the harness
+  binary, and asserts that the last output line is `PASS`. Results
+  go to `specs/tracking/` with the date and the commit. Phase exits
+  need them. Test runs do not. The owner runs the script. An agent
+  shell never runs it (T16).
 - **T16 — No sandboxed device runs.** Device programs never run from
   a sandboxed agent shell.
 

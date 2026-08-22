@@ -24,11 +24,21 @@ collide.
   case the return is a null instance and no other export is called.
 - **L3 — Every symbol resolves before any call.** The table is
   filled completely or not at all. A partial table never exists.
-- **L4 — No backend name in the facade.** The facade knows webgpu.h
-  and nothing about yawgpu, Dawn, or wgpu-native. Backend selection
-  inside the library (for example a yawgpu instance extension) is the
-  API layer's policy, reached through the descriptor chain the plan
-  exposes, and is exercised by a program.
+- **L4 — One backend name in the facade.** Rev 1, 2026-08-22. The
+  facade knows webgpu.h and one companion extension: the Tier-1
+  backend's instance backend-select chained struct (yawgpu,
+  `YAWGPU_STYPE_INSTANCE_BACKEND_SELECT`, a `u32` backend id). It
+  knows nothing else about yawgpu, Dawn, or wgpu-native. A library
+  that does not implement the extension ignores the chain, as
+  webgpu.h specifies for an unknown `sType`.
+- **L13 — The backend request.** `subscript_typegpu_create_instance`
+  reads `SUBSCRIPT_TYPEGPU_BACKEND`. Absent means no chain: the
+  library's default (yawgpu: Noop). `metal`, `vulkan`, `gles` select
+  that backend through the L4 extension. Any other value prints one
+  stderr line with the value and the accepted set, and returns a
+  null instance. A null instance from the library after a request
+  prints one line that names the request and the library path. The
+  gate never sets the variable. The live lane sets it.
 - **L5 — The ship tier links the same crate.** The facade builds as
   `lib` and `staticlib`. The staticlib carries `libloading` and the
   platform's dynamic loader library. No other link input exists.
