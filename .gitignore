@@ -4,3 +4,5 @@
 /.claude/
 /.cargo/
 *.local.*
+/HANDOFF*.md
+/REPORT*.md
