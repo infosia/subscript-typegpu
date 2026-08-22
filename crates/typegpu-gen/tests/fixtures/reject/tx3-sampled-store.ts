@@ -1,4 +1,4 @@
-// expected-rule: TX8
+// expected-rule: TX3
 // expected-message: sampled texture
 import { ComputeInvocation, ComputePipelineSpec, Texture2d, computePipeline } from "./typegpu";
 import { Vec2i, Vec4f } from "./typegpu-types";

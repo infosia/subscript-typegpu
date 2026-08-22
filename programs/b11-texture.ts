@@ -1,6 +1,6 @@
 // program: b11-texture
 // purpose: prove sampled, sampler, storage-texture, and second-group uniform bindings
-// exercises: TX1-TX6, PI1-PI13, K1-K17
+// exercises: TX1, TX2, TX3, TX4, TX5, TX6, PI1, PI2, PI3, PI5, PI8, PI9, K14, K15, K16
 // questions: none
 
 import {

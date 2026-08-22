@@ -1,5 +1,5 @@
-// expected-rule: TX8
-// expected-message: TX1 library marker
+// expected-rule: TX1
+// expected-message: float-channel library marker
 import { ComputeInvocation, ComputePipelineSpec, StorageTexture2d, computePipeline } from "./typegpu";
 class FakeFormat {}
 class Layout { target!: StorageTexture2d<FakeFormat>; }

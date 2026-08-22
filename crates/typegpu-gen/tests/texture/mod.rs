@@ -90,45 +90,41 @@ fn fragment_sample_emits_and_validates() {
 }
 
 #[test]
-fn every_texture_wrapper_and_storage_format_is_declared_by_library_identity() {
+fn float_texture_wrappers_and_storage_formats_are_declared_by_library_identity() {
     let generated = generate(
         r#"
-import { ComparisonSampler, ComputeInvocation, ComputePipelineSpec, R32float, Rgba16float, Rgba32float, Rgba8uint, Rgba8unorm, Sampler, StorageTexture2d, Texture2d, computePipeline } from "./typegpu";
+import { ComputeInvocation, ComputePipelineSpec, R32float, Rgba16float, Rgba32float, Rgba8unorm, Sampler, StorageTexture2d, Texture2d, computePipeline } from "./typegpu";
+import { Vec2f, Vec2i, Vec4f } from "./typegpu-types";
 class Layout {
   floats!: Texture2d<f32>;
-  signed!: Texture2d<i32>;
-  unsigned!: Texture2d<u32>;
   filtering!: Sampler;
-  comparison!: ComparisonSampler;
   rgba8unorm!: StorageTexture2d<Rgba8unorm>;
-  rgba8uint!: StorageTexture2d<Rgba8uint>;
   rgba16float!: StorageTexture2d<Rgba16float>;
   r32float!: StorageTexture2d<R32float>;
   rgba32float!: StorageTexture2d<Rgba32float>;
 }
-function kernel(res: Layout, ctx: ComputeInvocation): void {}
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  const dimensions = res.floats.dimensions();
+  const loaded = res.floats.load(new Vec2i(0, 0), 0);
+  const sampled = res.floats.sampleLevel(res.filtering, new Vec2f(0.25, 0.25), 0.0);
+  res.rgba8unorm.store(new Vec2i(0, 0), loaded.add(sampled));
+  res.rgba16float.store(new Vec2i(0, 0), loaded);
+  res.r32float.store(new Vec2i(0, 0), sampled);
+  res.rgba32float.store(new Vec2i(dimensions.x as i32, 0), new Vec4f(0.0, 0.0, 0.0, 1.0));
+}
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
     for expected in [
         "texture_2d<f32>",
-        "texture_2d<i32>",
-        "texture_2d<u32>",
         "var filtering: sampler;",
-        "var comparison: sampler_comparison;",
         "texture_storage_2d<rgba8unorm, write>",
-        "texture_storage_2d<rgba8uint, write>",
         "texture_storage_2d<rgba16float, write>",
         "texture_storage_2d<r32float, write>",
         "texture_storage_2d<rgba32float, write>",
     ] {
         assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
     }
-    assert!(generated.support_module.contains("sampleType: \"sint\""));
-    assert!(generated.support_module.contains("sampleType: \"uint\""));
-    assert!(generated
-        .support_module
-        .contains("samplerType: \"comparison\""));
     validate(wgsl);
 }

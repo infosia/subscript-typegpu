@@ -1,6 +1,6 @@
 // program: x10-live-texture
 // purpose: compare nearest compute sampling and storage-texture writes texel by texel
-// exercises: TX1-TX7, T4, T15
+// exercises: TX1, TX2, TX3, TX4, TX5, TX7, PI1, PI2, PI3, PI5, PI8, PI9, K14, K15, K16, T4, T15
 // questions: none
 
 import {
@@ -43,8 +43,8 @@ class TextureCopyLayout {
 function textureCopyKernel(res: TextureCopyLayout, ctx: ComputeInvocation): void {
   if (ctx.globalId.x >= 4 || ctx.globalId.y >= 4) return;
   const uv = new Vec2f(
-    ((ctx.globalId.x as f32) + 0.5) / 4.0,
-    ((ctx.globalId.y as f32) + 0.5) / 4.0,
+    ((ctx.globalId.x as f32) + 0.25) / 4.0,
+    ((ctx.globalId.y as f32) + 0.25) / 4.0,
   );
   const color: Vec4f = res.source.sampleLevel(res.nearest, uv, 0.0);
   res.target.store(new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32), color);
@@ -66,24 +66,6 @@ function checkerBytes(): u8[] {
       values.push(value);
       values.push(value);
       values.push(255);
-      x = x + 1;
-    }
-    y = y + 1;
-  }
-  return values;
-}
-
-function checkerFloats(): f32[] {
-  const values: f32[] = [];
-  let y: i32 = 0;
-  while (y < 4) {
-    let x: i32 = 0;
-    while (x < 4) {
-      const value: f32 = ((x + y) % 2 === 0) ? 1.0 : 0.0;
-      values.push(value);
-      values.push(value);
-      values.push(value);
-      values.push(1.0);
       x = x + 1;
     }
     y = y + 1;
@@ -167,15 +149,15 @@ export async function main(): Promise<void> {
     if (!await readback.mapAsync(GPUMapMode.READ, 0, 1024)) { print("FAIL map"); return; }
     const pixels: u8[] = readback.readMappedRange(0, 1024);
     print("readback:mapped");
-    const hostTexture = new Texture2d<f32>(checkerFloats(), checkerPixels(), 4, 4);
-    const hostSampler = new Sampler();
+    const hostTexture = new Texture2d<f32>(checkerPixels(), 4, 4);
+    const hostSampler = new Sampler("nearest");
     let y: i32 = 0;
     while (y < 4) {
       let x: i32 = 0;
       while (x < 4) {
         const expected: Vec4f = hostTexture.sample(
           hostSampler,
-          new Vec2f(((x as f32) + 0.5) / 4.0, ((y as f32) + 0.5) / 4.0),
+          new Vec2f(((x as f32) + 0.25) / 4.0, ((y as f32) + 0.25) / 4.0),
         );
         const offset: i32 = y * 256 + x * 4;
         const expectedR: u8 = (expected.x * 255.0) as u8;

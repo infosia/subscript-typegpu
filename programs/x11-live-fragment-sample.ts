@@ -1,6 +1,6 @@
 // program: x11-live-fragment-sample
 // purpose: compare fragment textureSample over a full-screen quad with the host sampler body
-// exercises: TX1-TX7, RN1-RN17, T4, T15
+// exercises: TX1, TX2, TX3, TX4, TX5, TX7, RN1, RN2, RN4, RN6, RN7, RN9, RN10, RN11, RN17, T4, T15
 // questions: none
 
 import {
@@ -100,21 +100,6 @@ function checkerBytes(): u8[] {
   return values;
 }
 
-function checkerFloats(): f32[] {
-  const values: f32[] = [];
-  let y: i32 = 0;
-  while (y < 4) {
-    let x: i32 = 0;
-    while (x < 4) {
-      const value: f32 = ((x + y) % 2 === 0) ? 1.0 : 0.0;
-      values.push(value); values.push(value); values.push(value); values.push(1.0);
-      x = x + 1;
-    }
-    y = y + 1;
-  }
-  return values;
-}
-
 function checkerPixels(): Vec4f[] {
   const pixels: Vec4f[] = [];
   let y: i32 = 0;
@@ -139,12 +124,12 @@ export async function main(): Promise<void> {
     using adapter = adapterResult;
     using device = deviceResult;
     const vertices: FixedArray<FragmentVertex, 6> = [
-      new FragmentVertex(new Vec2f(-1.0, -1.0), new Vec2f(0.0, 1.0)),
-      new FragmentVertex(new Vec2f(1.0, -1.0), new Vec2f(1.0, 1.0)),
-      new FragmentVertex(new Vec2f(-1.0, 1.0), new Vec2f(0.0, 0.0)),
-      new FragmentVertex(new Vec2f(-1.0, 1.0), new Vec2f(0.0, 0.0)),
-      new FragmentVertex(new Vec2f(1.0, -1.0), new Vec2f(1.0, 1.0)),
-      new FragmentVertex(new Vec2f(1.0, 1.0), new Vec2f(1.0, 0.0)),
+      new FragmentVertex(new Vec2f(-1.0, -1.0), new Vec2f(-0.0625, 0.9375)),
+      new FragmentVertex(new Vec2f(1.0, -1.0), new Vec2f(0.9375, 0.9375)),
+      new FragmentVertex(new Vec2f(-1.0, 1.0), new Vec2f(-0.0625, -0.0625)),
+      new FragmentVertex(new Vec2f(-1.0, 1.0), new Vec2f(-0.0625, -0.0625)),
+      new FragmentVertex(new Vec2f(1.0, -1.0), new Vec2f(0.9375, 0.9375)),
+      new FragmentVertex(new Vec2f(1.0, 1.0), new Vec2f(0.9375, -0.0625)),
     ];
     using vertexBuffer: Buffer<FragmentVertex> = createBuffer<FragmentVertex>(
       device, FragmentVertex_STRIDE, 6,
@@ -209,15 +194,15 @@ export async function main(): Promise<void> {
     if (!await readback.mapAsync(GPUMapMode.READ, 0, 1024)) { print("FAIL map"); return; }
     const pixels: u8[] = readback.readMappedRange(0, 1024);
     print("readback:mapped");
-    const hostTexture = new Texture2d<f32>(checkerFloats(), checkerPixels(), 4, 4);
-    const hostSampler = new Sampler();
+    const hostTexture = new Texture2d<f32>(checkerPixels(), 4, 4);
+    const hostSampler = new Sampler("nearest");
     let y: i32 = 0;
     while (y < 4) {
       let x: i32 = 0;
       while (x < 4) {
         const expected: Vec4f = hostTexture.sample(
           hostSampler,
-          new Vec2f(((x as f32) + 0.5) / 4.0, ((y as f32) + 0.5) / 4.0),
+          new Vec2f(((x as f32) + 0.25) / 4.0, ((y as f32) + 0.25) / 4.0),
         );
         const offset: i32 = y * 256 + x * 4;
         const expectedValue: u8 = (expected.x * 255.0) as u8;

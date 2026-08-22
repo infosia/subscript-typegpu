@@ -176,7 +176,7 @@ fn binding_size(
     tree.map(|tree| layout::wgsl_layout(&tree).size)
         .ok_or_else(|| {
             diagnostic(
-                "PI13",
+                "PI5",
                 "binding item type has no WGSL layout size",
                 pos.clone(),
             )
@@ -202,9 +202,6 @@ fn emit_binding_entry(
             format!("minBindingSize: 0, format: \"{}\"", format.webgpu(),)
         }
         BindingKind::Sampler => "minBindingSize: 0, samplerType: \"filtering\"".to_owned(),
-        BindingKind::ComparisonSampler => {
-            "minBindingSize: 0, samplerType: \"comparison\"".to_owned()
-        }
     };
     out.push_str(&format!(
         "  {{ binding: {}, visibility: {visibility}, kind: \"{}\", {tail} }},\n",

@@ -1,4 +1,4 @@
-// expected-rule: PI13
+// expected-rule: PI3
 import { ComputeInvocation, computePipeline, ComputePipelineSpec } from "./typegpu";
 class Layout { bad!: f32; }
 function kernel(res: Layout, ctx: ComputeInvocation): void {}

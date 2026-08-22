@@ -474,7 +474,6 @@ fn binding_declaration(
             format!("var {name}: texture_storage_2d<{}, write>;", format.wgsl())
         }
         BindingKind::Sampler => format!("var {name}: sampler;"),
-        BindingKind::ComparisonSampler => format!("var {name}: sampler_comparison;"),
     };
     Ok(format!(
         "@group({group}) @binding({}) {declaration}\n",
@@ -1149,6 +1148,65 @@ struct BindingRef {
     item_ty: Type,
 }
 
+fn local_declarations(statements: &[Stmt], out: &mut Vec<String>) {
+    for statement in statements {
+        match statement {
+            Stmt::Let { name, .. } => out.push(name.clone()),
+            Stmt::If { then, els, .. } => {
+                local_declarations(then, out);
+                if let Some(els) = els {
+                    local_declarations(els, out);
+                }
+            }
+            Stmt::While { body, .. } => {
+                local_declarations(body, out);
+            }
+            Stmt::ForOf { name, body, .. } => {
+                out.push(name.clone());
+                local_declarations(body, out);
+            }
+            Stmt::For { init, body, .. } => {
+                if let Some(init) = init {
+                    if let Stmt::Let { name, .. } = init.as_ref() {
+                        out.push(name.clone());
+                    }
+                }
+                local_declarations(body, out);
+            }
+            Stmt::Switch { cases, .. } => {
+                for case in cases {
+                    local_declarations(&case.body, out);
+                }
+            }
+            Stmt::Block(body) => local_declarations(body, out),
+            _ => {}
+        }
+    }
+}
+
+fn local_names(function: &Function, module_names: &BTreeSet<String>) -> BTreeMap<String, String> {
+    let mut originals = function
+        .params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<Vec<_>>();
+    local_declarations(&function.body, &mut originals);
+    let mut used = module_names.clone();
+    let mut names = BTreeMap::new();
+    for original in originals {
+        if names.contains_key(&original) {
+            continue;
+        }
+        let mut emitted = mapping::ident(&original);
+        while used.contains(&emitted) {
+            emitted.push('_');
+        }
+        used.insert(emitted.clone());
+        names.insert(original, emitted);
+    }
+    names
+}
+
 struct Emitter<'a> {
     module: &'a Module,
     layout_params: BTreeMap<String, usize>,
@@ -1157,6 +1215,7 @@ struct Emitter<'a> {
     invocation_kind: InvocationKind,
     bindings: BTreeMap<(usize, String), BindingRef>,
     globals: BTreeMap<String, KernelGlobal>,
+    local_names: BTreeMap<String, String>,
     used_builtins: BTreeSet<String>,
     conditional_index: u32,
     loop_depth: u32,
@@ -1180,6 +1239,7 @@ impl<'a> Emitter<'a> {
         invocation_index: usize,
         invocation_kind: InvocationKind,
         globals: &[KernelGlobal],
+        module_names: &BTreeSet<String>,
     ) -> Self {
         let mut layout_params = BTreeMap::new();
         let mut bindings = BTreeMap::new();
@@ -1196,6 +1256,7 @@ impl<'a> Emitter<'a> {
                 );
             }
         }
+        let local_names = local_names(kernel, module_names);
         Self {
             module,
             layout_params,
@@ -1207,6 +1268,7 @@ impl<'a> Emitter<'a> {
                 .iter()
                 .map(|global| (global.name.clone(), global.clone()))
                 .collect(),
+            local_names,
             used_builtins: BTreeSet::new(),
             conditional_index: 0,
             loop_depth: 0,
@@ -1215,7 +1277,12 @@ impl<'a> Emitter<'a> {
         }
     }
 
-    fn helper(module: &'a Module, globals: &[KernelGlobal]) -> Self {
+    fn helper(
+        module: &'a Module,
+        helper: &Function,
+        globals: &[KernelGlobal],
+        module_names: &BTreeSet<String>,
+    ) -> Self {
         Self {
             module,
             layout_params: BTreeMap::new(),
@@ -1227,12 +1294,20 @@ impl<'a> Emitter<'a> {
                 .iter()
                 .map(|global| (global.name.clone(), global.clone()))
                 .collect(),
+            local_names: local_names(helper, module_names),
             used_builtins: BTreeSet::new(),
             conditional_index: 0,
             loop_depth: 0,
             switch_depth: 0,
             in_helper: true,
         }
+    }
+
+    fn local_name(&self, name: &str) -> String {
+        self.local_names
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| mapping::ident(name))
     }
 
     fn binding_ref(&self, expr: &Expr) -> Option<BindingRef> {
@@ -1399,7 +1474,7 @@ impl<'a> Emitter<'a> {
                 "string local or expression in kernel",
                 expr.pos.clone(),
             )),
-            ExprKind::Local(name) => Ok(Snippet::atom(mapping::ident(name))),
+            ExprKind::Local(name) => Ok(Snippet::atom(self.local_name(name))),
             ExprKind::Global(name) => {
                 if !self.globals.contains_key(name) {
                     return Err(generator_diagnostic(
@@ -1831,7 +1906,7 @@ impl<'a> Emitter<'a> {
                         (BindingKind::Texture(_), "sample", [sampler, uv]) => {
                             if self.invocation_kind != InvocationKind::Fragment {
                                 return Err(diagnostic(
-                                    "TX8",
+                                    "TX3",
                                     "Texture2d.sample is legal only in a fragment kernel",
                                     expr.pos.clone(),
                                 ));
@@ -1840,7 +1915,7 @@ impl<'a> Emitter<'a> {
                         }
                         (BindingKind::Texture(_), "store", _) => {
                             return Err(diagnostic(
-                                "TX8",
+                                "TX3",
                                 "store is not legal on a sampled texture",
                                 expr.pos.clone(),
                             ));
@@ -1988,7 +2063,7 @@ impl<'a> Emitter<'a> {
                     .is_some_and(|class| self.layout_names.contains(class))
                 {
                     return Err(diagnostic(
-                        "PI13",
+                        "PI6",
                         "a layout class is used as a kernel local",
                         pos.clone(),
                     ));
@@ -2014,7 +2089,7 @@ impl<'a> Emitter<'a> {
                 Self::line(
                     out,
                     indent,
-                    &format!("{declaration} {} = {};", mapping::ident(name), value.text),
+                    &format!("{declaration} {} = {};", self.local_name(name), value.text),
                 );
             }
             Stmt::Expr(expr) => {
@@ -2096,7 +2171,7 @@ impl<'a> Emitter<'a> {
                             .is_some_and(|class| self.layout_names.contains(class))
                         {
                             return Err(diagnostic(
-                                "PI13",
+                                "PI6",
                                 "a layout class is used as a for-loop local",
                                 pos.clone(),
                             ));
@@ -2111,7 +2186,7 @@ impl<'a> Emitter<'a> {
                         };
                         let _ = wgsl_type(self.module, ty, pos)?;
                         (
-                            format!("{} {} = {}", declaration, mapping::ident(name), value.text),
+                            format!("{} {} = {}", declaration, self.local_name(name), value.text),
                             value.prelude,
                         )
                     }
@@ -2184,7 +2259,7 @@ impl<'a> Emitter<'a> {
                 };
                 let subject = self.snippet(subject)?;
                 Self::emit_prelude(out, indent, subject.prelude);
-                let index = format!("_g_{}_index", mapping::ident(name));
+                let index = format!("_g_{}_index", self.local_name(name));
                 Self::line(
                     out,
                     indent,
@@ -2195,7 +2270,7 @@ impl<'a> Emitter<'a> {
                 Self::line(
                     out,
                     indent + 1,
-                    &format!("let {} = {}[{index}];", mapping::ident(name), subject.text),
+                    &format!("let {} = {}[{index}];", self.local_name(name), subject.text),
                 );
                 let _ = wgsl_type(self.module, ty, pos)?;
                 self.loop_depth += 1;
@@ -3353,6 +3428,47 @@ fn builtin_parameter(name: &str) -> &'static str {
     }
 }
 
+fn module_scope_names(
+    structs: &[(String, String)],
+    layouts: &[crate::pipeline::Layout],
+    globals: &[KernelGlobal],
+    helpers: &[String],
+    entries: &[&str],
+) -> BTreeSet<String> {
+    let mut names = structs
+        .iter()
+        .map(|(name, _)| mapping::ident(name))
+        .collect::<BTreeSet<_>>();
+    names.extend(
+        layouts
+            .iter()
+            .flat_map(|layout| &layout.bindings)
+            .map(|binding| mapping::ident(&binding.name)),
+    );
+    names.extend(globals.iter().map(|global| mapping::ident(&global.name)));
+    names.extend(
+        helpers
+            .iter()
+            .map(|name| mapping::ident(name.split('<').next().unwrap_or(name))),
+    );
+    names.extend(entries.iter().map(|name| mapping::ident(name)));
+    names.extend(
+        [
+            "globalId",
+            "localId",
+            "workgroupId",
+            "numWorkgroups",
+            "localIndex",
+            "vertexIndex",
+            "instanceIndex",
+            "frontFacing",
+        ]
+        .into_iter()
+        .map(str::to_owned),
+    );
+    names
+}
+
 pub(crate) fn emit(
     module: &Module,
     pipeline: &Pipeline,
@@ -3363,6 +3479,13 @@ pub(crate) fn emit(
         .ok_or_else(|| generator_diagnostic("kernel disappeared from HIR", pipeline.pos.clone()))?;
     let helpers = dependencies(module, kernel)?;
     let globals = kernel_globals(module, kernel)?;
+    let module_names = module_scope_names(
+        structs,
+        &pipeline.layouts,
+        &globals,
+        &helpers,
+        &[&pipeline.entry],
+    );
     validate_statement_subset(&kernel.body)?;
     for binding in pipeline.layouts.iter().flat_map(|layout| &layout.bindings) {
         if binding.kind.is_buffer()
@@ -3386,10 +3509,11 @@ pub(crate) fn emit(
         pipeline.layouts.len(),
         InvocationKind::Compute,
         &globals,
+        &module_names,
     );
     let mut helper_text = String::new();
-    for name in helpers {
-        let helper = function(module, &name).ok_or_else(|| {
+    for name in &helpers {
+        let helper = function(module, name).ok_or_else(|| {
             generator_diagnostic(
                 format!("helper `{name}` disappeared from typed HIR"),
                 pipeline.pos.clone(),
@@ -3415,13 +3539,14 @@ pub(crate) fn emit(
             }
             let _ = wgsl_type(module, &param.ty, &param.pos)?;
         }
+        let mut helper_emitter = Emitter::helper(module, helper, &globals, &module_names);
         let params = helper
             .params
             .iter()
             .map(|param| {
                 Ok(format!(
                     "{}: {}",
-                    mapping::ident(&param.name),
+                    helper_emitter.local_name(&param.name),
                     wgsl_type(module, &param.ty, &param.pos)?
                 ))
             })
@@ -3433,10 +3558,9 @@ pub(crate) fn emit(
         };
         helper_text.push_str(&format!(
             "fn {}({}){result} {{\n",
-            mapping::ident(name.split('<').next().unwrap_or(&name)),
+            mapping::ident(name.split('<').next().unwrap_or(name.as_str())),
             params.join(", ")
         ));
-        let mut helper_emitter = Emitter::helper(module, &globals);
         helper_emitter.statements(&helper.body, 1, &mut helper_text)?;
         helper_text.push_str("}\n\n");
     }
@@ -3622,6 +3746,7 @@ fn render_helpers(
     module: &Module,
     pipeline: &RenderPipeline,
     kernels: [&Function; 2],
+    module_names: &BTreeSet<String>,
 ) -> Result<String, Diagnostic> {
     let mut names = Vec::new();
     let mut seen = BTreeSet::new();
@@ -3664,13 +3789,14 @@ fn render_helpers(
             }
             let _ = wgsl_type(module, &param.ty, &param.pos)?;
         }
+        let mut emitter = Emitter::helper(module, helper, &[], module_names);
         let params = helper
             .params
             .iter()
             .map(|param| {
                 Ok(format!(
                     "{}: {}",
-                    mapping::ident(&param.name),
+                    emitter.local_name(&param.name),
                     wgsl_type(module, &param.ty, &param.pos)?
                 ))
             })
@@ -3685,7 +3811,6 @@ fn render_helpers(
             mapping::ident(name.split('<').next().unwrap_or(&name)),
             params.join(", ")
         ));
-        let mut emitter = Emitter::helper(module, &[]);
         emitter.statements(&helper.body, 1, &mut out)?;
         out.push_str("}\n\n");
     }
@@ -3705,6 +3830,26 @@ pub(crate) fn emit_render(
     let fragment = function(module, &pipeline.fragment_entry).ok_or_else(|| {
         generator_diagnostic("fragment kernel disappeared from HIR", pipeline.pos.clone())
     })?;
+    let mut helper_names = Vec::new();
+    let mut seen_helpers = BTreeSet::new();
+    for kernel in [vertex, fragment] {
+        for name in dependencies(module, kernel)? {
+            if seen_helpers.insert(name.clone()) {
+                helper_names.push(name);
+            }
+        }
+    }
+    let mut module_names = module_scope_names(
+        structs,
+        &pipeline.layouts,
+        &[],
+        &helper_names,
+        &[&pipeline.vertex_entry, &pipeline.fragment_entry],
+    );
+    module_names.insert(mapping::ident(&pipeline.varyings_name));
+    if let Some(output) = &pipeline.fragment_output {
+        module_names.insert(mapping::ident(&output.name));
+    }
     let layout_count = pipeline.layouts.len();
     let vertex_value_count = pipeline.vertex_buffers.len();
     let mut vertex_emitter = Emitter::entry(
@@ -3714,6 +3859,7 @@ pub(crate) fn emit_render(
         layout_count + vertex_value_count,
         InvocationKind::Vertex,
         &[],
+        &module_names,
     );
     let mut fragment_emitter = Emitter::entry(
         module,
@@ -3722,6 +3868,7 @@ pub(crate) fn emit_render(
         layout_count + 1,
         InvocationKind::Fragment,
         &[],
+        &module_names,
     );
     let mut vertex_body = String::new();
     vertex_emitter.statements(&vertex.body, 1, &mut vertex_body)?;
@@ -3767,14 +3914,19 @@ pub(crate) fn emit_render(
     if !pipeline.layouts.is_empty() {
         out.push('\n');
     }
-    out.push_str(&render_helpers(module, pipeline, [vertex, fragment])?);
+    out.push_str(&render_helpers(
+        module,
+        pipeline,
+        [vertex, fragment],
+        &module_names,
+    )?);
 
     let mut vertex_parameters = vertex.params[layout_count..layout_count + vertex_value_count]
         .iter()
         .map(|param| {
             Ok(format!(
                 "{}: {}",
-                mapping::ident(&param.name),
+                vertex_emitter.local_name(&param.name),
                 wgsl_type(module, &param.ty, &param.pos)?
             ))
         })
@@ -3799,7 +3951,7 @@ pub(crate) fn emit_render(
     let input = &fragment.params[layout_count];
     let mut fragment_parameters = vec![format!(
         "{}: {}",
-        mapping::ident(&input.name),
+        fragment_emitter.local_name(&input.name),
         wgsl_type(module, &input.ty, &input.pos)?
     )];
     fragment_parameters.extend(

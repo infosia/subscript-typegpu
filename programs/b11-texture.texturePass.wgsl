@@ -10,13 +10,13 @@ struct SampleParams {
 
 @compute @workgroup_size(4, 4, 1)
 fn textureKernel(@builtin(global_invocation_id) globalId: vec3<u32>) {
-  var params = params;
-  if (globalId.x >= params.width || globalId.y >= params.height) {
+  var params_ = params;
+  if (globalId.x >= params_.width || globalId.y >= params_.height) {
     return;
   }
   var coords = vec2<i32>(i32(globalId.x), i32(globalId.y));
   var loaded = textureLoad(source, coords, 0u);
-  var uv = vec2<f32>((f32(globalId.x) + 0.5f) / f32(params.width), (f32(globalId.y) + 0.5f) / f32(params.height));
+  var uv = vec2<f32>((f32(globalId.x) + 0.5f) / f32(params_.width), (f32(globalId.y) + 0.5f) / f32(params_.height));
   var sampled = textureSampleLevel(source, linear, uv, 0.0f);
   textureStore(target_, coords, (loaded + sampled) * 0.5f);
 }

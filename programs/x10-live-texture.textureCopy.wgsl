@@ -7,7 +7,7 @@ fn textureCopyKernel(@builtin(global_invocation_id) globalId: vec3<u32>) {
   if (globalId.x >= 4u || globalId.y >= 4u) {
     return;
   }
-  var uv = vec2<f32>((f32(globalId.x) + 0.5f) / 4.0f, (f32(globalId.y) + 0.5f) / 4.0f);
+  var uv = vec2<f32>((f32(globalId.x) + 0.25f) / 4.0f, (f32(globalId.y) + 0.25f) / 4.0f);
   var color = textureSampleLevel(source, nearest, uv, 0.0f);
   textureStore(target_, vec2<i32>(i32(globalId.x), i32(globalId.y)), color);
 }

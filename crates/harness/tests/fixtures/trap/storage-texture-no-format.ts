@@ -1,0 +1,27 @@
+// program: storage-texture-no-format
+// purpose: prove a storageTexture layout entry without a format traps
+// exercises: TX5
+// questions: none
+
+import { BindGroupLayoutSpec, COMPUTE_VISIBILITY, createComputePipeline } from "./typegpu";
+import { gpu, GPUAdapter, GPUDevice } from "./webgpu";
+
+export async function main(): Promise<void> {
+  const adapter: GPUAdapter | null = await gpu.requestAdapter();
+  if (adapter === null) { print("FAIL adapter"); return; }
+  const device: GPUDevice | null = await adapter.requestDevice();
+  if (device === null) { print("FAIL device"); return; }
+  const spec: BindGroupLayoutSpec = { entries: [{
+    binding: 2,
+    visibility: COMPUTE_VISIBILITY,
+    kind: "storageTexture",
+    minBindingSize: 0,
+  }] };
+  using pipeline = createComputePipeline(
+    device,
+    "@compute @workgroup_size(1) fn main() {}",
+    "main",
+    [spec],
+    [1, 1, 1],
+  );
+}

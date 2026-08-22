@@ -13,30 +13,23 @@ pub(crate) enum BindingKind {
     Texture(TextureSampleType),
     StorageTexture(StorageTextureFormat),
     Sampler,
-    ComparisonSampler,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TextureSampleType {
     Float,
-    Sint,
-    Uint,
 }
 
 impl TextureSampleType {
     pub(crate) fn wgsl(self) -> &'static str {
         match self {
             Self::Float => "f32",
-            Self::Sint => "i32",
-            Self::Uint => "u32",
         }
     }
 
     pub(crate) fn webgpu(self) -> &'static str {
         match self {
             Self::Float => "float",
-            Self::Sint => "sint",
-            Self::Uint => "uint",
         }
     }
 }
@@ -44,7 +37,6 @@ impl TextureSampleType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StorageTextureFormat {
     Rgba8unorm,
-    Rgba8uint,
     Rgba16float,
     R32float,
     Rgba32float,
@@ -54,7 +46,6 @@ impl StorageTextureFormat {
     pub(crate) fn wgsl(self) -> &'static str {
         match self {
             Self::Rgba8unorm => "rgba8unorm",
-            Self::Rgba8uint => "rgba8uint",
             Self::Rgba16float => "rgba16float",
             Self::R32float => "r32float",
             Self::Rgba32float => "rgba32float",
@@ -72,10 +63,7 @@ impl BindingKind {
             Self::Uniform => "uniform",
             Self::Storage => "storage, read",
             Self::MutStorage => "storage, read_write",
-            Self::Texture(_)
-            | Self::StorageTexture(_)
-            | Self::Sampler
-            | Self::ComparisonSampler => "",
+            Self::Texture(_) | Self::StorageTexture(_) | Self::Sampler => "",
         }
     }
 
@@ -87,7 +75,6 @@ impl BindingKind {
             Self::Texture(_) => "texture",
             Self::StorageTexture(_) => "storageTexture",
             Self::Sampler => "sampler",
-            Self::ComparisonSampler => "comparisonSampler",
         }
     }
 
@@ -129,6 +116,14 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
+    Diagnostic::new(
+        RuleCode::S100,
+        format!("K15: {} (generator)", message.into()),
+        pos,
+    )
+}
+
 pub(crate) fn class_name<'a>(module: &'a Module, ty: &Type) -> Option<&'a str> {
     let Type::Class(id) = ty else { return None };
     module.classes.get(id.0).map(|class| class.name.as_str())
@@ -159,6 +154,13 @@ fn wrapper(
     ty: &Type,
     pos: &Pos,
 ) -> Result<Option<(BindingKind, Type)>, Diagnostic> {
+    if class_name(module, ty).is_some_and(|name| name == "ComparisonSampler") {
+        return Err(diagnostic(
+            "TX1",
+            "comparison samplers are not supported in this revision",
+            pos.clone(),
+        ));
+    }
     let Some(class) = library_class(module, ty) else {
         return Ok(None);
     };
@@ -169,41 +171,44 @@ fn wrapper(
     } else if class.name.starts_with("MutStorage<") {
         BindingKind::MutStorage
     } else if class.name.starts_with("Texture2d<") {
-        let Type::Array(item) = &class
-            .fields
-            .iter()
-            .find(|field| field.name == "values")
-            .expect("library texture values")
-            .ty
-        else {
-            unreachable!("Texture2d values field changed")
+        let Some(values) = class.fields.iter().find(|field| field.name == "values") else {
+            return Err(generator_diagnostic(
+                "library Texture2d lost its typed marker field",
+                pos.clone(),
+            ));
         };
-        let sample = match item.as_ref() {
-            Type::F32 => TextureSampleType::Float,
-            Type::I32 => TextureSampleType::Sint,
-            Type::U32 => TextureSampleType::Uint,
-            _ => {
-                return Err(diagnostic(
-                    "TX8",
-                    "Texture2d sample type must be f32, i32, or u32",
-                    pos.clone(),
-                ))
-            }
+        let Type::Array(item) = &values.ty else {
+            return Err(generator_diagnostic(
+                "library Texture2d typed marker is not an array",
+                pos.clone(),
+            ));
         };
-        return Ok(Some((BindingKind::Texture(sample), (**item).clone())));
+        if item.as_ref() != &Type::F32 {
+            return Err(diagnostic(
+                "TX1",
+                "Texture2d sample type must be f32",
+                pos.clone(),
+            ));
+        }
+        return Ok(Some((
+            BindingKind::Texture(TextureSampleType::Float),
+            Type::F32,
+        )));
     } else if class.name.starts_with("StorageTexture2d<") {
-        let Type::Array(item) = &class
-            .fields
-            .iter()
-            .find(|field| field.name == "formats")
-            .expect("library storage texture formats")
-            .ty
-        else {
-            unreachable!("StorageTexture2d formats field changed")
+        let Some(formats) = class.fields.iter().find(|field| field.name == "formats") else {
+            return Err(generator_diagnostic(
+                "library StorageTexture2d lost its format marker field",
+                pos.clone(),
+            ));
+        };
+        let Type::Array(item) = &formats.ty else {
+            return Err(generator_diagnostic(
+                "library StorageTexture2d format marker is not an array",
+                pos.clone(),
+            ));
         };
         let marker = library_class(module, item).and_then(|marker| match marker.name.as_str() {
             "Rgba8unorm" => Some(StorageTextureFormat::Rgba8unorm),
-            "Rgba8uint" => Some(StorageTextureFormat::Rgba8uint),
             "Rgba16float" => Some(StorageTextureFormat::Rgba16float),
             "R32float" => Some(StorageTextureFormat::R32float),
             "Rgba32float" => Some(StorageTextureFormat::Rgba32float),
@@ -211,8 +216,8 @@ fn wrapper(
         });
         let Some(format) = marker else {
             return Err(diagnostic(
-                "TX8",
-                "StorageTexture2d format must be a TX1 library marker",
+                "TX1",
+                "StorageTexture2d format must be a float-channel library marker",
                 pos.clone(),
             ));
         };
@@ -222,8 +227,6 @@ fn wrapper(
         )));
     } else if class.name == "Sampler" {
         return Ok(Some((BindingKind::Sampler, ty.clone())));
-    } else if class.name == "ComparisonSampler" {
-        return Ok(Some((BindingKind::ComparisonSampler, ty.clone())));
     } else {
         return Ok(None);
     };
@@ -270,11 +273,18 @@ pub(crate) fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, D
             class.pos.clone(),
         ));
     }
+    if class.fields.is_empty() {
+        return Err(diagnostic(
+            "TX2",
+            format!("layout class `{}` is empty", class.name),
+            class.pos.clone(),
+        ));
+    }
     let mut bindings = Vec::new();
     for (index, field) in class.fields.iter().enumerate() {
         let Some((kind, item_ty)) = wrapper(module, &field.ty, &field.pos)? else {
             return Err(diagnostic(
-                "PI13",
+                "PI3",
                 format!(
                     "layout field `{}.{}` is not a Uniform, Storage, or MutStorage binding wrapper",
                     class.name, field.name
@@ -284,7 +294,7 @@ pub(crate) fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, D
         };
         if kind.is_buffer() && !allowed_binding_item(module, &item_ty) {
             return Err(diagnostic(
-                "PI13",
+                "PI5",
                 format!(
                     "layout field `{}.{}` has a binding item type outside PI5",
                     class.name, field.name
@@ -317,7 +327,7 @@ fn literal_u32(expr: &Expr) -> Option<u32> {
 fn workgroup(module: &Module, expr: &Expr) -> Result<[u32; 3], Diagnostic> {
     let ExprKind::DescriptorLit { class, fields } = &expr.kind else {
         return Err(diagnostic(
-            "PI13",
+            "PI1",
             "pipeline workgroup options must be a descriptor literal",
             expr.pos.clone(),
         ));
@@ -329,56 +339,56 @@ fn workgroup(module: &Module, expr: &Expr) -> Result<[u32; 3], Diagnostic> {
         .position(|field| field.name == "workgroupSize")
     else {
         return Err(diagnostic(
-            "PI13",
+            "PI1",
             "pipeline options omit workgroupSize",
             expr.pos.clone(),
         ));
     };
     let Some(Some(value)) = fields.get(index) else {
         return Err(diagnostic(
-            "PI13",
+            "PI1",
             "pipeline workgroup size is not literal",
             expr.pos.clone(),
         ));
     };
     let ExprKind::ArrayLit(values) = &value.kind else {
         return Err(diagnostic(
-            "PI13",
+            "PI1",
             "pipeline workgroup size is not literal",
             value.pos.clone(),
         ));
     };
     if values.len() != 3 {
         return Err(diagnostic(
-            "PI13",
+            "PI1",
             "pipeline workgroup size requires three literals",
             value.pos.clone(),
         ));
     }
     let Some(x) = literal_u32(&values[0]) else {
         return Err(diagnostic(
-            "PI13",
+            "PI1",
             "pipeline workgroup size is not literal",
             values[0].pos.clone(),
         ));
     };
     let Some(y) = literal_u32(&values[1]) else {
         return Err(diagnostic(
-            "PI13",
+            "PI1",
             "pipeline workgroup size is not literal",
             values[1].pos.clone(),
         ));
     };
     let Some(z) = literal_u32(&values[2]) else {
         return Err(diagnostic(
-            "PI13",
+            "PI1",
             "pipeline workgroup size is not literal",
             values[2].pos.clone(),
         ));
     };
     if x == 0 || y == 0 || z == 0 {
         return Err(diagnostic(
-            "PI13",
+            "PI1",
             "pipeline workgroup dimensions must be nonzero",
             value.pos.clone(),
         ));
@@ -491,7 +501,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
                 .any(|stmt| stmt_has_compute(module, stmt))
         {
             diagnostics.push(diagnostic(
-                "PI13",
+                "PI1",
                 "a pipeline declaration appears inside a function",
                 function.pos.clone(),
             ));
@@ -561,7 +571,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
             {
                 if declared != &actual.ty {
                     diagnostics.push(diagnostic(
-                        "PI13",
+                        "PI2",
                         format!(
                             "pipeline layout type argument {} is `{}` but kernel parameter is `{}`",
                             index + 1,
@@ -584,22 +594,6 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
                 Err(error) => diagnostics.push(error),
             }
         }
-        if let Some(layout) = layouts.iter().find(|layout| {
-            layout.bindings.is_empty()
-                && layouts
-                    .iter()
-                    .any(|later| later.group > layout.group && !later.bindings.is_empty())
-        }) {
-            diagnostics.push(diagnostic(
-                "TX8",
-                format!(
-                    "pipeline binding groups have a gap at group {}",
-                    layout.group
-                ),
-                kernel.params[layout.group as usize].pos.clone(),
-            ));
-            continue;
-        }
         let invocation_ok = class_name(module, &kernel.params[arity].ty)
             .is_some_and(|name| name == "ComputeInvocation")
             && library_class(module, &kernel.params[arity].ty).is_some();
@@ -613,7 +607,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
         }
         let Some(options) = args.get(1) else {
             diagnostics.push(diagnostic(
-                "PI13",
+                "PI1",
                 "pipeline declaration omits options",
                 global.init.pos.clone(),
             ));
@@ -709,7 +703,7 @@ export const pipeline: ComputePipelineSpec = computePipeline<Declared>(kernel, {
         kernel.params[0].ty = Type::Class(subscript_compiler::ClassId(replacement));
         let diagnostics = discover(&module).expect_err("PI2 mismatch must fail");
         assert_eq!(diagnostics.len(), 1);
-        assert!(diagnostics[0].message.starts_with("PI13:"));
+        assert!(diagnostics[0].message.starts_with("PI2:"));
         assert!(diagnostics[0].message.contains("`Declared`"));
         assert!(diagnostics[0].message.contains("`KernelLayout`"));
     }

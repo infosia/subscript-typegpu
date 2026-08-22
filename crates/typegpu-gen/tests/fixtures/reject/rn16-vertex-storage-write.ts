@@ -1,4 +1,4 @@
-// expected-rule: RN16
+// expected-rule: RN9
 import { FragmentInvocation, MutStorage, renderPipelineL, RenderPipelineSpec, VertexInvocation } from "./typegpu";
 import { Vec2f, Vec4f } from "./typegpu-types";
 @CStruct class Item { value: f32; constructor(value: f32) { this.value = value; } }

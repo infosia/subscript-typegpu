@@ -36,7 +36,7 @@ fn assert_trap(fixture: &Path, expected: &str) {
 }
 
 #[test]
-fn buffer_bounds_traps_are_named_and_numbered() {
+fn runtime_traps_are_named_and_numbered() {
     if !super::differential::backend_is_available() {
         return;
     }
@@ -56,7 +56,23 @@ fn buffer_bounds_traps_are_named_and_numbered() {
         ),
         (
             "resource-kind-mismatch.ts",
-            "TX8 createBindGroup binding=3 expected=texture actual=buffer",
+            "TX4 createBindGroup binding=3 expected=texture actual=buffer",
+        ),
+        (
+            "resource-two-fields.ts",
+            "TX4 createBindGroup binding=1 resourceFields=2",
+        ),
+        (
+            "sampled-texture-store.ts",
+            "TX3 store is not legal on Texture2d",
+        ),
+        (
+            "storage-texture-no-format.ts",
+            "TX5 storageTexture binding=2 has no format",
+        ),
+        (
+            "unknown-layout-kind.ts",
+            "TX5 bind group layout binding=4 has unknown kind=mystery",
         ),
     ] {
         assert_trap(&directory.join(name), expected);

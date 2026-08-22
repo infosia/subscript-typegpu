@@ -44,6 +44,38 @@ fn validate(wgsl: &str) {
 }
 
 #[test]
+fn local_shadow_of_a_binding_is_renamed_for_every_reference() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, Uniform, computePipeline } from "./typegpu";
+@CStruct class Params { value: u32; constructor(value: u32) { this.value = value; } }
+@CStruct class Result { local: u32; reread: u32; constructor(local: u32, reread: u32) { this.local = local; this.reread = reread; } }
+class Layout { params!: Uniform<Params>; output!: MutStorage<Result>; }
+function shadow(res: Layout, ctx: ComputeInvocation): void {
+  let params: Params = res.params.get();
+  params.value = params.value + 1;
+  const reread: Params = res.params.get();
+  res.output.set(0, new Result(params.value, reread.value));
+}
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(shadow, { workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(wgsl.contains("var params_ = params;"), "{wgsl}");
+    assert!(
+        wgsl.contains("params_.value = params_.value + 1u;"),
+        "{wgsl}"
+    );
+    assert!(wgsl.contains("var reread = params;"), "{wgsl}");
+    assert!(!wgsl.contains("var reread = params_;"), "{wgsl}");
+    assert!(
+        wgsl.contains("output[0u] = Result(params_.value, reread.value);"),
+        "{wgsl}"
+    );
+    validate(wgsl);
+}
+
+#[test]
 fn uniform_stride_loop_with_conditional_binding_load_emits() {
     let generated = generate(
         r#"

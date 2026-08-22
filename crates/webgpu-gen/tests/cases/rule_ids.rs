@@ -86,6 +86,9 @@ fn every_cited_rule_id_resolves() {
     ]
     .into_iter()
     .collect::<BTreeSet<_>>();
+    let meta_rules = ["K17", "K24", "PI13", "RN16", "SC14", "TX8"]
+        .into_iter()
+        .collect::<BTreeSet<_>>();
 
     let mut files = Vec::new();
     collect_files(&root.join("crates/webgpu-gen/src"), &mut files);
@@ -119,10 +122,26 @@ fn every_cited_rule_id_resolves() {
                 if descriptor_kinds.contains(id) || subscript_rule {
                     continue;
                 }
+                let relative = path.strip_prefix(&root).unwrap_or(&path);
+                let fixture_rule = relative
+                    .components()
+                    .any(|part| part.as_os_str() == "fixtures")
+                    && line.trim_start().starts_with("// expected-rule:");
+                let generator_diagnostic = relative.starts_with("crates/typegpu-gen/src")
+                    && line.contains(&format!("\"{id}\""));
+                let runtime_diagnostic =
+                    relative == Path::new("lib/typegpu.ts") && line.contains("print(");
+                assert!(
+                    !meta_rules.contains(id)
+                        || !(fixture_rule || generator_diagnostic || runtime_diagnostic),
+                    "{}:{}: meta-rule {id} is cited by a diagnostic or fixture",
+                    relative.display(),
+                    index + 1,
+                );
                 assert!(
                     allowed.contains(id),
                     "{}:{}: unresolved rule id {id}",
-                    path.strip_prefix(&root).unwrap_or(&path).display(),
+                    relative.display(),
                     index + 1,
                 );
             }

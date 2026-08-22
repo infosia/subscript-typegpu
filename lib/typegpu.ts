@@ -21,13 +21,14 @@ import {
 } from "./webgpu";
 
 export class Texture2d<T> {
+  // The generator reads this zero-length marker to recover T from the typed HIR.
   private values: T[];
   private pixels: Vec4f[];
   private width: u32;
   private height: u32;
 
-  constructor(values: T[], pixels: Vec4f[], width: u32, height: u32) {
-    this.values = values;
+  constructor(pixels: Vec4f[], width: u32, height: u32) {
+    this.values = [];
     this.pixels = pixels;
     this.width = width;
     this.height = height;
@@ -63,41 +64,32 @@ export class Texture2d<T> {
     return this.sampleLevel(sampler, uv, 0.0);
   }
 
-  store(coords: Vec2i, value: Vec4f): void {}
+  store(coords: Vec2i, value: Vec4f): void {
+    print("TX3 store is not legal on Texture2d");
+    unreachable();
+  }
 }
 
 export class Sampler {
-  private nearest: boolean;
+  private filterMode: string;
 
-  constructor() {
-    this.nearest = true;
+  constructor(filterMode: string) {
+    this.filterMode = filterMode;
   }
 
   isNearest(): boolean {
-    return this.nearest;
-  }
-}
-
-export class ComparisonSampler {
-  private nearest: boolean;
-
-  constructor() {
-    this.nearest = true;
-  }
-
-  isNearest(): boolean {
-    return this.nearest;
+    return this.filterMode === "nearest";
   }
 }
 
 export class Rgba8unorm {}
-export class Rgba8uint {}
 export class Rgba16float {}
 export class R32float {}
 export class Rgba32float {}
 
 export class StorageTexture2d<F> {
   private values: Vec4f[];
+  // The generator reads this zero-length marker to recover F from the typed HIR.
   private formats: F[];
   private width: u32;
   private height: u32;
@@ -663,15 +655,18 @@ function createNativeBindGroupLayouts(
             storageTexture: { access: "write-only", format: source.format, viewDimension: "2d" },
           });
         } else {
-          print(`TX8 storageTexture binding=${source.binding} has no format`);
+          print(`TX5 storageTexture binding=${source.binding} has no format`);
           unreachable();
         }
-      } else {
+      } else if (source.kind === "sampler" || source.kind === "comparisonSampler") {
         entries.push({
           binding: source.binding,
           visibility: source.visibility,
           sampler: { type: source.samplerType },
         });
+      } else {
+        print(`TX5 bind group layout binding=${source.binding} has unknown kind=${source.kind}`);
+        unreachable();
       }
       binding = binding + 1;
     }
@@ -770,7 +765,7 @@ export function createBindGroup(
   resources: BindingResource[],
 ): GPUBindGroup {
   if (spec.entries.length !== resources.length) {
-    print(`createBindGroup expected ${spec.entries.length} resources but received ${resources.length}`);
+    print(`PI9 createBindGroup expected ${spec.entries.length} resources but received ${resources.length}`);
     unreachable();
   }
   const entries: GPUBindGroupEntry[] = [];
@@ -779,14 +774,34 @@ export function createBindGroup(
     const specEntry: BindGroupLayoutEntrySpec = spec.entries[index];
     const resource: BindingResource = resources[index];
     let actual: string = "none";
-    if (resource.buffer !== null) actual = "buffer";
-    if (resource.textureView !== null) actual = "texture";
-    if (resource.sampler !== null) actual = "sampler";
-    let expected: string = "buffer";
+    let fieldCount: u32 = 0;
+    if (resource.buffer !== null) {
+      actual = "buffer";
+      fieldCount = fieldCount + 1;
+    }
+    if (resource.textureView !== null) {
+      actual = "texture";
+      fieldCount = fieldCount + 1;
+    }
+    if (resource.sampler !== null) {
+      actual = "sampler";
+      fieldCount = fieldCount + 1;
+    }
+    if (fieldCount !== 1) {
+      print(`TX4 createBindGroup binding=${specEntry.binding} resourceFields=${fieldCount}`);
+      unreachable();
+    }
+    let expected: string = "unknown";
+    if (specEntry.kind === "uniform" || specEntry.kind === "read-only-storage"
+      || specEntry.kind === "storage") expected = "buffer";
     if (specEntry.kind === "texture" || specEntry.kind === "storageTexture") expected = "texture";
     if (specEntry.kind === "sampler" || specEntry.kind === "comparisonSampler") expected = "sampler";
+    if (expected === "unknown") {
+      print(`TX5 createBindGroup binding=${specEntry.binding} has unknown kind=${specEntry.kind}`);
+      unreachable();
+    }
     if (actual !== expected) {
-      print(`TX8 createBindGroup binding=${specEntry.binding} expected=${expected} actual=${actual}`);
+      print(`TX4 createBindGroup binding=${specEntry.binding} expected=${expected} actual=${actual}`);
       unreachable();
     }
     entries.push({

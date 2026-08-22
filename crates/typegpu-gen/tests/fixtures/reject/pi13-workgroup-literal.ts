@@ -1,4 +1,4 @@
-// expected-rule: PI13
+// expected-rule: PI1
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
 @CStruct class Item { value: f32; constructor(value: f32) { this.value = value; } }
 class Layout { input!: Storage<Item>; }

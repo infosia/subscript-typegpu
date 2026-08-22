@@ -1101,7 +1101,7 @@ pub(crate) fn reject_vertex_storage_writes(
             continue;
         }
         return Err(diagnostic(
-            "RN16",
+            "RN9",
             format!("vertex kernel writes storage binding `{name}`"),
             vertex.pos.clone(),
         ));

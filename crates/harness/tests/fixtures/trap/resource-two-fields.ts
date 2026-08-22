@@ -1,14 +1,9 @@
-// program: resource-kind-mismatch
-// purpose: prove createBindGroup rejects a resource whose kind differs from the layout entry
+// program: resource-two-fields
+// purpose: prove a BindingResource with two populated fields traps
 // exercises: TX4
 // questions: none
 
-import {
-  BindGroupLayoutSpec,
-  COMPUTE_VISIBILITY,
-  bufferResource,
-  createBindGroup,
-} from "./typegpu";
+import { BindGroupLayoutSpec, COMPUTE_VISIBILITY, createBindGroup } from "./typegpu";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
 
 export async function main(): Promise<void> {
@@ -17,21 +12,25 @@ export async function main(): Promise<void> {
   const device: GPUDevice | null = await adapter.requestDevice();
   if (device === null) { print("FAIL device"); return; }
   const spec: BindGroupLayoutSpec = { entries: [{
-    binding: 3,
+    binding: 1,
     visibility: COMPUTE_VISIBILITY,
-    kind: "texture",
-    minBindingSize: 0,
-    sampleType: "float",
+    kind: "uniform",
+    minBindingSize: 4,
   }] };
   using layout = device.createBindGroupLayout({ entries: [{
-    binding: 3,
+    binding: 1,
     visibility: COMPUTE_VISIBILITY,
-    texture: { sampleType: "float", viewDimension: "2d", multisampled: false },
+    buffer: { type: "uniform", minBindingSize: 4 },
   }] });
   using buffer = device.createBuffer({
     label: "tx4-buffer",
     size: 4,
-    usage: GPUBufferUsage.STORAGE,
+    usage: GPUBufferUsage.UNIFORM,
   });
-  using group = createBindGroup(device, layout, spec, [bufferResource(buffer)]);
+  using sampler = device.createSampler({ minFilter: "nearest", magFilter: "nearest" });
+  using group = createBindGroup(device, layout, spec, [{
+    buffer,
+    textureView: null,
+    sampler,
+  }]);
 }

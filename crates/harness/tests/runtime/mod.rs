@@ -38,17 +38,16 @@ export function main(): void {
   print(`atomic=${unsigned.add(5)},${unsigned.sub(3)},${unsigned.min(20)},${unsigned.max(20)},${unsigned.exchange(7)},${unsigned.load()}`);
   signed.store(4);
   print(`signed=${signed.add(-6)},${signed.min(-3)},${signed.max(9)},${signed.exchange(1)},${signed.load()}`);
-  const textureValues: f32[] = [1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0];
   const texturePixels: Vec4f[] = [new Vec4f(1.0, 0.0, 0.0, 1.0), new Vec4f(0.0, 1.0, 0.0, 1.0)];
-  const texture = new Texture2d<f32>(textureValues, texturePixels, 2, 1);
-  const sampler = new Sampler();
+  const texture = new Texture2d<f32>(texturePixels, 2, 1);
+  const sampler = new Sampler("nearest");
   const dimensions = texture.dimensions();
   const loaded = texture.load(new Vec2i(1, 0), 0);
   const sampled = texture.sample(sampler, new Vec2f(0.25, 0.5));
   const storagePixels: Vec4f[] = [new Vec4f(0.0, 0.0, 0.0, 0.0)];
   const storage = new StorageTexture2d<Rgba8unorm>(storagePixels, 1, 1);
   storage.store(new Vec2i(0, 0), sampled);
-  print(`texture=${dimensions.x},${dimensions.y},${loaded.x},${loaded.y},${sampled.x},${sampled.y},${storagePixels[0].x}`);
+  print(`texture=${dimensions.x},${dimensions.y},${loaded.x},${loaded.y},${sampled.x},${sampled.y},${storagePixels[0].x},nearest=${sampler.isNearest()}`);
 }
 "#).expect("write runtime test program");
     let result = std::process::Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-harness"))
@@ -66,7 +65,7 @@ export function main(): void {
     std::fs::remove_dir(&directory).expect("remove runtime test directory");
     assert_eq!(
         output,
-        b"runtime=7,3,2,9,2\nvariables=7,8,9,10,2\natomic=10,15,12,12,20,7\nsigned=4,-2,-3,9,1\ntexture=2,1,0,1,1,0,1\n"
+        b"runtime=7,3,2,9,2\nvariables=7,8,9,10,2\natomic=10,15,12,12,20,7\nsigned=4,-2,-3,9,1\ntexture=2,1,0,1,1,0,1,nearest=true\n"
     );
 }
 
