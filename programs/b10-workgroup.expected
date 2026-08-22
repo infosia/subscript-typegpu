@@ -1,0 +1,8 @@
+pipeline:created
+WorkCounter_SIZE=4
+workgroup_WORKGROUP_X=4
+workgroup_WORKGROUP_Y=1
+workgroup_WORKGROUP_Z=1
+workgroup_WGSL_LINES=25
+dispatch:submitted
+PASS

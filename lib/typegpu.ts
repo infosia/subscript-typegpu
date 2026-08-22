@@ -213,6 +213,85 @@ export class MutStorage<T> {
   }
 }
 
+export class PrivateVar<T> {
+  private value: T;
+
+  constructor(value: T) {
+    this.value = value;
+  }
+
+  get(): T {
+    return this.value;
+  }
+
+  set(value: T): void {
+    this.value = value;
+  }
+}
+
+export class WorkgroupVar<T> {
+  private values: T[];
+
+  constructor() {
+    this.values = [];
+  }
+
+  get(): T {
+    return this.values[0];
+  }
+
+  set(value: T): void {
+    if (this.values.length === 0) {
+      this.values.push(value);
+    } else {
+      this.values[0] = value;
+    }
+  }
+}
+
+export class WorkgroupArray<T> {
+  [index: u32]: T;
+  private values: T[];
+  private count: u32;
+
+  constructor(count: u32) {
+    this.values = [];
+    this.count = count;
+  }
+
+  get(index: u32): T {
+    return this.values[index as i32];
+  }
+
+  set(index: u32, value: T): void {
+    if (index === (this.values.length as u32)) {
+      this.values.push(value);
+    } else {
+      this.values[index as i32] = value;
+    }
+  }
+
+  length(): u32 {
+    return this.count;
+  }
+}
+
+export function privateVar<T>(init: T): PrivateVar<T> {
+  return new PrivateVar<T>(init);
+}
+
+export function workgroupVar<T>(): WorkgroupVar<T> {
+  return new WorkgroupVar<T>();
+}
+
+export function workgroupArray<T>(n: u32): WorkgroupArray<T> {
+  return new WorkgroupArray<T>(n);
+}
+
+export function workgroupBarrier(): void {}
+
+export function storageBarrier(): void {}
+
 @Descriptor
 export class ComputePipelineSpec {
   workgroupSize!: FixedArray<u32, 3>;

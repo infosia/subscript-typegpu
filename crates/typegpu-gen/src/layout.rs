@@ -86,6 +86,8 @@ pub enum TypeTree {
     Vector(Vector),
     /// A matrix.
     Matrix(Matrix),
+    /// A 32-bit signed or unsigned atomic value.
+    Atomic(Scalar),
     /// A fixed-size array.
     Array(Box<TypeTree>, u32),
     /// A struct.
@@ -198,6 +200,7 @@ fn struct_layout(
 pub fn wgsl_layout(tree: &TypeTree) -> Layout {
     match tree {
         TypeTree::Scalar(scalar) => scalar_layout(*scalar),
+        TypeTree::Atomic(scalar) => scalar_layout(*scalar),
         TypeTree::Vector(vector) => wgsl_vector_layout(vector),
         TypeTree::Matrix(matrix) => {
             let column = wgsl_vector_layout(&Vector {
@@ -232,6 +235,7 @@ pub fn wgsl_layout(tree: &TypeTree) -> Layout {
 pub fn c_layout(tree: &TypeTree) -> Layout {
     match tree {
         TypeTree::Scalar(scalar) => scalar_layout(*scalar),
+        TypeTree::Atomic(scalar) => scalar_layout(*scalar),
         TypeTree::Vector(vector) => c_vector_layout(vector),
         TypeTree::Matrix(matrix) => {
             let column = c_vector_layout(&Vector {

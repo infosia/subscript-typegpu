@@ -79,7 +79,7 @@ fn library_types(tree: &TypeTree, names: &mut std::collections::BTreeSet<&'stati
                 library_types(&member.ty, names);
             }
         }
-        TypeTree::Scalar(_) => {}
+        TypeTree::Scalar(_) | TypeTree::Atomic(_) => {}
     }
 }
 

@@ -18,6 +18,148 @@ fn generate(source: &str) -> subscript_typegpu_gen::Generated {
     })
 }
 
+fn validate(wgsl: &str) {
+    let module = naga::front::wgsl::parse_str(wgsl)
+        .unwrap_or_else(|error| panic!("WGSL parse failed:\n{}", error.emit_to_string(wgsl)));
+    naga::valid::Validator::new(
+        naga::valid::ValidationFlags::all(),
+        naga::valid::Capabilities::empty(),
+    )
+    .validate(&module)
+    .unwrap_or_else(|error| panic!("WGSL validation failed: {error:?}\n{wgsl}"));
+}
+
+#[test]
+fn switch_grouping_module_constants_and_nested_control_flow_emit() {
+    let generated = generate(
+        r#"
+import { Mat2x2f, Vec2u, v2f, v2u } from "./typegpu-types";
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
+@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+class Layout { output!: MutStorage<Item>; }
+const LIMIT: u32 = 4;
+const OFFSET: Vec2u = v2u(1, 2);
+const BASIS: Mat2x2f = new Mat2x2f(v2f(1.0, 0.0), v2f(0.0, 1.0));
+function depth(res: Layout, ctx: ComputeInvocation): void {
+  let i: u32 = 0;
+  let result: u32 = 0;
+  while (i < LIMIT) {
+    switch (i) {
+      case 0:
+      case 1: result += OFFSET.x; break;
+      case 2: { i += 1; continue; }
+      default: return;
+    }
+    { result += 1; }
+    i += 1;
+  }
+  res.output[0] = new Item(result + (BASIS.mulVec(v2f(1.0, 0.0)).x as u32));
+}
+export const depthPipeline: ComputePipelineSpec = computePipeline<Layout>(depth, { workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    for expected in [
+        "const LIMIT: u32 = 4u;",
+        "const OFFSET: vec2<u32> = vec2<u32>(1u, 2u);",
+        "const BASIS: mat2x2<f32> = mat2x2<f32>(vec2<f32>(1.0f, 0.0f), vec2<f32>(0.0f, 1.0f));",
+        "case 0u, 1u: {",
+        "case 2u: {",
+        "continue;",
+        "default: {",
+        "{\n      result += 1u;\n    }",
+    ] {
+        assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
+    }
+    validate(wgsl);
+}
+
+#[test]
+fn private_workgroup_variables_barriers_and_builtins_emit() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, PrivateVar, privateVar, WorkgroupArray, workgroupArray, workgroupBarrier, WorkgroupVar, workgroupVar } from "./typegpu";
+@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+@CStruct class Initial { value: u32; constructor(value: u32) { this.value = value; } }
+class Layout { output!: MutStorage<Item>; }
+const BASE: u32 = 3;
+const privateState: PrivateVar<Initial> = privateVar<Initial>(new Initial(BASE));
+const sharedValue: WorkgroupVar<u32> = workgroupVar<u32>();
+const sharedValues: WorkgroupArray<u32> = workgroupArray<u32>(4);
+function variables(res: Layout, ctx: ComputeInvocation): void {
+  privateState.set(new Initial(privateState.get().value + ctx.workgroupId.x + ctx.numWorkgroups.x));
+  sharedValue.set(ctx.localId.x);
+  sharedValues[ctx.localIndex] = sharedValue.get();
+  workgroupBarrier();
+  res.output[ctx.globalId.x] = new Item(sharedValues[(sharedValues.length() - 1)] + privateState.get().value);
+}
+export const variablePipeline: ComputePipelineSpec = computePipeline<Layout>(variables, { workgroupSize: [4, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    for expected in [
+        "var<private> privateState: Initial = Initial(BASE);",
+        "var<workgroup> sharedValue: u32;",
+        "var<workgroup> sharedValues: array<u32, 4>;",
+        "@builtin(global_invocation_id) globalId: vec3<u32>",
+        "@builtin(local_invocation_id) localId: vec3<u32>",
+        "@builtin(workgroup_id) workgroupId: vec3<u32>",
+        "@builtin(num_workgroups) numWorkgroups: vec3<u32>",
+        "@builtin(local_invocation_index) localIndex: u32",
+        "workgroupBarrier();",
+    ] {
+        assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
+    }
+    validate(wgsl);
+}
+
+#[test]
+fn atomic_storage_and_workgroup_places_emit_every_operation() {
+    let generated = generate(
+        r#"
+import { AtomicI32, AtomicU32 } from "./typegpu-types";
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, storageBarrier, WorkgroupVar, workgroupVar } from "./typegpu";
+@CStruct class Counters { unsigned: AtomicU32; signed: AtomicI32; constructor(unsigned: AtomicU32, signed: AtomicI32) { this.unsigned = unsigned; this.signed = signed; } }
+class Layout { counters!: MutStorage<Counters>; }
+const localCounter: WorkgroupVar<AtomicU32> = workgroupVar<AtomicU32>();
+function atomics(res: Layout, ctx: ComputeInvocation): void {
+  const a: u32 = res.counters[0].unsigned.load();
+  res.counters[0].unsigned.store(a);
+  res.counters[0].unsigned.add(1);
+  res.counters[0].unsigned.sub(1);
+  res.counters[0].unsigned.min(2);
+  res.counters[0].unsigned.max(3);
+  res.counters[0].unsigned.exchange(4);
+  localCounter.get().store(ctx.localIndex);
+  localCounter.get().add(1);
+  res.counters[0].signed.add(-1);
+  storageBarrier();
+}
+export const atomicPipeline: ComputePipelineSpec = computePipeline<Layout>(atomics, { workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    for expected in [
+        "unsigned: atomic<u32>",
+        "signed: atomic<i32>",
+        "var<workgroup> localCounter: atomic<u32>;",
+        "atomicLoad(&counters[0u].unsigned)",
+        "atomicStore(&counters[0u].unsigned, a)",
+        "atomicAdd(&counters[0u].unsigned, 1u)",
+        "atomicSub(&counters[0u].unsigned, 1u)",
+        "atomicMin(&counters[0u].unsigned, 2u)",
+        "atomicMax(&counters[0u].unsigned, 3u)",
+        "atomicExchange(&counters[0u].unsigned, 4u)",
+        "atomicStore(&localCounter, localIndex)",
+        "atomicAdd(&localCounter, 1u)",
+        "atomicAdd(&counters[0u].signed, -1i)",
+        "storageBarrier();",
+    ] {
+        assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
+    }
+    validate(wgsl);
+}
+
 #[test]
 fn conditional_uses_control_flow_and_all_identifiers_use_one_mangler() {
     let generated = generate(

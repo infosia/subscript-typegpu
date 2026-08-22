@@ -15,13 +15,29 @@ fn wrappers_execute_their_real_host_bodies() {
     std::fs::create_dir_all(&directory).expect("create runtime test directory");
     let program = directory.join("runtime-host.ts");
     std::fs::write(&program, r#"
-import { MutStorage, Storage, Uniform } from "./typegpu";
+import { MutStorage, PrivateVar, Storage, Uniform, WorkgroupArray, WorkgroupVar, privateVar, storageBarrier, workgroupArray, workgroupBarrier, workgroupVar } from "./typegpu";
+import { AtomicI32, AtomicU32 } from "./typegpu-types";
 export function main(): void {
   const uniform: Uniform<u32> = new Uniform<u32>(7);
   const storage: Storage<u32> = new Storage<u32>([2, 3]);
   const mutable: MutStorage<u32> = new MutStorage<u32>([4, 5]);
   mutable.set(1, 9);
   print(`runtime=${uniform.get()},${storage.get(1)},${storage.length()},${mutable.get(1)},${mutable.length()}`);
+  const privateValue: PrivateVar<u32> = privateVar<u32>(6);
+  privateValue.set(privateValue.get() + 1);
+  const workgroupValue: WorkgroupVar<u32> = workgroupVar<u32>();
+  workgroupValue.set(8);
+  const workgroupValues: WorkgroupArray<u32> = workgroupArray<u32>(2);
+  workgroupValues.set(0, 9);
+  workgroupValues.set(1, 10);
+  workgroupBarrier();
+  storageBarrier();
+  print(`variables=${privateValue.get()},${workgroupValue.get()},${workgroupValues.get(0)},${workgroupValues.get(1)},${workgroupValues.length()}`);
+  const unsigned: AtomicU32 = new AtomicU32(10);
+  const signed: AtomicI32 = new AtomicI32(-2);
+  print(`atomic=${unsigned.add(5)},${unsigned.sub(3)},${unsigned.min(20)},${unsigned.max(20)},${unsigned.exchange(7)},${unsigned.load()}`);
+  signed.store(4);
+  print(`signed=${signed.add(-6)},${signed.min(-3)},${signed.max(9)},${signed.exchange(1)},${signed.load()}`);
 }
 "#).expect("write runtime test program");
     let result = std::process::Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-harness"))
@@ -37,7 +53,10 @@ export function main(): void {
     let output = result.stdout;
     std::fs::remove_file(&program).expect("remove runtime test program");
     std::fs::remove_dir(&directory).expect("remove runtime test directory");
-    assert_eq!(output, b"runtime=7,3,2,9,2\n");
+    assert_eq!(
+        output,
+        b"runtime=7,3,2,9,2\nvariables=7,8,9,10,2\natomic=10,15,12,12,20,7\nsigned=4,-2,-3,9,1\n"
+    );
 }
 
 #[test]

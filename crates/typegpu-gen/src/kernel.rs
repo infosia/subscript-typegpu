@@ -63,6 +63,336 @@ fn class_name<'a>(module: &'a Module, ty: &Type) -> Option<&'a str> {
     module.classes.get(id.0).map(|class| class.name.as_str())
 }
 
+fn statement_pos(statement: &Stmt) -> Option<&Pos> {
+    match statement {
+        Stmt::Let { pos, .. }
+        | Stmt::Return { pos, .. }
+        | Stmt::If { pos, .. }
+        | Stmt::While { pos, .. }
+        | Stmt::For { pos, .. }
+        | Stmt::ForOf { pos, .. }
+        | Stmt::Switch { pos, .. }
+        | Stmt::Break(pos)
+        | Stmt::Continue(pos) => Some(pos),
+        Stmt::Expr(expr) => Some(&expr.pos),
+        Stmt::Block(body) => body.first().and_then(statement_pos),
+        _ => None,
+    }
+}
+
+fn function_declared_in(module: &Module, name: &str, file: &str) -> bool {
+    function(module, name).is_some_and(|function| {
+        function.pos.file == file
+            || function.params.iter().any(|param| param.pos.file == file)
+            || function
+                .body
+                .first()
+                .and_then(statement_pos)
+                .is_some_and(|pos| pos.file == file)
+    })
+}
+
+fn atomic_scalar(module: &Module, ty: &Type) -> Option<&'static str> {
+    let Type::Class(id) = ty else { return None };
+    let class = &module.classes[id.0];
+    if class.pos.file != "typegpu-types.ts" {
+        return None;
+    }
+    match class.name.as_str() {
+        "AtomicU32" => Some("u32"),
+        "AtomicI32" => Some("i32"),
+        _ => None,
+    }
+}
+
+fn type_contains_atomic(module: &Module, ty: &Type) -> bool {
+    fn visit(module: &Module, ty: &Type, seen: &mut BTreeSet<usize>) -> bool {
+        if atomic_scalar(module, ty).is_some() {
+            return true;
+        }
+        match ty {
+            Type::FixedArray(item, _) | Type::Array(item) => visit(module, item, seen),
+            Type::Class(id) if seen.insert(id.0) => module.classes[id.0]
+                .fields
+                .iter()
+                .any(|field| visit(module, &field.ty, seen)),
+            _ => false,
+        }
+    }
+    visit(module, ty, &mut BTreeSet::new())
+}
+
+#[derive(Debug, Clone)]
+enum KernelGlobalKind {
+    Constant(Expr),
+    Private(Expr),
+    WorkgroupVar,
+    WorkgroupArray(u32),
+}
+
+#[derive(Debug, Clone)]
+struct KernelGlobal {
+    name: String,
+    ty: Type,
+    kind: KernelGlobalKind,
+    pos: Pos,
+}
+
+fn global_names_expr(expr: &Expr, out: &mut BTreeSet<String>) {
+    if let ExprKind::Global(name) = &expr.kind {
+        out.insert(name.clone());
+    }
+    match &expr.kind {
+        ExprKind::Unary { operand, .. }
+        | ExprKind::Cast(operand)
+        | ExprKind::Length(operand)
+        | ExprKind::Field { obj: operand, .. }
+        | ExprKind::JsonResultValue(operand) => global_names_expr(operand, out),
+        ExprKind::Binary { left, right, .. }
+        | ExprKind::Assign {
+            target: left,
+            value: right,
+            ..
+        } => {
+            global_names_expr(left, out);
+            global_names_expr(right, out);
+        }
+        ExprKind::Call { callee, args } => {
+            if let Callee::Value(value) = callee {
+                global_names_expr(value, out);
+            }
+            if let Callee::Method { recv, .. } = callee {
+                global_names_expr(recv, out);
+            }
+            for arg in args {
+                global_names_expr(arg, out);
+            }
+        }
+        ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => {
+            for arg in args {
+                global_names_expr(arg, out);
+            }
+        }
+        ExprKind::DescriptorLit { fields, .. } => {
+            for value in fields.iter().flatten() {
+                global_names_expr(value, out);
+            }
+        }
+        ExprKind::Index { obj, index, .. } => {
+            global_names_expr(obj, out);
+            global_names_expr(index, out);
+        }
+        ExprKind::Cond { cond, then, els } => {
+            global_names_expr(cond, out);
+            global_names_expr(then, out);
+            global_names_expr(els, out);
+        }
+        _ => {}
+    }
+}
+
+fn global_names_stmt(statement: &Stmt, out: &mut BTreeSet<String>) {
+    match statement {
+        Stmt::Let { init, .. } | Stmt::Expr(init) => global_names_expr(init, out),
+        Stmt::Return {
+            value: Some(value), ..
+        } => global_names_expr(value, out),
+        Stmt::Return { value: None, .. } => {}
+        Stmt::If {
+            cond, then, els, ..
+        } => {
+            global_names_expr(cond, out);
+            for statement in then {
+                global_names_stmt(statement, out);
+            }
+            if let Some(els) = els {
+                for statement in els {
+                    global_names_stmt(statement, out);
+                }
+            }
+        }
+        Stmt::While { cond, body, .. } => {
+            global_names_expr(cond, out);
+            for statement in body {
+                global_names_stmt(statement, out);
+            }
+        }
+        Stmt::For {
+            init,
+            cond,
+            step,
+            body,
+            ..
+        } => {
+            if let Some(init) = init {
+                global_names_stmt(init, out);
+            }
+            if let Some(cond) = cond {
+                global_names_expr(cond, out);
+            }
+            if let Some(step) = step {
+                global_names_expr(step, out);
+            }
+            for statement in body {
+                global_names_stmt(statement, out);
+            }
+        }
+        Stmt::ForOf { subject, body, .. } => {
+            global_names_expr(subject, out);
+            for statement in body {
+                global_names_stmt(statement, out);
+            }
+        }
+        Stmt::Switch { disc, cases, .. } => {
+            global_names_expr(disc, out);
+            for case in cases {
+                if let Some(test) = &case.test {
+                    global_names_expr(test, out);
+                }
+                for statement in &case.body {
+                    global_names_stmt(statement, out);
+                }
+            }
+        }
+        Stmt::Block(body) => {
+            for statement in body {
+                global_names_stmt(statement, out);
+            }
+        }
+        Stmt::Break(_) | Stmt::Continue(_) => {}
+        _ => {}
+    }
+}
+
+fn wrapper_item_type(module: &Module, ty: &Type, field_name: &str) -> Option<Type> {
+    let Type::Class(id) = ty else { return None };
+    let field = module.classes[id.0]
+        .fields
+        .iter()
+        .find(|field| field.name == field_name)?;
+    match &field.ty {
+        Type::Array(item) => Some((**item).clone()),
+        item => Some(item.clone()),
+    }
+}
+
+fn kernel_globals(module: &Module, kernel: &Function) -> Result<Vec<KernelGlobal>, Diagnostic> {
+    let helpers = dependencies(module, kernel)?;
+    let mut reached = BTreeSet::new();
+    for statement in &kernel.body {
+        global_names_stmt(statement, &mut reached);
+    }
+    for helper in helpers {
+        if let Some(function) = function(module, &helper) {
+            for statement in &function.body {
+                global_names_stmt(statement, &mut reached);
+            }
+        }
+    }
+    loop {
+        let before = reached.len();
+        for global in &module.globals {
+            if reached.contains(&global.name) {
+                global_names_expr(&global.init, &mut reached);
+            }
+        }
+        if reached.len() == before {
+            break;
+        }
+    }
+
+    let mut globals = Vec::new();
+    for global in module
+        .globals
+        .iter()
+        .filter(|global| reached.contains(&global.name))
+    {
+        if global.mutable {
+            return Err(diagnostic(
+                "K19",
+                format!("mutable global `{}` is read by a kernel", global.name),
+                global.pos.clone(),
+            ));
+        }
+        let wrapper = match &global.init.kind {
+            ExprKind::Call {
+                callee: Callee::Func(name),
+                args,
+            } if function_declared_in(module, name, "typegpu.ts") => Some((
+                name.split('<').next().unwrap_or(name.as_str()),
+                args.as_slice(),
+            )),
+            _ => None,
+        };
+        let (ty, kind) = match wrapper {
+            Some(("privateVar", [init])) => (
+                wrapper_item_type(module, &global.ty, "value").ok_or_else(|| {
+                    diagnostic(
+                        "K20",
+                        "private variable has no value type",
+                        global.pos.clone(),
+                    )
+                })?,
+                KernelGlobalKind::Private(init.clone()),
+            ),
+            Some(("workgroupVar", [])) => (
+                wrapper_item_type(module, &global.ty, "values").ok_or_else(|| {
+                    diagnostic(
+                        "K20",
+                        "workgroup variable has no value type",
+                        global.pos.clone(),
+                    )
+                })?,
+                KernelGlobalKind::WorkgroupVar,
+            ),
+            Some(("workgroupArray", [length])) => {
+                let ExprKind::Int(length) = length.kind else {
+                    return Err(diagnostic(
+                        "K20",
+                        "workgroup array length is not an integer literal",
+                        length.pos.clone(),
+                    ));
+                };
+                let length = u32::try_from(length).map_err(|_| {
+                    diagnostic(
+                        "K20",
+                        "workgroup array length is outside u32",
+                        global.pos.clone(),
+                    )
+                })?;
+                (
+                    wrapper_item_type(module, &global.ty, "values").ok_or_else(|| {
+                        diagnostic(
+                            "K20",
+                            "workgroup array has no item type",
+                            global.pos.clone(),
+                        )
+                    })?,
+                    KernelGlobalKind::WorkgroupArray(length),
+                )
+            }
+            Some(("workgroupVar", _)) | Some(("workgroupArray", _)) => {
+                return Err(diagnostic(
+                    "K20",
+                    format!("workgroup variable `{}` has an initializer", global.name),
+                    global.pos.clone(),
+                ));
+            }
+            _ => (
+                global.ty.clone(),
+                KernelGlobalKind::Constant(global.init.clone()),
+            ),
+        };
+        globals.push(KernelGlobal {
+            name: global.name.clone(),
+            ty,
+            kind,
+            pos: global.pos.clone(),
+        });
+    }
+    Ok(globals)
+}
+
 fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String, Diagnostic> {
     Ok(match ty {
         Type::F32 => "f32".to_owned(),
@@ -110,6 +440,8 @@ fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String, Diagnostic
                 "Mat2x2f" => "mat2x2<f32>".to_owned(),
                 "Mat3x3f" => "mat3x3<f32>".to_owned(),
                 "Mat4x4f" => "mat4x4<f32>".to_owned(),
+                "AtomicU32" => "atomic<u32>".to_owned(),
+                "AtomicI32" => "atomic<i32>".to_owned(),
                 name => mapping::ident(name),
             }
         }
@@ -206,10 +538,224 @@ fn f32_literal(value: f64) -> String {
     format!("{text}f")
 }
 
+fn constant_type(module: &Module, ty: &Type) -> bool {
+    match ty {
+        Type::F32 | Type::I32 | Type::U32 | Type::Bool => true,
+        Type::Class(id) => {
+            let class = &module.classes[id.0];
+            class.pos.file == "typegpu-types.ts"
+                && (class.name.starts_with("Vec") || class.name.starts_with("Mat"))
+                && atomic_scalar(module, ty).is_none()
+        }
+        _ => false,
+    }
+}
+
+fn constant_snippet(
+    module: &Module,
+    globals: &BTreeMap<String, KernelGlobal>,
+    expr: &Expr,
+) -> Result<Snippet, Diagnostic> {
+    match &expr.kind {
+        ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) => {
+            Ok(Snippet::atom(literal(expr)?))
+        }
+        ExprKind::Global(name) => {
+            let global = globals.get(name).ok_or_else(|| {
+                generator_diagnostic(
+                    format!("global `{name}` disappeared from typed HIR"),
+                    expr.pos.clone(),
+                )
+            })?;
+            if !matches!(global.kind, KernelGlobalKind::Constant(_)) {
+                return Err(diagnostic(
+                    "K19",
+                    format!("module constant initializer reads variable `{name}`"),
+                    expr.pos.clone(),
+                ));
+            }
+            Ok(Snippet::atom(mapping::ident(name)))
+        }
+        ExprKind::Unary { op, operand } => {
+            let operand = constant_snippet(module, globals, operand)?;
+            let spelling = match op {
+                UnOp::Neg => "-",
+                UnOp::Not => "!",
+                UnOp::BitNot => "~",
+                _ => {
+                    return Err(diagnostic(
+                        "K19",
+                        "module constant uses an unsupported unary operator",
+                        expr.pos.clone(),
+                    ))
+                }
+            };
+            let text = if operand.precedence <= 9 {
+                format!("({})", operand.text)
+            } else {
+                operand.text
+            };
+            Ok(Snippet::new(format!("{spelling}{text}"), 9))
+        }
+        ExprKind::Binary { op, left, right } => {
+            let spelling = binop(*op).ok_or_else(|| {
+                diagnostic(
+                    "K19",
+                    "module constant uses an unsupported binary operator",
+                    expr.pos.clone(),
+                )
+            })?;
+            let left = constant_snippet(module, globals, left)?;
+            let right = constant_snippet(module, globals, right)?;
+            let precedence = binary_precedence(*op);
+            Ok(Snippet::new(
+                format!(
+                    "{} {spelling} {}",
+                    binary_operand(&left, precedence, false),
+                    binary_operand(&right, precedence, true)
+                ),
+                precedence,
+            ))
+        }
+        ExprKind::Call {
+            callee: Callee::Func(name),
+            args,
+        } if function_declared_in(module, name, "typegpu-types.ts") => {
+            let Some(factory) = mapping::free_function(name) else {
+                return Err(diagnostic(
+                    "K19",
+                    format!("module constant calls unsupported function `{name}`"),
+                    expr.pos.clone(),
+                ));
+            };
+            if !factory.starts_with("vec") {
+                return Err(diagnostic(
+                    "K19",
+                    format!("module constant calls non-vector factory `{name}`"),
+                    expr.pos.clone(),
+                ));
+            }
+            let args = args
+                .iter()
+                .map(|arg| constant_snippet(module, globals, arg).map(|value| value.text))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Snippet::atom(format!("{factory}({})", args.join(", "))))
+        }
+        ExprKind::New { class, args } => {
+            let class = &module.classes[class.0];
+            if !class.is_value {
+                return Err(diagnostic(
+                    "K19",
+                    format!(
+                        "module constant constructs reference class `{}`",
+                        class.name
+                    ),
+                    expr.pos.clone(),
+                ));
+            }
+            let constructor = wgsl_type(module, &expr.ty, &expr.pos)?;
+            let args = args
+                .iter()
+                .map(|arg| constant_snippet(module, globals, arg).map(|value| value.text))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Snippet::atom(format!("{constructor}({})", args.join(", "))))
+        }
+        _ => Err(diagnostic(
+            "K19",
+            "module constant initializer is not evaluable",
+            expr.pos.clone(),
+        )),
+    }
+}
+
+fn emit_kernel_globals(module: &Module, globals: &[KernelGlobal]) -> Result<String, Diagnostic> {
+    let by_name = globals
+        .iter()
+        .map(|global| (global.name.clone(), global.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let mut out = String::new();
+    for global in globals {
+        let name = mapping::ident(&global.name);
+        match &global.kind {
+            KernelGlobalKind::Constant(init) => {
+                if !constant_type(module, &global.ty) {
+                    return Err(diagnostic(
+                        "K19",
+                        format!(
+                            "module constant `{}` has unsupported type `{}`",
+                            global.name,
+                            type_name(module, &global.ty)
+                        ),
+                        global.pos.clone(),
+                    ));
+                }
+                let ty = wgsl_type(module, &global.ty, &global.pos)?;
+                let value = constant_snippet(module, &by_name, init)?;
+                out.push_str(&format!("const {name}: {ty} = {};\n", value.text));
+            }
+            KernelGlobalKind::Private(init) => {
+                if type_contains_atomic(module, &global.ty) {
+                    return Err(diagnostic(
+                        "K21",
+                        "an atomic value cannot use private address space",
+                        global.pos.clone(),
+                    ));
+                }
+                let ty = wgsl_type(module, &global.ty, &global.pos)?;
+                let value = constant_snippet(module, &by_name, init)?;
+                out.push_str(&format!("var<private> {name}: {ty} = {};\n", value.text));
+            }
+            KernelGlobalKind::WorkgroupVar => {
+                let ty = wgsl_type(module, &global.ty, &global.pos)?;
+                out.push_str(&format!("var<workgroup> {name}: {ty};\n"));
+            }
+            KernelGlobalKind::WorkgroupArray(length) => {
+                if *length == 0 {
+                    return Err(diagnostic(
+                        "K20",
+                        "workgroup array length is zero",
+                        global.pos.clone(),
+                    ));
+                }
+                let ty = wgsl_type(module, &global.ty, &global.pos)?;
+                out.push_str(&format!("var<workgroup> {name}: array<{ty}, {length}>;\n"));
+            }
+        }
+    }
+    if !out.is_empty() {
+        out.push('\n');
+    }
+    Ok(out)
+}
+
+fn barrier_call<'a>(module: &Module, expr: &'a Expr) -> Option<&'a str> {
+    let ExprKind::Call {
+        callee: Callee::Func(name),
+        args,
+    } = &expr.kind
+    else {
+        return None;
+    };
+    if !args.is_empty() || !function_declared_in(module, name, "typegpu.ts") {
+        return None;
+    }
+    let base = name.split('<').next().unwrap_or(name);
+    matches!(base, "workgroupBarrier" | "storageBarrier").then_some(base)
+}
+
+fn case_terminates(body: &[Stmt]) -> bool {
+    match body.last() {
+        Some(Stmt::Break(_) | Stmt::Continue(_) | Stmt::Return { .. }) => true,
+        Some(Stmt::Block(body)) => case_terminates(body),
+        _ => false,
+    }
+}
+
 #[derive(Debug, Clone)]
 struct BindingRef {
     name: String,
     kind: BindingKind,
+    item_ty: Type,
 }
 
 struct Emitter<'a> {
@@ -219,8 +765,12 @@ struct Emitter<'a> {
     invocation_param: String,
     invocation_kind: InvocationKind,
     bindings: BTreeMap<(usize, String), BindingRef>,
+    globals: BTreeMap<String, KernelGlobal>,
     used_builtins: BTreeSet<String>,
     conditional_index: u32,
+    loop_depth: u32,
+    switch_depth: u32,
+    in_helper: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -238,6 +788,7 @@ impl<'a> Emitter<'a> {
         kernel: &Function,
         invocation_index: usize,
         invocation_kind: InvocationKind,
+        globals: &[KernelGlobal],
     ) -> Self {
         let mut layout_params = BTreeMap::new();
         let mut bindings = BTreeMap::new();
@@ -249,6 +800,7 @@ impl<'a> Emitter<'a> {
                     BindingRef {
                         name: mapping::ident(&binding.name),
                         kind: binding.kind,
+                        item_ty: binding.item_ty.clone(),
                     },
                 );
             }
@@ -260,12 +812,19 @@ impl<'a> Emitter<'a> {
             invocation_param: kernel.params[invocation_index].name.clone(),
             invocation_kind,
             bindings,
+            globals: globals
+                .iter()
+                .map(|global| (global.name.clone(), global.clone()))
+                .collect(),
             used_builtins: BTreeSet::new(),
             conditional_index: 0,
+            loop_depth: 0,
+            switch_depth: 0,
+            in_helper: false,
         }
     }
 
-    fn helper(module: &'a Module) -> Self {
+    fn helper(module: &'a Module, globals: &[KernelGlobal]) -> Self {
         Self {
             module,
             layout_params: BTreeMap::new(),
@@ -273,8 +832,15 @@ impl<'a> Emitter<'a> {
             invocation_param: String::new(),
             invocation_kind: InvocationKind::None,
             bindings: BTreeMap::new(),
+            globals: globals
+                .iter()
+                .map(|global| (global.name.clone(), global.clone()))
+                .collect(),
             used_builtins: BTreeSet::new(),
             conditional_index: 0,
+            loop_depth: 0,
+            switch_depth: 0,
+            in_helper: true,
         }
     }
 
@@ -287,6 +853,72 @@ impl<'a> Emitter<'a> {
         };
         let group = *self.layout_params.get(param)?;
         self.bindings.get(&(group, name.clone())).cloned()
+    }
+
+    fn binding_root(&self, expr: &Expr) -> Option<BindingRef> {
+        if let Some(binding) = self.binding_ref(expr) {
+            return Some(binding);
+        }
+        match &expr.kind {
+            ExprKind::Field { obj, .. } | ExprKind::Index { obj, .. } => self.binding_root(obj),
+            ExprKind::Call {
+                callee: Callee::Method { recv, .. },
+                ..
+            } => self.binding_root(recv),
+            _ => None,
+        }
+    }
+
+    fn global_root(&self, expr: &Expr) -> Option<KernelGlobal> {
+        match &expr.kind {
+            ExprKind::Global(name) => self.globals.get(name).cloned(),
+            ExprKind::Field { obj, .. } | ExprKind::Index { obj, .. } => self.global_root(obj),
+            ExprKind::Call {
+                callee: Callee::Method { recv, name },
+                args,
+            } if name == "get" && args.is_empty() => self.global_root(recv),
+            _ => None,
+        }
+    }
+
+    fn wrapper_ref(&self, expr: &Expr) -> Option<KernelGlobal> {
+        let ExprKind::Global(name) = &expr.kind else {
+            return None;
+        };
+        self.globals.get(name).and_then(|global| {
+            (!matches!(global.kind, KernelGlobalKind::Constant(_))).then(|| global.clone())
+        })
+    }
+
+    fn atomic_place(&mut self, recv: &Expr) -> Result<String, Diagnostic> {
+        let storage = self
+            .binding_root(recv)
+            .is_some_and(|binding| binding.kind == BindingKind::MutStorage);
+        let workgroup = self.global_root(recv).is_some_and(|global| {
+            matches!(
+                global.kind,
+                KernelGlobalKind::WorkgroupVar | KernelGlobalKind::WorkgroupArray(_)
+            )
+        });
+        if !storage && !workgroup {
+            return Err(diagnostic(
+                "K21",
+                "atomic method receiver is not a storage or workgroup place",
+                recv.pos.clone(),
+            ));
+        }
+        if let ExprKind::Call {
+            callee: Callee::Method { recv, name },
+            args,
+        } = &recv.kind
+        {
+            if name == "get" && args.is_empty() {
+                if let Some(global) = self.wrapper_ref(recv) {
+                    return Ok(mapping::ident(&global.name));
+                }
+            }
+        }
+        Ok(self.snippet(recv)?.text)
     }
 
     fn snippets(&mut self, args: &[Expr]) -> Result<(Vec<String>, Prelude), Diagnostic> {
@@ -368,6 +1000,15 @@ impl<'a> Emitter<'a> {
                 expr.pos.clone(),
             )),
             ExprKind::Local(name) => Ok(Snippet::atom(mapping::ident(name))),
+            ExprKind::Global(name) => {
+                if !self.globals.contains_key(name) {
+                    return Err(generator_diagnostic(
+                        format!("global `{name}` has no kernel declaration"),
+                        expr.pos.clone(),
+                    ));
+                }
+                Ok(Snippet::atom(mapping::ident(name)))
+            }
             ExprKind::Unary { op, operand } => {
                 let value = self.snippet(operand)?;
                 let spelling = match op {
@@ -418,6 +1059,15 @@ impl<'a> Emitter<'a> {
                 })
             }
             ExprKind::Assign { op, target, value } => {
+                if (self.binding_root(target).is_some() || self.global_root(target).is_some())
+                    && type_contains_atomic(self.module, &target.ty)
+                {
+                    return Err(diagnostic(
+                        "K21",
+                        "an atomic value or schema cannot be written as a whole",
+                        target.pos.clone(),
+                    ));
+                }
                 let target = self.snippet(target)?;
                 let value = self.snippet(value)?;
                 let spelling = match op {
@@ -488,8 +1138,13 @@ impl<'a> Emitter<'a> {
                     ));
                 }
                 let object = self.snippet(obj)?;
+                let object_text = if object.precedence < 10 {
+                    format!("({})", object.text)
+                } else {
+                    object.text
+                };
                 Ok(Snippet {
-                    text: format!("{}.{}", object.text, mapping::ident(name)),
+                    text: format!("{object_text}.{}", mapping::ident(name)),
                     precedence: 10,
                     prelude: object.prelude,
                 })
@@ -497,10 +1152,15 @@ impl<'a> Emitter<'a> {
             ExprKind::Index { obj, index, .. } => {
                 let object = self.snippet(obj)?;
                 let index = self.snippet(index)?;
+                let object_text = if object.precedence < 10 {
+                    format!("({})", object.text)
+                } else {
+                    object.text.clone()
+                };
                 let mut prelude = object.prelude;
                 prelude.extend(index.prelude);
                 Ok(Snippet {
-                    text: format!("{}[{}]", object.text, index.text),
+                    text: format!("{object_text}[{}]", index.text),
                     precedence: 10,
                     prelude,
                 })
@@ -630,6 +1290,16 @@ impl<'a> Emitter<'a> {
                 })
             }
             Callee::Func(name) => {
+                let base = name.split('<').next().unwrap_or(name);
+                if matches!(base, "workgroupBarrier" | "storageBarrier")
+                    && function_declared_in(self.module, name, "typegpu.ts")
+                {
+                    return Err(diagnostic(
+                        "K22",
+                        format!("`{base}` is legal only as a statement"),
+                        expr.pos.clone(),
+                    ));
+                }
                 let is_library = function(self.module, name)
                     .is_some_and(|function| function.pos.file == "typegpu-types.ts");
                 let mapped = is_library.then(|| mapping::free_function(name)).flatten();
@@ -647,6 +1317,81 @@ impl<'a> Emitter<'a> {
                 })
             }
             Callee::Method { recv, name } => {
+                if atomic_scalar(self.module, &recv.ty).is_some() {
+                    let place = self.atomic_place(recv)?;
+                    let (args, prelude) = self.snippets(args)?;
+                    let text = match (name.as_str(), args.as_slice()) {
+                        ("load", []) => format!("atomicLoad(&{place})"),
+                        ("store", [value]) => format!("atomicStore(&{place}, {value})"),
+                        ("add", [value]) => format!("atomicAdd(&{place}, {value})"),
+                        ("sub", [value]) => format!("atomicSub(&{place}, {value})"),
+                        ("min", [value]) => format!("atomicMin(&{place}, {value})"),
+                        ("max", [value]) => format!("atomicMax(&{place}, {value})"),
+                        ("exchange", [value]) => {
+                            format!("atomicExchange(&{place}, {value})")
+                        }
+                        _ => {
+                            return Err(diagnostic(
+                                "K21",
+                                format!("atomic method `{name}` has an invalid arity"),
+                                expr.pos.clone(),
+                            ))
+                        }
+                    };
+                    return Ok(Snippet {
+                        text,
+                        precedence: 10,
+                        prelude,
+                    });
+                }
+                if let Some(global) = self.wrapper_ref(recv) {
+                    let (args, prelude) = self.snippets(args)?;
+                    let target = mapping::ident(&global.name);
+                    let text = match (&global.kind, name.as_str(), args.as_slice()) {
+                        (KernelGlobalKind::Private(_), "get", [])
+                        | (KernelGlobalKind::WorkgroupVar, "get", []) => target,
+                        (KernelGlobalKind::Private(_), "set", [value])
+                        | (KernelGlobalKind::WorkgroupVar, "set", [value]) => {
+                            if type_contains_atomic(self.module, &global.ty) {
+                                return Err(diagnostic(
+                                    "K21",
+                                    "an atomic value or schema cannot be written as a whole",
+                                    expr.pos.clone(),
+                                ));
+                            }
+                            format!("{target} = {value}")
+                        }
+                        (KernelGlobalKind::WorkgroupArray(_), "get", [index]) => {
+                            format!("{target}[{index}]")
+                        }
+                        (KernelGlobalKind::WorkgroupArray(_), "set", [index, value]) => {
+                            if type_contains_atomic(self.module, &global.ty) {
+                                return Err(diagnostic(
+                                    "K21",
+                                    "an atomic value or schema cannot be written as a whole",
+                                    expr.pos.clone(),
+                                ));
+                            }
+                            format!("{target}[{index}] = {value}")
+                        }
+                        (KernelGlobalKind::WorkgroupArray(length), "length", []) => {
+                            format!("{length}u")
+                        }
+                        _ => {
+                            return Err(diagnostic(
+                                "K20",
+                                format!("variable method `{name}` is not valid for this wrapper"),
+                                expr.pos.clone(),
+                            ))
+                        }
+                    };
+                    let precedence = if name == "set" { 0 } else { 10 };
+                    return Ok(Snippet {
+                        text,
+                        precedence,
+                        prelude,
+                    });
+                }
                 if let Some(binding) = self.binding_ref(recv) {
                     let (args, prelude) = self.snippets(args)?;
                     let text = match (binding.kind, name.as_str(), args.as_slice()) {
@@ -655,6 +1400,13 @@ impl<'a> Emitter<'a> {
                             format!("{}[{index}]", binding.name)
                         }
                         (BindingKind::MutStorage, "set", [index, value]) => {
+                            if type_contains_atomic(self.module, &binding.item_ty) {
+                                return Err(diagnostic(
+                                    "K21",
+                                    "an atomic schema cannot be written as a whole",
+                                    expr.pos.clone(),
+                                ));
+                            }
                             format!("{}[{index}] = {value}", binding.name)
                         }
                         (BindingKind::Storage | BindingKind::MutStorage, "length", []) => {
@@ -801,6 +1553,14 @@ impl<'a> Emitter<'a> {
                         pos.clone(),
                     ));
                 }
+                if atomic_scalar(self.module, ty).is_none() && type_contains_atomic(self.module, ty)
+                {
+                    return Err(diagnostic(
+                        "K21",
+                        "a schema that contains an atomic cannot be copied to a local",
+                        pos.clone(),
+                    ));
+                }
                 let value = self.snippet(init)?;
                 let _ = wgsl_type(self.module, ty, pos)?;
                 Self::emit_prelude(out, indent, value.prelude);
@@ -818,6 +1578,17 @@ impl<'a> Emitter<'a> {
                 );
             }
             Stmt::Expr(expr) => {
+                if let Some(barrier) = barrier_call(self.module, expr) {
+                    if self.in_helper {
+                        return Err(diagnostic(
+                            "K22",
+                            format!("`{barrier}` is not legal in a helper"),
+                            expr.pos.clone(),
+                        ));
+                    }
+                    Self::line(out, indent, &format!("{barrier}();"));
+                    return Ok(());
+                }
                 let value = self.snippet(expr)?;
                 Self::emit_prelude(out, indent, value.prelude);
                 Self::line(out, indent, &format!("{};", value.text));
@@ -848,7 +1619,10 @@ impl<'a> Emitter<'a> {
                 let cond = self.snippet(cond)?;
                 if cond.prelude.is_empty() {
                     Self::line(out, indent, &format!("while ({}) {{", cond.text));
-                    self.statements(body, indent + 1, out)?;
+                    self.loop_depth += 1;
+                    let result = self.statements(body, indent + 1, out);
+                    self.loop_depth -= 1;
+                    result?;
                     Self::line(out, indent, "}");
                 } else {
                     Self::line(out, indent, "loop {");
@@ -856,7 +1630,10 @@ impl<'a> Emitter<'a> {
                     Self::line(out, indent + 1, &format!("if (!({})) {{", cond.text));
                     Self::line(out, indent + 2, "break;");
                     Self::line(out, indent + 1, "}");
-                    self.statements(body, indent + 1, out)?;
+                    self.loop_depth += 1;
+                    let result = self.statements(body, indent + 1, out);
+                    self.loop_depth -= 1;
+                    result?;
                     Self::line(out, indent, "}");
                 }
             }
@@ -928,7 +1705,10 @@ impl<'a> Emitter<'a> {
                         Self::line(out, indent + 3, "break;");
                         Self::line(out, indent + 2, "}");
                     }
-                    self.statements(body, indent + 2, out)?;
+                    self.loop_depth += 1;
+                    let result = self.statements(body, indent + 2, out);
+                    self.loop_depth -= 1;
+                    result?;
                     if let Some(step) = step {
                         Self::emit_prelude(out, indent + 2, step.prelude);
                         Self::line(out, indent + 2, &format!("{};", step.text));
@@ -940,7 +1720,10 @@ impl<'a> Emitter<'a> {
                     let cond = cond.map_or_else(String::new, |value| value.text);
                     let step = step.map_or_else(String::new, |value| value.text);
                     Self::line(out, indent, &format!("for ({init}; {cond}; {step}) {{"));
-                    self.statements(body, indent + 1, out)?;
+                    self.loop_depth += 1;
+                    let result = self.statements(body, indent + 1, out);
+                    self.loop_depth -= 1;
+                    result?;
                     Self::line(out, indent, "}");
                 }
             }
@@ -975,7 +1758,72 @@ impl<'a> Emitter<'a> {
                     &format!("let {} = {}[{index}];", mapping::ident(name), subject.text),
                 );
                 let _ = wgsl_type(self.module, ty, pos)?;
-                self.statements(body, indent + 1, out)?;
+                self.loop_depth += 1;
+                let result = self.statements(body, indent + 1, out);
+                self.loop_depth -= 1;
+                result?;
+                Self::line(out, indent, "}");
+            }
+            Stmt::Switch { disc, cases, pos } => {
+                if !matches!(disc.ty, Type::I32 | Type::U32) {
+                    return Err(diagnostic(
+                        "K18",
+                        "switch discriminant is not i32 or u32",
+                        disc.pos.clone(),
+                    ));
+                }
+                if !cases.iter().any(|case| case.test.is_none()) {
+                    return Err(diagnostic("K18", "switch has no default case", pos.clone()));
+                }
+                let disc = self.snippet(disc)?;
+                Self::emit_prelude(out, indent, disc.prelude);
+                Self::line(out, indent, &format!("switch ({}) {{", disc.text));
+                let mut labels = Vec::new();
+                for case in cases {
+                    let label = if let Some(test) = &case.test {
+                        let value = self.snippet(test)?;
+                        if !value.prelude.is_empty() {
+                            return Err(diagnostic(
+                                "K18",
+                                "switch case label is not constant",
+                                test.pos.clone(),
+                            ));
+                        }
+                        value.text
+                    } else {
+                        "default".to_owned()
+                    };
+                    labels.push(label);
+                    if case.body.is_empty() && case.test.is_some() {
+                        continue;
+                    }
+                    if !case.body.is_empty() && !case_terminates(&case.body) {
+                        return Err(diagnostic(
+                            "K18",
+                            "switch case falls through with statements",
+                            case.pos.clone(),
+                        ));
+                    }
+                    let selector = if labels.len() == 1 && labels[0] == "default" {
+                        "default".to_owned()
+                    } else {
+                        format!("case {}", labels.join(", "))
+                    };
+                    Self::line(out, indent + 1, &format!("{selector}: {{"));
+                    self.switch_depth += 1;
+                    let result = self.statements(&case.body, indent + 2, out);
+                    self.switch_depth -= 1;
+                    result?;
+                    Self::line(out, indent + 1, "}");
+                    labels.clear();
+                }
+                if !labels.is_empty() {
+                    return Err(diagnostic(
+                        "K18",
+                        "an empty switch case has no following body",
+                        pos.clone(),
+                    ));
+                }
                 Self::line(out, indent, "}");
             }
             Stmt::Block(body) => {
@@ -983,19 +1831,28 @@ impl<'a> Emitter<'a> {
                 self.statements(body, indent + 1, out)?;
                 Self::line(out, indent, "}");
             }
-            Stmt::ForOf { pos, .. } | Stmt::Switch { pos, .. } => {
+            Stmt::ForOf { pos, .. } => {
                 return Err(diagnostic(
                     "K7",
                     "statement is outside the current kernel subset",
                     pos.clone(),
                 ));
             }
-            Stmt::Break(pos) | Stmt::Continue(pos) => {
-                return Err(diagnostic(
-                    "K7",
-                    "break and continue are outside K7",
-                    pos.clone(),
-                ));
+            Stmt::Break(pos) => {
+                if self.loop_depth == 0 && self.switch_depth == 0 {
+                    return Err(diagnostic(
+                        "K18",
+                        "break is outside a loop or switch",
+                        pos.clone(),
+                    ));
+                }
+                Self::line(out, indent, "break;");
+            }
+            Stmt::Continue(pos) => {
+                if self.loop_depth == 0 {
+                    return Err(diagnostic("K18", "continue is outside a loop", pos.clone()));
+                }
+                Self::line(out, indent, "continue;");
             }
             _ => {
                 return Err(diagnostic(
@@ -1317,6 +2174,9 @@ pub(crate) fn referenced_schema_names(
             collect_schema_type(module, &binding.item_ty, &mut seen, &mut out);
         }
     }
+    for global in kernel_globals(module, kernel)? {
+        collect_schema_type(module, &global.ty, &mut seen, &mut out);
+    }
     for name in dependencies(module, kernel)? {
         let helper = function(module, &name).ok_or_else(|| {
             generator_diagnostic("a helper disappeared from typed HIR", pipeline.pos.clone())
@@ -1359,7 +2219,10 @@ fn dependencies(module: &Module, kernel: &Function) -> Result<Vec<String>, Diagn
         let Some(function) = function(module, name) else {
             return Ok(());
         };
-        if function.pos.file == "typegpu-types.ts" {
+        if matches!(
+            function.pos.file.as_str(),
+            "typegpu-types.ts" | "typegpu.ts"
+        ) {
             return Ok(());
         }
         stack.push(name.to_owned());
@@ -1417,12 +2280,14 @@ pub(crate) fn emit(
     let kernel = function(module, &pipeline.entry)
         .ok_or_else(|| generator_diagnostic("kernel disappeared from HIR", pipeline.pos.clone()))?;
     let helpers = dependencies(module, kernel)?;
+    let globals = kernel_globals(module, kernel)?;
     let mut emitter = Emitter::entry(
         module,
         &pipeline.layouts,
         kernel,
         pipeline.layouts.len(),
         InvocationKind::Compute,
+        &globals,
     );
     let mut helper_text = String::new();
     for name in helpers {
@@ -1472,7 +2337,7 @@ pub(crate) fn emit(
             mapping::ident(name.split('<').next().unwrap_or(&name)),
             params.join(", ")
         ));
-        let mut helper_emitter = Emitter::helper(module);
+        let mut helper_emitter = Emitter::helper(module, &globals);
         helper_emitter.statements(&helper.body, 1, &mut helper_text)?;
         helper_text.push_str("}\n\n");
     }
@@ -1496,6 +2361,7 @@ pub(crate) fn emit(
         out.push_str(structure);
         out.push('\n');
     }
+    out.push_str(&emit_kernel_globals(module, &globals)?);
     for layout in &pipeline.layouts {
         for binding in &layout.bindings {
             let item = wgsl_type(module, &binding.item_ty, &binding.pos)?;
@@ -1732,7 +2598,7 @@ fn render_helpers(
             mapping::ident(name.split('<').next().unwrap_or(&name)),
             params.join(", ")
         ));
-        let mut emitter = Emitter::helper(module);
+        let mut emitter = Emitter::helper(module, &[]);
         emitter.statements(&helper.body, 1, &mut out)?;
         out.push_str("}\n\n");
     }
@@ -1760,6 +2626,7 @@ pub(crate) fn emit_render(
         vertex,
         layout_count + vertex_value_count,
         InvocationKind::Vertex,
+        &[],
     );
     let mut fragment_emitter = Emitter::entry(
         module,
@@ -1767,6 +2634,7 @@ pub(crate) fn emit_render(
         fragment,
         layout_count + 1,
         InvocationKind::Fragment,
+        &[],
     );
     let mut vertex_body = String::new();
     vertex_emitter.statements(&vertex.body, 1, &mut vertex_body)?;

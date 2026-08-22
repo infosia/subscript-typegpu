@@ -1,0 +1,8 @@
+pipeline:created
+DepthItem_SIZE=4
+kernelDepth_WORKGROUP_X=8
+kernelDepth_WORKGROUP_Y=1
+kernelDepth_WORKGROUP_Z=1
+kernelDepth_WGSL_LINES=38
+dispatch:submitted
+PASS

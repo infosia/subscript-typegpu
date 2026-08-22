@@ -25,7 +25,7 @@ fn every_library_method_has_the_sc6_body() {
             .iter()
             .filter(|class| class.pos.file == "typegpu-types.ts")
             .count(),
-        15
+        17
     );
     for class in module
         .classes
@@ -51,6 +51,9 @@ fn every_library_method_has_the_sc6_body() {
                 ["add", "dot", "mul", "scale", "sub"].as_slice()
             }
             "Vec2h" | "Vec3h" | "Vec4h" => [].as_slice(),
+            "AtomicU32" | "AtomicI32" => {
+                ["add", "exchange", "load", "max", "min", "store", "sub"].as_slice()
+            }
             "Mat2x2f" | "Mat3x3f" | "Mat4x4f" => ["mul", "mulVec", "transpose"].as_slice(),
             name => panic!("unexpected library class {name}"),
         };

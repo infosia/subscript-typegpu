@@ -69,6 +69,12 @@ pub(crate) fn library_tree(module: &Module, class: &ClassDef) -> Option<TypeTree
             c_alignment: class_alignment(class),
         }));
     }
+    if class.name == "AtomicU32" {
+        return Some(TypeTree::Atomic(Scalar::U32));
+    }
+    if class.name == "AtomicI32" {
+        return Some(TypeTree::Atomic(Scalar::I32));
+    }
     let (columns, rows) = matrix_shape(&class.name)?;
     let column_name = format!("Vec{rows}f");
     let column_alignment = module
@@ -236,7 +242,9 @@ fn uniform_violation(tree: &TypeTree, path: &str) -> Option<String> {
             }
             None
         }
-        TypeTree::Scalar(_) | TypeTree::Vector(_) | TypeTree::Matrix(_) => None,
+        TypeTree::Scalar(_) | TypeTree::Vector(_) | TypeTree::Matrix(_) | TypeTree::Atomic(_) => {
+            None
+        }
     }
 }
 

@@ -294,6 +294,108 @@ export class Vec4h {
   }
 }
 
+@CStruct({ align: 4 })
+export class AtomicU32 {
+  value: u32;
+
+  constructor(value: u32) {
+    this.value = value;
+  }
+
+  load(): u32 {
+    return this.value;
+  }
+
+  store(value: u32): void {
+    this.value = value;
+  }
+
+  add(value: u32): u32 {
+    const old: u32 = this.value;
+    this.value += value;
+    return old;
+  }
+
+  sub(value: u32): u32 {
+    const old: u32 = this.value;
+    this.value -= value;
+    return old;
+  }
+
+  min(value: u32): u32 {
+    const old: u32 = this.value;
+    if (value < this.value) {
+      this.value = value;
+    }
+    return old;
+  }
+
+  max(value: u32): u32 {
+    const old: u32 = this.value;
+    if (value > this.value) {
+      this.value = value;
+    }
+    return old;
+  }
+
+  exchange(value: u32): u32 {
+    const old: u32 = this.value;
+    this.value = value;
+    return old;
+  }
+}
+
+@CStruct({ align: 4 })
+export class AtomicI32 {
+  value: i32;
+
+  constructor(value: i32) {
+    this.value = value;
+  }
+
+  load(): i32 {
+    return this.value;
+  }
+
+  store(value: i32): void {
+    this.value = value;
+  }
+
+  add(value: i32): i32 {
+    const old: i32 = this.value;
+    this.value += value;
+    return old;
+  }
+
+  sub(value: i32): i32 {
+    const old: i32 = this.value;
+    this.value -= value;
+    return old;
+  }
+
+  min(value: i32): i32 {
+    const old: i32 = this.value;
+    if (value < this.value) {
+      this.value = value;
+    }
+    return old;
+  }
+
+  max(value: i32): i32 {
+    const old: i32 = this.value;
+    if (value > this.value) {
+      this.value = value;
+    }
+    return old;
+  }
+
+  exchange(value: i32): i32 {
+    const old: i32 = this.value;
+    this.value = value;
+    return old;
+  }
+}
+
 @CStruct({ align: 8 })
 export class Mat2x2f {
   c0: Vec2f;

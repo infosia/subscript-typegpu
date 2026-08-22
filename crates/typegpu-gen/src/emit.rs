@@ -23,6 +23,7 @@ fn wgsl_type(tree: &TypeTree) -> String {
             format!("vec{}<{}>", vector.lanes, vector.scalar.wgsl())
         }
         TypeTree::Matrix(matrix) => format!("mat{}x{}<f32>", matrix.columns, matrix.rows),
+        TypeTree::Atomic(scalar) => format!("atomic<{}>", scalar.wgsl()),
         TypeTree::Array(element, length) => {
             format!("array<{}, {length}>", wgsl_type(element))
         }
@@ -35,6 +36,7 @@ pub(crate) fn uses_f16(tree: &TypeTree) -> bool {
         TypeTree::Scalar(Scalar::F16) => true,
         TypeTree::Vector(vector) => vector.scalar == Scalar::F16,
         TypeTree::Matrix(_) => false,
+        TypeTree::Atomic(_) => false,
         TypeTree::Array(element, _) => uses_f16(element),
         TypeTree::Struct(structure) => structure.members.iter().any(|member| uses_f16(&member.ty)),
         TypeTree::Scalar(_) => false,
