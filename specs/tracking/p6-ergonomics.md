@@ -41,6 +41,24 @@ included. The P2 review's M6 claim (a uniform struct needs a
 16-byte minimum binding size) is refuted by measurement: LY11
 stands as written, and the layout engine keeps one layout.
 
+## Phase review (2026-08-23)
+
+A fresh reviewer ran the gate (green, 96.58 s, 221 tests) and found
+CRITICAL 1, MAJOR 6, MINOR 13. CRITICAL: `README.md` listed `noop`
+among the accepted backend values; the facade rejects it. MAJOR: the
+coverage close deleted six exports through an undocumented policy
+row (now F22, 163 → 157 recorded); PI8 still denied generated types;
+the sweep accepted `covers-rule` claims for PI2, RN2, and RN8 sites
+the checker makes unreachable; the coverage pass re-ran every
+program and discarded its output; `TimestampPair.resolve` ignored
+its buffer; `a04-errors` printed two backend feature values. The
+reviewer measured the gate's cost structure — 60 dev and 32 ship
+child processes per program-change gate — and proposed counting
+coverage during the differential's own dev runs, which removes 16
+runs and makes the counted run the gated run. Resolutions in the
+specs: F22, PI8 Rev 2, PI11, BF3 wording, EG4 Rev 1, EG7 wording.
+The code findings go to the coding agent.
+
 ## Exit criteria
 
 | # | Criterion | Evidence |

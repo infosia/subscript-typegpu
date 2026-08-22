@@ -22,8 +22,9 @@ this block. The byte path is subscript R34 at `bb9dadc`
   `elementIndex + bytes.length / elementSize <= count`, and traps
   with all three numbers otherwise. `writeOne(queue, elementIndex,
   bytes)` requires `bytes.length == elementSize`.
-- **BF3 — Reading is explicit.** `read(readback: Buffer<T>,
-  elementIndex: u32, elementCount: u32): u8[]` copies from a
+- **BF3 — Reading is explicit.** `readBuffer<T>(readback: Buffer<T>,
+  elementIndex: u32, elementCount: u32): u8[]` (a free function)
+  copies from a
   mapped `MAP_READ` buffer the caller mapped (`mapAsync` stays in
   the program, because it awaits). The caller decodes with
   `Context.fromBytes<FixedArray<Particle, 64>>(bytes, 0)`.

@@ -87,6 +87,19 @@ letter with this block, so the pipelines area uses `PL`.
   carries a reason. An unknown, dead, duplicate, unpoliced, or
   invalid row fails generation.
 
+## 7. The policy file (continued)
+
+- **F22 — Export exclusion.** Rev 0, 2026-08-23. A `[[export_exclude]]`
+  row names one facade export and a reason. The generator then
+  emits no Rust export, no header declaration, no mirror
+  declaration, no symbol-table row, and resolves no backend symbol
+  the excluded export alone needed. The API layer must not reference
+  the name (the API join fails otherwise). The row is the only way
+  an export leaves, and the coverage list (EG4) is the only reason:
+  an export no program reaches and no API-layer member calls. The
+  facade's export count at P6: 157, from 163 (six descriptor-less or
+  unused variants).
+
 ## 7a. The mirror's banner
 
 - **F21 — The mirror is bindgen's output, byte for byte.** The

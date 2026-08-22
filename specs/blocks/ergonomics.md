@@ -31,14 +31,18 @@ question (P2 review M6), and the diagnostic sweep.
 
 ## Coverage
 
-- **EG4 — The reached-export list (I12 Rev 1).** The harness binary,
-  in `dev` mode, counts the facade exports each program calls
-  (through the symbol table: every `subscript_typegpu_*` export is
-  wrapped by a counting thunk in the dev JIT symbol table). A test
-  writes `specs/tracking/coverage.md` with the exports no `a`, `b`,
-  or `x` program reaches. P6 closes the list: every unreached export
-  gains a program or an exclusion row in `policy.toml` with a
-  reason, and the test then fails on any unreached export.
+- **EG4 — The reached-export list (I12 Rev 1).** Rev 1, 2026-08-23.
+  The harness binary's `dev` mode counts the facade exports a
+  program calls through counting thunks in the dev JIT symbol table
+  (ABI-preserving wrappers generated per export), and reports them
+  after the program's output when `--coverage` is set. The
+  differential test runs every `a` and `b` program with `--coverage`
+  on, splits the report off the output, and compares the output
+  bytes with the golden, so the counted run is the gated run. The
+  `x` programs get one extra dev run each. The test writes
+  `specs/tracking/coverage.md` and fails on any unreached export. An
+  export leaves the facade only through an `[[export_exclude]]` row
+  (F22) with a reason.
 
 ## Measurements
 
@@ -60,11 +64,13 @@ question (P2 review M6), and the diagnostic sweep.
 ## Diagnostics
 
 - **EG7 — The sweep.** A test enumerates every `diagnostic(`,
-  `generator_diagnostic(`, and trap site in `crates/typegpu-gen`
-  and `lib/typegpu.ts` and checks that each carries a rule id from
-  `rule-ids.txt` and an owner. A fixture exists for each rule id
-  the sweep finds (the corpus asserts one diagnostic per fixture),
-  so no rule lacks a red.
+  `generator_diagnostic(`, and trap site under `crates/typegpu-gen/src`
+  (recursively) and in `lib/typegpu.ts` and checks that each carries
+  a rule id from `rule-ids.txt` and an owner. A fixture with
+  `expected-rule` exists for each rule id the sweep finds (the
+  corpus asserts one diagnostic per fixture), so no rule lacks a
+  red. A site the checker makes unreachable is deleted, never kept
+  behind a claim.
 - **EG8 — A runtime guard says what it guarded.** Every trap in
   `lib/typegpu.ts` names the rule id, the method, and the values
   that failed, before it traps (BF8 extended to every guard).
