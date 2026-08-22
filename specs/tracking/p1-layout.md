@@ -42,8 +42,8 @@ harness's `c_layout` module proves every schema against
 `value_class_layouts` and a compiled `offsetof` probe (red recorded
 with an unrounded vector size: C 96 against WGSL 112), the class
 scanners are gone and the import-statement stub carries its R35
-kill date, hygiene clean. Measurement: 45 s / 0.2 s / 13 s / 10 s /
-6 (`build-time.md`).
+kill date, hygiene clean, the harness executable 6.42 seconds.
+Measurement: 45 s / 0.2 s / 13 s / 10 s / 6 (`build-time.md`).
 
 ## Slice 2 — the discovery check, `Buffer<T>`, the byte path
 
@@ -53,8 +53,21 @@ import scan are gone), `Buffer<T>` per BF1–BF5, `b05-buffer` (a
 `FixedArray<Particle, 4>` through `bytesOf`, a Noop copy, `fromBytes`,
 `roundtrip:match`, 128 bytes printed by value), `x01`–`x03` on the
 byte path, three BF8 trap fixtures. Planner verification: gate green
-with the backend, 193 tests in six executables, `b05` equal on both
-tiers. Measurement: 45 s / 0.2 s / 28 s / 25 s / 6.
+with the backend, 193 tests in six executables, the harness
+executable 19.32 seconds, `b05` equal on both tiers. Measurement:
+45 s / 0.2 s / 28 s / 25 s / 6.
+
+## Phase review (2026-08-22)
+
+A fresh reviewer found CRITICAL 0, MAJOR 4, MINOR 11. The MAJORs
+were records: the plan's P1 exit criteria had not taken the six
+criteria (a failed edit), `build-time.md` had lost its rows to a
+broken table, the BF8 trap fixtures lacked the backend-pending
+guard, and the slice closes quoted no differential wall time. The
+first, second, and fourth are corrected in this commit. The third
+and the code MINORs (naga offsets over every `b` program, the
+fixture name, the empty position in one SC1 diagnostic, `read` as a
+free function) go to the coding agent with the P2 findings.
 
 ## Exit criteria
 

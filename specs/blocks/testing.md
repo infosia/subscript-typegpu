@@ -13,7 +13,10 @@ principles" govern this block.
   renumbered.
 - **T2 — Determinism.** Programs never print backend-reported
   values. A printed value is a generated constant read by name, a
-  host-computed result, or a plain marker.
+  host-computed result, or a plain marker. A value read back from a
+  buffer is printable only after a host comparison proved it equal
+  to the host's own value (BF6): the print then shows the host
+  value.
 - **T3 — Header.** Each program opens with four comment lines:
   `// program:`, `// purpose:`, `// exercises:`, `// questions:`.
 - **T4 — Live output.** A live program prints one progress line per

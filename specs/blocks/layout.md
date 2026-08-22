@@ -96,10 +96,11 @@ implements. Evidence lands in `specs/tracking/p1-layout.md`.
   depends on `subscript-codegen`, proves the C side for every `b`
   program: (1) `subscript_codegen::value_class_layouts` over the
   checked module equals the engine's C layout for every schema, field
-  by field, size and alignment included; (2) a C probe — the emitted
+  by field, size and alignment included. (2) A C probe — the emitted
   C of the program (`emit_c_without_main`) plus `offsetof`,
   `sizeof`, and `_Alignof` prints for every schema — compiled by the
   host C compiler and run, equals the engine's numbers. A schema the
-  probe cannot name fails with the name. From R34 on, a program also
-  prints the byte length of `Context.bytesOf` over a `FixedArray` of
-  each schema, which proves the stride on both tiers in the golden.
+  probe cannot name fails with the name. (3) From R34 on, one gate
+  program prints the byte length of `Context.bytesOf` over a
+  `FixedArray` of a schema, which proves that stride on both tiers in
+  the golden (`b05-buffer`).

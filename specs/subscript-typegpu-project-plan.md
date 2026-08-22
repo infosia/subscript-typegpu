@@ -190,7 +190,7 @@ crates/facade/             subscript-typegpu-facade: lib + staticlib. Deps: libl
 crates/webgpu-gen/         subscript-typegpu-webgpu-gen: lib + bin. Deps: serde, serde_yaml,
                            toml, weedle2, subscript-bindgen. policy.toml lives here
 crates/typegpu-gen/        subscript-typegpu-gen: lib + bin. Deps: subscript-compiler.
-                           Dev-deps: naga
+                           Dev-deps: naga, serde_json
 crates/harness/            subscript-typegpu-harness: bin + one test target. Deps: the three
                            crates above, subscript-compiler, subscript-codegen
 lib/                       webgpu.ts (generated), wire-enum-aliases.generated.d.ts,
@@ -269,7 +269,8 @@ Crate `subscript-typegpu-gen` exposes `generate(files: &[SourceFile])
 -> Result<Generated, Vec<Diagnostic>>`. `Generated` holds the WGSL
 per pipeline and the support module source. The harness calls it in
 process before the JIT. The CLI (`subscript-typegpu-gen gen
-program.ts -o dir/`) writes the same artifacts for ship-tier users.
+program.ts --lib lib/ -o dir/`) writes the same artifacts for
+ship-tier users.
 
 Layout engine: a pure module over a schema type tree. Two modes,
 WGSL default and uniform. A C-layout function for the same tree,
@@ -377,11 +378,16 @@ layout with the override. The phase's first program proves identity
 for every vector and matrix class, because subscript's own corpus
 entry pins values and not alignment numbers.
 
-Exit: (1) every committed golden vector passes. (2) `b02-layout`
-prints layout constants that match its golden on both tiers. (3)
-naga's offsets equal the engine's for every emitted struct. (4) The
-ship tier's `offsetof` check passes for every schema in the corpus.
-(5) No schema in the corpus holds a padding field.
+Exit: (1) every committed golden vector passes. (2) `b01-layout`
+lays out every vector and matrix class and prints the constants by
+name, equal on both tiers and the golden. (3) naga's offsets equal
+the engine's for every emitted struct. (4) The harness's C probe and
+`value_class_layouts` equal the engine for every schema (LY16 Rev
+1). (5) No schema in the corpus holds a padding field. (6) `Buffer<T>`
+writes a `FixedArray<T, N>` and reads it back through R34, proven by
+a program.
+
+Status: see `specs/tracking/p1-layout.md`.
 
 ### P2 — compute kernels (~20%)
 

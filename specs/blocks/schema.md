@@ -19,10 +19,13 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
   `poison_missing_modules = ["./<stem>.typegpu"]` (R35, at subscript
   `bb9dadc`). The discovery HIR carries the classes, the functions,
   the globals, and one `PoisonedImport` record with the imported
-  names. The generator reads schemas, pipelines, and the imported
-  names from it, generates, and lets the harness check the complete
-  set. The generator never lowers or lays out a discovery HIR. No
-  stub and no text scan exist. An imported name that no schema or
+  names. The generator reads the class declarations, the pipeline
+  declarations, and the imported names from it, computes layouts
+  from its own type tree, generates, and lets the harness check the
+  complete set. The generator never lowers a discovery HIR and never
+  calls subscript's layout on it. No stub module exists. The one
+  text access left reads a source line to name the construct in a
+  relabelled checker diagnostic. An imported name that no schema or
   pipeline produces is an SC3 diagnostic when its class has an
   illegal field, and an SC1 diagnostic ("not a schema") otherwise.
 - **SC2 — Declaration order is layout order.** The generator never
@@ -89,7 +92,9 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
 - **SC11 — Layout constants.** For schema `X` the generator emits
   `X_SIZE`, `X_ALIGN`, and `X_OFFSET_<field>` as `u32` module
   constants in the support module, plus `X_STRIDE` for the array
-  stride. A nested path joins with an underscore. A program prints
+  stride and `X_STRIDE_<member>` for each array-typed member. A
+  nested path joins with an underscore. A field name that contains
+  an underscore is rejected, so names stay unique. A program prints
   these by name (testing.md T2), never a literal.
 - **SC12 — The WGSL struct.** The generator emits one WGSL `struct`
   per schema, fields in order, types mapped per LY12, with no
