@@ -1,6 +1,7 @@
 # P1 — schemas and layout
 
-Status: **in progress**. Opened 2026-08-22. Plan §8 P1. Contracts:
+Status: **COMPLETE 2026-08-22.** Opened 2026-08-22. Closed at
+`0e0156c`. Plan §8 P1. Contracts:
 `specs/blocks/schema.md` (SC), `specs/blocks/layout.md` (LY).
 
 ## Slice 1 — the layout engine, the type library, the first program

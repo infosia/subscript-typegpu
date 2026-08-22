@@ -1,6 +1,7 @@
 # P2 — compute kernels
 
-Status: **in progress**. Opened 2026-08-22. Plan §8 P2. Contracts:
+Status: **COMPLETE 2026-08-22.** Opened 2026-08-22. Closed at
+`0e0156c`. Plan §8 P2. Contracts:
 `specs/blocks/kernel.md` (K), `specs/blocks/pipeline.md` (PI).
 
 ## Slice 1 — the RC-2 probe, the wrappers, the emitter, `b02-vecadd`
@@ -64,7 +65,8 @@ seconds, `x01`–`x03` `PASS` on both tiers. Phase-close run by
 the planner outside the sandbox (2026-08-22, Metal, the same
 library, committed tree `b7e2533`, `x01`–`x03` on the R34 byte
 path): `live::every_x_program_passes_on_a_real_adapter ... ok`,
-6.70 seconds.
+6.70 seconds. Close run at `0e0156c` with `x04-live-control-flow`
+added: ok, 8.55 seconds.
 Measurement: 44 s / 0.2 s / 25 s / 22 s / 6.
 
 Noted for a later round: the generated Rust of the backend request
@@ -110,7 +112,7 @@ harness 16 in 19.17 seconds plus the ignored live test, webgpu-gen
 | # | Criterion | Evidence |
 |---|---|---|
 | 1 | `b02-vecadd`, `b03-saxpy-uniform`, `b04-particles` gate-green on both tiers with WGSL goldens | Slice 2 close: all three equal, goldens naga-valid |
-| 2 | `x01`–`x03` print `PASS` on a real adapter | Metal, `b7e2533`: ok, 6.70 s (and an earlier run at 9.71 s) |
+| 2 | `x01`–`x04` print `PASS` on a real adapter | Metal, `0e0156c`: ok, 8.55 s (earlier runs 6.70 s and 9.71 s) |
 | 3 | Every rejection rule has a red fixture | Phase close: 44 fixtures, one diagnostic each, every author diagnostic site covered |
 | 4 | Every generator diagnostic names its rule id and its owner | Slice 1: asserted per fixture |
 | 5 | Build-time budgets hold | 44 s / 0.2 s / 25 s / 22 s / 6 at the slice 2 close |
