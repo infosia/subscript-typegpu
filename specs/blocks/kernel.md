@@ -2,7 +2,7 @@
 
 P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
 2026-08-22. Rev 2 (K18–K24), 2026-08-23. Rev 3 (K18, K19, K22),
-2026-08-23. Plan §3 D2, D3, D7, D9 and §4
+2026-08-23. Rev 4 (K14 shadowing), 2026-08-23. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -107,7 +107,13 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `_ENTRY` constant. The list of reserved words and builtins is
   committed in `mapping.rs`, and a test compares it with naga's
   lists. A mangled name that collides with an author identifier gets
-  a further `_`. Parentheses appear where precedence needs them,
+  a further `_`. Rev 4, 2026-08-23: the emitter fixes the
+  module-scope name set before it emits a body — struct names,
+  binding names, module constants, private and workgroup variables,
+  helpers, the entry — and a kernel local, a `for` variable, or a
+  block-scoped local whose emitted name is in that set gets a `_`
+  suffix, repeated until the name is free, on its declaration and
+  every reference. A binding read never resolves to a local. Parentheses appear where precedence needs them,
   and the need is judged on the emitted WGSL operator, not on the
   subscript expression kind: a K10 method that lowers to an
   operator, a `Math.fround` that lowers to its argument, and a

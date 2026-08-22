@@ -38,7 +38,7 @@ this block. Kernels are `kernel.md`. The runtime classes live in
 
 ## Binding wrappers
 
-- **PI5 — Three wrappers in P2.** `Uniform<T>`: `get(): T`. WGSL
+- **PI5 — The buffer wrappers.** (P5 adds the texture wrappers, TX1.) `Uniform<T>`: `get(): T`. WGSL
   `var<uniform> name: T`. `Storage<T>`: `[index: u32]: T` readonly
   through `get(i)`, `length(): u32`. WGSL `var<storage, read> name:
   array<T>`. `MutStorage<T>`: `[index: u32]: T` through `get(i)` and
@@ -47,7 +47,8 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   `i32`, `u32`. The wrappers have real bodies over a `T[]` so a
   kernel runs on the host (P7).
 - **PI6 — Binding access emits the variable.** `res.params.get()` →
-  `params` (a copy into a `let`). `res.particles[i]` → `particles[i]`.
+  `params` (a copy into the local the author declared, `var` for a
+  value class per K8). `res.particles[i]` → `particles[i]`.
   `res.particles[i] = v` → `particles[i] = v;`.
   `res.particles.length()` → `arrayLength(&particles)`. `res` itself
   never appears in WGSL. A layout class passed anywhere but the

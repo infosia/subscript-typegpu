@@ -1,30 +1,34 @@
 # Block: texture (TX-rules)
 
-P5 contract. Rev 0, 2026-08-23. Plan §8 P5 governs this block.
+P5 contract. Rev 0, 2026-08-23. Rev 1 (TX1, TX2, TX3, TX8),
+2026-08-23. Plan §8 P5 governs this block.
 Kernels are `kernel.md`, pipelines `pipeline.md`, render `render.md`.
 
 ## Binding wrappers
 
-- **TX1 — Three more wrappers.** `Texture2d<T>` (`T` is `f32`,
-  `i32`, or `u32`, the sample type) emits `var name: texture_2d<T>`.
-  `Sampler` emits `var name: sampler`, `ComparisonSampler` emits
-  `var name: sampler_comparison`. `StorageTexture2d<F>` emits
-  `var name: texture_storage_2d<F, write>` where `F` is a library
-  format marker class (`Rgba8unorm`, `Rgba8uint`, `Rgba16float`,
-  `R32float`, `Rgba32float`) and the access is `write` in P5. A
-  layout class field of any of these kinds is a binding like a
-  buffer wrapper (PI3, PI5). The wrappers have real host bodies over
-  a `T[]` image of known width and height, so a kernel runs on the
-  host.
-- **TX2 — Groups.** `computePipeline2` through `computePipeline4`
-  and `renderPipelineL` carry up to four layout classes. Group index
-  is parameter order, dense from 0.
+- **TX1 — The texture wrappers.** Rev 1. `Texture2d<f32>` emits
+  `var name: texture_2d<f32>`. `Sampler` emits `var name: sampler`.
+  `StorageTexture2d<F>` emits `var name: texture_storage_2d<F,
+  write>` where `F` is a library format marker class with float
+  channels (`Rgba8unorm`, `Rgba16float`, `R32float`, `Rgba32float`)
+  and the access is `write`. `Texture2d<i32>`, `Texture2d<u32>`,
+  an integer format, and a comparison sampler are diagnostics in
+  this revision: each needs a typed `Vec4i`/`Vec4u` operation set
+  that a later revision adds. A layout class field of any of these
+  kinds is a binding like a buffer wrapper (PI3, PI5). The wrappers
+  have real host bodies over a `Vec4f[]` image of known width and
+  height, so a kernel runs on the host. An operation the generator
+  rejects has a host body that traps with its rule id (RC-9).
+- **TX2 — Groups.** Rev 1. `computePipeline2` through
+  `computePipeline4` carry up to four layout classes. `renderPipelineL`
+  carries one. Group index is parameter order. An empty layout class
+  is a diagnostic.
 
 ## Kernel operations
 
 - **TX3 — The texture calls.** Methods on the wrappers map to WGSL:
   `tex.dimensions(): Vec2u` → `textureDimensions(tex)`,
-  `tex.load(coords: Vec2i, level: u32): Vec4<T>` → `textureLoad(tex,
+  `tex.load(coords: Vec2i, level: u32): Vec4f` → `textureLoad(tex,
   coords, level)`, `tex.sampleLevel(sampler, uv: Vec2f, level: f32):
   Vec4f` → `textureSampleLevel(tex, s, uv, level)`, `tex.sample(sampler,
   uv: Vec2f): Vec4f` → `textureSample(tex, s, uv)`,
@@ -65,7 +69,9 @@ Kernels are `kernel.md`, pipelines `pipeline.md`, render `render.md`.
 
 ## Rejections
 
-- **TX8 — The P5 set.** `sample` in a compute kernel, `store` on a
-  sampled texture, a format marker outside TX1, a `Texture2d<T>`
-  with `T` outside the set, a group gap, a resource kind mismatch
-  (a trap). Each with a fixture.
+- **TX8 — The P5 set.** Rev 1. `sample` in a compute kernel (TX3),
+  `store` on a sampled texture (TX3), a format marker outside TX1
+  (TX1), a `Texture2d<T>` with `T` outside the set (TX1), an empty
+  layout class (TX2), a resource kind mismatch (TX4, a trap). Each
+  with a fixture. A diagnostic cites the rule in parentheses, never
+  TX8.
