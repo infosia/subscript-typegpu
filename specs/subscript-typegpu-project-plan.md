@@ -450,9 +450,11 @@ red fixture. (4) Budgets hold.
 Buffer range writes and field patches in elements, guarded dispatch
 (`dispatchThreads`), timestamp queries opt-in, the diagnostics sweep.
 
-Exit: every generated guard prints its rule, its wrapper, and the
-values that failed before it traps. A search over the emitter finds no
-author defect that reports as a generator defect.
+Exit: (1) EG1 typed resources used by one `b` program. (2) EG4's
+list is closed. (3) EG5's Dawn run is recorded with its decision.
+(4) EG7's sweep finds no diagnostic without a rule id, an owner, and
+a fixture. (5) `README.md` and the tutorial exist with their quote
+gate. (6) Budgets hold.
 
 ### P7 — the CPU lane (~5%, optional, owner decides at P6 close)
 
