@@ -62,7 +62,11 @@ fn base_name(name: &str) -> &str {
     name.split('<').next().unwrap_or(name)
 }
 
-fn render_shape(name: &str) -> Option<(usize, usize, Option<usize>)> {
+fn render_shape(module: &Module, name: &str) -> Option<(usize, usize, Option<usize>)> {
+    let declaration = pipeline::function(module, name)?;
+    if declaration.params.first()?.pos.file != "typegpu.ts" {
+        return None;
+    }
     Some(match base_name(name) {
         "renderPipeline" => (0, 0, None),
         "renderPipelineL" => (1, 0, None),
@@ -177,6 +181,18 @@ fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varyin
     let mut location = 0;
     let mut fields = Vec::new();
     for field in &class.fields {
+        if !varying_type(module, &field.ty) {
+            return Err(diagnostic(
+                "RN7",
+                format!(
+                    "varying field `{}.{}` has unsupported type `{}`",
+                    class.name,
+                    field.name,
+                    pipeline::type_name(module, &field.ty)
+                ),
+                field.pos.clone(),
+            ));
+        }
         let builtin_position = field.name == "position";
         let field_location = (!builtin_position).then_some(location);
         if !builtin_position {
@@ -193,6 +209,33 @@ fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varyin
         });
     }
     Ok((class.name.clone(), fields))
+}
+
+fn varying_type(module: &Module, ty: &Type) -> bool {
+    match ty {
+        Type::F32 | Type::I32 | Type::U32 => true,
+        Type::Class(id) if module.classes[id.0].pos.file == "typegpu-types.ts" => matches!(
+            module.classes[id.0].name.as_str(),
+            "Vec2f"
+                | "Vec3f"
+                | "Vec4f"
+                | "Vec2i"
+                | "Vec3i"
+                | "Vec4i"
+                | "Vec2u"
+                | "Vec3u"
+                | "Vec4u"
+                | "Vec2h"
+                | "Vec3h"
+                | "Vec4h"
+        ),
+        _ => false,
+    }
+}
+
+pub(crate) fn type_uses_f16(module: &Module, ty: &Type) -> bool {
+    matches!(ty, Type::F16)
+        || matches!(ty, Type::Class(id) if module.classes[id.0].pos.file == "typegpu-types.ts" && matches!(module.classes[id.0].name.as_str(), "Vec2h" | "Vec3h" | "Vec4h"))
 }
 
 fn descriptor_string(
@@ -269,148 +312,77 @@ fn descriptor_string(
     }
 }
 
-fn called_forbidden_expr(expr: &Expr) -> Option<(&'static str, Pos)> {
-    match &expr.kind {
-        ExprKind::Call { callee, args } => {
-            if matches!(callee, Callee::Func(name) if base_name(name) == "textureSample") {
-                return Some((
-                    "textureSample is unavailable in the current render surface",
-                    expr.pos.clone(),
-                ));
-            }
-            let nested = match callee {
-                Callee::Value(value) => called_forbidden_expr(value),
-                Callee::Method { recv, .. } => called_forbidden_expr(recv),
-                _ => None,
-            };
-            nested.or_else(|| args.iter().find_map(called_forbidden_expr))
-        }
-        ExprKind::Unary { operand, .. } | ExprKind::Cast(operand) | ExprKind::Length(operand) => {
-            called_forbidden_expr(operand)
-        }
-        ExprKind::Binary { left, right, .. } => {
-            called_forbidden_expr(left).or_else(|| called_forbidden_expr(right))
-        }
-        ExprKind::Assign { target, value, .. } => {
-            called_forbidden_expr(target).or_else(|| called_forbidden_expr(value))
-        }
-        ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => {
-            args.iter().find_map(called_forbidden_expr)
-        }
-        ExprKind::DescriptorLit { fields, .. } => {
-            fields.iter().flatten().find_map(called_forbidden_expr)
-        }
-        ExprKind::Field { obj, .. } | ExprKind::JsonResultValue(obj) => called_forbidden_expr(obj),
-        ExprKind::Index { obj, index, .. } => {
-            called_forbidden_expr(obj).or_else(|| called_forbidden_expr(index))
-        }
-        ExprKind::Cond { cond, then, els } => called_forbidden_expr(cond)
-            .or_else(|| called_forbidden_expr(then))
-            .or_else(|| called_forbidden_expr(els)),
-        _ => None,
-    }
-}
-
-fn called_forbidden_stmt(stmt: &Stmt) -> Option<(&'static str, Pos)> {
-    match stmt {
-        Stmt::Let { init, .. } | Stmt::Expr(init) => called_forbidden_expr(init),
-        Stmt::Return { value, .. } => value.as_ref().and_then(called_forbidden_expr),
-        Stmt::If {
-            cond, then, els, ..
-        } => called_forbidden_expr(cond)
-            .or_else(|| then.iter().find_map(called_forbidden_stmt))
-            .or_else(|| {
-                els.as_ref()
-                    .and_then(|body| body.iter().find_map(called_forbidden_stmt))
-            }),
-        Stmt::While { cond, body, .. } => {
-            called_forbidden_expr(cond).or_else(|| body.iter().find_map(called_forbidden_stmt))
-        }
-        Stmt::For {
-            init,
-            cond,
-            step,
-            body,
-            ..
-        } => init
-            .as_deref()
-            .and_then(called_forbidden_stmt)
-            .or_else(|| cond.as_ref().and_then(called_forbidden_expr))
-            .or_else(|| step.as_ref().and_then(called_forbidden_expr))
-            .or_else(|| body.iter().find_map(called_forbidden_stmt)),
-        Stmt::ForOf { subject, body, .. } => {
-            called_forbidden_expr(subject).or_else(|| body.iter().find_map(called_forbidden_stmt))
-        }
-        Stmt::Switch { disc, cases, .. } => called_forbidden_expr(disc).or_else(|| {
-            cases
-                .iter()
-                .flat_map(|case| &case.body)
-                .find_map(called_forbidden_stmt)
-        }),
-        Stmt::Block(body) => body.iter().find_map(called_forbidden_stmt),
-        _ => None,
-    }
-}
-
-fn contains_render_call_expr(expr: &Expr) -> bool {
-    if matches!(&expr.kind, ExprKind::Call { callee: Callee::Func(name), .. } if render_shape(name).is_some())
+fn contains_render_call_expr(module: &Module, expr: &Expr) -> bool {
+    if matches!(&expr.kind, ExprKind::Call { callee: Callee::Func(name), .. } if render_shape(module, name).is_some())
     {
         return true;
     }
     match &expr.kind {
         ExprKind::Unary { operand, .. } | ExprKind::Cast(operand) | ExprKind::Length(operand) => {
-            contains_render_call_expr(operand)
+            contains_render_call_expr(module, operand)
         }
         ExprKind::Binary { left, right, .. } => {
-            contains_render_call_expr(left) || contains_render_call_expr(right)
+            contains_render_call_expr(module, left) || contains_render_call_expr(module, right)
         }
         ExprKind::Assign { target, value, .. } => {
-            contains_render_call_expr(target) || contains_render_call_expr(value)
+            contains_render_call_expr(module, target) || contains_render_call_expr(module, value)
         }
         ExprKind::Call { callee, args } => {
             let receiver = match callee {
-                Callee::Value(value) => contains_render_call_expr(value),
-                Callee::Method { recv, .. } => contains_render_call_expr(recv),
+                Callee::Value(value) => contains_render_call_expr(module, value),
+                Callee::Method { recv, .. } => contains_render_call_expr(module, recv),
                 _ => false,
             };
-            receiver || args.iter().any(contains_render_call_expr)
+            receiver
+                || args
+                    .iter()
+                    .any(|arg| contains_render_call_expr(module, arg))
         }
-        ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => {
-            args.iter().any(contains_render_call_expr)
-        }
-        ExprKind::DescriptorLit { fields, .. } => {
-            fields.iter().flatten().any(contains_render_call_expr)
-        }
+        ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => args
+            .iter()
+            .any(|arg| contains_render_call_expr(module, arg)),
+        ExprKind::DescriptorLit { fields, .. } => fields
+            .iter()
+            .flatten()
+            .any(|value| contains_render_call_expr(module, value)),
         ExprKind::Field { obj, .. } | ExprKind::JsonResultValue(obj) => {
-            contains_render_call_expr(obj)
+            contains_render_call_expr(module, obj)
         }
         ExprKind::Index { obj, index, .. } => {
-            contains_render_call_expr(obj) || contains_render_call_expr(index)
+            contains_render_call_expr(module, obj) || contains_render_call_expr(module, index)
         }
         ExprKind::Cond { cond, then, els } => {
-            contains_render_call_expr(cond)
-                || contains_render_call_expr(then)
-                || contains_render_call_expr(els)
+            contains_render_call_expr(module, cond)
+                || contains_render_call_expr(module, then)
+                || contains_render_call_expr(module, els)
         }
         _ => false,
     }
 }
 
-fn contains_render_call_stmt(stmt: &Stmt) -> bool {
+fn contains_render_call_stmt(module: &Module, stmt: &Stmt) -> bool {
     match stmt {
-        Stmt::Let { init, .. } | Stmt::Expr(init) => contains_render_call_expr(init),
-        Stmt::Return { value, .. } => value.as_ref().is_some_and(contains_render_call_expr),
+        Stmt::Let { init, .. } | Stmt::Expr(init) => contains_render_call_expr(module, init),
+        Stmt::Return { value, .. } => value
+            .as_ref()
+            .is_some_and(|value| contains_render_call_expr(module, value)),
         Stmt::If {
             cond, then, els, ..
         } => {
-            contains_render_call_expr(cond)
-                || then.iter().any(contains_render_call_stmt)
-                || els
-                    .as_ref()
-                    .is_some_and(|body| body.iter().any(contains_render_call_stmt))
+            contains_render_call_expr(module, cond)
+                || then
+                    .iter()
+                    .any(|stmt| contains_render_call_stmt(module, stmt))
+                || els.as_ref().is_some_and(|body| {
+                    body.iter()
+                        .any(|stmt| contains_render_call_stmt(module, stmt))
+                })
         }
         Stmt::While { cond, body, .. } => {
-            contains_render_call_expr(cond) || body.iter().any(contains_render_call_stmt)
+            contains_render_call_expr(module, cond)
+                || body
+                    .iter()
+                    .any(|stmt| contains_render_call_stmt(module, stmt))
         }
         Stmt::For {
             init,
@@ -419,22 +391,34 @@ fn contains_render_call_stmt(stmt: &Stmt) -> bool {
             body,
             ..
         } => {
-            init.as_deref().is_some_and(contains_render_call_stmt)
-                || cond.as_ref().is_some_and(contains_render_call_expr)
-                || step.as_ref().is_some_and(contains_render_call_expr)
-                || body.iter().any(contains_render_call_stmt)
+            init.as_deref()
+                .is_some_and(|stmt| contains_render_call_stmt(module, stmt))
+                || cond
+                    .as_ref()
+                    .is_some_and(|value| contains_render_call_expr(module, value))
+                || step
+                    .as_ref()
+                    .is_some_and(|value| contains_render_call_expr(module, value))
+                || body
+                    .iter()
+                    .any(|stmt| contains_render_call_stmt(module, stmt))
         }
         Stmt::ForOf { subject, body, .. } => {
-            contains_render_call_expr(subject) || body.iter().any(contains_render_call_stmt)
+            contains_render_call_expr(module, subject)
+                || body
+                    .iter()
+                    .any(|stmt| contains_render_call_stmt(module, stmt))
         }
         Stmt::Switch { disc, cases, .. } => {
-            contains_render_call_expr(disc)
+            contains_render_call_expr(module, disc)
                 || cases
                     .iter()
                     .flat_map(|case| &case.body)
-                    .any(contains_render_call_stmt)
+                    .any(|stmt| contains_render_call_stmt(module, stmt))
         }
-        Stmt::Block(body) => body.iter().any(contains_render_call_stmt),
+        Stmt::Block(body) => body
+            .iter()
+            .any(|stmt| contains_render_call_stmt(module, stmt)),
         _ => false,
     }
 }
@@ -525,7 +509,11 @@ fn validate_rn2(
 pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
     for function in &module.functions {
-        if function.pos.file != "typegpu.ts" && function.body.iter().any(contains_render_call_stmt)
+        if function.pos.file != "typegpu.ts"
+            && function
+                .body
+                .iter()
+                .any(|stmt| contains_render_call_stmt(module, stmt))
         {
             diagnostics.push(diagnostic(
                 "RN1",
@@ -543,7 +531,8 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
         else {
             continue;
         };
-        let Some((layout_count, vertex_index, instance_index)) = render_shape(callee) else {
+        let Some((layout_count, vertex_index, instance_index)) = render_shape(module, callee)
+        else {
             continue;
         };
         if global.mutable {
@@ -639,6 +628,24 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
                 continue;
             }
         };
+        let overlaps_vertex = vertex_buffers
+            .iter()
+            .any(|buffer| buffer.schema == varyings_name);
+        let overlaps_binding = layouts
+            .iter()
+            .flat_map(|layout| &layout.bindings)
+            .any(|binding| {
+                pipeline::class_name(module, &binding.item_ty)
+                    .is_some_and(|name| name == varyings_name)
+            });
+        if overlaps_vertex || overlaps_binding {
+            diagnostics.push(diagnostic(
+                "RN7",
+                format!("varyings `{varyings_name}` is also a vertex schema or binding item"),
+                vertex.pos.clone(),
+            ));
+            continue;
+        }
         let fragment_output = if library_named(module, &fragment.ret, "Vec4f") {
             None
         } else if let Type::Class(id) = &fragment.ret {
@@ -673,15 +680,6 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             ));
             continue;
         };
-        let forbidden = vertex
-            .body
-            .iter()
-            .find_map(called_forbidden_stmt)
-            .or_else(|| fragment.body.iter().find_map(called_forbidden_stmt));
-        if let Some((message, pos)) = forbidden {
-            diagnostics.push(diagnostic("RN16", message, pos));
-            continue;
-        }
         let Some(options) = args.get(2) else {
             diagnostics.push(diagnostic(
                 "RN1",
@@ -706,7 +704,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
                 diagnostics.push(error);
             }
         }
-        pipelines.push(RenderPipeline {
+        let pipeline = RenderPipeline {
             declaration: global.name.clone(),
             vertex_entry: vertex_name.clone(),
             fragment_entry: fragment_name.clone(),
@@ -717,7 +715,12 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             fragment_output,
             target_format,
             pos: global.pos.clone(),
-        });
+        };
+        if let Some(error) = unreached_binding(module, &pipeline) {
+            diagnostics.push(error);
+            continue;
+        }
+        pipelines.push(pipeline);
     }
     if diagnostics.is_empty() {
         Ok(pipelines)
@@ -899,6 +902,26 @@ pub(crate) fn binding_visibility(
     )
 }
 
+fn unreached_binding(module: &Module, pipeline: &RenderPipeline) -> Option<Diagnostic> {
+    for layout in &pipeline.layouts {
+        for binding in &layout.bindings {
+            if binding_visibility(module, pipeline, layout.group as usize, &binding.name)
+                == (false, false)
+            {
+                return Some(diagnostic(
+                    "RN9",
+                    format!(
+                        "binding `{}` is not reached by either render kernel",
+                        binding.name
+                    ),
+                    binding.pos.clone(),
+                ));
+            }
+        }
+    }
+    None
+}
+
 fn binding_key(expr: &Expr, layout_params: &BTreeMap<String, usize>) -> Option<(usize, String)> {
     match &expr.kind {
         ExprKind::Field { obj, name } => {
@@ -915,124 +938,140 @@ fn binding_key(expr: &Expr, layout_params: &BTreeMap<String, usize>) -> Option<(
 fn written_binding_expr(
     expr: &Expr,
     layout_params: &BTreeMap<String, usize>,
-) -> Option<(usize, String)> {
+    out: &mut Vec<(usize, String)>,
+) {
     match &expr.kind {
-        ExprKind::Assign { target, value, .. } => binding_key(target, layout_params)
-            .or_else(|| written_binding_expr(target, layout_params))
-            .or_else(|| written_binding_expr(value, layout_params)),
+        ExprKind::Assign { target, value, .. } => {
+            if let Some(binding) = binding_key(target, layout_params) {
+                out.push(binding);
+            }
+            written_binding_expr(target, layout_params, out);
+            written_binding_expr(value, layout_params, out);
+        }
         ExprKind::Call {
             callee: Callee::Method { recv, name },
             args,
         } => {
             if name == "set" {
                 if let Some(binding) = binding_key(recv, layout_params) {
-                    return Some(binding);
+                    out.push(binding);
                 }
             }
-            written_binding_expr(recv, layout_params).or_else(|| {
-                args.iter()
-                    .find_map(|arg| written_binding_expr(arg, layout_params))
-            })
+            written_binding_expr(recv, layout_params, out);
+            for arg in args {
+                written_binding_expr(arg, layout_params, out);
+            }
         }
         ExprKind::Call { callee, args } => {
-            let receiver = match callee {
-                Callee::Value(value) => written_binding_expr(value, layout_params),
-                _ => None,
-            };
-            receiver.or_else(|| {
-                args.iter()
-                    .find_map(|arg| written_binding_expr(arg, layout_params))
-            })
+            if let Callee::Value(value) = callee {
+                written_binding_expr(value, layout_params, out);
+            }
+            for arg in args {
+                written_binding_expr(arg, layout_params, out);
+            }
         }
         ExprKind::Unary { operand, .. } | ExprKind::Cast(operand) | ExprKind::Length(operand) => {
-            written_binding_expr(operand, layout_params)
+            written_binding_expr(operand, layout_params, out);
         }
-        ExprKind::Binary { left, right, .. } => written_binding_expr(left, layout_params)
-            .or_else(|| written_binding_expr(right, layout_params)),
-        ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => args
-            .iter()
-            .find_map(|arg| written_binding_expr(arg, layout_params)),
-        ExprKind::DescriptorLit { fields, .. } => fields
-            .iter()
-            .flatten()
-            .find_map(|value| written_binding_expr(value, layout_params)),
+        ExprKind::Binary { left, right, .. } => {
+            written_binding_expr(left, layout_params, out);
+            written_binding_expr(right, layout_params, out);
+        }
+        ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => {
+            for arg in args {
+                written_binding_expr(arg, layout_params, out);
+            }
+        }
+        ExprKind::DescriptorLit { fields, .. } => {
+            for value in fields.iter().flatten() {
+                written_binding_expr(value, layout_params, out);
+            }
+        }
         ExprKind::Field { obj, .. } | ExprKind::JsonResultValue(obj) => {
-            written_binding_expr(obj, layout_params)
+            written_binding_expr(obj, layout_params, out);
         }
-        ExprKind::Index { obj, index, .. } => written_binding_expr(obj, layout_params)
-            .or_else(|| written_binding_expr(index, layout_params)),
-        ExprKind::Cond { cond, then, els } => written_binding_expr(cond, layout_params)
-            .or_else(|| written_binding_expr(then, layout_params))
-            .or_else(|| written_binding_expr(els, layout_params)),
-        _ => None,
+        ExprKind::Index { obj, index, .. } => {
+            written_binding_expr(obj, layout_params, out);
+            written_binding_expr(index, layout_params, out);
+        }
+        ExprKind::Cond { cond, then, els } => {
+            written_binding_expr(cond, layout_params, out);
+            written_binding_expr(then, layout_params, out);
+            written_binding_expr(els, layout_params, out);
+        }
+        _ => {}
     }
 }
 
 fn written_binding_stmt(
     stmt: &Stmt,
     layout_params: &BTreeMap<String, usize>,
-) -> Option<(usize, String)> {
+    out: &mut Vec<(usize, String)>,
+) {
     match stmt {
-        Stmt::Let { init, .. } | Stmt::Expr(init) => written_binding_expr(init, layout_params),
-        Stmt::Return { value, .. } => value
-            .as_ref()
-            .and_then(|value| written_binding_expr(value, layout_params)),
+        Stmt::Let { init, .. } | Stmt::Expr(init) => {
+            written_binding_expr(init, layout_params, out);
+        }
+        Stmt::Return {
+            value: Some(value), ..
+        } => written_binding_expr(value, layout_params, out),
         Stmt::If {
             cond, then, els, ..
-        } => written_binding_expr(cond, layout_params)
-            .or_else(|| {
-                then.iter()
-                    .find_map(|item| written_binding_stmt(item, layout_params))
-            })
-            .or_else(|| {
-                els.as_ref().and_then(|body| {
-                    body.iter()
-                        .find_map(|item| written_binding_stmt(item, layout_params))
-                })
-            }),
-        Stmt::While { cond, body, .. } => written_binding_expr(cond, layout_params).or_else(|| {
-            body.iter()
-                .find_map(|item| written_binding_stmt(item, layout_params))
-        }),
+        } => {
+            written_binding_expr(cond, layout_params, out);
+            for item in then {
+                written_binding_stmt(item, layout_params, out);
+            }
+            if let Some(body) = els {
+                for item in body {
+                    written_binding_stmt(item, layout_params, out);
+                }
+            }
+        }
+        Stmt::While { cond, body, .. } => {
+            written_binding_expr(cond, layout_params, out);
+            for item in body {
+                written_binding_stmt(item, layout_params, out);
+            }
+        }
         Stmt::For {
             init,
             cond,
             step,
             body,
             ..
-        } => init
-            .as_deref()
-            .and_then(|item| written_binding_stmt(item, layout_params))
-            .or_else(|| {
-                cond.as_ref()
-                    .and_then(|value| written_binding_expr(value, layout_params))
-            })
-            .or_else(|| {
-                step.as_ref()
-                    .and_then(|value| written_binding_expr(value, layout_params))
-            })
-            .or_else(|| {
-                body.iter()
-                    .find_map(|item| written_binding_stmt(item, layout_params))
-            }),
+        } => {
+            if let Some(item) = init {
+                written_binding_stmt(item, layout_params, out);
+            }
+            if let Some(value) = cond {
+                written_binding_expr(value, layout_params, out);
+            }
+            if let Some(value) = step {
+                written_binding_expr(value, layout_params, out);
+            }
+            for item in body {
+                written_binding_stmt(item, layout_params, out);
+            }
+        }
         Stmt::ForOf { subject, body, .. } => {
-            written_binding_expr(subject, layout_params).or_else(|| {
-                body.iter()
-                    .find_map(|item| written_binding_stmt(item, layout_params))
-            })
+            written_binding_expr(subject, layout_params, out);
+            for item in body {
+                written_binding_stmt(item, layout_params, out);
+            }
         }
         Stmt::Switch { disc, cases, .. } => {
-            written_binding_expr(disc, layout_params).or_else(|| {
-                cases
-                    .iter()
-                    .flat_map(|case| &case.body)
-                    .find_map(|item| written_binding_stmt(item, layout_params))
-            })
+            written_binding_expr(disc, layout_params, out);
+            for item in cases.iter().flat_map(|case| &case.body) {
+                written_binding_stmt(item, layout_params, out);
+            }
         }
-        Stmt::Block(body) => body
-            .iter()
-            .find_map(|item| written_binding_stmt(item, layout_params)),
-        _ => None,
+        Stmt::Block(body) => {
+            for item in body {
+                written_binding_stmt(item, layout_params, out);
+            }
+        }
+        _ => {}
     }
 }
 
@@ -1049,22 +1088,23 @@ pub(crate) fn reject_vertex_storage_writes(
         .enumerate()
         .map(|(group, _)| (vertex.params[group].name.clone(), group))
         .collect::<BTreeMap<_, _>>();
-    let written = vertex
-        .body
-        .iter()
-        .find_map(|stmt| written_binding_stmt(stmt, &layout_params));
-    if let Some((group, name)) = written {
+    let mut writes = Vec::new();
+    for statement in &vertex.body {
+        written_binding_stmt(statement, &layout_params, &mut writes);
+    }
+    for (group, name) in writes {
         let mutable = pipeline.layouts[group]
             .bindings
             .iter()
             .any(|binding| binding.name == name && binding.kind == BindingKind::MutStorage);
-        if mutable {
-            return Err(diagnostic(
-                "RN16",
-                format!("vertex kernel writes storage binding `{name}`"),
-                vertex.pos.clone(),
-            ));
+        if !mutable {
+            continue;
         }
+        return Err(diagnostic(
+            "RN16",
+            format!("vertex kernel writes storage binding `{name}`"),
+            vertex.pos.clone(),
+        ));
     }
     Ok(())
 }

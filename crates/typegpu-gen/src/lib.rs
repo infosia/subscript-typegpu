@@ -204,6 +204,20 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         );
     }
     let schemas = schema::discover(&module, &intended, support.as_ref().map(|item| &item.pos))?;
+    if let Some(pipeline) = render_definitions.iter().find(|pipeline| {
+        schemas
+            .iter()
+            .any(|schema| schema.name == pipeline.varyings_name)
+    }) {
+        return Err(vec![diagnostic(
+            "RN7",
+            format!(
+                "varyings `{}` is also a schema or binding item",
+                pipeline.varyings_name
+            ),
+            pipeline.pos.clone(),
+        )]);
+    }
     if let Some(support) = &support {
         let exports = generated_export_names(&schemas, &pipeline_definitions, &render_definitions);
         let missing = support

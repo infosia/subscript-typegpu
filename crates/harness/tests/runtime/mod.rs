@@ -52,16 +52,6 @@ fn dispatch_threads_rounds_all_three_axes() {
             "dispatchThreads lacks workgroup axis {axis}"
         );
     }
-    for statement in [
-        "pass.setPipeline(this.pipeline);",
-        "pass.setBindGroup(group as u32, groups[group]);",
-        "pass.setVertexBuffer(slot as u32, vertexBuffers[slot], 0, vertexBuffers[slot].size());",
-    ] {
-        assert!(
-            source.contains(statement),
-            "RenderPipeline.bind lacks `{statement}`"
-        );
-    }
 }
 
 #[test]

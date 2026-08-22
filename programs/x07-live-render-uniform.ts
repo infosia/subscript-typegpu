@@ -1,18 +1,21 @@
-// program: x05-live-triangle
-// purpose: draw one triangle and compare every texel with a host rasterizer
-// exercises: RN1-RN14, T4, T15, render copy and map
+// program: x07-live-render-uniform
+// purpose: compare a uniform-offset and storage-tinted triangle with a host rasterizer
+// exercises: RN1-RN14, RN17, T4, T15, render bindings and readback
 // questions: none
 
 import {
   Buffer,
+  createBindGroup,
   createBuffer,
   createRenderPipeline,
   FragmentInvocation,
   RenderPipelineSpec,
-  renderPipeline,
+  renderPipelineL,
+  Storage,
+  Uniform,
   VertexInvocation,
 } from "./typegpu";
-import { Vec2f, Vec3f, Vec4f } from "./typegpu-types";
+import { Vec2f, Vec4f } from "./typegpu-types";
 import {
   gpu,
   GPUAdapter,
@@ -22,57 +25,88 @@ import {
   GPUTextureUsage,
 } from "./webgpu";
 import {
-  tri_FRAGMENT_ENTRY,
-  tri_TARGET_FORMAT,
-  tri_VERTEX_ENTRY,
-  tri_VERTEX_LAYOUT0,
-  tri_WGSL,
+  Offset_SIZE,
+  shifted_FRAGMENT_ENTRY,
+  shifted_LAYOUT0,
+  shifted_TARGET_FORMAT,
+  shifted_VERTEX_ENTRY,
+  shifted_VERTEX_LAYOUT0,
+  shifted_WGSL,
+  Tint_SIZE,
   Vertex_STRIDE,
-} from "./x05-live-triangle.typegpu";
+} from "./x07-live-render-uniform.typegpu";
 
 @CStruct
 class Vertex {
   position: Vec2f;
-  color: Vec3f;
 
-  constructor(position: Vec2f, color: Vec3f) {
+  constructor(position: Vec2f) {
     this.position = position;
-    this.color = color;
+  }
+}
+
+@CStruct
+class Offset {
+  value: Vec4f;
+
+  constructor(value: Vec4f) {
+    this.value = value;
+  }
+}
+
+@CStruct
+class Tint {
+  value: Vec4f;
+
+  constructor(value: Vec4f) {
+    this.value = value;
   }
 }
 
 @CStruct
 class Varyings {
   position: Vec4f;
-  color: Vec3f;
 
-  constructor(position: Vec4f, color: Vec3f) {
+  constructor(position: Vec4f) {
     this.position = position;
-    this.color = color;
   }
 }
 
-function vert(value: Vertex, ctx: VertexInvocation): Varyings {
+class RenderLayout {
+  params!: Uniform<Offset>;
+  tint!: Storage<Tint>;
+}
+
+function vert(res: RenderLayout, value: Vertex, ctx: VertexInvocation): Varyings {
+  const offset: Offset = res.params.get();
   return new Varyings(
-    new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
-    value.color,
+    new Vec4f(
+      value.position.x + offset.value.x,
+      value.position.y + offset.value.y,
+      0.0,
+      1.0,
+    ),
   );
 }
 
-function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
-  return new Vec4f(input.color.x, input.color.y, input.color.z, 1.0);
+function frag(res: RenderLayout, input: Varyings, ctx: FragmentInvocation): Vec4f {
+  const color: Tint = res.tint[0];
+  return color.value;
 }
 
-export const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, {
-  format: "rgba8unorm",
-});
+export const shifted: RenderPipelineSpec = renderPipelineL<RenderLayout, Vertex, Varyings>(
+  vert,
+  frag,
+  { format: "rgba8unorm" },
+);
 
 function edge(a: Vec2f, b: Vec2f, point: Vec2f): f32 {
   return (point.x - a.x) * (b.y - a.y) - (point.y - a.y) * (b.x - a.x);
 }
 
 function pixelCenter(x: i32, y: i32): Vec2f {
-  // Texel row 0 maps to clip-space y=+1. Increasing texel rows lowers clip-space y.
+  // Texel row 0 maps to clip-space y=+1.
+  // Each later row lowers the clip-space y coordinate.
   return new Vec2f(
     ((x as f32) + 0.5) * (2.0 / 64.0) - 1.0,
     1.0 - ((y as f32) + 0.5) * (2.0 / 64.0),
@@ -124,52 +158,75 @@ export async function main(): Promise<void> {
   {
     using adapter = adapterResult;
     using device = deviceResult;
-    const a = new Vec2f(-0.6, -0.6);
-    const b = new Vec2f(0.6, -0.6);
-    const c = new Vec2f(0.0, 0.7);
+    const offset = new Vec2f(0.11, -0.07);
+    const a = new Vec2f(-0.49, -0.67);
+    const b = new Vec2f(0.71, -0.67);
+    const c = new Vec2f(0.11, 0.63);
     if (!noCenterOnEdge(a, b, c)) {
       print("FAIL pixel center on edge");
       return;
     }
-    const color = new Vec3f(0.25, 0.6, 0.75);
     const values: FixedArray<Vertex, 3> = [
-      new Vertex(a, color),
-      new Vertex(b, color),
-      new Vertex(c, color),
+      new Vertex(new Vec2f(a.x - offset.x, a.y - offset.y)),
+      new Vertex(new Vec2f(b.x - offset.x, b.y - offset.y)),
+      new Vertex(new Vec2f(c.x - offset.x, c.y - offset.y)),
     ];
     using vertices: Buffer<Vertex> = createBuffer<Vertex>(
       device,
       Vertex_STRIDE,
       3,
       GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
-      "x05-vertices",
+      "x07-vertices",
     );
-    vertices.write(
-      device.queue(),
+    using params = device.createBuffer({
+      label: "x07-params",
+      size: Offset_SIZE as u64,
+      usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
+    });
+    using tint = device.createBuffer({
+      label: "x07-tint",
+      size: Tint_SIZE as u64,
+      usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
+    });
+    vertices.write(device.queue(), 0, Context.bytesOf<FixedArray<Vertex, 3>>(values));
+    device.queue().writeBuffer(
+      params,
       0,
-      Context.bytesOf<FixedArray<Vertex, 3>>(values),
+      Context.bytesOf<Offset>(new Offset(new Vec4f(offset.x, offset.y, 0.0, 0.0))),
+    );
+    device.queue().writeBuffer(
+      tint,
+      0,
+      Context.bytesOf<Tint>(new Tint(new Vec4f(0.25, 0.6, 0.75, 1.0))),
     );
     using target = device.createTexture({
-      label: "x05-target",
+      label: "x07-target",
       size: { width: 64, height: 64 },
-      format: tri_TARGET_FORMAT,
+      format: shifted_TARGET_FORMAT,
       usage: GPUTextureUsage.RENDER_ATTACHMENT + GPUTextureUsage.COPY_SRC,
     });
     using view = target.createView();
     using readback = device.createBuffer({
-      label: "x05-readback",
+      label: "x07-readback",
       size: 16384,
       usage: GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
     });
     print("inputs:written");
     using pipeline = createRenderPipeline(
       device,
-      tri_WGSL,
-      tri_VERTEX_ENTRY,
-      tri_FRAGMENT_ENTRY,
-      [],
-      [tri_VERTEX_LAYOUT0],
-      tri,
+      shifted_WGSL,
+      shifted_VERTEX_ENTRY,
+      shifted_FRAGMENT_ENTRY,
+      [shifted_LAYOUT0],
+      [shifted_VERTEX_LAYOUT0],
+      shifted,
+    );
+    using nativeLayout = pipeline.bindGroupLayout(0);
+    using bindGroup = createBindGroup(
+      device,
+      nativeLayout,
+      shifted_LAYOUT0,
+      [params, tint],
     );
     print("pipeline:created");
     using encoder = device.createCommandEncoderDefault();
@@ -181,7 +238,7 @@ export async function main(): Promise<void> {
         storeOp: "store",
       }],
     });
-    pipeline.bind(pass, [], [vertices.handle()]);
+    pipeline.bind(pass, [bindGroup], [vertices.handle()]);
     pass.draw(3);
     pass.end();
     encoder.copyTextureToBuffer(
@@ -211,13 +268,13 @@ export async function main(): Promise<void> {
         const expectedG: u8 = inside ? 153 : 0;
         const expectedB: u8 = inside ? 191 : 0;
         const expectedA: u8 = 255;
-        const offset: i32 = y * 256 + x * 4;
-        if (pixels[offset] !== expectedR
-          || pixels[offset + 1] !== expectedG
-          || pixels[offset + 2] !== expectedB
-          || pixels[offset + 3] !== expectedA) {
+        const byteOffset: i32 = y * 256 + x * 4;
+        if (pixels[byteOffset] !== expectedR
+          || pixels[byteOffset + 1] !== expectedG
+          || pixels[byteOffset + 2] !== expectedB
+          || pixels[byteOffset + 3] !== expectedA) {
           print(
-            `FAIL x=${x} y=${y} expected=${expectedR},${expectedG},${expectedB},${expectedA} got=${pixels[offset]},${pixels[offset + 1]},${pixels[offset + 2]},${pixels[offset + 3]}`,
+            `FAIL x=${x} y=${y} expected=${expectedR},${expectedG},${expectedB},${expectedA} got=${pixels[byteOffset]},${pixels[byteOffset + 1]},${pixels[byteOffset + 2]},${pixels[byteOffset + 3]}`,
           );
           return;
         }

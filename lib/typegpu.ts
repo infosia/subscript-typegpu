@@ -160,7 +160,6 @@ export class VertexInvocation {
 }
 
 export class FragmentInvocation {
-  position!: Vec4f;
   frontFacing!: boolean;
 }
 
@@ -415,13 +414,10 @@ export class RenderPipeline {
   }
 }
 
-export function createComputePipeline(
+function createNativeBindGroupLayouts(
   device: GPUDevice,
-  wgsl: string,
-  entry: string,
   layouts: BindGroupLayoutSpec[],
-  workgroup: FixedArray<u32, 3>,
-): ComputePipeline {
+): GPUBindGroupLayout[] {
   const nativeLayouts: GPUBindGroupLayout[] = [];
   let group: i32 = 0;
   while (group < layouts.length) {
@@ -453,13 +449,24 @@ export function createComputePipeline(
     nativeLayouts.push(device.createBindGroupLayout({ entries }));
     group = group + 1;
   }
+  return nativeLayouts;
+}
+
+export function createComputePipeline(
+  device: GPUDevice,
+  wgsl: string,
+  entry: string,
+  layouts: BindGroupLayoutSpec[],
+  workgroup: FixedArray<u32, 3>,
+): ComputePipeline {
+  const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayouts(device, layouts);
   using shader = device.createShaderModule({ code: wgsl });
   using layout = device.createPipelineLayout({ bindGroupLayouts: nativeLayouts });
   const pipeline = device.createComputePipeline({
     layout,
     compute: { module: shader, entryPoint: entry },
   });
-  group = 0;
+  let group: i32 = 0;
   while (group < nativeLayouts.length) {
     nativeLayouts[group].dispose();
     group = group + 1;
@@ -476,37 +483,8 @@ export function createRenderPipeline(
   vertexLayouts: VertexBufferLayoutSpec[],
   spec: RenderPipelineSpec,
 ): RenderPipeline {
-  const nativeLayouts: GPUBindGroupLayout[] = [];
+  const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayouts(device, layouts);
   let group: i32 = 0;
-  while (group < layouts.length) {
-    const entries: GPUBindGroupLayoutEntry[] = [];
-    let binding: i32 = 0;
-    while (binding < layouts[group].entries.length) {
-      const source: BindGroupLayoutEntrySpec = layouts[group].entries[binding];
-      if (source.kind === "uniform") {
-        entries.push({
-          binding: source.binding,
-          visibility: source.visibility,
-          buffer: { type: "uniform", minBindingSize: source.minBindingSize },
-        });
-      } else if (source.kind === "read-only-storage") {
-        entries.push({
-          binding: source.binding,
-          visibility: source.visibility,
-          buffer: { type: "read-only-storage", minBindingSize: source.minBindingSize },
-        });
-      } else {
-        entries.push({
-          binding: source.binding,
-          visibility: source.visibility,
-          buffer: { type: "storage", minBindingSize: source.minBindingSize },
-        });
-      }
-      binding = binding + 1;
-    }
-    nativeLayouts.push(device.createBindGroupLayout({ entries }));
-    group = group + 1;
-  }
   const nativeVertexLayouts: GPUVertexBufferLayout[] = [];
   let slot: i32 = 0;
   while (slot < vertexLayouts.length) {

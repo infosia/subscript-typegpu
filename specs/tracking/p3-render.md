@@ -49,7 +49,13 @@ unreached binding a diagnostic, RN1 recognizes by declaring file,
 RN16 Rev 1 sends the checker-first cases to the checker, RN17 adds
 `b08-render-bindings` and `x07-live-render-uniform`. The P4 and P5
 program ids shift by one. T12 Rev: a row names the tree it
-measured. The code findings go to the coding agent.
+measured. The code findings landed: the fragment position builtin is gone
+and an emitter test validates the render module with naga, the
+varying type set has six fixtures, `b08-render-bindings` prints
+`params.visibility=1` and `tint.visibility=2`, `x07-live-render-uniform`
+exists, declarations are recognized by declaring file, and the
+look-alike fixtures are replaced. Measurement: 44 s / 1 s / 41 s /
+38 s / 6.
 
 ## Exit criteria
 

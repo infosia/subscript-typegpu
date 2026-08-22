@@ -155,7 +155,7 @@ pub(crate) fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, D
             return Err(diagnostic(
                 "PI13",
                 format!(
-                    "layout field `{}.{}` has a binding item type outside PI13",
+                    "layout field `{}.{}` has a binding item type outside PI5",
                     class.name, field.name
                 ),
                 field.pos.clone(),
@@ -262,8 +262,12 @@ pub(crate) fn function<'a>(module: &'a Module, name: &str) -> Option<&'a Functio
         .find(|function| function.name == name)
 }
 
-fn compute_arity(name: &str) -> Option<usize> {
+fn compute_arity(module: &Module, name: &str) -> Option<usize> {
     let base = name.split('<').next().unwrap_or(name);
+    let declaration = function(module, name)?;
+    if declaration.params.first()?.pos.file != "typegpu.ts" {
+        return None;
+    }
     Some(match base {
         "computePipeline" => 1,
         "computePipeline2" => 2,
@@ -273,42 +277,46 @@ fn compute_arity(name: &str) -> Option<usize> {
     })
 }
 
-fn call_in_expr(expr: &Expr) -> bool {
+fn call_in_expr(module: &Module, expr: &Expr) -> bool {
     match &expr.kind {
-        ExprKind::Call { callee: Callee::Func(name), .. } if compute_arity(name).is_some() => true,
-        ExprKind::Unary { operand, .. } | ExprKind::Cast(operand) | ExprKind::Length(operand) => call_in_expr(operand),
-        ExprKind::Binary { left, right, .. } => call_in_expr(left) || call_in_expr(right),
-        ExprKind::Assign { target, value, .. } => call_in_expr(target) || call_in_expr(value),
+        ExprKind::Call { callee: Callee::Func(name), .. } if compute_arity(module, name).is_some() => true,
+        ExprKind::Unary { operand, .. } | ExprKind::Cast(operand) | ExprKind::Length(operand) => call_in_expr(module, operand),
+        ExprKind::Binary { left, right, .. } => call_in_expr(module, left) || call_in_expr(module, right),
+        ExprKind::Assign { target, value, .. } => call_in_expr(module, target) || call_in_expr(module, value),
         ExprKind::Call { callee, args } => {
-            matches!(callee, Callee::Value(value) if call_in_expr(value))
-                || matches!(callee, Callee::Method { recv, .. } if call_in_expr(recv))
-                || args.iter().any(call_in_expr)
+            matches!(callee, Callee::Value(value) if call_in_expr(module, value))
+                || matches!(callee, Callee::Method { recv, .. } if call_in_expr(module, recv))
+                || args.iter().any(|arg| call_in_expr(module, arg))
         }
-        ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => args.iter().any(call_in_expr),
-        ExprKind::DescriptorLit { fields, .. } => fields.iter().flatten().any(call_in_expr),
-        ExprKind::Field { obj, .. } | ExprKind::JsonResultValue(obj) => call_in_expr(obj),
-        ExprKind::Index { obj, index, .. } => call_in_expr(obj) || call_in_expr(index),
-        ExprKind::Template(parts) => parts.iter().any(|part| matches!(part, subscript_compiler::hir::TplPart::Expr(value) if call_in_expr(value))),
-        ExprKind::Lambda { body, .. } => body.iter().any(stmt_has_compute),
-        ExprKind::Cond { cond, then, els } => call_in_expr(cond) || call_in_expr(then) || call_in_expr(els),
+        ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => args.iter().any(|arg| call_in_expr(module, arg)),
+        ExprKind::DescriptorLit { fields, .. } => fields.iter().flatten().any(|value| call_in_expr(module, value)),
+        ExprKind::Field { obj, .. } | ExprKind::JsonResultValue(obj) => call_in_expr(module, obj),
+        ExprKind::Index { obj, index, .. } => call_in_expr(module, obj) || call_in_expr(module, index),
+        ExprKind::Template(parts) => parts.iter().any(|part| matches!(part, subscript_compiler::hir::TplPart::Expr(value) if call_in_expr(module, value))),
+        ExprKind::Lambda { body, .. } => body.iter().any(|stmt| stmt_has_compute(module, stmt)),
+        ExprKind::Cond { cond, then, els } => call_in_expr(module, cond) || call_in_expr(module, then) || call_in_expr(module, els),
         _ => false,
     }
 }
 
-fn stmt_has_compute(stmt: &Stmt) -> bool {
+fn stmt_has_compute(module: &Module, stmt: &Stmt) -> bool {
     match stmt {
-        Stmt::Let { init, .. } | Stmt::Expr(init) => call_in_expr(init),
-        Stmt::Return { value, .. } => value.as_ref().is_some_and(call_in_expr),
+        Stmt::Let { init, .. } | Stmt::Expr(init) => call_in_expr(module, init),
+        Stmt::Return { value, .. } => value
+            .as_ref()
+            .is_some_and(|value| call_in_expr(module, value)),
         Stmt::If {
             cond, then, els, ..
         } => {
-            call_in_expr(cond)
-                || then.iter().any(stmt_has_compute)
+            call_in_expr(module, cond)
+                || then.iter().any(|stmt| stmt_has_compute(module, stmt))
                 || els
                     .as_ref()
-                    .is_some_and(|items| items.iter().any(stmt_has_compute))
+                    .is_some_and(|items| items.iter().any(|stmt| stmt_has_compute(module, stmt)))
         }
-        Stmt::While { cond, body, .. } => call_in_expr(cond) || body.iter().any(stmt_has_compute),
+        Stmt::While { cond, body, .. } => {
+            call_in_expr(module, cond) || body.iter().any(|stmt| stmt_has_compute(module, stmt))
+        }
         Stmt::For {
             init,
             cond,
@@ -316,22 +324,27 @@ fn stmt_has_compute(stmt: &Stmt) -> bool {
             body,
             ..
         } => {
-            init.as_deref().is_some_and(stmt_has_compute)
-                || cond.as_ref().is_some_and(call_in_expr)
-                || step.as_ref().is_some_and(call_in_expr)
-                || body.iter().any(stmt_has_compute)
+            init.as_deref()
+                .is_some_and(|stmt| stmt_has_compute(module, stmt))
+                || cond
+                    .as_ref()
+                    .is_some_and(|value| call_in_expr(module, value))
+                || step
+                    .as_ref()
+                    .is_some_and(|value| call_in_expr(module, value))
+                || body.iter().any(|stmt| stmt_has_compute(module, stmt))
         }
         Stmt::ForOf { subject, body, .. } => {
-            call_in_expr(subject) || body.iter().any(stmt_has_compute)
+            call_in_expr(module, subject) || body.iter().any(|stmt| stmt_has_compute(module, stmt))
         }
         Stmt::Switch { disc, cases, .. } => {
-            call_in_expr(disc)
+            call_in_expr(module, disc)
                 || cases
                     .iter()
                     .flat_map(|case| &case.body)
-                    .any(stmt_has_compute)
+                    .any(|stmt| stmt_has_compute(module, stmt))
         }
-        Stmt::Block(body) => body.iter().any(stmt_has_compute),
+        Stmt::Block(body) => body.iter().any(|stmt| stmt_has_compute(module, stmt)),
         Stmt::Break(_) | Stmt::Continue(_) => false,
         _ => false,
     }
@@ -340,7 +353,12 @@ fn stmt_has_compute(stmt: &Stmt) -> bool {
 pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
     for function in &module.functions {
-        if function.pos.file != "typegpu.ts" && function.body.iter().any(stmt_has_compute) {
+        if function.pos.file != "typegpu.ts"
+            && function
+                .body
+                .iter()
+                .any(|stmt| stmt_has_compute(module, stmt))
+        {
             diagnostics.push(diagnostic(
                 "PI13",
                 "a pipeline declaration appears inside a function",
@@ -357,7 +375,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
         else {
             continue;
         };
-        let Some(arity) = compute_arity(callee) else {
+        let Some(arity) = compute_arity(module, callee) else {
             continue;
         };
         if global.mutable {

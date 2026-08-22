@@ -212,7 +212,9 @@ export async function main(): Promise<void> {
     print(`position.shaderLocation=${quad_VERTEX_LAYOUT0.attributes[0].shaderLocation}`);
     print(`quad_VERTEX_LAYOUT1.arrayStride=${quad_VERTEX_LAYOUT1.arrayStride}`);
     print(`quad_VERTEX_LAYOUT1.stepMode=${quad_VERTEX_LAYOUT1.stepMode}`);
+    print(`offset.offset=${quad_VERTEX_LAYOUT1.attributes[0].offset}`);
     print(`offset.shaderLocation=${quad_VERTEX_LAYOUT1.attributes[0].shaderLocation}`);
+    print(`color.offset=${quad_VERTEX_LAYOUT1.attributes[1].offset}`);
     print(`color.shaderLocation=${quad_VERTEX_LAYOUT1.attributes[1].shaderLocation}`);
     print(`tri_VERTEX_LAYOUT0.arrayStride=${tri_VERTEX_LAYOUT0.arrayStride}`);
     print(`tri_TARGET_FORMAT=${tri_TARGET_FORMAT}`);

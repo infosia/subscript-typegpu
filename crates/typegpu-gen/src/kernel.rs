@@ -469,7 +469,6 @@ impl<'a> Emitter<'a> {
                         (InvocationKind::Compute, "localIndex") => "localIndex",
                         (InvocationKind::Vertex, "vertexIndex") => "vertexIndex",
                         (InvocationKind::Vertex, "instanceIndex") => "instanceIndex",
-                        (InvocationKind::Fragment, "position") => "fragmentPosition",
                         (InvocationKind::Fragment, "frontFacing") => "frontFacing",
                         _ => {
                             return Err(generator_diagnostic(
@@ -1404,7 +1403,6 @@ fn builtin_parameter(name: &str) -> &'static str {
         "localIndex" => "@builtin(local_invocation_index) localIndex: u32",
         "vertexIndex" => "@builtin(vertex_index) vertexIndex: u32",
         "instanceIndex" => "@builtin(instance_index) instanceIndex: u32",
-        "fragmentPosition" => "@builtin(position) fragmentPosition: vec4<f32>",
         "frontFacing" => "@builtin(front_facing) frontFacing: bool",
         _ => "",
     }
@@ -1775,14 +1773,28 @@ pub(crate) fn emit_render(
     let mut fragment_body = String::new();
     fragment_emitter.statements(&fragment.body, 1, &mut fragment_body)?;
 
+    let selected_names = structs
+        .iter()
+        .map(|(name, _)| name.as_str())
+        .collect::<BTreeSet<_>>();
     let uses_f16 = schemas
         .iter()
+        .filter(|schema| selected_names.contains(schema.name.as_str()))
         .any(|schema| crate::emit::uses_f16(&schema.tree))
+        || pipeline
+            .layouts
+            .iter()
+            .flat_map(|layout| &layout.bindings)
+            .any(|binding| crate::render::type_uses_f16(module, &binding.item_ty))
         || pipeline
             .vertex_buffers
             .iter()
             .flat_map(|buffer| &buffer.attributes)
-            .any(|attribute| attribute.format.starts_with("float16"));
+            .any(|attribute| attribute.format.starts_with("float16"))
+        || pipeline
+            .varyings
+            .iter()
+            .any(|varying| crate::render::type_uses_f16(module, &varying.ty));
     let mut out = String::new();
     if uses_f16 {
         out.push_str("enable f16;\n\n");
@@ -1849,7 +1861,7 @@ pub(crate) fn emit_render(
         wgsl_type(module, &input.ty, &input.pos)?
     )];
     fragment_parameters.extend(
-        ["fragmentPosition", "frontFacing"]
+        ["frontFacing"]
             .into_iter()
             .filter(|name| fragment_emitter.used_builtins.contains(*name))
             .map(builtin_parameter)

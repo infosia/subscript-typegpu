@@ -1,0 +1,6 @@
+pipeline:created
+params.visibility=1
+tint.visibility=2
+shifted_WGSL_LINES=31
+render:submitted
+PASS

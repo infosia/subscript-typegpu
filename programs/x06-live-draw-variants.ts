@@ -90,7 +90,8 @@ function edge(a: Vec2f, b: Vec2f, point: Vec2f): f32 {
 }
 
 function pixelCenter(x: i32, y: i32): Vec2f {
-  // Texel row 0 maps to clip-space y=+1; increasing rows is the render y-flip.
+  // Texel row 0 maps to clip-space y=+1.
+  // Each later row lowers the clip-space y coordinate.
   return new Vec2f(
     ((x as f32) + 0.5) * (2.0 / 64.0) - 1.0,
     1.0 - ((y as f32) + 0.5) * (2.0 / 64.0),
