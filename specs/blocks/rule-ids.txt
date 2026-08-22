@@ -1,5 +1,6 @@
 # Rule ids that a citation in code, policy, or a generated output can name.
-# One id per line. Q- and R-ids are subscript's. Maintained by hand with the blocks.
+# One id per line. Maintained by hand with the blocks.
+# Any `Q<n>` or `R<n>` is subscript's (a language question or a change request) and is allowed without a line here.
 A3
 A5
 B1
