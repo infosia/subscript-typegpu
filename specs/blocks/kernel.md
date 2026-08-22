@@ -169,20 +169,35 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   binding or a workgroup variable. A schema that holds an atomic
   cannot be copied to a local or written as a whole: both are
   diagnostics.
-- **K22 — Barriers.** `workgroupBarrier()` and `storageBarrier()`
-  are library free functions with empty host bodies, legal only as
-  a statement directly in the kernel body or in a block the kernel
-  body contains, never in a helper. WGSL's uniformity rule is
-  `naga`'s to enforce: the harness reports a uniformity failure
-  with the kernel name and naga's diagnostic, owner the author.
+- **K22 — Barriers.** Rev 1, 2026-08-23. `workgroupBarrier()` and
+  `storageBarrier()` are library free functions with empty host
+  bodies, legal only as a statement in the kernel body, never in a
+  helper. The generator enforces uniform placement itself, because
+  `naga` did not reject a barrier after a non-uniform early return
+  and yawgpu's Tint did not either, while Metal then read every
+  workgroup value as zero (measured 2026-08-23, `x08`). The rule: a
+  barrier statement is legal at the kernel body's top level, or
+  inside `while`, `for`, and `if` statements whose conditions are
+  uniform, where a uniform expression reads only literals, module
+  constants, and locals that were assigned only uniform expressions
+  (a builtin, a binding read, and a helper result are non-uniform).
+  No `return` statement may precede a barrier in source order, and
+  no `break` or `continue` may leave a loop that contains a barrier
+  under a non-uniform condition. A violation is a K22 diagnostic
+  that names the statement and the non-uniform value. The harness
+  still runs naga. The idiom for a bounds check before a barrier is
+  a conditional load: `partials[local] = global < n ?
+  input[global].value : 0.0;`.
 - **K23 — The workgroup builtins.** `ComputeInvocation.localId`,
   `workgroupId`, `numWorkgroups`, and `localIndex` emit their
   `@builtin` parameters when read (PI4).
 - **K24 — The P4 rejections.** A `switch` with no `default`, a
   fallthrough with statements, a mutable global read in a kernel, a
   workgroup variable with an initializer, an atomic schema copied to
-  a local, a barrier in a helper, an atomic method on a local. Each
-  with a fixture and one diagnostic.
+  a local, a barrier in a helper, an atomic method on a local, a
+  `return` before a barrier, a barrier inside an `if` on a builtin,
+  a barrier inside a loop whose condition reads a binding. Each with
+  a fixture and one diagnostic.
 
 ## Diagnostics
 

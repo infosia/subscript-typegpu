@@ -16,6 +16,27 @@ array<u32, 4>`, `var<workgroup> atomic<u32>`, a storage schema with
 `atomicLoad` on places. Eight K24 fixtures and the naga uniformity
 test. Measurement: 45 s / 0.2 s / 48 s / 47 s / 6.
 
+Live run at `010e846` (Metal): `x08-live-reduction` failed with
+`FAIL expected=4608 got=0`, `x09` passed. Bisection by the planner
+through the ship tier on Metal: atomics alone pass (A); a workgroup
+array written and read by the same thread passes (D); a workgroup
+scalar written by thread 0 and read after a barrier by others
+reads zero (F); hand-written modules with the same shapes — f32,
+256 threads, `local_invocation_index`, the workgroup variable
+before or after the bindings — all pass (w1–w3); the `x08` module
+verbatim through a hand-written pipeline fails (w4); the same
+module without its early `return` passes (w5, w7) and with the
+`return` fails regardless of the loop (w6). Cause: `if (global >=
+1024u) { return; }` before `workgroupBarrier()` is a uniformity
+violation. naga did not report it, yawgpu's Tint compiled it, and
+Metal read the workgroup memory as zero. Resolution: K22 Rev 1
+moves uniform placement into the generator (a taint rule over
+builtins, bindings, and helper results, and no `return` before a
+barrier), K24 gains three rejections, and `x08` loads under a
+condition and barriers unconditionally. Observation for the
+backend's owner: Dawn rejects this module at pipeline creation
+(docs), yawgpu accepted it.
+
 ## Exit criteria
 
 | # | Criterion | Evidence |
