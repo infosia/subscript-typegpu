@@ -21,15 +21,33 @@ a second time, which the gate budgets absorb (240 s / 120 s).
 
 ## Slice 2 — the coverage close, the Dawn run, timestamps, README and tutorial
 
-Not started.
+Delivered 2026-08-23, committed at `e07b434`. `a02-textures`,
+`a03-encoders`, `a04-errors` reach every export the API layer can
+call; six exports left through policy rows (157 exports, 157
+reached, the coverage test fails on any unreached export).
+`tools/live.sh` accepts `default`. `TimestampPair` and
+`a05-timestamps`. `README.md`, `docs/tutorial.md`, and the docs
+quote test. Planner verification: gate green, 221 tests.
+Measurement: 45 s / 0.2 s / 97 s / 94 s / 6 — inside budget, and
+the program-change gate approaches its 120 s line because the
+coverage test runs every program's dev tier a second time.
+
+Live runs by the planner outside the sandbox at `e07b434`: Metal
+(yawgpu) ok, 26.28 seconds, `x01`–`x12` `PASS`. **Dawn** (EG5,
+`libwebgpu_dawn.dylib`, `SUBSCRIPT_TYPEGPU_BACKEND=default`): ok,
+25.23 seconds, `x01`–`x12` `PASS`. Dawn accepted every module and
+every bind group, the uniform bindings with `minBindingSize` 8
+included. The P2 review's M6 claim (a uniform struct needs a
+16-byte minimum binding size) is refuted by measurement: LY11
+stands as written, and the layout engine keeps one layout.
 
 ## Exit criteria
 
 | # | Criterion | Evidence |
 |---|---|---|
-| 1 | EG1 typed resources used by one `b` program | — |
-| 2 | EG4's list is closed | — |
-| 3 | EG5's Dawn run is recorded with its decision | — |
-| 4 | EG7's sweep finds no diagnostic without a rule id, an owner, and a fixture | — |
-| 5 | `README.md` and the tutorial exist with their quote gate | — |
-| 6 | Budgets hold | — |
+| 1 | EG1 typed resources used by one `b` program | `b02-vecadd` |
+| 2 | EG4's list is closed | 157 of 157 at `e07b434` |
+| 3 | EG5's Dawn run is recorded with its decision | Dawn at `e07b434`: ok, 25.23 s, LY11 stands |
+| 4 | EG7's sweep finds no diagnostic without a rule id, an owner, and a fixture | Slice 1, green |
+| 5 | `README.md` and the tutorial exist with their quote gate | Slice 2 |
+| 6 | Budgets hold | 45 s / 0.2 s / 97 s / 94 s / 6 |

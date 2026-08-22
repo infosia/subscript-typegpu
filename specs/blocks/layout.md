@@ -59,7 +59,9 @@ implements. Evidence lands in `specs/tracking/p1-layout.md`.
   schema class is the host type (SC9), the generator does not emit
   `@align`. It reports the violation and the author aligns the
   source (SC10). The resulting layout is identical in storage and
-  uniform, so one layout serves both.
+  uniform, so one layout serves both. Measured 2026-08-23 on Dawn
+  (EG5): a uniform struct of 8 bytes binds with `minBindingSize` 8.
+  No 16-byte minimum exists.
 
 ## WGSL
 
