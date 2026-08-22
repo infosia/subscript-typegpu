@@ -22,11 +22,12 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-23 | P4 slice 1 round 2, the tree committed as `9670180` | 44 s | 0.2 s | 48 s | 47 s | 6 |
 | 2026-08-23 | P4 close, the tree committed as `ea25b01` | 44 s | 0.2 s | 49 s | 46 s | 6 |
 | 2026-08-23 | P5 slice 1, the tree committed as `4b34f4a` | 44 s | 0.2 s | 54 s | 51 s | 6 |
+| 2026-08-23 | P5 close, the tree committed as `3d9d988` | 45 s | 0.2 s | 55 s | 53 s | 6 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate
 paid for the first `target/ship-build`). Row 2 onward: the T12 Rev 1
-order. Rows 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15: the coding agent. Row 3: the planner. The
+order. Rows 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16: the coding agent. Row 3: the planner. The
 cold build is genuine: `cargo clean` removes `target/`, no user-wide
 build cache exists, and the rebuilt `target/` is 1.5 GB. Every
 number is inside the plan §7 budget (480 s / 5 s / 240 s / 120 s /
