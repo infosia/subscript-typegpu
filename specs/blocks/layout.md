@@ -83,12 +83,23 @@ implements. Evidence lands in `specs/tracking/p1-layout.md`.
   compares `span`, each member `offset`, and each array `stride`
   with the engine. For a uniform schema the test wraps the struct in
   `var<uniform>` and asserts that `naga` accepts it.
-- **LY15 — Every emitted WGSL module validates.** `naga` with
+- **LY15 — Every emitted WGSL module validates.** A module carries
+  `enable f16;` once, before its first declaration, when any struct
+  names `f16`. `naga` with
   `ValidationFlags::all()` and the capability set the module needs
   (`SHADER_FLOAT16` when `enable f16;` is present, else empty). A
   failure names the program and quotes the diagnostic with its cause
   chain.
-- **LY16 — The C numbers are proven end to end.** A program prints
-  `X_SIZE` and `X_OFFSET_<field>` by name on both tiers. The ship
-  tier compiles the schema class as C with `_Alignas`, so a printed
-  number that differs from the engine's fails the golden.
+- **LY16 — The C numbers are proven end to end.** Rev 1,
+  2026-08-22. A printed generated constant proves nothing about C,
+  because both tiers print the same constant. The harness, which
+  depends on `subscript-codegen`, proves the C side for every `b`
+  program: (1) `subscript_codegen::value_class_layouts` over the
+  checked module equals the engine's C layout for every schema, field
+  by field, size and alignment included; (2) a C probe — the emitted
+  C of the program (`emit_c_without_main`) plus `offsetof`,
+  `sizeof`, and `_Alignof` prints for every schema — compiled by the
+  host C compiler and run, equals the engine's numbers. A schema the
+  probe cannot name fails with the name. From R34 on, a program also
+  prints the byte length of `Context.bytesOf` over a `FixedArray` of
+  each schema, which proves the stride on both tiers in the golden.

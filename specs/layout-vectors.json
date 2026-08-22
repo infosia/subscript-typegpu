@@ -1,0 +1,134 @@
+{
+  "typegpuVersion": "0.12.0",
+  "scalars": [
+    {
+      "name": "f32",
+      "align": 4,
+      "size": 4
+    },
+    {
+      "name": "i32",
+      "align": 4,
+      "size": 4
+    },
+    {
+      "name": "u32",
+      "align": 4,
+      "size": 4
+    },
+    {
+      "name": "f16",
+      "align": 2,
+      "size": 2
+    }
+  ],
+  "vectors": [
+    {
+      "name": "vec2f",
+      "align": 8,
+      "size": 8
+    },
+    {
+      "name": "vec3f",
+      "align": 16,
+      "size": 12
+    },
+    {
+      "name": "vec4f",
+      "align": 16,
+      "size": 16
+    },
+    {
+      "name": "vec2i",
+      "align": 8,
+      "size": 8
+    },
+    {
+      "name": "vec3i",
+      "align": 16,
+      "size": 12
+    },
+    {
+      "name": "vec4i",
+      "align": 16,
+      "size": 16
+    },
+    {
+      "name": "vec2u",
+      "align": 8,
+      "size": 8
+    },
+    {
+      "name": "vec3u",
+      "align": 16,
+      "size": 12
+    },
+    {
+      "name": "vec4u",
+      "align": 16,
+      "size": 16
+    },
+    {
+      "name": "vec2h",
+      "align": 4,
+      "size": 4
+    },
+    {
+      "name": "vec3h",
+      "align": 8,
+      "size": 6
+    },
+    {
+      "name": "vec4h",
+      "align": 8,
+      "size": 8
+    }
+  ],
+  "matrices": [
+    {
+      "name": "mat2x2f",
+      "align": 8,
+      "size": 16
+    },
+    {
+      "name": "mat3x3f",
+      "align": 16,
+      "size": 48
+    },
+    {
+      "name": "mat4x4f",
+      "align": 16,
+      "size": 64
+    }
+  ],
+  "shapes": [
+    {
+      "name": "One",
+      "align": 16,
+      "size": 32,
+      "offsets": {
+        "a": 0,
+        "b": 16
+      }
+    },
+    {
+      "name": "OneArray3",
+      "align": 16,
+      "size": 96,
+      "stride": 32,
+      "offsets": {
+        "element0": 0,
+        "element1": 32
+      }
+    },
+    {
+      "name": "Two",
+      "align": 16,
+      "size": 112,
+      "offsets": {
+        "c": 0,
+        "d": 96
+      }
+    }
+  ]
+}

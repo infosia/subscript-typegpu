@@ -9,9 +9,26 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
   marker, no manifest, no sidecar file. The generator treats a value
   class as a schema when every field type is schema-legal (SC3) and
   the class is reachable from a schema use: a buffer creation
-  (`Buffer<T>`), a binding wrapper (P2), or a field of another
-  schema. A value class the program uses on the host only is not a
-  schema and gets no diagnostic.
+  (`Buffer<T>`), a binding wrapper (P2), a field of another schema,
+  or, in P1, a generated constant the program imports. A value class
+  the program uses on the host only is not a schema and gets no
+  diagnostic.
+- **SC1a — The discovery check.** The program imports its support
+  module before the module exists. The generator therefore checks
+  the program once without the support module, reads the schemas and
+  the imported names from the HIR, generates, and lets the harness
+  check the complete set. The first check needs the checker to
+  tolerate the one unresolved import. Until subscript supplies that
+  mode (request R35), the generator confirms the support-module
+  import with `parse_import_specifiers`, reads the imported names
+  from that one `import { ... } from "./<stem>.typegpu"` statement
+  (the only text scan, limited to that statement), and supplies a
+  stub module that exports those names as `u32` constants, or
+  `string` for a `_WGSL` name. The stub is a recorded deviation from
+  D2 with R35 as its kill date. No other text scan of the program
+  exists. An imported name that no schema produces is an SC3
+  diagnostic when its class has an illegal field, and an SC1
+  diagnostic ("not a schema") otherwise.
 - **SC2 — Declaration order is layout order.** The generator never
   reorders fields. An author who wants fewer padding bytes reorders
   the source.
@@ -28,18 +45,28 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
 ## The type library
 
 - **SC5 — Vectors and matrices are `@CStruct` classes in
-  `lib/typegpu-types.ts`**, hand-written, with the R33 alignment:
+  `lib/typegpu-types.ts`**, hand-written, with the R33 alignment.
+  The generator recognizes them by declaring file and class name,
+  never by name alone:
   `Vec2f`, `Vec2i`, `Vec2u` (`align: 8`), `Vec3f`, `Vec3i`, `Vec3u`,
   `Vec4f`, `Vec4i`, `Vec4u` (`align: 16`), `Vec2h` (`align: 4`),
   `Vec3h`, `Vec4h` (`align: 8`), `Mat2x2f` (two `Vec2f` columns,
   `align: 8`), `Mat3x3f` (three `Vec3f` columns, `align: 16`),
   `Mat4x4f` (four `Vec4f` columns, `align: 16`). Components are
   `x`, `y`, `z`, `w`. Columns are `c0` through `c3`.
-- **SC6 — The library has real bodies.** Every vector and matrix
-  method (`add`, `sub`, `mul`, `scale`, `dot`, `cross`, `length`,
-  `normalize`, and the set `kernel.md` names in P2) is ordinary
+- **SC6 — The library has real bodies.** Every method is ordinary
   subscript that runs on the host. The generator maps each to the
-  WGSL operator or builtin (P2). No method body is a stub.
+  WGSL operator or builtin (P2). No method body is a stub. The P1
+  method set, per kind:
+
+  | Kind | Methods |
+  |---|---|
+  | `Vec2f`, `Vec3f`, `Vec4f` | `add`, `sub`, `mul`, `scale`, `dot`, `length`, `normalize`. `Vec3f` adds `cross` |
+  | `Vec2i`, `Vec3i`, `Vec4i`, `Vec2u`, `Vec3u`, `Vec4u` | `add`, `sub`, `mul`, `scale`, `dot` |
+  | `Vec2h`, `Vec3h`, `Vec4h` | none (SC8) |
+  | `Mat2x2f`, `Mat3x3f`, `Mat4x4f` | `mul` (matrix × matrix), `mulVec` (matrix × vector), `transpose`, and a free `identity` factory |
+
+  `kernel.md` extends the set in P2.
 - **SC7 — Constructors.** Each vector class has a constructor that
   takes its components in order. A free factory `v3f(x, y, z)` and
   family exists beside it. A matrix constructor takes its columns.
