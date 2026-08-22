@@ -1,6 +1,7 @@
 # P3 — render
 
-Status: **in progress**. Opened 2026-08-22. Plan §8 P3. Contract:
+Status: **COMPLETE 2026-08-23.** Opened 2026-08-22. Closed at
+`b32f14a`. Plan §8 P3. Contract:
 `specs/blocks/render.md` (RN).
 
 ## Slice 1 — the render emitter, the runtime, `b06-render`, `x05-live-triangle`
@@ -55,13 +56,17 @@ varying type set has six fixtures, `b08-render-bindings` prints
 `params.visibility=1` and `tint.visibility=2`, `x07-live-render-uniform`
 exists, declarations are recognized by declaring file, and the
 look-alike fixtures are replaced. Measurement: 44 s / 1 s / 41 s /
-38 s / 6.
+38 s / 6. Planner verification at the close: gate green, 201 tests,
+the harness executable 31.37 seconds. Live run outside the sandbox
+at `b32f14a` (Metal): ok, 14.86 seconds, `x01`–`x07` `PASS` — the
+uniform-offset and storage-tinted triangle equals the host
+rasterizer.
 
 ## Exit criteria
 
 | # | Criterion | Evidence |
 |---|---|---|
-| 1 | `b06-render` and `b07-draw-variants` gate-green with WGSL goldens | Slices 1 and 2, `--require-backend` green |
-| 2 | `x05-live-triangle` and `x06-live-draw-variants` `PASS` against the host rasterizer | Metal at `3184883` (10.70 s) and `b32380d` (12.87 s) |
-| 3 | Every RN16 rejection has a red fixture | Six in slice 1, two in slice 2 |
+| 1 | `b06-render`, `b07-draw-variants`, `b08-render-bindings` gate-green with WGSL goldens | Slices 1 and 2 and the close, `--require-backend` green |
+| 2 | `x05`, `x06`, `x07` `PASS` against the host rasterizer | Metal at `3184883` (10.70 s), `b32380d` (12.87 s), `b32f14a` (14.86 s) |
+| 3 | Every RN16 rejection has a red fixture | Six in slice 1, two in slice 2, eight at the close |
 | 4 | Budgets hold | 45 s / 0.2 s / 38 s / 35 s / 6 |
