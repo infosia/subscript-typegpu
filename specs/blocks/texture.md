@@ -51,15 +51,15 @@ Kernels are `kernel.md`, pipelines `pipeline.md`, render `render.md`.
 
 ## Programs
 
-- **TX6 — Gate.** `b10-texture` binds a sampled texture, a sampler,
+- **TX6 — Gate.** `b11-texture` binds a sampled texture, a sampler,
   a storage texture, and a uniform in a second group, in a compute
   kernel that loads, samples at level 0, and stores. Prints the
   layout entries' kinds by name and the WGSL line count.
-- **TX7 — Live.** `x09-live-texture` uploads a 4×4 checkerboard
+- **TX7 — Live.** `x10-live-texture` uploads a 4×4 checkerboard
   through `queue.writeTexture`, runs the compute kernel that
   samples at pixel centers with a nearest sampler into a storage
   texture, copies the storage texture to a buffer, and compares
-  every texel with the host body's result. `x10-live-fragment-sample`
+  every texel with the host body's result. `x11-live-fragment-sample`
   samples the same checkerboard in a fragment kernel over a
   full-screen quad with `sample` and compares with the host.
 

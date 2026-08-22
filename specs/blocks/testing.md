@@ -79,7 +79,8 @@ principles" govern this block.
   in a program. (5) The test-executable count, which is an error when
   it cannot be read. The numbers go to `specs/tracking/build-time.md`
   with the date, the commit, and the command. A measurement row names
-  the commit whose tree was measured.
+  the tree it measured: the commit, or "the tree committed as
+  `<commit>`" when the run preceded the commit.
 - **T13 — A budget is a gate.** Plan §7 holds the budgets. A phase
   close quotes the five numbers. A number above budget is a red
   finding of the phase review.

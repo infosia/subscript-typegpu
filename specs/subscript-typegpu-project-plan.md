@@ -411,10 +411,12 @@ Vertex and fragment entries, IO structs with `@location` and
 `@builtin(position)`, vertex layouts from schemas, `RenderPipeline`,
 render pass encoding, indexed and instanced draws.
 
-Exit: (1) `b06-render` and `b07-draw-variants` gate-green with WGSL
-goldens. (2) `x05-live-triangle` and `x06-live-draw-variants` print
-`PASS` against the host rasterizer (RN14). (3) Every RN16 rejection
-has a red fixture. (4) Budgets hold.
+Exit: (1) `b06-render`, `b07-draw-variants`, and
+`b08-render-bindings` gate-green with WGSL goldens. (2)
+`x05-live-triangle`, `x06-live-draw-variants`, and
+`x07-live-render-uniform` print `PASS` against the host rasterizer
+(RN14, RN17). (3) Every RN16 rejection has a red fixture. (4)
+Budgets hold.
 
 ### P4 — kernel depth (~10%)
 
@@ -422,11 +424,11 @@ has a red fixture. (4) Budgets hold.
 acyclic call graph, module constants, private and workgroup
 variables, atomics, barriers under uniform control flow.
 
-Exit: (1) `b08-kernel-depth` (K18, K19) and `b09-workgroup` (K20,
-K21, K22, K23) gate-green with WGSL goldens. (2) `x07-live-reduction`
+Exit: (1) `b09-kernel-depth` (K18, K19) and `b10-workgroup` (K20,
+K21, K22, K23) gate-green with WGSL goldens. (2) `x08-live-reduction`
 sums across several workgroups with a workgroup array, a barrier,
 and an atomic add, and prints `PASS` — a result only correct
-barriers and atomics produce. (3) `x08-live-switch` decides a
+barriers and atomics produce. (3) `x09-live-switch` decides a
 result through `switch`, `break`, and `continue`, and prints
 `PASS`. (4) Every K24 rejection has a red fixture, and a barrier
 under non-uniform control flow fails the harness with naga's
@@ -438,8 +440,8 @@ Texture and sampler bindings, storage textures, `textureLoad`,
 `textureStore`, `textureSampleLevel` in compute, `textureSample` in
 fragment only, multiple bind groups.
 
-Exit: (1) `b10-texture` gate-green with its WGSL golden (TX6). (2)
-`x09-live-texture` and `x10-live-fragment-sample` print `PASS`
+Exit: (1) `b11-texture` gate-green with its WGSL golden (TX6). (2)
+`x10-live-texture` and `x11-live-fragment-sample` print `PASS`
 against the host sampling body (TX7). (3) Every TX8 rejection has a
 red fixture. (4) Budgets hold.
 

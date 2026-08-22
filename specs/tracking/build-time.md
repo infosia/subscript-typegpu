@@ -10,13 +10,13 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-22 | P0 slice 2 round 1 (committed as `46070bf`), T12 Rev 0 order | 34 s | 0.2 s | 39 s | 10 s | 4 |
 | 2026-08-22 | P0 slice 2 round 2 (committed as `46070bf`), T12 Rev 1 order | 37 s | 0.2 s | 9 s | 6 s | 4 |
 | 2026-08-22 | P0 close, `5f6840b` | 42 s | 0.2 s | 9 s | 6 s | 4 |
-| 2026-08-22 | P1 slice 1, `318729c` (six executables from here) | 45 s | 0.2 s | 13 s | 10 s | 6 |
-| 2026-08-22 | P2 slice 1, `4da1875` | 44 s | 0.2 s | 40 s | 25 s | 6 |
-| 2026-08-22 | P2 slice 2, `7e81ef9` | 44 s | 0.2 s | 25 s | 22 s | 6 |
-| 2026-08-22 | P1 slice 2, `4502030` | 45 s | 0.2 s | 28 s | 25 s | 6 |
-| 2026-08-22 | P1 and P2 close, `3011014` | 42 s | 0.2 s | 29 s | 27 s | 6 |
-| 2026-08-23 | P3 slice 1, `b54c9e8` | 45 s | 0.2 s | 33 s | 32 s | 6 |
-| 2026-08-23 | P3 slice 2, `d3a4f88` | 45 s | 0.2 s | 38 s | 35 s | 6 |
+| 2026-08-22 | P1 slice 1, the tree committed as `a633f12` (six executables from here) | 45 s | 0.2 s | 13 s | 10 s | 6 |
+| 2026-08-22 | P2 slice 1, the tree committed as `9c32b4b` | 44 s | 0.2 s | 40 s | 25 s | 6 |
+| 2026-08-22 | P2 slice 2, the tree committed as `fae7d46` | 44 s | 0.2 s | 25 s | 22 s | 6 |
+| 2026-08-22 | P1 slice 2, the tree committed as `b7e2533` | 45 s | 0.2 s | 28 s | 25 s | 6 |
+| 2026-08-22 | P1 and P2 close, the tree committed as `0e0156c` | 42 s | 0.2 s | 29 s | 27 s | 6 |
+| 2026-08-23 | P3 slice 1, the tree committed as `3184883` | 45 s | 0.2 s | 33 s | 32 s | 6 |
+| 2026-08-23 | P3 slice 2, the tree committed as `b32380d` | 45 s | 0.2 s | 38 s | 35 s | 6 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate

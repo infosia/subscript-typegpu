@@ -7,7 +7,9 @@ does not say otherwise. Schemas are `schema.md`.
 
 ## The declaration
 
-- **RN1 — A render pipeline is a module-level `const`.**
+- **RN1 — A render pipeline is a module-level `const`.** The
+  generator recognizes the declaration functions by declaring file
+  (`typegpu.ts`) and name, never by name alone.
   `export const tri = renderPipeline<Vertex, Varyings>(vert, frag,
   { format: "rgba8unorm" });`. `renderPipeline` is a library generic
   function with a real body that returns a `RenderPipelineSpec` (the
@@ -24,12 +26,13 @@ does not say otherwise. Schemas are `schema.md`.
   Varyings, ctx: FragmentInvocation): Vec4f`, with the same layout
   class first under `renderPipelineL`. The generator checks the
   types against the declaration's type arguments (PI2).
-- **RN3 — Builtins.** `VertexInvocation { vertexIndex: u32;
-  instanceIndex: u32 }` emits `@builtin(vertex_index)` and
-  `@builtin(instance_index)` for the fields the kernel reads.
-  `FragmentInvocation { position: Vec4f; frontFacing: boolean }`
-  emits `@builtin(position)` and `@builtin(front_facing)` the same
-  way.
+- **RN3 — Builtins.** Rev 1, 2026-08-23. `VertexInvocation {
+  vertexIndex: u32; instanceIndex: u32 }` emits `@builtin(vertex_index)`
+  and `@builtin(instance_index)` for the fields the kernel reads.
+  `FragmentInvocation { frontFacing: boolean }` emits
+  `@builtin(front_facing)` the same way. The fragment position is
+  the varyings' `position` field (RN7), never a second builtin: WGSL
+  admits one `@builtin(position)` per entry point.
 
 ## Vertex input
 
@@ -56,24 +59,34 @@ does not say otherwise. Schemas are `schema.md`.
 
 ## Inter-stage data
 
-- **RN7 — The varyings class.** A `@CStruct` class whose field named
-  `position` of type `Vec4f` is `@builtin(position)`, and whose
-  other fields are `@location(n)` in declaration order from 0, with
-  `@interpolate(flat)` for integer types. It is not a schema: it is
-  never laid out for a buffer and never gets layout constants. A
-  varyings class with no `position: Vec4f` field is a diagnostic.
+- **RN7 — The varyings class.** Rev 1, 2026-08-23. A `@CStruct`
+  class whose field named `position` of type `Vec4f` is
+  `@builtin(position)`, and whose other fields are `@location(n)` in
+  declaration order from 0, with `@interpolate(flat)` for integer
+  types. A varying field is `f32`, `i32`, `u32`, a library `f32`,
+  `i32`, or `u32` vector, or a library `f16` vector (which puts
+  `enable f16;` on the module). `boolean`, a matrix, a schema class,
+  `f16`, and a `FixedArray` are diagnostics. The class is not a
+  schema: it is never laid out for a buffer and never gets layout
+  constants, and the same class cannot also be a binding item or a
+  vertex schema. A varyings class with no `position: Vec4f` field is
+  a diagnostic.
 - **RN8 — The fragment output.** A `Vec4f` return is `@location(0)
-  vec4<f32>`. A `@CStruct` class return with `Vec4f` fields is one
-  `@location(n)` per field in declaration order, for multiple
-  targets. P3 declares one target. The rule allows more.
+  vec4<f32>`. A multiple-target form (a `@CStruct` return with one
+  `@location(n)` per `Vec4f` field) arrives with a library overload
+  that types it, in a later phase. Until then every declaration
+  types the fragment return as `Vec4f`, and a different return fails
+  subscript's checker.
 
 ## Emission
 
 - **RN9 — One module, two entries.** The render pipeline's module
   holds the structs, the bindings, the helpers, `@vertex fn <vert>`,
-  and `@fragment fn <frag>`, in that order (K14). Binding visibility
-  is derived from which kernel reaches the binding: vertex, fragment,
-  or both. The golden is `programs/<stem>.<name>.wgsl` (K16).
+  and `@fragment fn <frag>`, in that order (K14). The kernels that
+  reach a binding decide its visibility: vertex, fragment, or both.
+  A binding no kernel reaches is a diagnostic. `enable f16;` depends
+  on the types this module references. The golden is
+  `programs/<stem>.<name>.wgsl` (K16).
 - **RN10 — The support module.** `<name>_WGSL`, `<name>_VERTEX_ENTRY`,
   `<name>_FRAGMENT_ENTRY`, `<name>_LAYOUT<g>` as PI8, the RN6 vertex
   layouts, and `<name>_TARGET_FORMAT: GPUTextureFormat`.
@@ -116,11 +129,24 @@ does not say otherwise. Schemas are `schema.md`.
   `x06-live-draw-variants` cover `drawIndexed` with an index buffer
   and an instanced draw through `renderPipelineInstanced`, with the
   same host rasterizer: the host knows every triangle.
+- **RN17 — Render bindings.** `b08-render-bindings` declares a
+  pipeline through `renderPipelineL` with a uniform read by the
+  vertex kernel and a storage buffer read by the fragment kernel,
+  and prints each layout entry's visibility by name.
+  `x07-live-render-uniform` offsets the triangle through the uniform
+  and tints it through the storage buffer, compared with the host
+  rasterizer.
 
 ## Rejections
 
 - **RN16 — Each rejection is a named diagnostic with a red fixture.**
-  A vertex schema field outside RN5, a varyings class without
-  `position: Vec4f`, a fragment kernel that returns a non-`Vec4f`
-  non-class type, a kernel signature outside RN2, a `textureSample`
-  call (P5), a vertex kernel that writes a storage binding.
+  Rev 1, 2026-08-23. The generator's set: a vertex schema field
+  outside RN5, a varyings class without `position: Vec4f`, a varying
+  field outside RN7, a vertex kernel that writes any storage binding
+  (every write, not the first), a binding no kernel reaches (RN9), a
+  class that is both a varyings class and a schema. Two cases fail
+  subscript's checker first, because the library's declaration
+  types them: a fragment return outside `Vec4f` and a kernel
+  signature outside RN2. Their fixtures assert the checker's
+  diagnostic (PI13 Rev 1). A `textureSample` call is a K10 method
+  outside the table until P5, and its fixture asserts K10.
