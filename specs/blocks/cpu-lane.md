@@ -35,10 +35,9 @@ run P7.
   fails the gate with the program and the call. A later revision
   can phase invocations at barriers.
 - **CL3 — Same numbers.** The host and the GPU compute in `f32`.
-  The live programs `x01`–`x04` and `x09` compare the GPU with a
-  host formula today; under CL they compare the GPU with
-  `simulateCompute` over the same kernel, so the kernel body itself
-  is the oracle and the formula leaves the program.
+  The live programs `x01`–`x04` and `x09` compare the GPU with
+  `simulateCompute` over the same kernel. The kernel body itself is
+  the oracle, and no host formula remains in those programs.
 - **CL4 — The lane is a gate module.** Rev 1. Every `b` program
   whose pipeline is host-runnable calls `simulateCompute` itself
   after its Noop dispatch and prints one `host:` line per pipeline
