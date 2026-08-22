@@ -30,7 +30,7 @@ Kernels are `kernel.md`, pipelines `pipeline.md`, render `render.md`.
   uv: Vec2f): Vec4f` → `textureSample(tex, s, uv)`,
   `storage.store(coords: Vec2i, value: Vec4f)` → `textureStore(st,
   coords, value)`. `sample` is legal in a fragment kernel only (it
-  needs derivatives); in a compute or vertex kernel it is a
+  needs derivatives). In a compute or vertex kernel it is a
   diagnostic. `store` is a statement. The host bodies implement
   nearest sampling for `sampleLevel` and `sample` at level 0, and
   the live programs compare against that host body with a
