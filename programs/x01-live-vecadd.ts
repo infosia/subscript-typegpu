@@ -14,6 +14,7 @@ import {
   ComputePipelineSpec,
   MutStorage,
   Storage,
+  bufferResource,
 } from "./typegpu";
 import {
   gpu,
@@ -158,7 +159,7 @@ export async function main(): Promise<void> {
       device,
       nativeLayout,
       vecAdd_LAYOUT0,
-      [a.handle(), b.handle(), out.handle()],
+      [bufferResource(a.handle()), bufferResource(b.handle()), bufferResource(out.handle())],
     );
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);

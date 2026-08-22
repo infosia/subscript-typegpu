@@ -17,6 +17,7 @@ import {
   workgroupArray,
   workgroupBarrier,
   workgroupVar,
+  bufferResource,
 } from "./typegpu";
 import { AtomicU32 } from "./typegpu-types";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
@@ -84,7 +85,7 @@ export async function main(): Promise<void> {
       [workgroup_WORKGROUP_X, workgroup_WORKGROUP_Y, workgroup_WORKGROUP_Z],
     );
     using nativeLayout = pipeline.bindGroupLayout(0);
-    using bindGroup = createBindGroup(device, nativeLayout, workgroup_LAYOUT0, [counters]);
+    using bindGroup = createBindGroup(device, nativeLayout, workgroup_LAYOUT0, [bufferResource(counters)]);
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count * 4, 1, 1);
     using command = encoder.finishDefault();

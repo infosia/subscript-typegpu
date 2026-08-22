@@ -3,6 +3,7 @@
 use std::collections::BTreeSet;
 
 use crate::layout::{self, Member, Scalar, TypeTree};
+use crate::pipeline::BindingKind;
 use crate::pipeline::Pipeline;
 use crate::render::RenderPipeline;
 use crate::schema::Schema;
@@ -182,6 +183,37 @@ fn binding_size(
         })
 }
 
+fn emit_binding_entry(
+    out: &mut String,
+    module: &Module,
+    schemas: &[Schema],
+    binding: &crate::pipeline::Binding,
+    visibility: &str,
+) -> Result<(), Diagnostic> {
+    let tail = match binding.kind {
+        BindingKind::Uniform | BindingKind::Storage | BindingKind::MutStorage => format!(
+            "minBindingSize: {}",
+            binding_size(module, schemas, &binding.item_ty, &binding.pos)?,
+        ),
+        BindingKind::Texture(sample) => {
+            format!("minBindingSize: 0, sampleType: \"{}\"", sample.webgpu(),)
+        }
+        BindingKind::StorageTexture(format) => {
+            format!("minBindingSize: 0, format: \"{}\"", format.webgpu(),)
+        }
+        BindingKind::Sampler => "minBindingSize: 0, samplerType: \"filtering\"".to_owned(),
+        BindingKind::ComparisonSampler => {
+            "minBindingSize: 0, samplerType: \"comparison\"".to_owned()
+        }
+    };
+    out.push_str(&format!(
+        "  {{ binding: {}, visibility: {visibility}, kind: \"{}\", {tail} }},\n",
+        binding.index,
+        binding.kind.webgpu(),
+    ));
+    Ok(())
+}
+
 pub(crate) fn support_module(
     module: &Module,
     schemas: &[Schema],
@@ -247,12 +279,7 @@ pub(crate) fn support_module(
                 pipeline.declaration, layout.group
             ));
             for binding in &layout.bindings {
-                out.push_str(&format!(
-                    "  {{ binding: {}, visibility: COMPUTE_VISIBILITY, kind: \"{}\", minBindingSize: {} }},\n",
-                    binding.index,
-                    binding.kind.webgpu(),
-                    binding_size(module, schemas, &binding.item_ty, &binding.pos)?,
-                ));
+                emit_binding_entry(&mut out, module, schemas, binding, "COMPUTE_VISIBILITY")?;
             }
             out.push_str("] };\n");
         }
@@ -301,12 +328,7 @@ pub(crate) fn support_module(
                         ));
                     }
                 };
-                out.push_str(&format!(
-                    "  {{ binding: {}, visibility: {visibility}, kind: \"{}\", minBindingSize: {} }},\n",
-                    binding.index,
-                    binding.kind.webgpu(),
-                    binding_size(module, schemas, &binding.item_ty, &binding.pos)?,
-                ));
+                emit_binding_entry(&mut out, module, schemas, binding, visibility)?;
             }
             out.push_str("] };\n");
         }

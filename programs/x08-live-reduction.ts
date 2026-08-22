@@ -17,6 +17,7 @@ import {
   readBuffer,
   workgroupArray,
   workgroupBarrier,
+  bufferResource,
 } from "./typegpu";
 import { AtomicU32 } from "./typegpu-types";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice, GPUMapMode } from "./webgpu";
@@ -142,7 +143,7 @@ export async function main(): Promise<void> {
       device,
       nativeLayout,
       reduction_LAYOUT0,
-      [input.handle(), output.handle()],
+      [bufferResource(input.handle()), bufferResource(output.handle())],
     );
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);

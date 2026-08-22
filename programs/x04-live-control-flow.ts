@@ -9,6 +9,7 @@ import {
   ComputePipelineSpec,
   MutStorage,
   Storage,
+  bufferResource,
   computePipeline,
   createBindGroup,
   createBuffer,
@@ -69,7 +70,7 @@ export async function main(): Promise<void> {
     input.write(queue, 0, Context.bytesOf<FixedArray<Item, 4>>(inputValues));
     using pipeline = createComputePipeline(device, controlFlow_WGSL, controlFlow_ENTRY, [controlFlow_LAYOUT0], [controlFlow_WORKGROUP_X, controlFlow_WORKGROUP_Y, controlFlow_WORKGROUP_Z]);
     using nativeLayout = pipeline.bindGroupLayout(0);
-    using bindGroup = createBindGroup(device, nativeLayout, controlFlow_LAYOUT0, [input.handle(), output.handle()]);
+    using bindGroup = createBindGroup(device, nativeLayout, controlFlow_LAYOUT0, [bufferResource(input.handle()), bufferResource(output.handle())]);
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], 1, 1, 1);
     output.copyTo(encoder, readback, 0, 1);

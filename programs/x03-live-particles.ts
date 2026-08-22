@@ -14,6 +14,7 @@ import {
   ComputePipelineSpec,
   MutStorage,
   Uniform,
+  bufferResource,
 } from "./typegpu";
 import { Vec3f } from "./typegpu-types";
 import {
@@ -190,7 +191,7 @@ export async function main(): Promise<void> {
       device,
       nativeLayout,
       particles_LAYOUT0,
-      [params.handle(), particlesBuffer.handle()],
+      [bufferResource(params.handle()), bufferResource(particlesBuffer.handle())],
     );
     using encoder = device.createCommandEncoderDefault();
     step = 0;

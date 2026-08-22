@@ -11,6 +11,7 @@ import {
   ComputePipelineSpec,
   MutStorage,
   Uniform,
+  bufferResource,
 } from "./typegpu";
 import { Vec3f } from "./typegpu-types";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
@@ -113,7 +114,7 @@ export async function main(): Promise<void> {
       device,
       nativeLayout,
       particles_LAYOUT0,
-      [params, particlesBuffer],
+      [bufferResource(params), bufferResource(particlesBuffer)],
     );
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);

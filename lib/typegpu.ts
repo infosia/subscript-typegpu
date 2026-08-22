@@ -1,6 +1,6 @@
 /** Runtime bindings shared by generated TypeGPU support modules and programs. */
 
-import { Vec3u, Vec4f } from "./typegpu-types";
+import { Vec2f, Vec2i, Vec2u, Vec3u, Vec4f } from "./typegpu-types";
 import {
   GPUBindGroup,
   GPUBindGroupEntry,
@@ -13,10 +13,115 @@ import {
   GPUQueue,
   GPURenderPassEncoder,
   GPURenderPipeline,
+  GPUSampler,
   GPUShaderStage,
+  GPUTextureView,
   GPUVertexAttribute,
   GPUVertexBufferLayout,
 } from "./webgpu";
+
+export class Texture2d<T> {
+  private values: T[];
+  private pixels: Vec4f[];
+  private width: u32;
+  private height: u32;
+
+  constructor(values: T[], pixels: Vec4f[], width: u32, height: u32) {
+    this.values = values;
+    this.pixels = pixels;
+    this.width = width;
+    this.height = height;
+  }
+
+  dimensions(): Vec2u {
+    return new Vec2u(this.width, this.height);
+  }
+
+  load(coords: Vec2i, level: u32): Vec4f {
+    if (level !== 0 || coords.x < 0 || coords.y < 0
+      || (coords.x as u32) >= this.width || (coords.y as u32) >= this.height) {
+      return new Vec4f(0.0, 0.0, 0.0, 0.0);
+    }
+    const pixel: u32 = (coords.y as u32) * this.width + (coords.x as u32);
+    return this.pixels[pixel as i32];
+  }
+
+  sampleLevel(sampler: Sampler, uv: Vec2f, level: f32): Vec4f {
+    if (this.width === 0 || this.height === 0 || level !== 0.0 || !sampler.isNearest()) {
+      return new Vec4f(0.0, 0.0, 0.0, 0.0);
+    }
+    let x: i32 = Math.floor((uv.x * (this.width as f32)) as f64) as i32;
+    let y: i32 = Math.floor((uv.y * (this.height as f32)) as f64) as i32;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if ((x as u32) >= this.width) x = (this.width - 1) as i32;
+    if ((y as u32) >= this.height) y = (this.height - 1) as i32;
+    return this.load(new Vec2i(x, y), 0);
+  }
+
+  sample(sampler: Sampler, uv: Vec2f): Vec4f {
+    return this.sampleLevel(sampler, uv, 0.0);
+  }
+
+  store(coords: Vec2i, value: Vec4f): void {}
+}
+
+export class Sampler {
+  private nearest: boolean;
+
+  constructor() {
+    this.nearest = true;
+  }
+
+  isNearest(): boolean {
+    return this.nearest;
+  }
+}
+
+export class ComparisonSampler {
+  private nearest: boolean;
+
+  constructor() {
+    this.nearest = true;
+  }
+
+  isNearest(): boolean {
+    return this.nearest;
+  }
+}
+
+export class Rgba8unorm {}
+export class Rgba8uint {}
+export class Rgba16float {}
+export class R32float {}
+export class Rgba32float {}
+
+export class StorageTexture2d<F> {
+  private values: Vec4f[];
+  private formats: F[];
+  private width: u32;
+  private height: u32;
+
+  constructor(values: Vec4f[], width: u32, height: u32) {
+    this.values = values;
+    this.formats = [];
+    this.width = width;
+    this.height = height;
+  }
+
+  store(coords: Vec2i, value: Vec4f): void {
+    if (coords.x < 0 || coords.y < 0
+      || (coords.x as u32) >= this.width || (coords.y as u32) >= this.height) {
+      return;
+    }
+    const pixel: i32 = ((coords.y as u32) * this.width + (coords.x as u32)) as i32;
+    if (pixel === this.values.length) {
+      this.values.push(value);
+    } else {
+      this.values[pixel] = value;
+    }
+  }
+}
 
 export class Buffer<T> {
   buffer: GPUBuffer;
@@ -392,6 +497,28 @@ export class BindGroupLayoutEntrySpec {
   visibility!: u64;
   kind!: string;
   minBindingSize!: u64;
+  sampleType?: GPUTextureSampleType = "float";
+  format?: GPUTextureFormat;
+  samplerType?: GPUSamplerBindingType = "filtering";
+}
+
+@Descriptor
+export class BindingResource {
+  buffer?: GPUBuffer | null = null;
+  textureView?: GPUTextureView | null = null;
+  sampler?: GPUSampler | null = null;
+}
+
+export function bufferResource(buffer: GPUBuffer): BindingResource {
+  return { buffer, textureView: null, sampler: null };
+}
+
+export function textureResource(textureView: GPUTextureView): BindingResource {
+  return { buffer: null, textureView, sampler: null };
+}
+
+export function samplerResource(sampler: GPUSampler): BindingResource {
+  return { buffer: null, textureView: null, sampler };
 }
 
 @Descriptor
@@ -516,11 +643,34 @@ function createNativeBindGroupLayouts(
           visibility: source.visibility,
           buffer: { type: "read-only-storage", minBindingSize: source.minBindingSize },
         });
-      } else {
+      } else if (source.kind === "storage") {
         entries.push({
           binding: source.binding,
           visibility: source.visibility,
           buffer: { type: "storage", minBindingSize: source.minBindingSize },
+        });
+      } else if (source.kind === "texture") {
+        entries.push({
+          binding: source.binding,
+          visibility: source.visibility,
+          texture: { sampleType: source.sampleType, viewDimension: "2d", multisampled: false },
+        });
+      } else if (source.kind === "storageTexture") {
+        if (source.format !== undefined) {
+          entries.push({
+            binding: source.binding,
+            visibility: source.visibility,
+            storageTexture: { access: "write-only", format: source.format, viewDimension: "2d" },
+          });
+        } else {
+          print(`TX8 storageTexture binding=${source.binding} has no format`);
+          unreachable();
+        }
+      } else {
+        entries.push({
+          binding: source.binding,
+          visibility: source.visibility,
+          sampler: { type: source.samplerType },
         });
       }
       binding = binding + 1;
@@ -617,16 +767,34 @@ export function createBindGroup(
   device: GPUDevice,
   layout: GPUBindGroupLayout,
   spec: BindGroupLayoutSpec,
-  buffers: GPUBuffer[],
+  resources: BindingResource[],
 ): GPUBindGroup {
-  if (spec.entries.length !== buffers.length) {
-    print(`createBindGroup expected ${spec.entries.length} buffers but received ${buffers.length}`);
+  if (spec.entries.length !== resources.length) {
+    print(`createBindGroup expected ${spec.entries.length} resources but received ${resources.length}`);
     unreachable();
   }
   const entries: GPUBindGroupEntry[] = [];
   let index: i32 = 0;
-  while (index < buffers.length) {
-    entries.push({ binding: spec.entries[index].binding, buffer: buffers[index] });
+  while (index < resources.length) {
+    const specEntry: BindGroupLayoutEntrySpec = spec.entries[index];
+    const resource: BindingResource = resources[index];
+    let actual: string = "none";
+    if (resource.buffer !== null) actual = "buffer";
+    if (resource.textureView !== null) actual = "texture";
+    if (resource.sampler !== null) actual = "sampler";
+    let expected: string = "buffer";
+    if (specEntry.kind === "texture" || specEntry.kind === "storageTexture") expected = "texture";
+    if (specEntry.kind === "sampler" || specEntry.kind === "comparisonSampler") expected = "sampler";
+    if (actual !== expected) {
+      print(`TX8 createBindGroup binding=${specEntry.binding} expected=${expected} actual=${actual}`);
+      unreachable();
+    }
+    entries.push({
+      binding: specEntry.binding,
+      buffer: resource.buffer,
+      textureView: resource.textureView,
+      sampler: resource.sampler,
+    });
     index = index + 1;
   }
   return device.createBindGroup({ layout, entries });

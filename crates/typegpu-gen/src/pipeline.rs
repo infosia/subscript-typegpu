@@ -10,6 +10,60 @@ pub(crate) enum BindingKind {
     Uniform,
     Storage,
     MutStorage,
+    Texture(TextureSampleType),
+    StorageTexture(StorageTextureFormat),
+    Sampler,
+    ComparisonSampler,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TextureSampleType {
+    Float,
+    Sint,
+    Uint,
+}
+
+impl TextureSampleType {
+    pub(crate) fn wgsl(self) -> &'static str {
+        match self {
+            Self::Float => "f32",
+            Self::Sint => "i32",
+            Self::Uint => "u32",
+        }
+    }
+
+    pub(crate) fn webgpu(self) -> &'static str {
+        match self {
+            Self::Float => "float",
+            Self::Sint => "sint",
+            Self::Uint => "uint",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StorageTextureFormat {
+    Rgba8unorm,
+    Rgba8uint,
+    Rgba16float,
+    R32float,
+    Rgba32float,
+}
+
+impl StorageTextureFormat {
+    pub(crate) fn wgsl(self) -> &'static str {
+        match self {
+            Self::Rgba8unorm => "rgba8unorm",
+            Self::Rgba8uint => "rgba8uint",
+            Self::Rgba16float => "rgba16float",
+            Self::R32float => "r32float",
+            Self::Rgba32float => "rgba32float",
+        }
+    }
+
+    pub(crate) fn webgpu(self) -> &'static str {
+        self.wgsl()
+    }
 }
 
 impl BindingKind {
@@ -18,6 +72,10 @@ impl BindingKind {
             Self::Uniform => "uniform",
             Self::Storage => "storage, read",
             Self::MutStorage => "storage, read_write",
+            Self::Texture(_)
+            | Self::StorageTexture(_)
+            | Self::Sampler
+            | Self::ComparisonSampler => "",
         }
     }
 
@@ -26,7 +84,15 @@ impl BindingKind {
             Self::Uniform => "uniform",
             Self::Storage => "read-only-storage",
             Self::MutStorage => "storage",
+            Self::Texture(_) => "texture",
+            Self::StorageTexture(_) => "storageTexture",
+            Self::Sampler => "sampler",
+            Self::ComparisonSampler => "comparisonSampler",
         }
+    }
+
+    pub(crate) fn is_buffer(self) -> bool {
+        matches!(self, Self::Uniform | Self::Storage | Self::MutStorage)
     }
 }
 
@@ -88,21 +154,86 @@ pub(crate) fn library_class<'a>(
         .filter(|class| class.pos.file == "typegpu.ts")
 }
 
-fn wrapper(module: &Module, ty: &Type) -> Option<(BindingKind, Type)> {
-    let class = library_class(module, ty)?;
+fn wrapper(
+    module: &Module,
+    ty: &Type,
+    pos: &Pos,
+) -> Result<Option<(BindingKind, Type)>, Diagnostic> {
+    let Some(class) = library_class(module, ty) else {
+        return Ok(None);
+    };
     let kind = if class.name.starts_with("Uniform<") {
         BindingKind::Uniform
     } else if class.name.starts_with("Storage<") {
         BindingKind::Storage
     } else if class.name.starts_with("MutStorage<") {
         BindingKind::MutStorage
+    } else if class.name.starts_with("Texture2d<") {
+        let Type::Array(item) = &class
+            .fields
+            .iter()
+            .find(|field| field.name == "values")
+            .expect("library texture values")
+            .ty
+        else {
+            unreachable!("Texture2d values field changed")
+        };
+        let sample = match item.as_ref() {
+            Type::F32 => TextureSampleType::Float,
+            Type::I32 => TextureSampleType::Sint,
+            Type::U32 => TextureSampleType::Uint,
+            _ => {
+                return Err(diagnostic(
+                    "TX8",
+                    "Texture2d sample type must be f32, i32, or u32",
+                    pos.clone(),
+                ))
+            }
+        };
+        return Ok(Some((BindingKind::Texture(sample), (**item).clone())));
+    } else if class.name.starts_with("StorageTexture2d<") {
+        let Type::Array(item) = &class
+            .fields
+            .iter()
+            .find(|field| field.name == "formats")
+            .expect("library storage texture formats")
+            .ty
+        else {
+            unreachable!("StorageTexture2d formats field changed")
+        };
+        let marker = library_class(module, item).and_then(|marker| match marker.name.as_str() {
+            "Rgba8unorm" => Some(StorageTextureFormat::Rgba8unorm),
+            "Rgba8uint" => Some(StorageTextureFormat::Rgba8uint),
+            "Rgba16float" => Some(StorageTextureFormat::Rgba16float),
+            "R32float" => Some(StorageTextureFormat::R32float),
+            "Rgba32float" => Some(StorageTextureFormat::Rgba32float),
+            _ => None,
+        });
+        let Some(format) = marker else {
+            return Err(diagnostic(
+                "TX8",
+                "StorageTexture2d format must be a TX1 library marker",
+                pos.clone(),
+            ));
+        };
+        return Ok(Some((
+            BindingKind::StorageTexture(format),
+            (**item).clone(),
+        )));
+    } else if class.name == "Sampler" {
+        return Ok(Some((BindingKind::Sampler, ty.clone())));
+    } else if class.name == "ComparisonSampler" {
+        return Ok(Some((BindingKind::ComparisonSampler, ty.clone())));
     } else {
-        return None;
+        return Ok(None);
     };
-    let Type::Array(item) = &class.fields.iter().find(|field| field.name == "values")?.ty else {
-        return None;
+    let Some(values) = class.fields.iter().find(|field| field.name == "values") else {
+        return Ok(None);
     };
-    Some((kind, (**item).clone()))
+    let Type::Array(item) = &values.ty else {
+        return Ok(None);
+    };
+    Ok(Some((kind, (**item).clone())))
 }
 
 fn allowed_binding_item(module: &Module, ty: &Type) -> bool {
@@ -141,7 +272,7 @@ pub(crate) fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, D
     }
     let mut bindings = Vec::new();
     for (index, field) in class.fields.iter().enumerate() {
-        let Some((kind, item_ty)) = wrapper(module, &field.ty) else {
+        let Some((kind, item_ty)) = wrapper(module, &field.ty, &field.pos)? else {
             return Err(diagnostic(
                 "PI13",
                 format!(
@@ -151,7 +282,7 @@ pub(crate) fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, D
                 field.pos.clone(),
             ));
         };
-        if !allowed_binding_item(module, &item_ty) {
+        if kind.is_buffer() && !allowed_binding_item(module, &item_ty) {
             return Err(diagnostic(
                 "PI13",
                 format!(
@@ -452,6 +583,22 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
                 Ok(layout) => layouts.push(layout),
                 Err(error) => diagnostics.push(error),
             }
+        }
+        if let Some(layout) = layouts.iter().find(|layout| {
+            layout.bindings.is_empty()
+                && layouts
+                    .iter()
+                    .any(|later| later.group > layout.group && !later.bindings.is_empty())
+        }) {
+            diagnostics.push(diagnostic(
+                "TX8",
+                format!(
+                    "pipeline binding groups have a gap at group {}",
+                    layout.group
+                ),
+                kernel.params[layout.group as usize].pos.clone(),
+            ));
+            continue;
         }
         let invocation_ok = class_name(module, &kernel.params[arity].ty)
             .is_some_and(|name| name == "ComputeInvocation")

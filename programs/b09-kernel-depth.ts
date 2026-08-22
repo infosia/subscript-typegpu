@@ -10,6 +10,7 @@ import {
   computePipeline,
   createBindGroup,
   createComputePipeline,
+  bufferResource,
 } from "./typegpu";
 import { Vec2u, v2u } from "./typegpu-types";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
@@ -78,7 +79,7 @@ export async function main(): Promise<void> {
       [kernelDepth_WORKGROUP_X, kernelDepth_WORKGROUP_Y, kernelDepth_WORKGROUP_Z],
     );
     using nativeLayout = pipeline.bindGroupLayout(0);
-    using bindGroup = createBindGroup(device, nativeLayout, kernelDepth_LAYOUT0, [output]);
+    using bindGroup = createBindGroup(device, nativeLayout, kernelDepth_LAYOUT0, [bufferResource(output)]);
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();

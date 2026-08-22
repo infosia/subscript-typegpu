@@ -11,6 +11,7 @@ import {
   ComputePipelineSpec,
   MutStorage,
   Storage,
+  bufferResource,
 } from "./typegpu";
 import {
   gpu,
@@ -99,7 +100,7 @@ export async function main(): Promise<void> {
       [vecAdd_WORKGROUP_X, vecAdd_WORKGROUP_Y, vecAdd_WORKGROUP_Z],
     );
     using nativeLayout = pipeline.bindGroupLayout(0);
-    using bindGroup = createBindGroup(device, nativeLayout, vecAdd_LAYOUT0, [a, b, out]);
+    using bindGroup = createBindGroup(device, nativeLayout, vecAdd_LAYOUT0, [bufferResource(a), bufferResource(b), bufferResource(out)]);
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();

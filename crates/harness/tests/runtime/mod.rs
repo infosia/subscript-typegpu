@@ -15,8 +15,8 @@ fn wrappers_execute_their_real_host_bodies() {
     std::fs::create_dir_all(&directory).expect("create runtime test directory");
     let program = directory.join("runtime-host.ts");
     std::fs::write(&program, r#"
-import { MutStorage, PrivateVar, Storage, Uniform, WorkgroupArray, WorkgroupVar, privateVar, storageBarrier, workgroupArray, workgroupBarrier, workgroupVar } from "./typegpu";
-import { AtomicI32, AtomicU32 } from "./typegpu-types";
+import { MutStorage, PrivateVar, Rgba8unorm, Sampler, Storage, StorageTexture2d, Texture2d, Uniform, WorkgroupArray, WorkgroupVar, privateVar, storageBarrier, workgroupArray, workgroupBarrier, workgroupVar } from "./typegpu";
+import { AtomicI32, AtomicU32, Vec2f, Vec2i, Vec4f } from "./typegpu-types";
 export function main(): void {
   const uniform: Uniform<u32> = new Uniform<u32>(7);
   const storage: Storage<u32> = new Storage<u32>([2, 3]);
@@ -38,6 +38,17 @@ export function main(): void {
   print(`atomic=${unsigned.add(5)},${unsigned.sub(3)},${unsigned.min(20)},${unsigned.max(20)},${unsigned.exchange(7)},${unsigned.load()}`);
   signed.store(4);
   print(`signed=${signed.add(-6)},${signed.min(-3)},${signed.max(9)},${signed.exchange(1)},${signed.load()}`);
+  const textureValues: f32[] = [1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0];
+  const texturePixels: Vec4f[] = [new Vec4f(1.0, 0.0, 0.0, 1.0), new Vec4f(0.0, 1.0, 0.0, 1.0)];
+  const texture = new Texture2d<f32>(textureValues, texturePixels, 2, 1);
+  const sampler = new Sampler();
+  const dimensions = texture.dimensions();
+  const loaded = texture.load(new Vec2i(1, 0), 0);
+  const sampled = texture.sample(sampler, new Vec2f(0.25, 0.5));
+  const storagePixels: Vec4f[] = [new Vec4f(0.0, 0.0, 0.0, 0.0)];
+  const storage = new StorageTexture2d<Rgba8unorm>(storagePixels, 1, 1);
+  storage.store(new Vec2i(0, 0), sampled);
+  print(`texture=${dimensions.x},${dimensions.y},${loaded.x},${loaded.y},${sampled.x},${sampled.y},${storagePixels[0].x}`);
 }
 "#).expect("write runtime test program");
     let result = std::process::Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-harness"))
@@ -55,7 +66,7 @@ export function main(): void {
     std::fs::remove_dir(&directory).expect("remove runtime test directory");
     assert_eq!(
         output,
-        b"runtime=7,3,2,9,2\nvariables=7,8,9,10,2\natomic=10,15,12,12,20,7\nsigned=4,-2,-3,9,1\n"
+        b"runtime=7,3,2,9,2\nvariables=7,8,9,10,2\natomic=10,15,12,12,20,7\nsigned=4,-2,-3,9,1\ntexture=2,1,0,1,1,0,1\n"
     );
 }
 

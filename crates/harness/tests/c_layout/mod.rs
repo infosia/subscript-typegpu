@@ -59,6 +59,7 @@ fn programs() -> Vec<PathBuf> {
             "b08-render-bindings.ts",
             "b09-kernel-depth.ts",
             "b10-workgroup.ts",
+            "b11-texture.ts",
         ],
         "C layout program set changed"
     );

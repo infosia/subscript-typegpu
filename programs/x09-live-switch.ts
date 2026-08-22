@@ -13,6 +13,7 @@ import {
   createBuffer,
   createComputePipeline,
   readBuffer,
+  bufferResource,
 } from "./typegpu";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice, GPUMapMode } from "./webgpu";
 import {
@@ -90,7 +91,7 @@ export async function main(): Promise<void> {
     );
     print("pipeline:created");
     using nativeLayout = pipeline.bindGroupLayout(0);
-    using bindGroup = createBindGroup(device, nativeLayout, liveSwitch_LAYOUT0, [output.handle()]);
+    using bindGroup = createBindGroup(device, nativeLayout, liveSwitch_LAYOUT0, [bufferResource(output.handle())]);
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     output.copyTo(encoder, readback, 0, count);

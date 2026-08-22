@@ -6,4 +6,5 @@ mod library;
 mod naga_offsets;
 mod render;
 mod support;
+mod texture;
 mod vectors;

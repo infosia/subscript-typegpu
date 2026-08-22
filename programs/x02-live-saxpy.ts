@@ -15,6 +15,7 @@ import {
   MutStorage,
   Storage,
   Uniform,
+  bufferResource,
 } from "./typegpu";
 import {
   gpu,
@@ -174,7 +175,7 @@ export async function main(): Promise<void> {
       device,
       nativeLayout,
       saxpy_LAYOUT0,
-      [params.handle(), x.handle(), y.handle()],
+      [bufferResource(params.handle()), bufferResource(x.handle()), bufferResource(y.handle())],
     );
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);

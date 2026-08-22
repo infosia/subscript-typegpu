@@ -14,6 +14,7 @@ import {
   Storage,
   Uniform,
   VertexInvocation,
+  bufferResource,
 } from "./typegpu";
 import { Vec2f, Vec4f } from "./typegpu-types";
 import {
@@ -170,7 +171,7 @@ export async function main(): Promise<void> {
       device,
       nativeLayout,
       shifted_LAYOUT0,
-      [params, tint],
+      [bufferResource(params), bufferResource(tint)],
     );
     using encoder = device.createCommandEncoderDefault();
     using pass = encoder.beginRenderPass({

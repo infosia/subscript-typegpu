@@ -451,6 +451,37 @@ fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String, Diagnostic
     })
 }
 
+fn binding_declaration(
+    module: &Module,
+    group: u32,
+    binding: &crate::pipeline::Binding,
+) -> Result<String, Diagnostic> {
+    let name = mapping::ident(&binding.name);
+    let declaration = match binding.kind {
+        BindingKind::Uniform => format!(
+            "var<uniform> {name}: {};",
+            wgsl_type(module, &binding.item_ty, &binding.pos)?,
+        ),
+        BindingKind::Storage | BindingKind::MutStorage => format!(
+            "var<{}> {name}: array<{}>;",
+            binding.kind.wgsl(),
+            wgsl_type(module, &binding.item_ty, &binding.pos)?,
+        ),
+        BindingKind::Texture(sample) => {
+            format!("var {name}: texture_2d<{}>;", sample.wgsl())
+        }
+        BindingKind::StorageTexture(format) => {
+            format!("var {name}: texture_storage_2d<{}, write>;", format.wgsl())
+        }
+        BindingKind::Sampler => format!("var {name}: sampler;"),
+        BindingKind::ComparisonSampler => format!("var {name}: sampler_comparison;"),
+    };
+    Ok(format!(
+        "@group({group}) @binding({}) {declaration}\n",
+        binding.index,
+    ))
+}
+
 fn type_name(module: &Module, ty: &Type) -> String {
     subscript_compiler::types::display_type(
         ty,
@@ -1785,6 +1816,38 @@ impl<'a> Emitter<'a> {
                         (BindingKind::Storage | BindingKind::MutStorage, "length", []) => {
                             format!("arrayLength(&{})", binding.name)
                         }
+                        (BindingKind::Texture(_), "dimensions", []) => {
+                            format!("textureDimensions({})", binding.name)
+                        }
+                        (BindingKind::Texture(_), "load", [coords, level]) => {
+                            format!("textureLoad({}, {coords}, {level})", binding.name)
+                        }
+                        (BindingKind::Texture(_), "sampleLevel", [sampler, uv, level]) => {
+                            format!(
+                                "textureSampleLevel({}, {sampler}, {uv}, {level})",
+                                binding.name
+                            )
+                        }
+                        (BindingKind::Texture(_), "sample", [sampler, uv]) => {
+                            if self.invocation_kind != InvocationKind::Fragment {
+                                return Err(diagnostic(
+                                    "TX8",
+                                    "Texture2d.sample is legal only in a fragment kernel",
+                                    expr.pos.clone(),
+                                ));
+                            }
+                            format!("textureSample({}, {sampler}, {uv})", binding.name)
+                        }
+                        (BindingKind::Texture(_), "store", _) => {
+                            return Err(diagnostic(
+                                "TX8",
+                                "store is not legal on a sampled texture",
+                                expr.pos.clone(),
+                            ));
+                        }
+                        (BindingKind::StorageTexture(_), "store", [coords, value]) => {
+                            format!("textureStore({}, {coords}, {value})", binding.name)
+                        }
                         _ => {
                             return Err(generator_diagnostic(
                                 format!("binding method `{name}` is not valid for this wrapper"),
@@ -1792,7 +1855,11 @@ impl<'a> Emitter<'a> {
                             ))
                         }
                     };
-                    let precedence = if name == "set" { 0 } else { 10 };
+                    let precedence = if matches!(name.as_str(), "set" | "store") {
+                        0
+                    } else {
+                        10
+                    };
                     return Ok(Snippet {
                         text,
                         precedence,
@@ -3298,7 +3365,9 @@ pub(crate) fn emit(
     let globals = kernel_globals(module, kernel)?;
     validate_statement_subset(&kernel.body)?;
     for binding in pipeline.layouts.iter().flat_map(|layout| &layout.bindings) {
-        if binding.kind != BindingKind::MutStorage && type_contains_atomic(module, &binding.item_ty)
+        if binding.kind.is_buffer()
+            && binding.kind != BindingKind::MutStorage
+            && type_contains_atomic(module, &binding.item_ty)
         {
             return Err(diagnostic(
                 "K21",
@@ -3395,20 +3464,7 @@ pub(crate) fn emit(
     out.push_str(&emit_kernel_globals(module, &globals)?);
     for layout in &pipeline.layouts {
         for binding in &layout.bindings {
-            let item = wgsl_type(module, &binding.item_ty, &binding.pos)?;
-            let declaration_ty = if binding.kind == BindingKind::Uniform {
-                item
-            } else {
-                format!("array<{item}>")
-            };
-            out.push_str(&format!(
-                "@group({}) @binding({}) var<{}> {}: {};\n",
-                layout.group,
-                binding.index,
-                binding.kind.wgsl(),
-                mapping::ident(&binding.name),
-                declaration_ty
-            ));
+            out.push_str(&binding_declaration(module, layout.group, binding)?);
         }
     }
     out.push('\n');
@@ -3705,20 +3761,7 @@ pub(crate) fn emit_render(
     out.push_str(&render_interface_structs(module, pipeline)?);
     for layout in &pipeline.layouts {
         for binding in &layout.bindings {
-            let item = wgsl_type(module, &binding.item_ty, &binding.pos)?;
-            let declaration_ty = if binding.kind == BindingKind::Uniform {
-                item
-            } else {
-                format!("array<{item}>")
-            };
-            out.push_str(&format!(
-                "@group({}) @binding({}) var<{}> {}: {};\n",
-                layout.group,
-                binding.index,
-                binding.kind.wgsl(),
-                mapping::ident(&binding.name),
-                declaration_ty
-            ));
+            out.push_str(&binding_declaration(module, layout.group, binding)?);
         }
     }
     if !pipeline.layouts.is_empty() {

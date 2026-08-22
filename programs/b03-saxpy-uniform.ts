@@ -12,6 +12,7 @@ import {
   MutStorage,
   Storage,
   Uniform,
+  bufferResource,
 } from "./typegpu";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
 import {
@@ -107,7 +108,7 @@ export async function main(): Promise<void> {
       [saxpy_WORKGROUP_X, saxpy_WORKGROUP_Y, saxpy_WORKGROUP_Z],
     );
     using nativeLayout = pipeline.bindGroupLayout(0);
-    using bindGroup = createBindGroup(device, nativeLayout, saxpy_LAYOUT0, [params, x, y]);
+    using bindGroup = createBindGroup(device, nativeLayout, saxpy_LAYOUT0, [bufferResource(params), bufferResource(x), bufferResource(y)]);
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();

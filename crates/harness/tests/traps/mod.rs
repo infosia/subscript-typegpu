@@ -54,6 +54,10 @@ fn buffer_bounds_traps_are_named_and_numbered() {
             "read-past-end.ts",
             "BF8 readBuffer elementIndex=1 elementCount=2 count=2",
         ),
+        (
+            "resource-kind-mismatch.ts",
+            "TX8 createBindGroup binding=3 expected=texture actual=buffer",
+        ),
     ] {
         assert_trap(&directory.join(name), expected);
     }
