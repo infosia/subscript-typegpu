@@ -21,13 +21,22 @@ triangle equals the host rasterizer's.
 
 ## Slice 2 — draw variants
 
-Handoff issued 2026-08-23. Result: pending.
+Delivered 2026-08-23, committed at `b32380d`. Planner verification:
+gate green, 197 tests (the harness executable 28.13 seconds on the
+coding agent's run), `b07-draw-variants` equal on both tiers with
+the `quad` (instanced, 24 lines) and `tri` (19 lines) goldens. Live
+run by the planner outside the sandbox at `b32380d` (Metal): ok,
+12.87 seconds, `x01`–`x06` `PASS` — three instanced quads through
+`drawIndexed(6, 3)` equal the host rasterizer pixel by pixel (the
+coding agent's host probe counted 225, 210, and 210 covered pixels
+per instance with 58 overlapping). Measurement: 45 s / 0.2 s / 38 s
+/ 35 s / 6.
 
 ## Exit criteria
 
 | # | Criterion | Evidence |
 |---|---|---|
-| 1 | `b06-render` and `b07-draw-variants` gate-green with WGSL goldens | — |
-| 2 | `x05-live-triangle` and `x06-live-draw-variants` `PASS` against the host rasterizer | — |
-| 3 | Every RN16 rejection has a red fixture | — |
-| 4 | Budgets hold | — |
+| 1 | `b06-render` and `b07-draw-variants` gate-green with WGSL goldens | Slices 1 and 2, `--require-backend` green |
+| 2 | `x05-live-triangle` and `x06-live-draw-variants` `PASS` against the host rasterizer | Metal at `3184883` (10.70 s) and `b32380d` (12.87 s) |
+| 3 | Every RN16 rejection has a red fixture | Six in slice 1, two in slice 2 |
+| 4 | Budgets hold | 45 s / 0.2 s / 38 s / 35 s / 6 |
