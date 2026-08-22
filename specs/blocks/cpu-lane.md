@@ -1,8 +1,7 @@
 # Block: the CPU lane (CL-rules)
 
-P7 contract draft. Rev 0, 2026-08-23. Plan §8 P7: optional, the
-owner decides at the P6 close. The block exists so the decision has
-a shape and a cost.
+P7 contract. Rev 0, 2026-08-23. The owner decided on 2026-08-23 to
+run P7.
 
 ## What the lane is
 
