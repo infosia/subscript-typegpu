@@ -19,6 +19,8 @@ name = "create_instance"
 pattern = "create"
 doc = "Creates an instance with no descriptor."
 
+# Method rows in emission order. Reshape rows carry an F-rule reason.
+
 [[functions]]
 name = "get_instance_limits"
 pattern = "limits-fill"
@@ -26,8 +28,6 @@ pattern = "limits-fill"
 [[functions]]
 name = "has_instance_feature"
 pattern = "feature-probe"
-
-# Method rows in emission order. Reshape rows carry an F-rule reason.
 
 [[map]]
 method = "instance.process_events"
@@ -638,6 +638,32 @@ reason = "feature enumeration needs the parked mutable-pair and enum-parameter-p
 [[exclude]]
 construct = "shader_module.get_compilation_info"
 reason = "compilation-info output records are deferred from the facade area work"
+
+# Generated compatibility exports with no selected API-layer consumer.
+
+[[export_exclude]]
+name = "subscript_typegpu_get_instance_limits"
+reason = "the selected GPU API reports capabilities through the adapter and device"
+
+[[export_exclude]]
+name = "subscript_typegpu_has_instance_feature"
+reason = "the selected GPU API reports features through the adapter and device"
+
+[[export_exclude]]
+name = "subscript_typegpu_adapter_request_device"
+reason = "the selected API always sends the explicit device descriptor form"
+
+[[export_exclude]]
+name = "subscript_typegpu_buffer_map_whole_async"
+reason = "the selected API requires an explicit mapped range"
+
+[[export_exclude]]
+name = "subscript_typegpu_command_encoder_write_timestamp"
+reason = "EG6 uses pass timestamp writes instead of the encoder command"
+
+[[export_exclude]]
+name = "subscript_typegpu_texture_get_texture_binding_view_dimension"
+reason = "the selected WebIDL API has no texture binding view dimension attribute"
 
 # --- Constant sets emitted into generated.rs (values from yml) -------
 

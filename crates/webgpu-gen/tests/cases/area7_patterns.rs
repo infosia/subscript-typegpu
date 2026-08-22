@@ -19,15 +19,12 @@ fn area7_fills_features_and_device_descriptor_are_generated() {
     .expect("area 7 policy generates");
 
     for declaration in [
-        "int32_t subscript_typegpu_get_instance_limits(SubscriptTypegpuInstanceLimits* out);",
-        "bool subscript_typegpu_has_instance_feature(SubscriptTypegpuInstanceFeatureName feature);",
         "int32_t subscript_typegpu_adapter_get_limits(SubscriptTypegpuAdapter adapter, SubscriptTypegpuLimits* out);",
         "bool subscript_typegpu_adapter_get_info(SubscriptTypegpuAdapter adapter, SubscriptTypegpuAdapterInfo* out);",
         "bool subscript_typegpu_adapter_has_feature(SubscriptTypegpuAdapter adapter, SubscriptTypegpuFeatureName feature);",
         "int32_t subscript_typegpu_device_get_limits(SubscriptTypegpuDevice device, SubscriptTypegpuLimits* out);",
         "bool subscript_typegpu_device_get_adapter_info(SubscriptTypegpuDevice device, SubscriptTypegpuAdapterInfo* out);",
         "bool subscript_typegpu_device_has_feature(SubscriptTypegpuDevice device, SubscriptTypegpuFeatureName feature);",
-        "SubscriptTypegpuFutureId subscript_typegpu_adapter_request_device(SubscriptTypegpuInstance instance, SubscriptTypegpuAdapter adapter);",
         "SubscriptTypegpuFutureId subscript_typegpu_adapter_request_device_with_descriptor(SubscriptTypegpuInstance instance, SubscriptTypegpuAdapter adapter, const SubscriptTypegpuDeviceDescriptor* descriptor);",
     ] {
         assert!(generated.header.contains(declaration), "missing {declaration}");

@@ -8,7 +8,7 @@ pub(crate) struct GeneratedNativeSymbols {
     pub(crate) names: Vec<String>,
 }
 
-fn export_names(plan: &Plan) -> Vec<String> {
+pub(crate) fn export_names(plan: &Plan) -> Vec<String> {
     let mut names = Vec::new();
     names.extend(
         plan.creates
@@ -125,8 +125,15 @@ fn rust_signature<'a>(rust: &'a str, name: &str) -> (&'a str, Vec<&'a str>, &'a 
     (params, arguments, result)
 }
 
-pub(crate) fn render(plan: &Plan, rust: &str) -> GeneratedNativeSymbols {
-    let names = export_names(plan);
+pub(crate) fn render(
+    plan: &Plan,
+    rust: &str,
+    excluded_exports: &std::collections::BTreeSet<String>,
+) -> GeneratedNativeSymbols {
+    let names = export_names(plan)
+        .into_iter()
+        .filter(|name| !excluded_exports.contains(name))
+        .collect::<Vec<_>>();
     let mut source = String::from(
         "// GENERATED FILE — DO NOT EDIT.\n//\n// Facade exports emitted from the resolved generator plan.\n\n#![allow(non_snake_case)]\n\n",
     );

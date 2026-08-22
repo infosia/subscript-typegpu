@@ -5,6 +5,7 @@ use crate::patterns::{
     handle_array, handles, label, map_async, shader_wgsl, strings, sync, typed_pair, write_texture,
 };
 use crate::plan::{Chunk, Plan};
+use std::collections::BTreeSet;
 
 const MODULE_DOC: &str = "//! GENERATED FILE — DO NOT EDIT.\n//!\n//! `tools/regen.sh` emits this file from the pinned inputs and policy.\n//! The regeneration test compares the committed bytes.\n//!\n//! Async callbacks use AllowProcessEvents and copy borrowed messages.\n//! Backend handle cleanup occurs after each callback returns.\n";
 
@@ -158,7 +159,7 @@ mod tests {
     }
 }
 
-pub(crate) fn render(plan: &Plan) -> String {
+pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String {
     let async_ops: Vec<_> = plan
         .chunks
         .iter()
@@ -318,16 +319,24 @@ pub(crate) fn render(plan: &Plan) -> String {
 
     let mut declarations = String::new();
     for create in &plan.creates {
-        declarations.push_str(&sync::rust_create_extern(create));
+        if !excluded_exports.contains(&create.subscript_typegpu_fn) {
+            declarations.push_str(&sync::rust_create_extern(create));
+        }
     }
     for op in &plan.anchor_syncs {
-        declarations.push_str(&sync::rust_sync_extern(op));
+        if !excluded_exports.contains(&op.subscript_typegpu_fn) {
+            declarations.push_str(&sync::rust_sync_extern(op));
+        }
     }
     declarations.push_str(&handles::rust_release_extern(&plan.anchor));
     for chunk in &plan.chunks {
         match chunk {
             Chunk::Async(op) => declarations.push_str(&future_poll::rust_async_extern(op)),
-            Chunk::Sync(op) => declarations.push_str(&sync::rust_sync_extern(op)),
+            Chunk::Sync(op) => {
+                if !excluded_exports.contains(&op.subscript_typegpu_fn) {
+                    declarations.push_str(&sync::rust_sync_extern(op));
+                }
+            }
             Chunk::Descriptor(op) => {
                 let shape = plan
                     .structs
@@ -366,15 +375,21 @@ pub(crate) fn render(plan: &Plan) -> String {
             }
             Chunk::DeviceEvents(op) => declarations.push_str(&device_events::rust_extern(op)),
             Chunk::Limits(op) => {
-                let shape = plan
-                    .structs
-                    .iter()
-                    .find(|shape| shape.source == op.shape)
-                    .expect("limits shape exists");
-                declarations.push_str(&adapter_limits::rust_limits_extern(op, shape));
+                if !excluded_exports.contains(&op.subscript_typegpu_fn) {
+                    let shape = plan
+                        .structs
+                        .iter()
+                        .find(|shape| shape.source == op.shape)
+                        .expect("limits shape exists");
+                    declarations.push_str(&adapter_limits::rust_limits_extern(op, shape));
+                }
             }
             Chunk::AdapterInfo(op) => declarations.push_str(&adapter_limits::rust_info_extern(op)),
-            Chunk::Feature(op) => declarations.push_str(&adapter_limits::rust_feature_extern(op)),
+            Chunk::Feature(op) => {
+                if !excluded_exports.contains(&op.subscript_typegpu_fn) {
+                    declarations.push_str(&adapter_limits::rust_feature_extern(op));
+                }
+            }
         }
     }
     if !info_ops.is_empty() {

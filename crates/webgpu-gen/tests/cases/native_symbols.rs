@@ -87,3 +87,23 @@ fn full_plan_export_names_are_unique() {
     names.dedup();
     assert_eq!(names.len(), before);
 }
+
+#[test]
+fn export_exclusion_removes_every_public_and_backend_symbol() {
+    let mut policy = fixture("mini.policy.toml");
+    policy.push_str(
+        "\n[[export_exclude]]\nname = \"subscript_typegpu_gizmo_get_tag\"\nreason = \"the fixture has no public API consumer\"\n",
+    );
+    let generated = subscript_typegpu_webgpu_gen::generate(&fixture("mini.yml"), &policy)
+        .expect("mini fixture with an export exclusion generates");
+    assert!(!generated
+        .export_names
+        .iter()
+        .any(|name| name == "subscript_typegpu_gizmo_get_tag"));
+    assert!(!generated.header.contains("subscript_typegpu_gizmo_get_tag"));
+    assert!(!generated.rust.contains("subscript_typegpu_gizmo_get_tag"));
+    assert!(!generated.rust.contains("wgpuGizmoGetTag"));
+    assert!(!generated
+        .native_symbols
+        .contains("subscript_typegpu_gizmo_get_tag"));
+}

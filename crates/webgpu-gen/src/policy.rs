@@ -22,6 +22,9 @@ pub(crate) struct Policy {
     /// (facade-generator.md F18).
     #[serde(default)]
     pub exclude: Vec<ExcludeRow>,
+    /// Generated facade exports which have no selected API-layer consumer.
+    #[serde(default)]
+    pub export_exclude: Vec<ExportExcludeRow>,
     /// Enum/bitflag constant sets emitted into the generated Rust.
     #[serde(default)]
     pub constants: Vec<ConstantRow>,
@@ -415,6 +418,15 @@ pub(crate) struct MapRow {
 pub(crate) struct ExcludeRow {
     /// `object.method`, or `addref` for the implicit AddRef family.
     pub construct: String,
+    pub reason: String,
+}
+
+/// `[[export_exclude]]` row.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ExportExcludeRow {
+    /// Exact generated `subscript_typegpu_*` export name.
+    pub name: String,
     pub reason: String,
 }
 

@@ -91,6 +91,17 @@ fn assert_pass(program: &Path, tier: &str, output: &str) {
 }
 
 #[test]
+fn live_tool_removes_the_default_backend_request() {
+    let path = repository_root().join("tools/live.sh");
+    let source = std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+    assert!(source.contains("default|metal|vulkan"));
+    assert!(source
+        .contains("if [ \"$backend\" = \"default\" ]; then\n  unset SUBSCRIPT_TYPEGPU_BACKEND"));
+    assert!(source.contains("[ \"$backend\" = \"metal\" ]"));
+}
+
+#[test]
 #[ignore = "requires a real adapter through tools/live.sh"]
 fn every_x_program_passes_on_a_real_adapter() {
     let programs = live_programs();

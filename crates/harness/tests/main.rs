@@ -5,6 +5,7 @@ mod api;
 mod c_layout;
 mod coverage;
 mod differential;
+mod docs;
 mod library;
 mod live;
 mod rejections;
@@ -15,7 +16,7 @@ mod wgsl_goldens;
 
 // Re-pin with specs/subscript-typegpu-project-plan.md section 5,
 // "The substrate generator".
-const FACADE_EXPORT_COUNT: usize = 163;
+const FACADE_EXPORT_COUNT: usize = 157;
 
 fn repository_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

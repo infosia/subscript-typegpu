@@ -10,11 +10,13 @@ import {
   GPUCommandEncoder,
   GPUComputePipeline,
   GPUDevice,
+  GPUQuerySet,
   GPUQueue,
   GPURenderPassEncoder,
   GPURenderPipeline,
   GPUSampler,
   GPUShaderStage,
+  GPUBufferUsage,
   GPUTextureView,
   GPUVertexAttribute,
   GPUVertexBufferLayout,
@@ -569,6 +571,31 @@ export class ComputePipeline {
     );
   }
 
+  dispatchTimed(
+    encoder: GPUCommandEncoder,
+    groups: GPUBindGroup[],
+    x: u32,
+    y: u32,
+    z: u32,
+    pair: TimestampPair,
+  ): void {
+    using pass = encoder.beginComputePass({
+      timestampWrites: {
+        querySet: pair.querySet(),
+        beginningOfPassWriteIndex: 0,
+        endOfPassWriteIndex: 1,
+      },
+    });
+    pass.setPipeline(this.pipeline);
+    let group: i32 = 0;
+    while (group < groups.length) {
+      pass.setBindGroup(group as u32, groups[group]);
+      group = group + 1;
+    }
+    pass.dispatchWorkgroups(x, y, z);
+    pass.end();
+  }
+
   dispose(): void {
     this.pipeline.dispose();
   }
@@ -576,6 +603,62 @@ export class ComputePipeline {
   [Symbol.dispose](): void {
     this.dispose();
   }
+}
+
+export class TimestampPair {
+  private queries: GPUQuerySet;
+  private resolved: GPUBuffer;
+
+  constructor(queries: GPUQuerySet, resolved: GPUBuffer) {
+    this.queries = queries;
+    this.resolved = resolved;
+  }
+
+  querySet(): GPUQuerySet {
+    return this.queries;
+  }
+
+  resolve(
+    encoder: GPUCommandEncoder,
+    buffer: Buffer<FixedArray<u64, 2>>,
+  ): void {
+    buffer.handle();
+    encoder.resolveQuerySet(this.queries, 0, 2, this.resolved, 0);
+  }
+
+  copyTo(
+    encoder: GPUCommandEncoder,
+    readback: Buffer<FixedArray<u64, 2>>,
+  ): void {
+    encoder.copyBufferToBuffer(this.resolved, 0, readback.handle(), 0, 16);
+  }
+
+  dispose(): void {
+    this.queries.destroy();
+    this.queries.dispose();
+    this.resolved.dispose();
+  }
+
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
+}
+
+export function createTimestampPair(device: GPUDevice): TimestampPair | null {
+  if (!device.hasFeature("timestamp-query")) {
+    return null;
+  }
+  const queries: GPUQuerySet = device.createQuerySet({
+    label: "typegpu-timestamps",
+    type: "timestamp",
+    count: 2,
+  });
+  const resolved: GPUBuffer = device.createBuffer({
+    label: "typegpu-timestamp-resolve",
+    size: 16,
+    usage: GPUBufferUsage.QUERY_RESOLVE + GPUBufferUsage.COPY_SRC,
+  });
+  return new TimestampPair(queries, resolved);
 }
 
 export class RenderPipeline {

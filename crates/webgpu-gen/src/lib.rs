@@ -17,6 +17,7 @@ mod patterns;
 mod plan;
 mod policy;
 
+use std::collections::BTreeSet;
 use std::fmt;
 
 pub use api::{generate_api, ApiError, ApiPolicyError, CEnumAlias, GeneratedApi};
@@ -73,11 +74,124 @@ impl From<PolicyError> for Error {
     }
 }
 
+fn export_exclusions(
+    policy: &policy::Policy,
+    plan: &plan::Plan,
+) -> Result<BTreeSet<String>, Error> {
+    let exports = native_symbols::export_names(plan)
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    let mut excluded = BTreeSet::new();
+    for row in &policy.export_exclude {
+        if row.reason.trim().is_empty() {
+            return Err(Error::Policy(PolicyError::Invalid {
+                entry: row.name.clone(),
+                message: "export exclusion requires a reason".to_owned(),
+            }));
+        }
+        if !exports.contains(&row.name) {
+            return Err(Error::Policy(PolicyError::Unknown {
+                entry: row.name.clone(),
+            }));
+        }
+        if !excluded.insert(row.name.clone()) {
+            return Err(Error::Policy(PolicyError::Duplicate {
+                entry: row.name.clone(),
+            }));
+        }
+    }
+    Ok(excluded)
+}
+
+fn filter_header_exports(mut header: String, excluded: &BTreeSet<String>) -> String {
+    if excluded.is_empty() {
+        return header;
+    }
+    header = header
+        .lines()
+        .filter(|line| {
+            !excluded
+                .iter()
+                .any(|name| line.contains(&format!(" {name}(")))
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    header.push('\n');
+    header
+}
+
+fn rust_export_range(source: &str, name: &str) -> Option<std::ops::Range<usize>> {
+    let marker = format!("pub extern \"C\" fn {name}(");
+    let signature = source.find(&marker)?;
+    let start = source[..signature].rfind("\n///").map_or_else(
+        || source[..signature].rfind("#[no_mangle]"),
+        |offset| Some(offset + 1),
+    )?;
+    let open = source[signature..].find('{')? + signature;
+    let bytes = source.as_bytes();
+    let mut depth = 0usize;
+    let mut index = open;
+    let mut string = false;
+    let mut character = false;
+    let mut escaped = false;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if escaped {
+            escaped = false;
+        } else if string {
+            match byte {
+                b'\\' => escaped = true,
+                b'"' => string = false,
+                _ => {}
+            }
+        } else if character {
+            match byte {
+                b'\\' => escaped = true,
+                b'\'' => character = false,
+                _ => {}
+            }
+        } else {
+            match byte {
+                b'"' => string = true,
+                b'\'' => character = true,
+                b'{' => depth += 1,
+                b'}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        let mut end = index + 1;
+                        while end < bytes.len() && bytes[end] == b'\n' {
+                            end += 1;
+                        }
+                        return Some(start..end);
+                    }
+                }
+                _ => {}
+            }
+        }
+        index += 1;
+    }
+    None
+}
+
+fn filter_rust_exports(mut rust: String, excluded: &BTreeSet<String>) -> Result<String, Error> {
+    for name in excluded {
+        let range = rust_export_range(&rust, name).ok_or_else(|| {
+            Error::Policy(PolicyError::Invalid {
+                entry: name.clone(),
+                message: "excluded export has no generated Rust function".to_owned(),
+            })
+        })?;
+        rust.replace_range(range, "");
+    }
+    Ok(rust)
+}
+
 /// Generates both artifacts from yml + policy text, byte-stably.
 pub fn generate(yml_text: &str, policy_text: &str) -> Result<Generated, Error> {
     let yml: model::Yml = serde_yaml::from_str(yml_text).map_err(Error::Yaml)?;
     let policy: policy::Policy = toml::from_str(policy_text).map_err(Error::Toml)?;
     let plan = plan::build(&yml, &policy)?;
+    let excluded_exports = export_exclusions(&policy, &plan)?;
     let cenum_aliases = policy
         .api
         .as_ref()
@@ -113,10 +227,16 @@ pub fn generate(yml_text: &str, policy_text: &str) -> Result<Generated, Error> {
             }));
         }
     }
-    let rust = emit_rust::render(&plan);
-    let symbols = native_symbols::render(&plan, &rust);
+    let rust = filter_rust_exports(
+        emit_rust::render(&plan, &excluded_exports),
+        &excluded_exports,
+    )?;
+    let symbols = native_symbols::render(&plan, &rust, &excluded_exports);
     Ok(Generated {
-        header: emit_header::render(&plan, &cenum_aliases),
+        header: filter_header_exports(
+            emit_header::render(&plan, &cenum_aliases),
+            &excluded_exports,
+        ),
         rust,
         native_symbols: symbols.source,
         export_names: symbols.names,

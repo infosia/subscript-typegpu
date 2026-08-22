@@ -3627,10 +3627,6 @@ wgpuInstanceProcessEvents: unsafe extern "C" fn(WGPUInstance),
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuInstanceRelease: unsafe extern "C" fn(WGPUInstance),
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-wgpuGetInstanceLimits: unsafe extern "C" fn(*mut WGPUInstanceLimits)-> i32,
-    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-wgpuHasInstanceFeature: unsafe extern "C" fn(i32)-> u32,
-    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuInstanceRequestAdapter: unsafe extern "C" fn(WGPUInstance, *const WGPURequestAdapterOptions, WGPURequestAdapterCallbackInfo)-> WGPUFuture,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuAdapterGetLimits: unsafe extern "C" fn(WGPUAdapter, *mut WGPULimits)-> i32,
@@ -3729,8 +3725,6 @@ wgpuTextureGetSampleCount: unsafe extern "C" fn(WGPUTexture)-> u32,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuTextureGetDimension: unsafe extern "C" fn(WGPUTexture)-> i32,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-wgpuTextureGetTextureBindingViewDimension: unsafe extern "C" fn(WGPUTexture)-> i32,
-    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuTextureGetFormat: unsafe extern "C" fn(WGPUTexture)-> i32,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuTextureGetUsage: unsafe extern "C" fn(WGPUTexture)-> u64,
@@ -3774,8 +3768,6 @@ wgpuCommandEncoderCopyTextureToTexture: unsafe extern "C" fn(WGPUCommandEncoder,
 wgpuCommandEncoderClearBuffer: unsafe extern "C" fn(WGPUCommandEncoder, WGPUBuffer, u64, u64),
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuCommandEncoderResolveQuerySet: unsafe extern "C" fn(WGPUCommandEncoder, WGPUQuerySet, u32, u32, WGPUBuffer, u64),
-    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-wgpuCommandEncoderWriteTimestamp: unsafe extern "C" fn(WGPUCommandEncoder, WGPUQuerySet, u32),
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuCommandEncoderInsertDebugMarker: unsafe extern "C" fn(WGPUCommandEncoder, WGPUStringView),
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
@@ -3946,8 +3938,6 @@ impl WebgpuTable {
             wgpuCreateInstance: symbol(&library, path, b"wgpuCreateInstance\0")?,
             wgpuInstanceProcessEvents: symbol(&library, path, b"wgpuInstanceProcessEvents\0")?,
             wgpuInstanceRelease: symbol(&library, path, b"wgpuInstanceRelease\0")?,
-            wgpuGetInstanceLimits: symbol(&library, path, b"wgpuGetInstanceLimits\0")?,
-            wgpuHasInstanceFeature: symbol(&library, path, b"wgpuHasInstanceFeature\0")?,
             wgpuInstanceRequestAdapter: symbol(&library, path, b"wgpuInstanceRequestAdapter\0")?,
             wgpuAdapterGetLimits: symbol(&library, path, b"wgpuAdapterGetLimits\0")?,
             wgpuAdapterGetInfo: symbol(&library, path, b"wgpuAdapterGetInfo\0")?,
@@ -3997,7 +3987,6 @@ impl WebgpuTable {
             wgpuTextureGetMipLevelCount: symbol(&library, path, b"wgpuTextureGetMipLevelCount\0")?,
             wgpuTextureGetSampleCount: symbol(&library, path, b"wgpuTextureGetSampleCount\0")?,
             wgpuTextureGetDimension: symbol(&library, path, b"wgpuTextureGetDimension\0")?,
-            wgpuTextureGetTextureBindingViewDimension: symbol(&library, path, b"wgpuTextureGetTextureBindingViewDimension\0")?,
             wgpuTextureGetFormat: symbol(&library, path, b"wgpuTextureGetFormat\0")?,
             wgpuTextureGetUsage: symbol(&library, path, b"wgpuTextureGetUsage\0")?,
             wgpuTextureDestroy: symbol(&library, path, b"wgpuTextureDestroy\0")?,
@@ -4020,7 +4009,6 @@ impl WebgpuTable {
             wgpuCommandEncoderCopyTextureToTexture: symbol(&library, path, b"wgpuCommandEncoderCopyTextureToTexture\0")?,
             wgpuCommandEncoderClearBuffer: symbol(&library, path, b"wgpuCommandEncoderClearBuffer\0")?,
             wgpuCommandEncoderResolveQuerySet: symbol(&library, path, b"wgpuCommandEncoderResolveQuerySet\0")?,
-            wgpuCommandEncoderWriteTimestamp: symbol(&library, path, b"wgpuCommandEncoderWriteTimestamp\0")?,
             wgpuCommandEncoderInsertDebugMarker: symbol(&library, path, b"wgpuCommandEncoderInsertDebugMarker\0")?,
             wgpuCommandEncoderPushDebugGroup: symbol(&library, path, b"wgpuCommandEncoderPushDebugGroup\0")?,
             wgpuCommandEncoderPopDebugGroup: symbol(&library, path, b"wgpuCommandEncoderPopDebugGroup\0")?,
@@ -4124,24 +4112,6 @@ unsafe fn wgpuInstanceRelease(instance: WGPUInstance) {
     };
     // SAFETY: the table stores the pinned signature for this symbol.
     unsafe { (table.wgpuInstanceRelease)(instance) }
-}
-
-unsafe fn wgpuGetInstanceLimits(out: *mut WGPUInstanceLimits)-> i32 {
-    let Some(table) = crate::runtime::table() else {
-        eprintln!("subscript-typegpu: cannot call wgpuGetInstanceLimits: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
-        std::process::abort();
-    };
-    // SAFETY: the table stores the pinned signature for this symbol.
-    unsafe { (table.wgpuGetInstanceLimits)(out) }
-}
-
-unsafe fn wgpuHasInstanceFeature(feature: i32)-> u32 {
-    let Some(table) = crate::runtime::table() else {
-        eprintln!("subscript-typegpu: cannot call wgpuHasInstanceFeature: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
-        std::process::abort();
-    };
-    // SAFETY: the table stores the pinned signature for this symbol.
-    unsafe { (table.wgpuHasInstanceFeature)(feature) }
 }
 
 unsafe fn wgpuInstanceRequestAdapter(instance: WGPUInstance, options: *const WGPURequestAdapterOptions, callback_info: WGPURequestAdapterCallbackInfo,)-> WGPUFuture {
@@ -4585,15 +4555,6 @@ unsafe fn wgpuTextureGetDimension(texture: WGPUTexture)-> i32 {
     unsafe { (table.wgpuTextureGetDimension)(texture) }
 }
 
-unsafe fn wgpuTextureGetTextureBindingViewDimension(texture: WGPUTexture)-> i32 {
-    let Some(table) = crate::runtime::table() else {
-        eprintln!("subscript-typegpu: cannot call wgpuTextureGetTextureBindingViewDimension: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
-        std::process::abort();
-    };
-    // SAFETY: the table stores the pinned signature for this symbol.
-    unsafe { (table.wgpuTextureGetTextureBindingViewDimension)(texture) }
-}
-
 unsafe fn wgpuTextureGetFormat(texture: WGPUTexture)-> i32 {
     let Some(table) = crate::runtime::table() else {
         eprintln!("subscript-typegpu: cannot call wgpuTextureGetFormat: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
@@ -4790,15 +4751,6 @@ unsafe fn wgpuCommandEncoderResolveQuerySet(commandEncoder: WGPUCommandEncoder, 
     };
     // SAFETY: the table stores the pinned signature for this symbol.
     unsafe { (table.wgpuCommandEncoderResolveQuerySet)(commandEncoder, querySet, firstQuery, queryCount, destination, destinationOffset) }
-}
-
-unsafe fn wgpuCommandEncoderWriteTimestamp(commandEncoder: WGPUCommandEncoder, querySet: WGPUQuerySet, queryIndex: u32) {
-    let Some(table) = crate::runtime::table() else {
-        eprintln!("subscript-typegpu: cannot call wgpuCommandEncoderWriteTimestamp: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
-        std::process::abort();
-    };
-    // SAFETY: the table stores the pinned signature for this symbol.
-    unsafe { (table.wgpuCommandEncoderWriteTimestamp)(commandEncoder, querySet, queryIndex) }
 }
 
 unsafe fn wgpuCommandEncoderInsertDebugMarker(commandEncoder: WGPUCommandEncoder, markerLabel: WGPUStringView) {
@@ -6773,38 +6725,6 @@ pub extern "C" fn subscript_typegpu_instance_release(instance: SubscriptTypegpuI
     }
 }
 
-/// `subscript-typegpu.h`: fills backend-reported limits and returns status verbatim.
-#[no_mangle]
-pub extern "C" fn subscript_typegpu_get_instance_limits(out: *mut SubscriptTypegpuInstanceLimits) -> i32 {
-    if runtime::table().is_none() {
-        return 0;
-    }
-    if out.is_null() {
-        return 0;
-    }
-    // SAFETY: this scalar-only out struct admits all-zero initialization.
-    let mut backend: WGPUInstanceLimits = unsafe { std::mem::zeroed() };
-    // SAFETY: the optional receiver is non-null and `backend` is writable.
-    let status = unsafe { wgpuGetInstanceLimits(&mut backend) };
-    // SAFETY: `out` was checked and every field is copied verbatim.
-    unsafe {
-        out.write(SubscriptTypegpuInstanceLimits {
-            timed_wait_any_max_count: backend.timed_wait_any_max_count,
-        });
-    }
-    status
-}
-
-/// `subscript-typegpu.h`: reports whether one pinned feature enum is present.
-#[no_mangle]
-pub extern "C" fn subscript_typegpu_has_instance_feature(feature: i32) -> bool {
-    if runtime::table().is_none() {
-        return false;
-    }
-    // SAFETY: optional receiver is non-null and the enum is passed verbatim.
-    unsafe { wgpuHasInstanceFeature(feature) != 0 }
-}
-
 /// `subscript-typegpu.h`: begins the `wgpuInstanceRequestAdapter` request; poll after pumping.
 #[no_mangle]
 pub extern "C" fn subscript_typegpu_instance_request_adapter(
@@ -6954,15 +6874,6 @@ pub extern "C" fn subscript_typegpu_adapter_has_feature(adapter: SubscriptTypegp
     }
     // SAFETY: optional receiver is non-null and the enum is passed verbatim.
     unsafe { wgpuAdapterHasFeature(adapter.cast(), feature) != 0 }
-}
-
-/// `subscript-typegpu.h`: backward-compatible request with the default descriptor.
-#[no_mangle]
-pub extern "C" fn subscript_typegpu_adapter_request_device(
-    instance: SubscriptTypegpuInstance,
-    adapter: SubscriptTypegpuAdapter,
-) -> SubscriptTypegpuFutureId {
-    subscript_typegpu_adapter_request_device_with_descriptor(instance, adapter, std::ptr::null())
 }
 
 /// `subscript-typegpu.h`: begins the `wgpuAdapterRequestDevice` request; poll after pumping.
@@ -7824,33 +7735,6 @@ pub extern "C" fn subscript_typegpu_buffer_map_async(
     id
 }
 
-/// `subscript-typegpu.h`: begins a buffer map request; poll after pumping.
-#[no_mangle]
-pub extern "C" fn subscript_typegpu_buffer_map_whole_async(
-    buffer: SubscriptTypegpuBuffer,
-    mode: u64,
-) -> SubscriptTypegpuFutureId {
-    if buffer.is_null() {
-        return 0;
-    }
-    let instance = runtime::instance_for_handle(buffer as usize);
-    if instance == 0 {
-        return 0;
-    }
-    let (id, userdata1) = runtime::new_pending_slot(instance, SLOT_KIND_BUFFER_MAP);
-    let info = WGPUBufferMapCallbackInfo {
-        next_in_chain: std::ptr::null_mut(),
-        mode: WGPUCallbackMode_AllowProcessEvents,
-        callback: Some(buffer_map_callback),
-        userdata1,
-        userdata2: std::ptr::null_mut(),
-    };
-    // SAFETY: the receiver is non-null; callback userdata stays live
-    // until completion or instance release.
-    let _ = unsafe { wgpuBufferMapAsync(buffer.cast(), mode, 0, usize::MAX, info) };
-    id
-}
-
 /// `subscript-typegpu.h`: forwards a count-first byte array (F20).
 #[no_mangle]
 pub extern "C" fn subscript_typegpu_buffer_read_mapped_range(
@@ -8063,16 +7947,6 @@ pub extern "C" fn subscript_typegpu_texture_get_dimension(texture: SubscriptType
     }
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuTextureGetDimension(texture.cast()) }
-}
-
-/// `subscript-typegpu.h`: forwards to `wgpuTextureGetTextureBindingViewDimension`.
-#[no_mangle]
-pub extern "C" fn subscript_typegpu_texture_get_texture_binding_view_dimension(texture: SubscriptTypegpuTexture) -> i32 {
-    if texture.is_null() {
-        return 0;
-    }
-    // SAFETY: non-null handle owned by the caller.
-    unsafe { wgpuTextureGetTextureBindingViewDimension(texture.cast()) }
 }
 
 /// `subscript-typegpu.h`: forwards to `wgpuTextureGetFormat`.
@@ -8403,19 +8277,6 @@ pub extern "C" fn subscript_typegpu_command_encoder_resolve_query_set(commandEnc
     }
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuCommandEncoderResolveQuerySet(commandEncoder.cast(), querySet.cast(), firstQuery, queryCount, destination.cast(), destinationOffset) }
-}
-
-/// `subscript-typegpu.h`: forwards to `wgpuCommandEncoderWriteTimestamp`.
-#[no_mangle]
-pub extern "C" fn subscript_typegpu_command_encoder_write_timestamp(commandEncoder: SubscriptTypegpuCommandEncoder, querySet: SubscriptTypegpuQuerySet, queryIndex: u32) {
-    if commandEncoder.is_null() {
-        return;
-    }
-    if querySet.is_null() {
-        return;
-    }
-    // SAFETY: non-null handle owned by the caller.
-    unsafe { wgpuCommandEncoderWriteTimestamp(commandEncoder.cast(), querySet.cast(), queryIndex) }
 }
 
 /// `subscript-typegpu.h`: forwards a borrowed label string view.

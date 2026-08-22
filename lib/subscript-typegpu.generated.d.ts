@@ -644,8 +644,6 @@ declare class SubscriptTypegpuShaderModuleDescriptor {
 declare function subscript_typegpu_create_instance(): SubscriptTypegpuInstance;
 declare function subscript_typegpu_instance_process_events(instance: SubscriptTypegpuInstance): void;
 declare function subscript_typegpu_instance_release(instance: SubscriptTypegpuInstance): void;
-declare function subscript_typegpu_get_instance_limits(out: SubscriptTypegpuInstanceLimits | null): i32;
-declare function subscript_typegpu_has_instance_feature(feature: SubscriptTypegpuInstanceFeatureName): boolean;
 declare function subscript_typegpu_instance_request_adapter(instance: SubscriptTypegpuInstance): SubscriptTypegpuFutureId;
 declare function subscript_typegpu_future_status(instance: SubscriptTypegpuInstance, future: SubscriptTypegpuFutureId): i32;
 declare function subscript_typegpu_future_drop(instance: SubscriptTypegpuInstance, future: SubscriptTypegpuFutureId): void;
@@ -653,7 +651,6 @@ declare function subscript_typegpu_request_adapter_take(instance: SubscriptTypeg
 declare function subscript_typegpu_adapter_get_limits(adapter: SubscriptTypegpuAdapter, out: SubscriptTypegpuLimits | null): i32;
 declare function subscript_typegpu_adapter_get_info(adapter: SubscriptTypegpuAdapter, out: SubscriptTypegpuAdapterInfo | null): boolean;
 declare function subscript_typegpu_adapter_has_feature(adapter: SubscriptTypegpuAdapter, feature: GPUFeatureName): boolean;
-declare function subscript_typegpu_adapter_request_device(instance: SubscriptTypegpuInstance, adapter: SubscriptTypegpuAdapter): SubscriptTypegpuFutureId;
 declare function subscript_typegpu_adapter_request_device_with_descriptor(instance: SubscriptTypegpuInstance, adapter: SubscriptTypegpuAdapter, descriptor: SubscriptTypegpuDeviceDescriptor | null): SubscriptTypegpuFutureId;
 declare function subscript_typegpu_request_device_take(instance: SubscriptTypegpuInstance, future: SubscriptTypegpuFutureId): SubscriptTypegpuDevice;
 declare function subscript_typegpu_device_get_queue(device: SubscriptTypegpuDevice): SubscriptTypegpuQueue;
@@ -690,7 +687,6 @@ declare function subscript_typegpu_queue_write_buffer_f32(queue: SubscriptTypegp
 declare function subscript_typegpu_queue_write_texture(queue: SubscriptTypegpuQueue, dst: SubscriptTypegpuTexelCopyTextureInfo | null, layout: SubscriptTypegpuTexelCopyBufferLayout | null, extent: SubscriptTypegpuExtent3D | null, data: u8[]): void;
 declare function subscript_typegpu_queue_set_label(queue: SubscriptTypegpuQueue, label: string): void;
 declare function subscript_typegpu_buffer_map_async(buffer: SubscriptTypegpuBuffer, mode: SubscriptTypegpuMapMode, offset: u64, size: u64): SubscriptTypegpuFutureId;
-declare function subscript_typegpu_buffer_map_whole_async(buffer: SubscriptTypegpuBuffer, mode: SubscriptTypegpuMapMode): SubscriptTypegpuFutureId;
 declare function subscript_typegpu_buffer_read_mapped_range(buffer: SubscriptTypegpuBuffer, offset: u64, out: u8[]): i32;
 declare function subscript_typegpu_buffer_read_mapped_range_f32(buffer: SubscriptTypegpuBuffer, offsetBytes: u64, out: f32[]): i32;
 declare function subscript_typegpu_buffer_write_mapped_range(buffer: SubscriptTypegpuBuffer, offset: u64, data: u8[]): i32;
@@ -708,7 +704,6 @@ declare function subscript_typegpu_texture_get_depth_or_array_layers(texture: Su
 declare function subscript_typegpu_texture_get_mip_level_count(texture: SubscriptTypegpuTexture): u32;
 declare function subscript_typegpu_texture_get_sample_count(texture: SubscriptTypegpuTexture): u32;
 declare function subscript_typegpu_texture_get_dimension(texture: SubscriptTypegpuTexture): GPUTextureDimension;
-declare function subscript_typegpu_texture_get_texture_binding_view_dimension(texture: SubscriptTypegpuTexture): GPUTextureViewDimension;
 declare function subscript_typegpu_texture_get_format(texture: SubscriptTypegpuTexture): GPUTextureFormat;
 declare function subscript_typegpu_texture_get_usage(texture: SubscriptTypegpuTexture): SubscriptTypegpuTextureUsage;
 declare function subscript_typegpu_texture_destroy(texture: SubscriptTypegpuTexture): void;
@@ -731,7 +726,6 @@ declare function subscript_typegpu_command_encoder_copy_texture_to_buffer(comman
 declare function subscript_typegpu_command_encoder_copy_texture_to_texture(commandEncoder: SubscriptTypegpuCommandEncoder, source: SubscriptTypegpuTexelCopyTextureInfo | null, destination: SubscriptTypegpuTexelCopyTextureInfo | null, copySize: SubscriptTypegpuExtent3D | null): void;
 declare function subscript_typegpu_command_encoder_clear_buffer(commandEncoder: SubscriptTypegpuCommandEncoder, buffer: SubscriptTypegpuBuffer, offset: u64, size: u64): void;
 declare function subscript_typegpu_command_encoder_resolve_query_set(commandEncoder: SubscriptTypegpuCommandEncoder, querySet: SubscriptTypegpuQuerySet, firstQuery: u32, queryCount: u32, destination: SubscriptTypegpuBuffer, destinationOffset: u64): void;
-declare function subscript_typegpu_command_encoder_write_timestamp(commandEncoder: SubscriptTypegpuCommandEncoder, querySet: SubscriptTypegpuQuerySet, queryIndex: u32): void;
 declare function subscript_typegpu_command_encoder_insert_debug_marker(commandEncoder: SubscriptTypegpuCommandEncoder, markerLabel: string): void;
 declare function subscript_typegpu_command_encoder_push_debug_group(commandEncoder: SubscriptTypegpuCommandEncoder, groupLabel: string): void;
 declare function subscript_typegpu_command_encoder_pop_debug_group(commandEncoder: SubscriptTypegpuCommandEncoder): void;

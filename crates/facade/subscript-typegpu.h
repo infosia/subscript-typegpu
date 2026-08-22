@@ -945,9 +945,7 @@ SubscriptTypegpuInstance subscript_typegpu_create_instance(void);
 void subscript_typegpu_instance_process_events(SubscriptTypegpuInstance instance);
 void subscript_typegpu_instance_release(SubscriptTypegpuInstance instance);
 
-int32_t subscript_typegpu_get_instance_limits(SubscriptTypegpuInstanceLimits* out);
 
-bool subscript_typegpu_has_instance_feature(SubscriptTypegpuInstanceFeatureName feature);
 
 SubscriptTypegpuFutureId subscript_typegpu_instance_request_adapter(SubscriptTypegpuInstance instance);
 
@@ -970,7 +968,6 @@ bool subscript_typegpu_adapter_get_info(SubscriptTypegpuAdapter adapter, Subscri
 
 bool subscript_typegpu_adapter_has_feature(SubscriptTypegpuAdapter adapter, SubscriptTypegpuFeatureName feature);
 
-SubscriptTypegpuFutureId subscript_typegpu_adapter_request_device(SubscriptTypegpuInstance instance, SubscriptTypegpuAdapter adapter);
 SubscriptTypegpuFutureId subscript_typegpu_adapter_request_device_with_descriptor(SubscriptTypegpuInstance instance, SubscriptTypegpuAdapter adapter, const SubscriptTypegpuDeviceDescriptor* descriptor);
 SubscriptTypegpuDevice subscript_typegpu_request_device_take(SubscriptTypegpuInstance instance, SubscriptTypegpuFutureId future);
 
@@ -1037,7 +1034,6 @@ void subscript_typegpu_queue_write_texture(SubscriptTypegpuQueue queue, const Su
 void subscript_typegpu_queue_set_label(SubscriptTypegpuQueue queue, SubscriptTypegpuStringView label);
 
 SubscriptTypegpuFutureId subscript_typegpu_buffer_map_async(SubscriptTypegpuBuffer buffer, SubscriptTypegpuMapMode mode, size_t offset, size_t size);
-SubscriptTypegpuFutureId subscript_typegpu_buffer_map_whole_async(SubscriptTypegpuBuffer buffer, SubscriptTypegpuMapMode mode);
 
 int32_t subscript_typegpu_buffer_read_mapped_range(SubscriptTypegpuBuffer buffer, size_t offset, size_t outCount, uint8_t* out);
 
@@ -1074,7 +1070,6 @@ uint32_t subscript_typegpu_texture_get_sample_count(SubscriptTypegpuTexture text
 
 SubscriptTypegpuTextureDimension subscript_typegpu_texture_get_dimension(SubscriptTypegpuTexture texture);
 
-SubscriptTypegpuTextureViewDimension subscript_typegpu_texture_get_texture_binding_view_dimension(SubscriptTypegpuTexture texture);
 
 SubscriptTypegpuTextureFormat subscript_typegpu_texture_get_format(SubscriptTypegpuTexture texture);
 
@@ -1120,7 +1115,6 @@ void subscript_typegpu_command_encoder_clear_buffer(SubscriptTypegpuCommandEncod
 
 void subscript_typegpu_command_encoder_resolve_query_set(SubscriptTypegpuCommandEncoder commandEncoder, SubscriptTypegpuQuerySet querySet, uint32_t firstQuery, uint32_t queryCount, SubscriptTypegpuBuffer destination, uint64_t destinationOffset);
 
-void subscript_typegpu_command_encoder_write_timestamp(SubscriptTypegpuCommandEncoder commandEncoder, SubscriptTypegpuQuerySet querySet, uint32_t queryIndex);
 
 void subscript_typegpu_command_encoder_insert_debug_marker(SubscriptTypegpuCommandEncoder commandEncoder, SubscriptTypegpuStringView markerLabel);
 

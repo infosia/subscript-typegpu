@@ -1,0 +1,4 @@
+adapter:capabilities=true
+device:capabilities=false
+errors:empty
+PASS

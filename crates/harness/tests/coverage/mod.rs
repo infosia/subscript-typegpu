@@ -89,4 +89,9 @@ fn dev_corpus_writes_sorted_facade_coverage() {
     let path = root.join("specs/tracking/coverage.md");
     std::fs::write(&path, markdown)
         .unwrap_or_else(|error| panic!("write {}: {error}", path.display()));
+    assert!(
+        unreached.is_empty(),
+        "unreached facade exports:\n{}",
+        unreached.iter().cloned().collect::<Vec<_>>().join("\n"),
+    );
 }

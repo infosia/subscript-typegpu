@@ -6,12 +6,15 @@ cd "$repo_root"
 
 backend=${SUBSCRIPT_TYPEGPU_BACKEND:-}
 case "$backend" in
-  metal|vulkan) ;;
+  default|metal|vulkan) ;;
   *)
-    echo "live: set SUBSCRIPT_TYPEGPU_BACKEND to metal or vulkan" >&2
+    echo "live: set SUBSCRIPT_TYPEGPU_BACKEND to default, metal, or vulkan" >&2
     exit 1
     ;;
 esac
+if [ "$backend" = "default" ]; then
+  unset SUBSCRIPT_TYPEGPU_BACKEND
+fi
 
 backend_lib=${SUBSCRIPT_TYPEGPU_BACKEND_LIB:-}
 if [ -z "$backend_lib" ] || [ ! -f "$backend_lib" ]; then

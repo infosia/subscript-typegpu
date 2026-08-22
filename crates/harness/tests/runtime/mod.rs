@@ -84,6 +84,27 @@ fn dispatch_threads_rounds_all_three_axes() {
 }
 
 #[test]
+fn timestamp_pair_has_explicit_query_resolution() {
+    let source =
+        std::fs::read_to_string(root().join("lib/typegpu.ts")).expect("read TypeGPU runtime");
+    for required in [
+        "device.hasFeature(\"timestamp-query\")",
+        "type: \"timestamp\"",
+        "count: 2",
+        "GPUBufferUsage.QUERY_RESOLVE + GPUBufferUsage.COPY_SRC",
+        "beginningOfPassWriteIndex: 0",
+        "endOfPassWriteIndex: 1",
+        "encoder.resolveQuerySet(this.queries, 0, 2, this.resolved, 0)",
+        "encoder.copyBufferToBuffer(this.resolved, 0, readback.handle(), 0, 16)",
+    ] {
+        assert!(
+            source.contains(required),
+            "timestamp runtime lacks `{required}`"
+        );
+    }
+}
+
+#[test]
 fn render_declaration_helpers_execute_their_real_host_bodies() {
     let directory = std::env::temp_dir().join(format!(
         "subscript-typegpu-render-runtime-{}",
