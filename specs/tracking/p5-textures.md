@@ -1,6 +1,7 @@
 # P5 — textures and samplers
 
-Status: **in progress**. Opened 2026-08-23. Plan §8 P5. Contract:
+Status: **COMPLETE 2026-08-23.** Opened 2026-08-23. Closed at
+`3d9d988`. Plan §8 P5. Contract:
 `specs/blocks/texture.md` (TX1–TX8).
 
 ## Slice 1 — the wrappers, the texture calls, `b11-texture`, `x10`, `x11`
@@ -38,14 +39,25 @@ emitter reserves the module-scope name set and suffixes colliding
 locals), TX1 Rev 1 (float sample type and float formats only, the
 rest diagnostics, host bodies trap for rejected operations), TX2 Rev
 1, TX8 Rev 1 (cite the enforced rule), PI9 Rev 1, PI6 wording, the
-meta-rule line in `rule-ids.txt`. The code findings go to the
-coding agent.
+meta-rule line in `rule-ids.txt`. The code findings landed at
+`3d9d988`: `b11`'s golden reads `var params_ = params;`, the
+integer sample types and formats are diagnostics, every P5
+diagnostic cites TX1 through TX5 and a gate rejects a meta-rule
+citation, `Texture2d.store` traps on the host, `x10` and `x11`
+sample off-centre so a linear sampler would fail. Planner
+verification at the close: gate green, 215 tests in six executables
+(facade 4, typegpu-gen 7 and 36, harness 18 in 41.67 seconds plus
+the ignored live test, webgpu-gen 3 and 147). Live run outside the
+sandbox at `3d9d988` (Metal): ok, 25.52 seconds, `x01`–`x12`
+`PASS` — `x12-live-uniform-reread` reads the uniform again after a
+same-named local was mutated and gets the uniform's value.
+Measurement: 45 s / 0.2 s / 55 s / 53 s / 6.
 
 ## Exit criteria
 
 | # | Criterion | Evidence |
 |---|---|---|
 | 1 | `b11-texture` gate-green with its WGSL golden | Slice 1, `--require-backend` green |
-| 2 | `x10-live-texture` and `x11-live-fragment-sample` `PASS` against the host sampling body | Metal at `4b34f4a`, 23.60 s |
-| 3 | Every TX8 rejection has a red fixture | Five fixtures and one trap, one diagnostic each |
-| 4 | Budgets hold | 44 s / 0.2 s / 54 s / 51 s / 6 |
+| 2 | `x10-live-texture` and `x11-live-fragment-sample` `PASS` against the host sampling body | Metal at `4b34f4a` (23.60 s) and `3d9d988` (25.52 s, off-centre UVs) |
+| 3 | Every TX8 rejection has a red fixture | The close corpus, each citing TX1–TX5, one diagnostic each |
+| 4 | Budgets hold | 45 s / 0.2 s / 55 s / 53 s / 6 at the close |
