@@ -15,9 +15,9 @@ import {
 } from "./webgpu";
 
 export class Buffer<T> {
-  private buffer: GPUBuffer;
-  private elementSize: u32;
-  private count: u32;
+  buffer: GPUBuffer;
+  elementSize: u32;
+  count: u32;
 
   constructor(buffer: GPUBuffer, elementSize: u32, count: u32) {
     this.buffer = buffer;
@@ -67,19 +67,6 @@ export class Buffer<T> {
     );
   }
 
-  read(readback: Buffer<T>, elementIndex: u32, elementCount: u32): u8[] {
-    if (elementIndex > readback.count || elementCount > readback.count - elementIndex) {
-      print(
-        `BF8 Buffer.read elementIndex=${elementIndex} elementCount=${elementCount} count=${readback.count}`,
-      );
-      unreachable();
-    }
-    return readback.buffer.readMappedRange(
-      (elementIndex as u64) * (readback.elementSize as u64),
-      (elementCount as u64) * (readback.elementSize as u64),
-    );
-  }
-
   copyTo(
     encoder: GPUCommandEncoder,
     target: Buffer<T>,
@@ -118,6 +105,23 @@ export class Buffer<T> {
   [Symbol.dispose](): void {
     this.dispose();
   }
+}
+
+export function readBuffer<T>(
+  readback: Buffer<T>,
+  elementIndex: u32,
+  elementCount: u32,
+): u8[] {
+  if (elementIndex > readback.count || elementCount > readback.count - elementIndex) {
+    print(
+      `BF8 readBuffer elementIndex=${elementIndex} elementCount=${elementCount} count=${readback.count}`,
+    );
+    unreachable();
+  }
+  return readback.buffer.readMappedRange(
+    (elementIndex as u64) * (readback.elementSize as u64),
+    (elementCount as u64) * (readback.elementSize as u64),
+  );
 }
 
 export function createBuffer<T>(
@@ -197,39 +201,34 @@ export class MutStorage<T> {
 }
 
 @Descriptor
-export class ComputePipelineOptions {
-  workgroupSize!: FixedArray<u32, 3>;
-}
-
-@Descriptor
 export class ComputePipelineSpec {
   workgroupSize!: FixedArray<u32, 3>;
 }
 
 export function computePipeline<L>(
   kernel: (res: L, ctx: ComputeInvocation) => void,
-  spec: ComputePipelineOptions,
+  spec: ComputePipelineSpec,
 ): ComputePipelineSpec {
   return { workgroupSize: spec.workgroupSize };
 }
 
 export function computePipeline2<L0, L1>(
   kernel: (res0: L0, res1: L1, ctx: ComputeInvocation) => void,
-  spec: ComputePipelineOptions,
+  spec: ComputePipelineSpec,
 ): ComputePipelineSpec {
   return { workgroupSize: spec.workgroupSize };
 }
 
 export function computePipeline3<L0, L1, L2>(
   kernel: (res0: L0, res1: L1, res2: L2, ctx: ComputeInvocation) => void,
-  spec: ComputePipelineOptions,
+  spec: ComputePipelineSpec,
 ): ComputePipelineSpec {
   return { workgroupSize: spec.workgroupSize };
 }
 
 export function computePipeline4<L0, L1, L2, L3>(
   kernel: (res0: L0, res1: L1, res2: L2, res3: L3, ctx: ComputeInvocation) => void,
-  spec: ComputePipelineOptions,
+  spec: ComputePipelineSpec,
 ): ComputePipelineSpec {
   return { workgroupSize: spec.workgroupSize };
 }

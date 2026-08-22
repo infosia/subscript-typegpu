@@ -68,6 +68,15 @@ fn class_name<'a>(module: &'a Module, ty: &Type) -> Option<&'a str> {
     module.classes.get(id.0).map(|class| class.name.as_str())
 }
 
+fn type_name(module: &Module, ty: &Type) -> String {
+    subscript_compiler::types::display_type(
+        ty,
+        &|id| module.classes[id.0].name.clone(),
+        &|id| module.enums[id.0].name.clone(),
+        &|id| module.string_aliases[id.0].name.clone(),
+    )
+}
+
 fn library_class<'a>(
     module: &'a Module,
     ty: &Type,
@@ -136,7 +145,7 @@ fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, Diagnostic> 
             return Err(diagnostic(
                 "PI13",
                 format!(
-                    "layout field `{}.{}` is not a PI5 binding wrapper",
+                    "layout field `{}.{}` is not a Uniform, Storage, or MutStorage binding wrapper",
                     class.name, field.name
                 ),
                 field.pos.clone(),
@@ -146,7 +155,7 @@ fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, Diagnostic> 
             return Err(diagnostic(
                 "PI13",
                 format!(
-                    "layout field `{}.{}` has a wrapper type outside PI5",
+                    "layout field `{}.{}` has a binding item type outside PI13",
                     class.name, field.name
                 ),
                 field.pos.clone(),
@@ -365,43 +374,59 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
         }) = args.first()
         else {
             diagnostics.push(diagnostic(
-                "PI13",
+                "K1",
                 "pipeline kernel is not a named function",
                 global.init.pos.clone(),
             ));
             continue;
         };
         let Some(kernel) = function(module, entry) else {
-            diagnostics.push(diagnostic(
-                "K1",
-                format!("kernel `{entry}` is not a module-level function"),
+            diagnostics.push(Diagnostic::new(
+                RuleCode::S100,
+                format!("K15: kernel `{entry}` disappeared from typed HIR (generator)"),
                 global.init.pos.clone(),
             ));
             continue;
         };
-        if kernel.is_async || kernel.is_generator {
-            diagnostics.push(diagnostic(
-                "PI13",
-                format!("kernel `{entry}` cannot be async or a generator"),
-                kernel.pos.clone(),
-            ));
-            continue;
-        }
-        if kernel.ret != Type::Void {
-            diagnostics.push(diagnostic(
-                "PI13",
-                format!("kernel `{entry}` must return void"),
-                kernel.pos.clone(),
-            ));
-            continue;
-        }
+        let declared_layouts = function(module, callee)
+            .and_then(|declaration| declaration.params.first())
+            .and_then(|parameter| match &parameter.ty {
+                Type::Func(signature) => Some(&signature.params),
+                _ => None,
+            });
         if kernel.params.len() != arity + 1 {
-            diagnostics.push(diagnostic(
-                "K1",
-                format!("kernel `{entry}` has the wrong parameter count"),
+            diagnostics.push(Diagnostic::new(
+                RuleCode::S100,
+                format!("K15: kernel `{entry}` has an impossible parameter count (generator)"),
                 kernel.pos.clone(),
             ));
             continue;
+        }
+        if let Some(declared_layouts) = declared_layouts {
+            let mut mismatch = false;
+            for (index, (declared, actual)) in declared_layouts
+                .iter()
+                .take(arity)
+                .zip(&kernel.params[..arity])
+                .enumerate()
+            {
+                if declared != &actual.ty {
+                    diagnostics.push(diagnostic(
+                        "PI13",
+                        format!(
+                            "pipeline layout type argument {} is `{}` but kernel parameter is `{}`",
+                            index + 1,
+                            type_name(module, declared),
+                            type_name(module, &actual.ty),
+                        ),
+                        global.init.pos.clone(),
+                    ));
+                    mismatch = true;
+                }
+            }
+            if mismatch {
+                continue;
+            }
         }
         let mut layouts = Vec::new();
         for (group, param) in kernel.params[..arity].iter().enumerate() {
@@ -414,9 +439,9 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
             .is_some_and(|name| name == "ComputeInvocation")
             && library_class(module, &kernel.params[arity].ty).is_some();
         if !invocation_ok {
-            diagnostics.push(diagnostic(
-                "K1",
-                format!("kernel `{entry}` lacks its ComputeInvocation parameter"),
+            diagnostics.push(Diagnostic::new(
+                RuleCode::S100,
+                format!("K15: kernel `{entry}` lost its ComputeInvocation parameter (generator)"),
                 kernel.params[arity].pos.clone(),
             ));
             continue;
@@ -461,4 +486,66 @@ pub(crate) fn schema_names(module: &Module, pipelines: &[Pipeline]) -> BTreeSet<
         })
         .map(str::to_owned)
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use subscript_compiler::SourceFile;
+
+    use super::*;
+
+    fn read(root: &std::path::Path, name: &str) -> String {
+        std::fs::read_to_string(root.join("lib").join(name)).expect("read test library")
+    }
+
+    #[test]
+    fn pi2_compares_declared_type_arguments_with_kernel_layouts() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(2)
+            .expect("repository root")
+            .to_path_buf();
+        let files = vec![
+            SourceFile::ambient(
+                "subscript-typegpu.generated.d.ts",
+                read(&root, "subscript-typegpu.generated.d.ts"),
+            ),
+            SourceFile::ambient(
+                "wire-enum-aliases.generated.d.ts",
+                read(&root, "wire-enum-aliases.generated.d.ts"),
+            ),
+            SourceFile::new("webgpu.ts", read(&root, "webgpu.ts")),
+            SourceFile::new("typegpu-types.ts", read(&root, "typegpu-types.ts")),
+            SourceFile::new("typegpu.ts", read(&root, "typegpu.ts")),
+            SourceFile::new(
+                "pi2-test.ts",
+                r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec } from "./typegpu";
+class Declared {}
+class KernelLayout {}
+function kernel(res: Declared, ctx: ComputeInvocation): void {}
+export const pipeline: ComputePipelineSpec = computePipeline<Declared>(kernel, { workgroupSize: [1, 1, 1] });
+"#,
+            ),
+        ];
+        let mut module = subscript_compiler::check_program(&files).expect("valid PI2 seed HIR");
+        let replacement = module
+            .classes
+            .iter()
+            .position(|class| class.name == "KernelLayout")
+            .expect("replacement class");
+        let kernel = module
+            .functions
+            .iter_mut()
+            .find(|function| function.name == "kernel")
+            .expect("kernel");
+        kernel.params[0].ty = Type::Class(subscript_compiler::ClassId(replacement));
+        let diagnostics = discover(&module).expect_err("PI2 mismatch must fail");
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0].message.starts_with("PI13:"));
+        assert!(diagnostics[0].message.contains("`Declared`"));
+        assert!(diagnostics[0].message.contains("`KernelLayout`"));
+    }
 }

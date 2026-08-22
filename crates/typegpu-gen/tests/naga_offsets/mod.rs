@@ -85,86 +85,96 @@ fn library_types(tree: &TypeTree, names: &mut std::collections::BTreeSet<&'stati
 
 #[test]
 fn naga_offsets_and_spans_match_the_engine() {
-    let program = "b01-layout.ts";
-    let generated = subscript_typegpu_gen::generate(&support::b01_files()).expect("generate b01");
-    assert_eq!(generated.wgsl_module.matches("enable f16;").count(), 1);
-    assert!(generated.wgsl_module.starts_with("enable f16;\n"));
-    let module = parse(program, &generated.wgsl_module);
-    validate(program, &generated.wgsl_module, &module);
+    let programs = support::b_programs();
+    assert!(!programs.is_empty(), "no b programs found");
+    for path in programs {
+        let program = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("program name");
+        let generated = subscript_typegpu_gen::generate(&support::program_files(&path))
+            .unwrap_or_else(|diagnostics| panic!("generate {program}: {diagnostics:?}"));
+        let module = parse(program, &generated.wgsl_module);
+        validate(program, &generated.wgsl_module, &module);
 
-    let expected = generated
-        .layouts
-        .iter()
-        .map(|layout| (layout.name.as_str(), layout))
-        .collect::<BTreeMap<_, _>>();
-    let mut covered_library_types = std::collections::BTreeSet::new();
-    for layout in &generated.layouts {
-        library_types(&layout.tree, &mut covered_library_types);
-    }
-    assert_eq!(
-        covered_library_types,
-        [
-            "Mat2x2f", "Mat3x3f", "Mat4x4f", "Vec2f", "Vec2h", "Vec2i", "Vec2u", "Vec3f", "Vec3h",
-            "Vec3i", "Vec3u", "Vec4f", "Vec4h", "Vec4i", "Vec4u",
-        ]
-        .into_iter()
-        .collect(),
-        "{program}: every library class must appear in a schema"
-    );
-    let mut matched = 0;
-    for (_, ty) in module.types.iter() {
-        let Some(name) = ty.name.as_deref() else {
-            continue;
-        };
-        let Some(expected) = expected.get(name) else {
-            continue;
-        };
-        matched += 1;
-        let TypeInner::Struct { members, span } = &ty.inner else {
-            panic!("{program}: {name} is not a struct");
-        };
-        assert_eq!(*span, expected.wgsl.size, "{program}: {name} span");
-        assert_eq!(
-            members.len(),
-            expected.wgsl.members.len(),
-            "{program}: {name} member count"
-        );
-        let TypeTree::Struct(structure) = &expected.tree else {
-            panic!("{program}: {name} has no struct tree");
-        };
-        for ((member, expected_member), tree_member) in members
+        let expected = generated
+            .layouts
             .iter()
-            .zip(&expected.wgsl.members)
-            .zip(&structure.members)
-        {
+            .map(|layout| (layout.name.as_str(), layout))
+            .collect::<BTreeMap<_, _>>();
+        let mut matched = 0;
+        for (_, ty) in module.types.iter() {
+            let Some(name) = ty.name.as_deref() else {
+                continue;
+            };
+            let Some(expected) = expected.get(name) else {
+                continue;
+            };
+            matched += 1;
+            let TypeInner::Struct { members, span } = &ty.inner else {
+                panic!("{program}: {name} is not a struct");
+            };
+            assert_eq!(*span, expected.wgsl.size, "{program}: {name} span");
             assert_eq!(
-                member.offset, expected_member.offset,
-                "{program}: {name}.{:?}",
-                member.name
+                members.len(),
+                expected.wgsl.members.len(),
+                "{program}: {name} member count"
             );
-            if matches!(tree_member.ty, TypeTree::Array(_, _)) {
-                let TypeInner::Array { stride, .. } = module.types[member.ty].inner else {
-                    panic!("{program}: {name}.{} is not an array", tree_member.name);
-                };
+            let TypeTree::Struct(structure) = &expected.tree else {
+                panic!("{program}: {name} has no struct tree");
+            };
+            for ((member, expected_member), tree_member) in members
+                .iter()
+                .zip(&expected.wgsl.members)
+                .zip(&structure.members)
+            {
                 assert_eq!(
-                    stride,
-                    expected_member.layout.stride.expect("array stride"),
-                    "{program}: {name}.{} stride",
-                    tree_member.name
+                    member.offset, expected_member.offset,
+                    "{program}: {name}.{:?}",
+                    member.name
                 );
+                if matches!(tree_member.ty, TypeTree::Array(_, _)) {
+                    let TypeInner::Array { stride, .. } = module.types[member.ty].inner else {
+                        panic!("{program}: {name}.{} is not an array", tree_member.name);
+                    };
+                    assert_eq!(
+                        stride,
+                        expected_member.layout.stride.expect("array stride"),
+                        "{program}: {name}.{} stride",
+                        tree_member.name
+                    );
+                }
             }
         }
-    }
-    assert_eq!(
-        matched,
-        expected.len(),
-        "{program}: not every emitted struct matched an engine layout"
-    );
+        assert_eq!(
+            matched,
+            expected.len(),
+            "{program}: not every emitted struct matched an engine layout"
+        );
 
-    let uniform_source = format!(
-        "{}\n@group(0) @binding(0) var<uniform> params: Params;\n",
-        generated.wgsl_module
-    );
-    let uniform = parse(program, &uniform_source);
-    validate(program, &uniform_source, &uniform);
+        if program == "b01-layout.ts" {
+            assert_eq!(generated.wgsl_module.matches("enable f16;").count(), 1);
+            assert!(generated.wgsl_module.starts_with("enable f16;\n"));
+            let mut covered_library_types = std::collections::BTreeSet::new();
+            for layout in &generated.layouts {
+                library_types(&layout.tree, &mut covered_library_types);
+            }
+            assert_eq!(
+                covered_library_types,
+                [
+                    "Mat2x2f", "Mat3x3f", "Mat4x4f", "Vec2f", "Vec2h", "Vec2i", "Vec2u", "Vec3f",
+                    "Vec3h", "Vec3i", "Vec3u", "Vec4f", "Vec4h", "Vec4i", "Vec4u",
+                ]
+                .into_iter()
+                .collect(),
+                "{program}: every library class must appear in a schema"
+            );
+            let uniform_source = format!(
+                "{}\n@group(0) @binding(0) var<uniform> params: Params;\n",
+                generated.wgsl_module
+            );
+            let uniform = parse(program, &uniform_source);
+            validate(program, &uniform_source, &uniform);
+        }
+    }
 }

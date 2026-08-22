@@ -81,9 +81,11 @@ fn every_cited_rule_id_resolves() {
         .map(str::trim)
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .collect::<BTreeSet<_>>();
-    let descriptor_kinds = ["U8", "U16", "U32", "U64", "I32", "F32", "F64"]
-        .into_iter()
-        .collect::<BTreeSet<_>>();
+    let descriptor_kinds = [
+        "U8", "U16", "U32", "U64", "I32", "F32", "F64", "L0", "L1", "L2", "L3",
+    ]
+    .into_iter()
+    .collect::<BTreeSet<_>>();
 
     let mut files = Vec::new();
     collect_files(&root.join("crates/webgpu-gen/src"), &mut files);
@@ -92,6 +94,7 @@ fn every_cited_rule_id_resolves() {
     collect_files(&root.join("crates/typegpu-gen/tests"), &mut files);
     collect_files(&root.join("crates/harness/src"), &mut files);
     collect_files(&root.join("crates/harness/tests"), &mut files);
+    collect_files(&root.join("lib"), &mut files);
     collect_files(&root.join("programs"), &mut files);
     collect_files(&root.join("tools"), &mut files);
     files.push(root.join("crates/webgpu-gen/policy.toml"));
@@ -100,9 +103,6 @@ fn every_cited_rule_id_resolves() {
         root.join("crates/facade/src/generated.rs"),
         root.join("crates/facade/subscript-typegpu.h"),
         root.join("crates/harness/src/native_symbols.generated.rs"),
-        root.join("lib/subscript-typegpu.generated.d.ts"),
-        root.join("lib/wire-enum-aliases.generated.d.ts"),
-        root.join("lib/webgpu.ts"),
     ]);
 
     for path in files {

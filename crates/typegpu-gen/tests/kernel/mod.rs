@@ -35,7 +35,7 @@ export const names: ComputePipelineSpec = computePipeline<Layout>(loop, { workgr
     let wgsl = &generated.pipelines[0].1;
     assert!(wgsl.contains("struct Word {\n  let_: f32,\n}"));
     assert!(wgsl.contains("var<storage, read> new_: array<Word>;"));
-    assert!(wgsl.contains("var _conditional_0: f32;\n  if ("));
+    assert!(wgsl.contains("var _g_conditional_0: f32;\n  if ("));
     assert!(wgsl.contains("fn loop_("));
     assert!(generated
         .support_module
@@ -119,14 +119,47 @@ export const operationPipeline: ComputePipelineSpec = computePipeline<Layout>(op
         "fn helper(value: f32) -> f32 {",
         "while (index < 1u) {",
         "for (var i = 0u; i < 2u; i += 1u) {",
-        "for (var value_index = 0u; value_index < 2u;",
+        "for (var _g_value_index = 0u; _g_value_index < 2u;",
         "total += length(value);",
         "let inverted = ~index;",
         "let flag = !false;",
-        "var _conditional_0: f32;",
+        "var _g_conditional_0: f32;",
         "let integer = i32(choice);",
         "let unsigned = u32(integer);",
         "output[0u] = pack;",
+    ] {
+        assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
+    }
+}
+
+#[test]
+fn lowered_operators_preserve_emitted_wgsl_precedence() {
+    let generated = generate(
+        r#"
+import { Vec3f } from "./typegpu-types";
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
+class Layout { values!: Storage<Vec3f>; }
+function precedence(res: Layout, ctx: ComputeInvocation): void {
+  const a: Vec3f = res.values[0];
+  const b: Vec3f = res.values[1];
+  const s: f32 = 2.0;
+  const first: Vec3f = a.add(b).scale(s);
+  const second: Vec3f = a.scale(s).add(b);
+  const third: f32 = a.dot(b) * 2.0;
+  const fourth: f32 = -(a.x + b.x);
+  const rounded: f32 = (Math.fround(1.0 + 2.0) as f32) * s;
+}
+
+export const precedencePipeline: ComputePipelineSpec = computePipeline<Layout>(precedence, { workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    for expected in [
+        "var first = (a + b) * s;",
+        "var second = a * s + b;",
+        "let third = dot(a, b) * 2.0f;",
+        "let fourth = -(a.x + b.x);",
+        "let rounded = (1.0f + 2.0f) * s;",
     ] {
         assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
     }
@@ -164,6 +197,7 @@ function mappings(res: MappingLayout, ctx: ComputeInvocation): void {
   const stepped: f32 = step(0.5, scalar); const smoothed: f32 = smoothstep(0.0, 1.0, scalar);
   const fractional: f32 = fract(scalar); const signed: f32 = sign(scalar);
 }
+
 export const mappingPipeline: ComputePipelineSpec = computePipeline<MappingLayout>(mappings, { workgroupSize: [1, 1, 1] });
 "#,
     );
@@ -204,4 +238,60 @@ export const mappingPipeline: ComputePipelineSpec = computePipeline<MappingLayou
     ] {
         assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
     }
+}
+
+#[test]
+fn conditional_preludes_stay_at_their_runtime_evaluation_site() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
+@CStruct class Pack {
+  left: FixedArray<f32, 2>;
+  right: FixedArray<f32, 2>;
+  constructor(left: FixedArray<f32, 2>, right: FixedArray<f32, 2>) { this.left = left; this.right = right; }
+}
+class Layout { packs!: Storage<Pack>; }
+function control(res: Layout, ctx: ComputeInvocation): void {
+  let i: u32 = 0;
+  const flag: boolean = ctx.globalId.x === (0 as u32);
+  while (i < (2 as u32) ? true : false) {
+    const chosen: u32 = flag ? (i > (0 as u32) ? (2 as u32) : (1 as u32)) : (0 as u32);
+    i += chosen;
+  }
+  for (let j: u32 = 0; j < (flag ? (2 as u32) : (1 as u32)); j += 1) { i += j; }
+  const pack: Pack = res.packs[0];
+  for (const value of (flag ? pack.left : pack.right)) { i += value as u32; }
+}
+export const controlPipeline: ComputePipelineSpec = computePipeline<Layout>(control, { workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    let loop_start = wgsl
+        .find("loop {")
+        .expect("conditional while becomes a loop");
+    let while_cond = wgsl
+        .find("var _g_conditional_0: bool;")
+        .expect("while conditional prelude exists");
+    assert!(
+        while_cond > loop_start,
+        "while prelude escaped its loop:\n{wgsl}"
+    );
+    assert!(
+        wgsl.contains("if (flag) {\n      var _g_conditional_1: u32;\n      if (i > u32(0i)) {"),
+        "nested branch prelude escaped its branch:\n{wgsl}"
+    );
+    let for_loop = wgsl
+        .find("var _g_conditional_3: u32;")
+        .expect("for condition prelude exists");
+    assert!(for_loop > wgsl.find("var j = 0u;").expect("for initializer"));
+    let for_of_prelude = wgsl
+        .find("var _g_conditional_4: array<f32, 2>;")
+        .expect("for-of subject prelude exists");
+    let for_of = wgsl
+        .find("for (var _g_value_index")
+        .expect("for-of loop exists");
+    assert!(
+        for_of_prelude < for_of,
+        "for-of prelude was not flushed:\n{wgsl}"
+    );
 }

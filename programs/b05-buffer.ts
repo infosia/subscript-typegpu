@@ -3,7 +3,7 @@
 // exercises: BF1-BF6, SC1, SC11, LY16, R34
 // questions: none
 
-import { Buffer, createBuffer } from "./typegpu";
+import { Buffer, createBuffer, readBuffer } from "./typegpu";
 import { Vec3f } from "./typegpu-types";
 import {
   gpu,
@@ -87,7 +87,7 @@ export async function main(): Promise<void> {
       print("FAIL map");
       return;
     }
-    const resultBytes: u8[] = source.read(readback, 0, 4);
+    const resultBytes: u8[] = readBuffer<Particle>(readback, 0, 4);
     const result: FixedArray<Particle, 4> =
       Context.fromBytes<FixedArray<Particle, 4>>(resultBytes, 0);
     let index: i32 = 0;

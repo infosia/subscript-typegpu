@@ -10,9 +10,27 @@ use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 use crate::mapping::{self, MethodEmission};
 use crate::pipeline::{BindingKind, Pipeline};
 
+type Prelude = Vec<(usize, String)>;
+
 #[derive(Debug, Clone)]
 pub(crate) struct Snippet {
     pub(crate) text: String,
+    precedence: u8,
+    prelude: Prelude,
+}
+
+impl Snippet {
+    fn new(text: String, precedence: u8) -> Self {
+        Self {
+            text,
+            precedence,
+            prelude: Vec::new(),
+        }
+    }
+
+    fn atom(text: String) -> Self {
+        Self::new(text, 10)
+    }
 }
 
 fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
@@ -151,19 +169,11 @@ fn binary_precedence(op: BinOp) -> u8 {
     }
 }
 
-fn binary_operand(expr: &Expr, text: String, parent: BinOp, right: bool) -> String {
-    binary_operand_at(expr, text, binary_precedence(parent), right)
-}
-
-fn binary_operand_at(expr: &Expr, text: String, parent: u8, right: bool) -> String {
-    let ExprKind::Binary { op, .. } = &expr.kind else {
-        return text;
-    };
-    let child = binary_precedence(*op);
-    if child < parent || (right && child == parent) {
-        format!("({text})")
+fn binary_operand(value: &Snippet, parent: u8, right: bool) -> String {
+    if value.precedence < parent || (right && value.precedence == parent) {
+        format!("({})", value.text)
     } else {
-        text
+        value.text.clone()
     }
 }
 
@@ -207,7 +217,6 @@ struct Emitter<'a> {
     invocation_param: String,
     bindings: BTreeMap<(usize, String), BindingRef>,
     used_builtins: BTreeSet<String>,
-    pending: Vec<(usize, String)>,
     conditional_index: u32,
 }
 
@@ -238,7 +247,6 @@ impl<'a> Emitter<'a> {
             invocation_param: kernel.params[pipeline.layouts.len()].name.clone(),
             bindings,
             used_builtins: BTreeSet::new(),
-            pending: Vec::new(),
             conditional_index: 0,
         }
     }
@@ -251,7 +259,6 @@ impl<'a> Emitter<'a> {
             invocation_param: String::new(),
             bindings: BTreeMap::new(),
             used_builtins: BTreeSet::new(),
-            pending: Vec::new(),
             conditional_index: 0,
         }
     }
@@ -267,10 +274,58 @@ impl<'a> Emitter<'a> {
         self.bindings.get(&(group, name.clone())).cloned()
     }
 
+    fn snippets(&mut self, args: &[Expr]) -> Result<(Vec<String>, Prelude), Diagnostic> {
+        let mut texts = Vec::with_capacity(args.len());
+        let mut prelude = Vec::new();
+        for arg in args {
+            let value = self.snippet(arg)?;
+            prelude.extend(value.prelude);
+            texts.push(value.text);
+        }
+        Ok((texts, prelude))
+    }
+
+    fn fround_argument(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
+        match (&expr.kind, &expr.ty) {
+            (ExprKind::Float(value), Type::F64) => Ok(Snippet::atom(f32_literal(*value))),
+            (ExprKind::Binary { op, left, right }, Type::F64) => {
+                let Some(spelling) = binop(*op) else {
+                    return Err(diagnostic(
+                        "K11",
+                        "Math.fround argument uses an operator outside K11",
+                        expr.pos.clone(),
+                    ));
+                };
+                let left = self.fround_argument(left)?;
+                let right = self.fround_argument(right)?;
+                let precedence = binary_precedence(*op);
+                let text = format!(
+                    "{} {spelling} {}",
+                    binary_operand(&left, precedence, false),
+                    binary_operand(&right, precedence, true)
+                );
+                let mut prelude = left.prelude;
+                prelude.extend(right.prelude);
+                Ok(Snippet {
+                    text,
+                    precedence,
+                    prelude,
+                })
+            }
+            _ => self.snippet(expr),
+        }
+    }
+
     fn snippet(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
         if let ExprKind::Cast(value) = &expr.kind {
-            if !matches!(expr.ty, Type::F32 | Type::I32 | Type::U32)
-                || !matches!(value.ty, Type::F32 | Type::I32 | Type::U32)
+            let fround_to_f32 = matches!(
+                &value.kind,
+                ExprKind::Call { callee: Callee::Math(function), .. }
+                    if mapping::math(*function) == Some("") && expr.ty == Type::F32
+            );
+            if !fround_to_f32
+                && (!matches!(expr.ty, Type::F32 | Type::I32 | Type::U32)
+                    || !matches!(value.ty, Type::F32 | Type::I32 | Type::U32))
             {
                 return Err(diagnostic(
                     "K12",
@@ -287,7 +342,7 @@ impl<'a> Emitter<'a> {
         } else {
             String::new()
         };
-        let local = |text: String, _ty: String| Snippet { text };
+        let local = |text: String, _ty: String| Snippet::atom(text);
         match &expr.kind {
             ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) => {
                 Ok(local(literal(expr)?, ty))
@@ -297,9 +352,7 @@ impl<'a> Emitter<'a> {
                 "string local or expression in kernel",
                 expr.pos.clone(),
             )),
-            ExprKind::Local(name) => Ok(Snippet {
-                text: mapping::ident(name),
-            }),
+            ExprKind::Local(name) => Ok(Snippet::atom(mapping::ident(name))),
             ExprKind::Unary { op, operand } => {
                 let value = self.snippet(operand)?;
                 let spelling = match op {
@@ -314,15 +367,16 @@ impl<'a> Emitter<'a> {
                         ))
                     }
                 };
-                let value = if matches!(
-                    operand.kind,
-                    ExprKind::Unary { .. } | ExprKind::Binary { .. } | ExprKind::Assign { .. }
-                ) {
+                let text = if value.precedence <= 9 {
                     format!("({})", value.text)
                 } else {
-                    value.text
+                    value.text.clone()
                 };
-                Ok(local(format!("{spelling}{value}"), ty))
+                Ok(Snippet {
+                    text: format!("{spelling}{text}"),
+                    precedence: 9,
+                    prelude: value.prelude,
+                })
             }
             ExprKind::Binary { op, left, right } => {
                 let Some(spelling) = binop(*op) else {
@@ -332,11 +386,21 @@ impl<'a> Emitter<'a> {
                         expr.pos.clone(),
                     ));
                 };
-                let left_text = self.snippet(left)?.text;
-                let right_text = self.snippet(right)?.text;
-                let left = binary_operand(left, left_text, *op, false);
-                let right = binary_operand(right, right_text, *op, true);
-                Ok(local(format!("{left} {spelling} {right}"), ty))
+                let left = self.snippet(left)?;
+                let right = self.snippet(right)?;
+                let precedence = binary_precedence(*op);
+                let text = format!(
+                    "{} {spelling} {}",
+                    binary_operand(&left, precedence, false),
+                    binary_operand(&right, precedence, true)
+                );
+                let mut prelude = left.prelude;
+                prelude.extend(right.prelude);
+                Ok(Snippet {
+                    text,
+                    precedence,
+                    prelude,
+                })
             }
             ExprKind::Assign { op, target, value } => {
                 let target = self.snippet(target)?;
@@ -352,18 +416,34 @@ impl<'a> Emitter<'a> {
                         ))?
                     ),
                 };
-                Ok(local(
-                    format!("{} {spelling} {}", target.text, value.text),
-                    ty,
-                ))
+                let mut prelude = target.prelude;
+                prelude.extend(value.prelude);
+                Ok(Snippet {
+                    text: format!("{} {spelling} {}", target.text, value.text),
+                    precedence: 0,
+                    prelude,
+                })
             }
             ExprKind::Cast(value) => {
+                if let ExprKind::Call {
+                    callee: Callee::Math(function),
+                    args,
+                } = &value.kind
+                {
+                    if mapping::math(*function) == Some("") && expr.ty == Type::F32 {
+                        return self.call(value, &Callee::Math(*function), args);
+                    }
+                }
                 let value = self.snippet(value)?;
-                Ok(local(format!("{}({})", ty, value.text), ty))
+                Ok(Snippet {
+                    text: format!("{}({})", ty, value.text),
+                    precedence: 10,
+                    prelude: value.prelude,
+                })
             }
             ExprKind::Field { obj, name } => {
                 if let Some(binding) = self.binding_ref(expr) {
-                    return Ok(Snippet { text: binding.name });
+                    return Ok(Snippet::atom(binding.name));
                 }
                 if matches!(&obj.kind, ExprKind::Local(name) if name == &self.invocation_param) {
                     let builtin = match name.as_str() {
@@ -373,17 +453,14 @@ impl<'a> Emitter<'a> {
                         "numWorkgroups" => "numWorkgroups",
                         "localIndex" => "localIndex",
                         _ => {
-                            return Err(diagnostic(
-                                "PI4",
+                            return Err(generator_diagnostic(
                                 format!("unknown ComputeInvocation field `{name}`"),
                                 expr.pos.clone(),
                             ))
                         }
                     };
                     self.used_builtins.insert(builtin.to_owned());
-                    return Ok(Snippet {
-                        text: builtin.to_owned(),
-                    });
+                    return Ok(Snippet::atom(builtin.to_owned()));
                 }
                 if obj.ty == Type::F16 || expr.ty == Type::F16 {
                     return Err(diagnostic(
@@ -393,16 +470,21 @@ impl<'a> Emitter<'a> {
                     ));
                 }
                 let object = self.snippet(obj)?;
-                Ok(local(
-                    format!("{}.{}", object.text, mapping::ident(name)),
-                    ty,
-                ))
+                Ok(Snippet {
+                    text: format!("{}.{}", object.text, mapping::ident(name)),
+                    precedence: 10,
+                    prelude: object.prelude,
+                })
             }
             ExprKind::Index { obj, index, .. } => {
                 let object = self.snippet(obj)?;
                 let index = self.snippet(index)?;
+                let mut prelude = object.prelude;
+                prelude.extend(index.prelude);
                 Ok(Snippet {
                     text: format!("{}[{}]", object.text, index.text),
+                    precedence: 10,
+                    prelude,
                 })
             }
             ExprKind::Call { callee, args } => self.call(expr, callee, args),
@@ -417,25 +499,50 @@ impl<'a> Emitter<'a> {
                 }
                 let args = args
                     .iter()
-                    .map(|arg| self.snippet(arg).map(|value| value.text))
+                    .map(|arg| self.snippet(arg))
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(local(format!("{}({})", ty, args.join(", ")), ty))
+                let mut prelude = Vec::new();
+                let texts = args
+                    .into_iter()
+                    .map(|arg| {
+                        prelude.extend(arg.prelude);
+                        arg.text
+                    })
+                    .collect::<Vec<_>>();
+                Ok(Snippet {
+                    text: format!("{}({})", ty, texts.join(", ")),
+                    precedence: 10,
+                    prelude,
+                })
             }
             ExprKind::Cond { cond, then, els } => {
                 let cond = self.snippet(cond)?;
                 let then = self.snippet(then)?;
                 let els = self.snippet(els)?;
-                let result = format!("_conditional_{}", self.conditional_index);
+                let result = format!("_g_conditional_{}", self.conditional_index);
                 self.conditional_index += 1;
-                self.pending.extend([
-                    (0, format!("var {result}: {ty};")),
-                    (0, format!("if ({}) {{", cond.text)),
-                    (1, format!("{result} = {};", then.text)),
-                    (0, "} else {".to_owned()),
-                    (1, format!("{result} = {};", els.text)),
-                    (0, "}".to_owned()),
-                ]);
-                Ok(Snippet { text: result })
+                let mut prelude = cond.prelude;
+                prelude.push((0, format!("var {result}: {ty};")));
+                prelude.push((0, format!("if ({}) {{", cond.text)));
+                prelude.extend(
+                    then.prelude
+                        .into_iter()
+                        .map(|(relative, text)| (relative + 1, text)),
+                );
+                prelude.push((1, format!("{result} = {};", then.text)));
+                prelude.push((0, "} else {".to_owned()));
+                prelude.extend(
+                    els.prelude
+                        .into_iter()
+                        .map(|(relative, text)| (relative + 1, text)),
+                );
+                prelude.push((1, format!("{result} = {};", els.text)));
+                prelude.push((0, "}".to_owned()));
+                Ok(Snippet {
+                    text: result,
+                    precedence: 10,
+                    prelude,
+                })
             }
             ExprKind::Template(_) => Err(diagnostic(
                 "K9",
@@ -476,23 +583,33 @@ impl<'a> Emitter<'a> {
                         expr.pos.clone(),
                     ));
                 };
-                let args = args
-                    .iter()
-                    .map(|arg| match (&arg.kind, &arg.ty) {
+                if name.is_empty() {
+                    if args.len() != 1 {
+                        return Err(diagnostic(
+                            "K11",
+                            "Math.fround requires one argument",
+                            expr.pos.clone(),
+                        ));
+                    }
+                    return self.fround_argument(&args[0]);
+                }
+                let mut texts = Vec::with_capacity(args.len());
+                let mut prelude = Vec::new();
+                for arg in args {
+                    let value = match (&arg.kind, &arg.ty) {
                         // JavaScript Math arguments are typed as f64 by the checker; K11 maps
                         // those literal arguments to WGSL f32 without admitting f64 elsewhere.
-                        (ExprKind::Float(value), Type::F64) => Ok(f32_literal(*value)),
-                        _ => self.snippet(arg).map(|value| value.text),
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                let text = if name.is_empty() {
-                    args.first().cloned().ok_or_else(|| {
-                        diagnostic("K11", "Math.fround requires one argument", expr.pos.clone())
-                    })?
-                } else {
-                    format!("{name}({})", args.join(", "))
-                };
-                Ok(Snippet { text })
+                        (ExprKind::Float(value), Type::F64) => Snippet::atom(f32_literal(*value)),
+                        _ => self.snippet(arg)?,
+                    };
+                    prelude.extend(value.prelude);
+                    texts.push(value.text);
+                }
+                Ok(Snippet {
+                    text: format!("{name}({})", texts.join(", ")),
+                    precedence: 10,
+                    prelude,
+                })
             }
             Callee::Func(name) => {
                 let is_library = function(self.module, name)
@@ -504,20 +621,16 @@ impl<'a> Emitter<'a> {
                 } else {
                     mapping::ident(called)
                 };
-                let args = args
-                    .iter()
-                    .map(|arg| self.snippet(arg).map(|value| value.text))
-                    .collect::<Result<Vec<_>, _>>()?;
+                let (args, prelude) = self.snippets(args)?;
                 Ok(Snippet {
                     text: format!("{called}({})", args.join(", ")),
+                    precedence: 10,
+                    prelude,
                 })
             }
             Callee::Method { recv, name } => {
                 if let Some(binding) = self.binding_ref(recv) {
-                    let args = args
-                        .iter()
-                        .map(|arg| self.snippet(arg).map(|value| value.text))
-                        .collect::<Result<Vec<_>, _>>()?;
+                    let (args, prelude) = self.snippets(args)?;
                     let text = match (binding.kind, name.as_str(), args.as_slice()) {
                         (BindingKind::Uniform, "get", []) => binding.name,
                         (BindingKind::Storage | BindingKind::MutStorage, "get", [index]) => {
@@ -530,14 +643,18 @@ impl<'a> Emitter<'a> {
                             format!("arrayLength(&{})", binding.name)
                         }
                         _ => {
-                            return Err(diagnostic(
-                                "PI6",
+                            return Err(generator_diagnostic(
                                 format!("binding method `{name}` is not valid for this wrapper"),
                                 expr.pos.clone(),
                             ))
                         }
                     };
-                    return Ok(Snippet { text });
+                    let precedence = if name == "set" { 0 } else { 10 };
+                    return Ok(Snippet {
+                        text,
+                        precedence,
+                        prelude,
+                    });
                 }
                 let recv_value = self.snippet(recv)?;
                 let receiver = class_name(self.module, &recv.ty).ok_or_else(|| {
@@ -562,27 +679,31 @@ impl<'a> Emitter<'a> {
                         expr.pos.clone(),
                     ));
                 };
-                let arg_texts = args
+                let arg_values = args
                     .iter()
-                    .map(|arg| self.snippet(arg).map(|value| value.text))
+                    .map(|arg| self.snippet(arg))
                     .collect::<Result<Vec<_>, _>>()?;
-                let text = match emission {
-                    MethodEmission::Binary(op) if arg_texts.len() == 1 => {
+                let (text, precedence) = match emission {
+                    MethodEmission::Binary(op) if arg_values.len() == 1 => {
                         let precedence = match op {
                             "+" | "-" => 7,
                             "*" => 8,
                             _ => 0,
                         };
-                        let recv = binary_operand_at(recv, recv_value.text, precedence, false);
-                        let arg =
-                            binary_operand_at(&args[0], arg_texts[0].clone(), precedence, true);
-                        format!("{recv} {op} {arg}")
+                        let recv = binary_operand(&recv_value, precedence, false);
+                        let arg = binary_operand(&arg_values[0], precedence, true);
+                        (format!("{recv} {op} {arg}"), precedence)
                     }
-                    MethodEmission::Builtin(builtin) if arg_texts.is_empty() => {
-                        format!("{builtin}({})", recv_value.text)
+                    MethodEmission::Builtin(builtin) if arg_values.is_empty() => {
+                        (format!("{builtin}({})", recv_value.text), 10)
                     }
                     MethodEmission::Builtin(builtin) => {
-                        format!("{builtin}({}, {})", recv_value.text, arg_texts.join(", "))
+                        let args = arg_values
+                            .iter()
+                            .map(|value| value.text.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        (format!("{builtin}({}, {args})", recv_value.text), 10)
                     }
                     _ => {
                         return Err(diagnostic(
@@ -592,7 +713,15 @@ impl<'a> Emitter<'a> {
                         ))
                     }
                 };
-                Ok(Snippet { text })
+                let mut prelude = recv_value.prelude;
+                for arg in arg_values {
+                    prelude.extend(arg.prelude);
+                }
+                Ok(Snippet {
+                    text,
+                    precedence,
+                    prelude,
+                })
             }
             Callee::Value(_) => Err(diagnostic(
                 "K9",
@@ -625,8 +754,8 @@ impl<'a> Emitter<'a> {
         out.push('\n');
     }
 
-    fn flush_pending(&mut self, out: &mut String, indent: usize) {
-        for (relative, text) in self.pending.drain(..) {
+    fn emit_prelude(out: &mut String, indent: usize, prelude: Prelude) {
+        for (relative, text) in prelude {
             Self::line(out, indent + relative, &text);
         }
     }
@@ -654,22 +783,9 @@ impl<'a> Emitter<'a> {
                         pos.clone(),
                     ));
                 }
-                if !matches!(
-                    init.kind,
-                    ExprKind::Cast(_)
-                        | ExprKind::Call { .. }
-                        | ExprKind::Lambda { .. }
-                        | ExprKind::Template(_)
-                        | ExprKind::AsyncSuspend
-                        | ExprKind::AsyncCall { .. }
-                        | ExprKind::ArrayLit(_)
-                        | ExprKind::Length(_)
-                ) {
-                    let _ = wgsl_type(self.module, ty, pos)?;
-                }
                 let value = self.snippet(init)?;
                 let _ = wgsl_type(self.module, ty, pos)?;
-                self.flush_pending(out, indent);
+                Self::emit_prelude(out, indent, value.prelude);
                 let value_class =
                     matches!(ty, Type::Class(id) if self.module.classes[id.0].is_value);
                 let declaration = if *mutable || value_class {
@@ -685,13 +801,13 @@ impl<'a> Emitter<'a> {
             }
             Stmt::Expr(expr) => {
                 let value = self.snippet(expr)?;
-                self.flush_pending(out, indent);
+                Self::emit_prelude(out, indent, value.prelude);
                 Self::line(out, indent, &format!("{};", value.text));
             }
             Stmt::Return { value, .. } => {
                 if let Some(value) = value {
                     let value = self.snippet(value)?;
-                    self.flush_pending(out, indent);
+                    Self::emit_prelude(out, indent, value.prelude);
                     Self::line(out, indent, &format!("return {};", value.text));
                 } else {
                     Self::line(out, indent, "return;");
@@ -701,7 +817,7 @@ impl<'a> Emitter<'a> {
                 cond, then, els, ..
             } => {
                 let cond = self.snippet(cond)?;
-                self.flush_pending(out, indent);
+                Self::emit_prelude(out, indent, cond.prelude);
                 Self::line(out, indent, &format!("if ({}) {{", cond.text));
                 self.statements(then, indent + 1, out)?;
                 if let Some(els) = els {
@@ -712,10 +828,19 @@ impl<'a> Emitter<'a> {
             }
             Stmt::While { cond, body, .. } => {
                 let cond = self.snippet(cond)?;
-                self.flush_pending(out, indent);
-                Self::line(out, indent, &format!("while ({}) {{", cond.text));
-                self.statements(body, indent + 1, out)?;
-                Self::line(out, indent, "}");
+                if cond.prelude.is_empty() {
+                    Self::line(out, indent, &format!("while ({}) {{", cond.text));
+                    self.statements(body, indent + 1, out)?;
+                    Self::line(out, indent, "}");
+                } else {
+                    Self::line(out, indent, "loop {");
+                    Self::emit_prelude(out, indent + 1, cond.prelude);
+                    Self::line(out, indent + 1, &format!("if (!({})) {{", cond.text));
+                    Self::line(out, indent + 2, "break;");
+                    Self::line(out, indent + 1, "}");
+                    self.statements(body, indent + 1, out)?;
+                    Self::line(out, indent, "}");
+                }
             }
             Stmt::For {
                 init,
@@ -724,7 +849,7 @@ impl<'a> Emitter<'a> {
                 body,
                 pos,
             } => {
-                let init = match init.as_deref() {
+                let (init, init_prelude) = match init.as_deref() {
                     Some(Stmt::Let {
                         name,
                         ty,
@@ -750,10 +875,16 @@ impl<'a> Emitter<'a> {
                             "let"
                         };
                         let _ = wgsl_type(self.module, ty, pos)?;
-                        format!("{} {} = {}", declaration, mapping::ident(name), value.text)
+                        (
+                            format!("{} {} = {}", declaration, mapping::ident(name), value.text),
+                            value.prelude,
+                        )
                     }
-                    Some(Stmt::Expr(expr)) => self.snippet(expr)?.text,
-                    None => String::new(),
+                    Some(Stmt::Expr(expr)) => {
+                        let value = self.snippet(expr)?;
+                        (value.text, value.prelude)
+                    }
+                    None => (String::new(), Vec::new()),
                     _ => {
                         return Err(diagnostic(
                             "K7",
@@ -762,20 +893,38 @@ impl<'a> Emitter<'a> {
                         ))
                     }
                 };
-                let cond = cond
-                    .as_ref()
-                    .map(|value| self.snippet(value).map(|value| value.text))
-                    .transpose()?
-                    .unwrap_or_default();
-                let step = step
-                    .as_ref()
-                    .map(|value| self.snippet(value).map(|value| value.text))
-                    .transpose()?
-                    .unwrap_or_default();
-                self.flush_pending(out, indent);
-                Self::line(out, indent, &format!("for ({init}; {cond}; {step}) {{"));
-                self.statements(body, indent + 1, out)?;
-                Self::line(out, indent, "}");
+                let cond = cond.as_ref().map(|value| self.snippet(value)).transpose()?;
+                let step = step.as_ref().map(|value| self.snippet(value)).transpose()?;
+                let loop_prelude = cond.as_ref().is_some_and(|value| !value.prelude.is_empty())
+                    || step.as_ref().is_some_and(|value| !value.prelude.is_empty());
+                if loop_prelude {
+                    Self::line(out, indent, "{");
+                    Self::emit_prelude(out, indent + 1, init_prelude);
+                    if !init.is_empty() {
+                        Self::line(out, indent + 1, &format!("{init};"));
+                    }
+                    Self::line(out, indent + 1, "loop {");
+                    if let Some(cond) = cond {
+                        Self::emit_prelude(out, indent + 2, cond.prelude);
+                        Self::line(out, indent + 2, &format!("if (!({})) {{", cond.text));
+                        Self::line(out, indent + 3, "break;");
+                        Self::line(out, indent + 2, "}");
+                    }
+                    self.statements(body, indent + 2, out)?;
+                    if let Some(step) = step {
+                        Self::emit_prelude(out, indent + 2, step.prelude);
+                        Self::line(out, indent + 2, &format!("{};", step.text));
+                    }
+                    Self::line(out, indent + 1, "}");
+                    Self::line(out, indent, "}");
+                } else {
+                    Self::emit_prelude(out, indent, init_prelude);
+                    let cond = cond.map_or_else(String::new, |value| value.text);
+                    let step = step.map_or_else(String::new, |value| value.text);
+                    Self::line(out, indent, &format!("for ({init}; {cond}; {step}) {{"));
+                    self.statements(body, indent + 1, out)?;
+                    Self::line(out, indent, "}");
+                }
             }
             Stmt::ForOf {
                 name,
@@ -793,7 +942,8 @@ impl<'a> Emitter<'a> {
                     ));
                 };
                 let subject = self.snippet(subject)?;
-                let index = format!("{}_index", mapping::ident(name));
+                Self::emit_prelude(out, indent, subject.prelude);
+                let index = format!("_g_{}_index", mapping::ident(name));
                 Self::line(
                     out,
                     indent,
@@ -1244,18 +1394,7 @@ pub(crate) fn emit(
     uses_f16: bool,
 ) -> Result<String, Diagnostic> {
     let kernel = function(module, &pipeline.entry)
-        .ok_or_else(|| diagnostic("K1", "kernel disappeared from HIR", pipeline.pos.clone()))?;
-    let mut binding_pairs = BTreeSet::new();
-    for layout in &pipeline.layouts {
-        for binding in &layout.bindings {
-            if !binding_pairs.insert((layout.group, binding.index)) {
-                return Err(generator_diagnostic(
-                    "two bindings use one group and binding pair",
-                    binding.pos.clone(),
-                ));
-            }
-        }
-    }
+        .ok_or_else(|| generator_diagnostic("kernel disappeared from HIR", pipeline.pos.clone()))?;
     let helpers = dependencies(module, kernel)?;
     let mut emitter = Emitter::new(module, pipeline, kernel);
     let mut helper_text = String::new();

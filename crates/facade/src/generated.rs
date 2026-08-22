@@ -6703,38 +6703,38 @@ fn release_deferred_handles() {
 #[no_mangle]
 pub extern "C" fn subscript_typegpu_create_instance() -> SubscriptTypegpuInstance {
     let requested_backend = std::env::var_os("SUBSCRIPT_TYPEGPU_BACKEND");
-let backend = match requested_backend.as_deref().and_then(std::ffi::OsStr::to_str) {
-None if requested_backend.is_none() => None,
-Some("metal") => Some(("metal", YAWGPU_INSTANCE_BACKEND_METAL)),
-Some("vulkan") => Some(("vulkan", YAWGPU_INSTANCE_BACKEND_VULKAN)),
-Some("gles") => Some(("gles", YAWGPU_INSTANCE_BACKEND_GLES)),
-_ => {
-let value = requested_backend.as_deref().map_or_else(
-|| "<non-UTF-8>".into(),
-|value| value.to_string_lossy(),
-);
-eprintln!("subscript-typegpu: unknown SUBSCRIPT_TYPEGPU_BACKEND value `{value}`; expected metal, vulkan, or gles");
-return std::ptr::null_mut();
-}
-};
-if !runtime::initialize_table() {
-return std::ptr::null_mut();
-}
-let mut select = backend.map(|(_, backend)| YawgpuInstanceBackendSelect {
-chain: YawgpuChainedStruct {
-next: std::ptr::null_mut(),
-s_type: YAWGPU_STYPE_INSTANCE_BACKEND_SELECT,
-},
-backend,
-});
-let descriptor = select.as_mut().map(|select| WGPUInstanceDescriptor {
-next_in_chain: &mut select.chain,
-required_feature_count: 0,
-required_features: std::ptr::null(),
-required_limits: std::ptr::null(),
-});
-let descriptor = descriptor.as_ref().map_or(std::ptr::null(), |value| value);
-// SAFETY: the optional descriptor and chain live through the backend call.
+    let backend = match requested_backend.as_deref().and_then(std::ffi::OsStr::to_str) {
+        None if requested_backend.is_none() => None,
+        Some("metal") => Some(("metal", YAWGPU_INSTANCE_BACKEND_METAL)),
+        Some("vulkan") => Some(("vulkan", YAWGPU_INSTANCE_BACKEND_VULKAN)),
+        Some("gles") => Some(("gles", YAWGPU_INSTANCE_BACKEND_GLES)),
+        _ => {
+            let value = requested_backend.as_deref().map_or_else(
+                || "<non-UTF-8>".into(),
+                |value| value.to_string_lossy(),
+            );
+            eprintln!("subscript-typegpu: unknown SUBSCRIPT_TYPEGPU_BACKEND value `{value}`; expected metal, vulkan, or gles");
+            return std::ptr::null_mut();
+        }
+    };
+    if !runtime::initialize_table() {
+        return std::ptr::null_mut();
+    }
+    let mut select = backend.map(|(_, backend)| YawgpuInstanceBackendSelect {
+        chain: YawgpuChainedStruct {
+            next: std::ptr::null_mut(),
+            s_type: YAWGPU_STYPE_INSTANCE_BACKEND_SELECT,
+        },
+        backend,
+    });
+    let descriptor = select.as_mut().map(|select| WGPUInstanceDescriptor {
+        next_in_chain: &mut select.chain,
+        required_feature_count: 0,
+        required_features: std::ptr::null(),
+        required_limits: std::ptr::null(),
+    });
+    let descriptor = descriptor.as_ref().map_or(std::ptr::null(), |value| value);
+    // SAFETY: the optional descriptor and chain live through the backend call.
     let instance: SubscriptTypegpuInstance = unsafe { wgpuCreateInstance(descriptor).cast() };
     if instance.is_null() {
         if let Some((request, _)) = backend {

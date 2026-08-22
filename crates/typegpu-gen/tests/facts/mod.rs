@@ -76,7 +76,7 @@ class Bad {
 }
 "#,
             "illegal.ts",
-            "SC3",
+            "outside the value-class whitelist",
         ),
     ];
     for (source, file, rule) in cases {

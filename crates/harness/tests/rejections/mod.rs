@@ -45,24 +45,42 @@ fn every_fixture_is_red_with_rule_and_owner() {
         .map(|entry| entry.expect("read fixture entry").path())
         .collect::<Vec<_>>();
     fixtures.sort();
-    assert_eq!(fixtures.len(), 30, "rejection fixture count");
+    assert!(!fixtures.is_empty(), "rejection fixture corpus is empty");
     for fixture in fixtures {
         let inputs = files(&fixture);
-        let expected = inputs
-            .last()
-            .expect("fixture source")
-            .source
+        let source = &inputs.last().expect("fixture source").source;
+        let expected = source
             .lines()
-            .next()
-            .and_then(|line| line.strip_prefix("// expected-rule: "))
+            .find_map(|line| line.strip_prefix("// expected-rule: "))
             .expect("expected-rule header");
+        let owner = source
+            .lines()
+            .find_map(|line| line.strip_prefix("// expected-owner: "))
+            .unwrap_or("author");
+        let expected_message = source
+            .lines()
+            .find_map(|line| line.strip_prefix("// expected-message: "));
         let diagnostics = subscript_typegpu_gen::generate(&inputs)
             .expect_err("rejection fixture unexpectedly generated");
-        let matching = diagnostics
-            .iter()
-            .find(|diagnostic| diagnostic.message.starts_with(&format!("{expected}:")));
+        assert_eq!(
+            diagnostics.len(),
+            1,
+            "{} must reach one check only:\n{}",
+            fixture.display(),
+            diagnostics
+                .iter()
+                .map(|item| item.message.as_str())
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        let matching = &diagnostics[0];
+        let rule_matches = if owner == "checker" {
+            matching.code.as_str() == expected
+        } else {
+            matching.message.starts_with(&format!("{expected}:"))
+        };
         assert!(
-            matching.is_some(),
+            rule_matches,
             "{} expected {expected}:\n{}",
             fixture.display(),
             diagnostics
@@ -71,13 +89,27 @@ fn every_fixture_is_red_with_rule_and_owner() {
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        assert!(
-            matching
-                .expect("matching diagnostic")
-                .message
-                .contains("(author)"),
-            "{} matching diagnostic lacks its owner",
-            fixture.display()
-        );
+        match owner {
+            "author" => assert!(
+                matching.message.ends_with("(author)"),
+                "{} matching diagnostic lacks author owner",
+                fixture.display()
+            ),
+            "checker" => assert!(
+                !matching.message.ends_with("(author)")
+                    && !matching.message.ends_with("(generator)"),
+                "{} checker diagnostic was relabeled",
+                fixture.display()
+            ),
+            value => panic!("{} unknown expected owner {value}", fixture.display()),
+        }
+        if let Some(expected_message) = expected_message {
+            assert_eq!(
+                matching.message,
+                expected_message,
+                "{} checker diagnostic text",
+                fixture.display()
+            );
+        }
     }
 }

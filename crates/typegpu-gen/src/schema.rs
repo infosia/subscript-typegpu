@@ -284,6 +284,7 @@ fn collect_type_reachable(module: &Module, ty: &Type, reachable: &mut BTreeSet<u
 pub(crate) fn discover(
     module: &Module,
     intended: &BTreeSet<String>,
+    import_pos: Option<&Pos>,
 ) -> Result<Vec<Schema>, Vec<Diagnostic>> {
     let uniform_names = uniform_schema_names(module);
     let mut schemas = Vec::new();
@@ -299,7 +300,7 @@ pub(crate) fn discover(
             diagnostics.push(diagnostic(
                 "SC1",
                 format!("`{name}` is not a schema"),
-                Pos::new("", 1, 1),
+                import_pos.cloned().unwrap_or_else(|| Pos::new("", 1, 1)),
             ));
             continue;
         };

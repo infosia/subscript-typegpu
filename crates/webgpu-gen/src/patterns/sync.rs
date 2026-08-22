@@ -169,39 +169,41 @@ pub(crate) fn rust_create_export(op: &CreateOp) -> String {
             .expect("instance creation has its validated descriptor")
             .1;
         (
-            "    let requested_backend = std::env::var_os(\"SUBSCRIPT_TYPEGPU_BACKEND\");\n\
-             let backend = match requested_backend.as_deref().and_then(std::ffi::OsStr::to_str) {\n\
-                 None if requested_backend.is_none() => None,\n\
-                 Some(\"metal\") => Some((\"metal\", YAWGPU_INSTANCE_BACKEND_METAL)),\n\
-                 Some(\"vulkan\") => Some((\"vulkan\", YAWGPU_INSTANCE_BACKEND_VULKAN)),\n\
-                 Some(\"gles\") => Some((\"gles\", YAWGPU_INSTANCE_BACKEND_GLES)),\n\
-                 _ => {\n\
-                     let value = requested_backend.as_deref().map_or_else(\n\
-                         || \"<non-UTF-8>\".into(),\n\
-                         |value| value.to_string_lossy(),\n\
-                     );\n\
-                     eprintln!(\"subscript-typegpu: unknown SUBSCRIPT_TYPEGPU_BACKEND value `{value}`; expected metal, vulkan, or gles\");\n\
-                     return std::ptr::null_mut();\n\
-                 }\n\
-             };\n\
-             if !runtime::initialize_table() {\n\
-                 return std::ptr::null_mut();\n\
-             }\n\
-             let mut select = backend.map(|(_, backend)| YawgpuInstanceBackendSelect {\n\
-                 chain: YawgpuChainedStruct {\n\
-                     next: std::ptr::null_mut(),\n\
-                     s_type: YAWGPU_STYPE_INSTANCE_BACKEND_SELECT,\n\
-                 },\n\
-                 backend,\n\
-             });\n\
-             let descriptor = select.as_mut().map(|select| $INSTANCE_DESCRIPTOR$ {\n\
-                 next_in_chain: &mut select.chain,\n\
-                 required_feature_count: 0,\n\
-                 required_features: std::ptr::null(),\n\
-                 required_limits: std::ptr::null(),\n\
-             });\n\
-             let descriptor = descriptor.as_ref().map_or(std::ptr::null(), |value| value);\n\
-             // SAFETY: the optional descriptor and chain live through the backend call.\n"
+            concat!(
+                "    let requested_backend = std::env::var_os(\"SUBSCRIPT_TYPEGPU_BACKEND\");\n",
+                "    let backend = match requested_backend.as_deref().and_then(std::ffi::OsStr::to_str) {\n",
+                "        None if requested_backend.is_none() => None,\n",
+                "        Some(\"metal\") => Some((\"metal\", YAWGPU_INSTANCE_BACKEND_METAL)),\n",
+                "        Some(\"vulkan\") => Some((\"vulkan\", YAWGPU_INSTANCE_BACKEND_VULKAN)),\n",
+                "        Some(\"gles\") => Some((\"gles\", YAWGPU_INSTANCE_BACKEND_GLES)),\n",
+                "        _ => {\n",
+                "            let value = requested_backend.as_deref().map_or_else(\n",
+                "                || \"<non-UTF-8>\".into(),\n",
+                "                |value| value.to_string_lossy(),\n",
+                "            );\n",
+                "            eprintln!(\"subscript-typegpu: unknown SUBSCRIPT_TYPEGPU_BACKEND value `{value}`; expected metal, vulkan, or gles\");\n",
+                "            return std::ptr::null_mut();\n",
+                "        }\n",
+                "    };\n",
+                "    if !runtime::initialize_table() {\n",
+                "        return std::ptr::null_mut();\n",
+                "    }\n",
+                "    let mut select = backend.map(|(_, backend)| YawgpuInstanceBackendSelect {\n",
+                "        chain: YawgpuChainedStruct {\n",
+                "            next: std::ptr::null_mut(),\n",
+                "            s_type: YAWGPU_STYPE_INSTANCE_BACKEND_SELECT,\n",
+                "        },\n",
+                "        backend,\n",
+                "    });\n",
+                "    let descriptor = select.as_mut().map(|select| $INSTANCE_DESCRIPTOR$ {\n",
+                "        next_in_chain: &mut select.chain,\n",
+                "        required_feature_count: 0,\n",
+                "        required_features: std::ptr::null(),\n",
+                "        required_limits: std::ptr::null(),\n",
+                "    });\n",
+                "    let descriptor = descriptor.as_ref().map_or(std::ptr::null(), |value| value);\n",
+                "    // SAFETY: the optional descriptor and chain live through the backend call.\n",
+            )
                 .replace("$INSTANCE_DESCRIPTOR$", instance_descriptor),
             format!(
                 "    let instance: SubscriptTypegpuInstance = unsafe {{ {}(descriptor).cast() }};\n    if instance.is_null() {{\n        if let Some((request, _)) = backend {{\n            let path = std::env::var_os(\"SUBSCRIPT_TYPEGPU_BACKEND_LIB\")\n                .map(std::path::PathBuf::from)\n                .map_or_else(|| \"<unset>\".into(), |path| path.display().to_string());\n            eprintln!(\"subscript-typegpu: backend request `{{request}}` returned a null instance from {{path}}\");\n        }}\n        return std::ptr::null_mut();\n    }}\n    runtime::register_instance(instance as usize);\n    instance\n",

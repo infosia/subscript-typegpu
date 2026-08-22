@@ -67,7 +67,11 @@ guard, and the slice closes quoted no differential wall time. The
 first, second, and fourth are corrected in this commit. The third
 and the code MINORs (naga offsets over every `b` program, the
 fixture name, the empty position in one SC1 diagnostic, `read` as a
-free function) go to the coding agent with the P2 findings.
+free function) went to the coding agent with the P2 findings and landed: the
+traps module pends without a backend, naga offsets cover every `b`
+program, the fixture is `sc10-uniform-layout.ts`, the SC1
+diagnostic carries the import's position, and `readBuffer<T>` is a
+free function.
 
 ## Exit criteria
 

@@ -132,92 +132,6 @@ fn intended_schemas(support: Option<&SupportImport>) -> BTreeSet<String> {
         .collect()
 }
 
-fn source_line<'a>(files: &'a [SourceFile], pos: &Pos) -> Option<&'a str> {
-    files
-        .iter()
-        .find(|file| file.name == pos.file)?
-        .source
-        .lines()
-        .nth(pos.line.checked_sub(1)? as usize)
-}
-
-fn identifier_at(line: &str, col: u32) -> Option<&str> {
-    let start = col.checked_sub(1)? as usize;
-    let rest = line.get(start..)?;
-    let len = rest
-        .char_indices()
-        .take_while(|(_, ch)| ch.is_ascii_alphanumeric() || *ch == '_')
-        .last()
-        .map_or(0, |(index, ch)| index + ch.len_utf8());
-    (len > 0).then(|| &rest[..len])
-}
-
-fn function_header<'a>(source: &'a str, name: &str) -> Option<&'a str> {
-    let marker = format!("function {name}(");
-    let start = source.find(&marker)?;
-    let rest = &source[start..];
-    let end = rest.find('{')?;
-    Some(&rest[..end])
-}
-
-fn translate_kernel_checker_diagnostics(
-    files: &[SourceFile],
-    diagnostics: Vec<Diagnostic>,
-) -> Vec<Diagnostic> {
-    diagnostics
-        .into_iter()
-        .map(|item| {
-            if item.code == RuleCode::S100
-                && item.message.contains("outside the value-class whitelist")
-            {
-                let field = source_line(files, &item.pos)
-                    .and_then(|line| line.split_once(':'))
-                    .and_then(|(declaration, _)| declaration.split_whitespace().last())
-                    .unwrap_or("<unknown>");
-                let ty = item.message.split('`').nth(1).unwrap_or("<unknown>");
-                return diagnostic(
-                    "SC3",
-                    format!("field `{field}` has illegal schema type `{ty}`"),
-                    item.pos,
-                );
-            }
-            if item.code == RuleCode::S013 {
-                return diagnostic("K9", "await is outside K9", item.pos);
-            }
-            let Some(line) = source_line(files, &item.pos) else {
-                return item;
-            };
-            if item.code != RuleCode::S100 || !line.contains("computePipeline") {
-                return item;
-            }
-            let Some(name) = identifier_at(line, item.pos.col) else {
-                return item;
-            };
-            let Some(source) = files
-                .iter()
-                .find(|file| file.name == item.pos.file)
-                .map(|file| file.source.as_str())
-            else {
-                return item;
-            };
-            let Some(header) = function_header(source, name) else {
-                return item;
-            };
-            if source.contains(&format!("async function {name}(")) {
-                diagnostic(
-                    "PI13",
-                    "an async function cannot be a pipeline kernel",
-                    item.pos,
-                )
-            } else if !header.trim_end().ends_with(": void") {
-                diagnostic("PI13", "a pipeline kernel has a non-void return", item.pos)
-            } else {
-                item
-            }
-        })
-        .collect()
-}
-
 fn generated_export_names(
     schemas: &[schema::Schema],
     pipelines: &[pipeline::Pipeline],
@@ -254,12 +168,7 @@ fn generated_export_names(
 /// Returns compiler or schema diagnostics with source positions.
 pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     let options = discovery_options(files)?;
-    let module = match subscript_compiler::check_program_with(files, &options) {
-        Ok(module) => module,
-        Err(diagnostics) => {
-            return Err(translate_kernel_checker_diagnostics(files, diagnostics));
-        }
-    };
+    let module = subscript_compiler::check_program_with(files, &options)?;
     let support = support_import(&module)?;
     let mut intended = intended_schemas(support.as_ref());
     let pipeline_definitions = pipeline::discover(&module)?;
@@ -268,7 +177,7 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         intended
             .extend(kernel::referenced_schema_names(&module, pipeline).map_err(|item| vec![item])?);
     }
-    let schemas = schema::discover(&module, &intended)?;
+    let schemas = schema::discover(&module, &intended, support.as_ref().map(|item| &item.pos))?;
     if let Some(support) = &support {
         let exports = generated_export_names(&schemas, &pipeline_definitions);
         let missing = support
@@ -342,7 +251,8 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         &wgsl_structs,
         &pipeline_definitions,
         &pipelines,
-    );
+    )
+    .map_err(|diagnostic| vec![diagnostic])?;
     let layouts = schemas
         .iter()
         .map(|schema| GeneratedLayout {

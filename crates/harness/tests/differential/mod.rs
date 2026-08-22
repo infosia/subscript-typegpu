@@ -21,7 +21,7 @@ fn repository_root() -> PathBuf {
     root
 }
 
-fn backend_is_available() -> bool {
+pub(crate) fn backend_is_available() -> bool {
     match subscript_typegpu_harness::backend_lib() {
         Ok(Some(_)) => true,
         Ok(None) => {
@@ -147,7 +147,9 @@ fn run_ship(program: &Path) -> Vec<u8> {
 }
 
 fn run_suite() -> Vec<ProgramOutput> {
-    programs()
+    let programs = programs();
+    assert!(!programs.is_empty(), "differential program list is empty");
+    programs
         .into_iter()
         .map(|program| ProgramOutput {
             dev: run_dev(&program),

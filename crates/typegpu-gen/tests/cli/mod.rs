@@ -24,26 +24,56 @@ impl Drop for TempDir {
 }
 
 #[test]
-fn cli_writes_the_same_support_module_as_the_library() {
+fn cli_writes_the_same_support_and_wgsl_as_the_library_for_every_program() {
     let root = support::root();
     let output = TempDir::new();
-    let result = Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-gen"))
-        .arg("gen")
-        .arg(root.join("programs/b01-layout.ts"))
-        .arg("--lib")
-        .arg(root.join("lib"))
-        .arg("-o")
-        .arg(&output.0)
-        .output()
-        .expect("run generator CLI");
-    assert!(
-        result.status.success(),
-        "generator CLI failed:\n{}",
-        String::from_utf8_lossy(&result.stderr)
-    );
-    let written = support::read(&output.0.join("b01-layout.typegpu.ts"));
-    let expected = subscript_typegpu_gen::generate(&support::b01_files())
-        .expect("generate b01 in memory")
-        .support_module;
-    assert_eq!(written, expected);
+    let directory = root.join("programs");
+    let mut programs = std::fs::read_dir(&directory)
+        .expect("read programs")
+        .map(|entry| entry.expect("program entry").path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| {
+                    matches!(name.as_bytes().first(), Some(b'b' | b'x')) && name.ends_with(".ts")
+                })
+        })
+        .collect::<Vec<_>>();
+    programs.sort();
+    assert!(!programs.is_empty(), "no b/x programs");
+    for program in programs {
+        let result = Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-gen"))
+            .arg("gen")
+            .arg(&program)
+            .arg("--lib")
+            .arg(root.join("lib"))
+            .arg("-o")
+            .arg(&output.0)
+            .output()
+            .expect("run generator CLI");
+        assert!(
+            result.status.success(),
+            "generator CLI failed for {}:\n{}",
+            program.display(),
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let stem = program
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .expect("program stem");
+        let generated = subscript_typegpu_gen::generate(&support::program_files(&program))
+            .unwrap_or_else(|diagnostics| panic!("generate {stem} in memory: {diagnostics:?}"));
+        assert_eq!(
+            support::read(&output.0.join(format!("{stem}.typegpu.ts"))),
+            generated.support_module,
+            "{stem} support module"
+        );
+        for (pipeline, wgsl) in generated.pipelines {
+            assert_eq!(
+                support::read(&output.0.join(format!("{stem}.{pipeline}.wgsl"))),
+                wgsl,
+                "{stem}.{pipeline}.wgsl"
+            );
+        }
+    }
 }

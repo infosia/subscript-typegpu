@@ -92,7 +92,18 @@ the checker, K9 and K14 state where a lowering lands and how
 precedence is judged, plan §5 matches LY11, T6 names the library
 and binary equality. M6 is recorded as a Dawn measurement item for
 P6: LY11 stays as measured in the proof of concept until a Dawn run
-says otherwise. The code findings go to the coding agent.
+says otherwise. The code findings went to the coding agent in one round with the
+P1 findings: the three emitter defects carry emitter tests that were
+red before the fix (`a.add(b).scale(s)` emitted `a + b * s`), the
+PI2 check exists with a fixture, the rejection corpus is 44 fixtures
+each with exactly one diagnostic, no text matching over program
+source or checker messages remains, the traps module carries the
+T10 guard, naga offsets cover every `b` program, and
+`x04-live-control-flow` exercises a `while` condition and a nested
+`?:` against a host expectation. Planner verification: gate green,
+194 tests in six executables (facade 4, typegpu-gen 7 and 17,
+harness 16 in 19.17 seconds plus the ignored live test, webgpu-gen
+3 and 147). Measurement: 42 s / 0.2 s / 29 s / 27 s / 6.
 
 ## Exit criteria
 
@@ -100,6 +111,6 @@ says otherwise. The code findings go to the coding agent.
 |---|---|---|
 | 1 | `b02-vecadd`, `b03-saxpy-uniform`, `b04-particles` gate-green on both tiers with WGSL goldens | Slice 2 close: all three equal, goldens naga-valid |
 | 2 | `x01`–`x03` print `PASS` on a real adapter | Metal, `b7e2533`: ok, 6.70 s (and an earlier run at 9.71 s) |
-| 3 | Every rejection rule has a red fixture | Slice 1: 30 fixtures, one rule id each |
+| 3 | Every rejection rule has a red fixture | Phase close: 44 fixtures, one diagnostic each, every author diagnostic site covered |
 | 4 | Every generator diagnostic names its rule id and its owner | Slice 1: asserted per fixture |
 | 5 | Build-time budgets hold | 44 s / 0.2 s / 25 s / 22 s / 6 at the slice 2 close |

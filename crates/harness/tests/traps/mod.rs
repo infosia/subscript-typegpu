@@ -37,6 +37,9 @@ fn assert_trap(fixture: &Path, expected: &str) {
 
 #[test]
 fn buffer_bounds_traps_are_named_and_numbered() {
+    if !super::differential::backend_is_available() {
+        return;
+    }
     let directory = repository_root().join("crates/harness/tests/fixtures/trap");
     for (name, expected) in [
         (
@@ -49,7 +52,7 @@ fn buffer_bounds_traps_are_named_and_numbered() {
         ),
         (
             "read-past-end.ts",
-            "BF8 Buffer.read elementIndex=1 elementCount=2 count=2",
+            "BF8 readBuffer elementIndex=1 elementCount=2 count=2",
         ),
     ] {
         assert_trap(&directory.join(name), expected);

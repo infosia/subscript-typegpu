@@ -6,6 +6,7 @@
 import {
   Buffer,
   createBuffer,
+  readBuffer,
   createComputePipeline,
   createBindGroup,
   ComputeInvocation,
@@ -171,7 +172,7 @@ export async function main(): Promise<void> {
       return;
     }
     const result: FixedArray<Item, 64> = Context.fromBytes<FixedArray<Item, 64>>(
-      out.read(readback, 0, count),
+      readBuffer<Item>(readback, 0, count),
       0,
     );
     print("readback:mapped");

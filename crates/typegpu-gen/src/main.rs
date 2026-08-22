@@ -48,8 +48,8 @@ fn run() -> Result<(), String> {
             read(&library.join("wire-enum-aliases.generated.d.ts"))?,
         ),
         SourceFile::new("webgpu.ts", read(&library.join("webgpu.ts"))?),
-        SourceFile::new("typegpu.ts", read(&library.join("typegpu.ts"))?),
         SourceFile::new("typegpu-types.ts", read(&library.join("typegpu-types.ts"))?),
+        SourceFile::new("typegpu.ts", read(&library.join("typegpu.ts"))?),
         SourceFile::new(program_name, read(&program)?),
     ];
     let generated = subscript_typegpu_gen::generate(&files)

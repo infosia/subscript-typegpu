@@ -435,7 +435,14 @@ pub(crate) fn ident(name: &str) -> String {
             }
         })
         .collect::<String>();
-    if RESERVED.contains(&result.as_str()) || BUILTIN_IDENTIFIERS.contains(&result.as_str()) {
+    if name.starts_with("_g_")
+        || RESERVED.contains(&result.as_str())
+        || BUILTIN_IDENTIFIERS.contains(&result.as_str())
+    {
+        result.push('_');
+    } else if result.ends_with('_') {
+        // A legal author identifier that is the result of mangling another name
+        // moves one step farther away, so the mapping stays injective.
         result.push('_');
     }
     result
@@ -541,5 +548,8 @@ mod tests {
             assert_eq!(ident(name), format!("{name}_"));
         }
         assert_eq!(ident("userName"), "userName");
+        assert_eq!(ident("let"), "let_");
+        assert_eq!(ident("let_"), "let__");
+        assert_eq!(ident("_g_conditional_0"), "_g_conditional_0_");
     }
 }
