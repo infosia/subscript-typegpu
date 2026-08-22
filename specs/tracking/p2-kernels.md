@@ -56,7 +56,12 @@ and `b04-particles` (a `Vec3f` schema and a helper) equal on both
 tiers with their `.wgsl` goldens. The facade reads
 `SUBSCRIPT_TYPEGPU_BACKEND` and builds the yawgpu backend-select
 chain (L13), tested in a child process. `tools/live.sh` and the
-ignored `live` module exist. The live run is pending the owner.
+ignored `live` module exist. Live run by the owner (2026-08-22, Metal, yawgpu
+`target/release/libyawgpu.dylib`, pin `bb9dadc`, the working tree
+between `786aae7` and the P1 slice 2 landing):
+`live::every_x_program_passes_on_a_real_adapter ... ok`, 9.71
+seconds, `x01`–`x03` `PASS` on both tiers. A second run on the
+committed slice 2 tree is the phase-close citation.
 Measurement: 44 s / 0.2 s / 25 s / 22 s / 6.
 
 Noted for a later round: the generated Rust of the backend request
@@ -68,7 +73,7 @@ it).
 | # | Criterion | Evidence |
 |---|---|---|
 | 1 | `b02-vecadd`, `b03-saxpy-uniform`, `b04-particles` gate-green on both tiers with WGSL goldens | Slice 2 close: all three equal, goldens naga-valid |
-| 2 | `x01`–`x03` print `PASS` on a real adapter | — |
+| 2 | `x01`–`x03` print `PASS` on a real adapter | First run 2026-08-22 on Metal: ok, 9.71 s. The phase-close run is pending |
 | 3 | Every rejection rule has a red fixture | Slice 1: 30 fixtures, one rule id each |
 | 4 | Every generator diagnostic names its rule id and its owner | Slice 1: asserted per fixture |
 | 5 | Build-time budgets hold | 44 s / 0.2 s / 25 s / 22 s / 6 at the slice 2 close |
