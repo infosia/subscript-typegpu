@@ -1866,6 +1866,473 @@ impl<'a> Emitter<'a> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum UniformityTaint {
+    Uniform,
+    NonUniform(String),
+}
+
+impl UniformityTaint {
+    fn merge(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::NonUniform(reason), _) | (_, Self::NonUniform(reason)) => {
+                Self::NonUniform(reason)
+            }
+            (Self::Uniform, Self::Uniform) => Self::Uniform,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Uniform => None,
+            Self::NonUniform(reason) => Some(reason),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum UniformityTarget {
+    Loop { has_barrier: bool },
+    Switch,
+}
+
+struct BarrierValidator<'emitter, 'module> {
+    emitter: &'emitter Emitter<'module>,
+    locals: BTreeMap<String, UniformityTaint>,
+    last_barrier: Option<(u32, u32)>,
+}
+
+impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
+    fn new(emitter: &'emitter Emitter<'module>, kernel: &Function) -> Self {
+        Self {
+            emitter,
+            locals: BTreeMap::new(),
+            last_barrier: last_barrier_position(emitter.module, &kernel.body),
+        }
+    }
+
+    fn validate(mut self, kernel: &Function) -> Result<(), Diagnostic> {
+        self.collect_statements(&kernel.body, UniformityTaint::Uniform);
+        self.validate_statements(
+            &kernel.body,
+            UniformityTaint::Uniform,
+            true,
+            &mut Vec::new(),
+        )
+    }
+
+    fn expression(&self, expr: &Expr) -> UniformityTaint {
+        if let Some(binding) = self.emitter.binding_root(expr) {
+            return UniformityTaint::NonUniform(format!("binding `{}`", binding.name));
+        }
+        match &expr.kind {
+            ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) => UniformityTaint::Uniform,
+            ExprKind::Local(name) => self.locals.get(name).cloned().unwrap_or_else(|| {
+                UniformityTaint::NonUniform(format!("local or parameter `{name}`"))
+            }),
+            ExprKind::Global(name) => match self.emitter.globals.get(name) {
+                Some(KernelGlobal {
+                    kind: KernelGlobalKind::Constant(_),
+                    ..
+                }) => UniformityTaint::Uniform,
+                _ => UniformityTaint::NonUniform(format!("global variable `{name}`")),
+            },
+            ExprKind::Field { obj, name } if matches!(&obj.kind, ExprKind::Local(param) if param == &self.emitter.invocation_param) => {
+                UniformityTaint::NonUniform(format!(
+                    "builtin `{}.{name}`",
+                    self.emitter.invocation_param
+                ))
+            }
+            ExprKind::Unary { operand, .. }
+            | ExprKind::Cast(operand)
+            | ExprKind::Length(operand)
+            | ExprKind::JsonResultValue(operand)
+            | ExprKind::Field { obj: operand, .. } => self.expression(operand),
+            ExprKind::Binary { left, right, .. } => {
+                self.expression(left).merge(self.expression(right))
+            }
+            ExprKind::Assign { op, target, value } => {
+                let value = self.expression(value);
+                if op.is_some() {
+                    self.expression(target).merge(value)
+                } else {
+                    assignment_target_taint(self, target).merge(value)
+                }
+            }
+            ExprKind::Call { callee, args } => match callee {
+                Callee::Func(name)
+                    if function_declared_in(self.emitter.module, name, "typegpu.ts")
+                        || function_declared_in(self.emitter.module, name, "typegpu-types.ts") =>
+                {
+                    self.expressions(args)
+                }
+                Callee::Func(name) => UniformityTaint::NonUniform(format!(
+                    "helper result `{}`",
+                    name.split('<').next().unwrap_or(name)
+                )),
+                Callee::Method { recv, .. } => self.expression(recv).merge(self.expressions(args)),
+                Callee::Math(_) => self.expressions(args),
+                Callee::Value(value) => self.expression(value).merge(self.expressions(args)),
+                _ => UniformityTaint::NonUniform("call result".to_owned()),
+            },
+            ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => self.expressions(args),
+            ExprKind::DescriptorLit { fields, .. } => {
+                self.expressions(&fields.iter().flatten().cloned().collect::<Vec<_>>())
+            }
+            ExprKind::Index { obj, index, .. } => {
+                self.expression(obj).merge(self.expression(index))
+            }
+            ExprKind::Cond { cond, then, els } => self
+                .expression(cond)
+                .merge(self.expression(then))
+                .merge(self.expression(els)),
+            ExprKind::EnumMember { .. } | ExprKind::Zero => UniformityTaint::Uniform,
+            _ => UniformityTaint::NonUniform("expression value".to_owned()),
+        }
+    }
+
+    fn expressions(&self, expressions: &[Expr]) -> UniformityTaint {
+        expressions
+            .iter()
+            .fold(UniformityTaint::Uniform, |taint, expr| {
+                taint.merge(self.expression(expr))
+            })
+    }
+
+    fn record_assignment(&mut self, target: &Expr, value: UniformityTaint) {
+        let Some(name) = assigned_local(target) else {
+            return;
+        };
+        let prior = self
+            .locals
+            .get(name)
+            .cloned()
+            .unwrap_or(UniformityTaint::Uniform);
+        self.locals.insert(name.to_owned(), prior.merge(value));
+    }
+
+    fn collect_assignment(&mut self, expr: &Expr, control: UniformityTaint) {
+        let ExprKind::Assign { op, target, value } = &expr.kind else {
+            return;
+        };
+        let mut taint = self.expression(value).merge(control);
+        if op.is_some() {
+            taint = self.expression(target).merge(taint);
+        } else {
+            taint = assignment_target_taint(self, target).merge(taint);
+        }
+        self.record_assignment(target, taint);
+    }
+
+    fn collect_statements(&mut self, statements: &[Stmt], control: UniformityTaint) {
+        for statement in statements {
+            match statement {
+                Stmt::Let { name, init, .. } => {
+                    let value = self.expression(init).merge(control.clone());
+                    let prior = self
+                        .locals
+                        .get(name)
+                        .cloned()
+                        .unwrap_or(UniformityTaint::Uniform);
+                    self.locals.insert(name.clone(), prior.merge(value));
+                }
+                Stmt::Expr(expr) => self.collect_assignment(expr, control.clone()),
+                Stmt::If {
+                    cond, then, els, ..
+                } => {
+                    let branch = control.clone().merge(self.expression(cond));
+                    self.collect_statements(then, branch.clone());
+                    if let Some(els) = els {
+                        self.collect_statements(els, branch);
+                    }
+                }
+                Stmt::While { cond, body, .. } => loop {
+                    let before = self.locals.clone();
+                    let body_control = control.clone().merge(self.expression(cond));
+                    self.collect_statements(body, body_control);
+                    if self.locals == before {
+                        break;
+                    }
+                },
+                Stmt::For {
+                    init,
+                    cond,
+                    step,
+                    body,
+                    ..
+                } => {
+                    if let Some(init) = init {
+                        self.collect_statements(std::slice::from_ref(init), control.clone());
+                    }
+                    loop {
+                        let before = self.locals.clone();
+                        let condition = cond
+                            .as_ref()
+                            .map_or(UniformityTaint::Uniform, |expr| self.expression(expr));
+                        self.collect_statements(body, control.clone().merge(condition));
+                        if let Some(step) = step {
+                            self.collect_assignment(step, control.clone());
+                        }
+                        if self.locals == before {
+                            break;
+                        }
+                    }
+                }
+                Stmt::ForOf {
+                    name,
+                    subject,
+                    body,
+                    ..
+                } => {
+                    let subject = self.expression(subject).merge(control.clone());
+                    self.locals.insert(name.clone(), subject.clone());
+                    self.collect_statements(body, subject);
+                }
+                Stmt::Switch { disc, cases, .. } => {
+                    let branch = control.clone().merge(self.expression(disc));
+                    for case in cases {
+                        self.collect_statements(&case.body, branch.clone());
+                    }
+                }
+                Stmt::Block(body) => self.collect_statements(body, control.clone()),
+                Stmt::Return { .. } | Stmt::Break(_) | Stmt::Continue(_) => {}
+                _ => {}
+            }
+        }
+    }
+
+    fn validate_statements(
+        &self,
+        statements: &[Stmt],
+        control: UniformityTaint,
+        barrier_scope_allowed: bool,
+        targets: &mut Vec<UniformityTarget>,
+    ) -> Result<(), Diagnostic> {
+        for statement in statements {
+            match statement {
+                Stmt::Expr(expr) => {
+                    if let Some(barrier) = barrier_call(self.emitter.module, expr) {
+                        let reason = if barrier_scope_allowed {
+                            control.reason()
+                        } else {
+                            Some("`switch` or `for...of` control")
+                        };
+                        if let Some(reason) = reason {
+                            return Err(diagnostic(
+                                "K22",
+                                format!(
+                                    "`{barrier}` barrier statement is under non-uniform {reason}"
+                                ),
+                                expr.pos.clone(),
+                            ));
+                        }
+                    }
+                }
+                Stmt::Return { value, pos } => {
+                    let before_later_barrier = self
+                        .last_barrier
+                        .is_some_and(|barrier| (pos.line, pos.col) < barrier);
+                    let taint = control.clone().merge(
+                        value
+                            .as_ref()
+                            .map_or(UniformityTaint::Uniform, |value| self.expression(value)),
+                    );
+                    let leaves_loop_with_barrier = taint.reason().is_some()
+                        && targets.iter().rev().any(|target| {
+                            matches!(target, UniformityTarget::Loop { has_barrier: true })
+                        });
+                    if before_later_barrier || leaves_loop_with_barrier {
+                        let reason = taint.reason().unwrap_or("return path");
+                        return Err(diagnostic(
+                            "K22",
+                            format!(
+                                "`return` statement precedes a barrier with non-uniform {reason}"
+                            ),
+                            pos.clone(),
+                        ));
+                    }
+                }
+                Stmt::If {
+                    cond, then, els, ..
+                } => {
+                    let branch = control.clone().merge(self.expression(cond));
+                    self.validate_statements(then, branch.clone(), barrier_scope_allowed, targets)?;
+                    if let Some(els) = els {
+                        self.validate_statements(els, branch, barrier_scope_allowed, targets)?;
+                    }
+                }
+                Stmt::While { cond, body, .. } => {
+                    let loop_control = control.clone().merge(self.expression(cond));
+                    targets.push(UniformityTarget::Loop {
+                        has_barrier: contains_barrier(self.emitter.module, body),
+                    });
+                    let result = self.validate_statements(
+                        body,
+                        loop_control,
+                        barrier_scope_allowed,
+                        targets,
+                    );
+                    targets.pop();
+                    result?;
+                }
+                Stmt::For { cond, body, .. } => {
+                    let condition = cond
+                        .as_ref()
+                        .map_or(UniformityTaint::Uniform, |expr| self.expression(expr));
+                    let loop_control = control.clone().merge(condition);
+                    targets.push(UniformityTarget::Loop {
+                        has_barrier: contains_barrier(self.emitter.module, body),
+                    });
+                    let result = self.validate_statements(
+                        body,
+                        loop_control,
+                        barrier_scope_allowed,
+                        targets,
+                    );
+                    targets.pop();
+                    result?;
+                }
+                Stmt::ForOf { body, .. } => {
+                    let loop_control = control
+                        .clone()
+                        .merge(UniformityTaint::NonUniform("`for...of` control".to_owned()));
+                    targets.push(UniformityTarget::Loop {
+                        has_barrier: contains_barrier(self.emitter.module, body),
+                    });
+                    let result = self.validate_statements(body, loop_control, false, targets);
+                    targets.pop();
+                    result?;
+                }
+                Stmt::Switch { disc, cases, .. } => {
+                    let switch_control = control.clone().merge(self.expression(disc));
+                    targets.push(UniformityTarget::Switch);
+                    for case in cases {
+                        self.validate_statements(
+                            &case.body,
+                            switch_control.clone(),
+                            false,
+                            targets,
+                        )?;
+                    }
+                    targets.pop();
+                }
+                Stmt::Block(body) => {
+                    self.validate_statements(
+                        body,
+                        control.clone(),
+                        barrier_scope_allowed,
+                        targets,
+                    )?;
+                }
+                Stmt::Break(pos) => {
+                    if matches!(
+                        targets.last(),
+                        Some(UniformityTarget::Loop { has_barrier: true })
+                    ) {
+                        if let Some(reason) = control.reason() {
+                            return Err(diagnostic(
+                                "K22",
+                                format!(
+                                    "`break` statement leaves a loop with a barrier under non-uniform {reason}"
+                                ),
+                                pos.clone(),
+                            ));
+                        }
+                    }
+                }
+                Stmt::Continue(pos) => {
+                    let loop_has_barrier = targets.iter().rev().find_map(|target| match target {
+                        UniformityTarget::Loop { has_barrier } => Some(*has_barrier),
+                        UniformityTarget::Switch => None,
+                    });
+                    if loop_has_barrier == Some(true) {
+                        if let Some(reason) = control.reason() {
+                            return Err(diagnostic(
+                                "K22",
+                                format!(
+                                    "`continue` statement leaves a loop with a barrier under non-uniform {reason}"
+                                ),
+                                pos.clone(),
+                            ));
+                        }
+                    }
+                }
+                Stmt::Let { .. } => {}
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+}
+
+fn assigned_local(expr: &Expr) -> Option<&str> {
+    match &expr.kind {
+        ExprKind::Local(name) => Some(name),
+        ExprKind::Field { obj, .. } | ExprKind::Index { obj, .. } => assigned_local(obj),
+        _ => None,
+    }
+}
+
+fn assignment_target_taint(validator: &BarrierValidator<'_, '_>, target: &Expr) -> UniformityTaint {
+    match &target.kind {
+        ExprKind::Local(_) => UniformityTaint::Uniform,
+        ExprKind::Field { obj, .. } => assignment_target_taint(validator, obj),
+        ExprKind::Index { obj, index, .. } => {
+            assignment_target_taint(validator, obj).merge(validator.expression(index))
+        }
+        _ => UniformityTaint::Uniform,
+    }
+}
+
+fn contains_barrier(module: &Module, statements: &[Stmt]) -> bool {
+    statements.iter().any(|statement| match statement {
+        Stmt::Expr(expr) => barrier_call(module, expr).is_some(),
+        Stmt::If { then, els, .. } => {
+            contains_barrier(module, then)
+                || els
+                    .as_ref()
+                    .is_some_and(|statements| contains_barrier(module, statements))
+        }
+        Stmt::While { body, .. } | Stmt::For { body, .. } | Stmt::ForOf { body, .. } => {
+            contains_barrier(module, body)
+        }
+        Stmt::Switch { cases, .. } => cases
+            .iter()
+            .any(|case| contains_barrier(module, &case.body)),
+        Stmt::Block(body) => contains_barrier(module, body),
+        _ => false,
+    })
+}
+
+fn last_barrier_position(module: &Module, statements: &[Stmt]) -> Option<(u32, u32)> {
+    let mut last = None;
+    for statement in statements {
+        let candidate = match statement {
+            Stmt::Expr(expr) if barrier_call(module, expr).is_some() => {
+                Some((expr.pos.line, expr.pos.col))
+            }
+            Stmt::If { then, els, .. } => last_barrier_position(module, then)
+                .into_iter()
+                .chain(
+                    els.as_ref()
+                        .and_then(|statements| last_barrier_position(module, statements)),
+                )
+                .max(),
+            Stmt::While { body, .. } | Stmt::For { body, .. } | Stmt::ForOf { body, .. } => {
+                last_barrier_position(module, body)
+            }
+            Stmt::Switch { cases, .. } => cases
+                .iter()
+                .filter_map(|case| last_barrier_position(module, &case.body))
+                .max(),
+            Stmt::Block(body) => last_barrier_position(module, body),
+            _ => None,
+        };
+        last = last.into_iter().chain(candidate).max();
+    }
+    last
+}
+
 fn called_functions_expr(expr: &Expr, out: &mut BTreeSet<String>) {
     match &expr.kind {
         ExprKind::Call { callee, args } => {
@@ -2343,6 +2810,7 @@ pub(crate) fn emit(
     }
     let mut entry_body = String::new();
     emitter.statements(&kernel.body, 1, &mut entry_body)?;
+    BarrierValidator::new(&emitter, kernel).validate(kernel)?;
 
     let mut out = String::new();
     if uses_f16

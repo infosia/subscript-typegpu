@@ -1,8 +1,7 @@
-//! Naga owns the uniform-control-flow check for author barriers.
+//! Generator-owned uniform barrier placement checks.
 
 use std::path::PathBuf;
 
-use naga::valid::{Capabilities, UniformityRequirements, ValidationFlags, Validator};
 use subscript_compiler::SourceFile;
 
 fn root() -> PathBuf {
@@ -19,7 +18,7 @@ fn read(name: &str) -> String {
 }
 
 #[test]
-fn non_uniform_barrier_names_the_kernel_and_author() {
+fn non_uniform_barrier_names_statement_value_and_author() {
     let files = vec![
         SourceFile::ambient(
             "subscript-typegpu.generated.d.ts",
@@ -46,22 +45,12 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(nonUniform,
 "#,
         ),
     ];
-    let generated = subscript_typegpu_gen::generate(&files).expect("generate non-uniform barrier");
-    let wgsl = &generated.pipelines[0].1;
-    let module = naga::front::wgsl::parse_str(wgsl).expect("parse non-uniform barrier WGSL");
-    let info = Validator::new(ValidationFlags::all(), Capabilities::empty())
-        .validate(&module)
-        .expect("naga must analyze the non-uniform barrier module");
-    let requirements = info.get_entry_point(0).uniformity.requirements;
-    assert!(
-        requirements.contains(UniformityRequirements::WORK_GROUP_BARRIER),
-        "naga must diagnose the entry point as requiring uniform control flow"
-    );
-    let report =
-        format!("K22 (author): kernel `nonUniform`: naga uniformity diagnostic: {requirements:?}");
-    assert!(report.contains("K22 (author): kernel `nonUniform`"));
-    assert!(
-        report.to_ascii_lowercase().contains("uniform"),
-        "naga report lacks its uniformity diagnostic:\n{report}"
-    );
+    let diagnostics =
+        subscript_typegpu_gen::generate(&files).expect_err("non-uniform barrier must be rejected");
+    assert_eq!(diagnostics.len(), 1, "one uniformity diagnostic");
+    let diagnostic = &diagnostics[0];
+    assert!(diagnostic.message.starts_with("K22:"));
+    assert!(diagnostic.message.contains("barrier statement"));
+    assert!(diagnostic.message.contains("builtin `ctx.localIndex`"));
+    assert!(diagnostic.message.ends_with("(author)"));
 }

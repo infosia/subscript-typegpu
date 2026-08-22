@@ -15,10 +15,13 @@ var<workgroup> partials: array<f32, 256>;
 fn reductionKernel(@builtin(global_invocation_id) globalId: vec3<u32>, @builtin(local_invocation_index) localIndex: u32) {
   let global = globalId.x;
   let local = localIndex;
-  if (global >= 1024u) {
-    return;
+  var _g_conditional_0: f32;
+  if (global < 1024u) {
+    _g_conditional_0 = input[global].value;
+  } else {
+    _g_conditional_0 = 0.0f;
   }
-  partials[local] = input[global].value;
+  partials[local] = _g_conditional_0;
   workgroupBarrier();
   var stride = 128u;
   while (stride > 0u) {

@@ -18,6 +18,20 @@ fn generate(source: &str) -> subscript_typegpu_gen::Generated {
     })
 }
 
+fn reject(source: &str) -> subscript_compiler::Diagnostic {
+    let mut files = support::b01_files();
+    files.pop();
+    files.push(SourceFile::new("kernel-test.ts", source));
+    let diagnostics = subscript_typegpu_gen::generate(&files)
+        .expect_err("kernel uniformity fixture unexpectedly generated");
+    assert_eq!(
+        diagnostics.len(),
+        1,
+        "uniformity fixture must produce one diagnostic: {diagnostics:?}"
+    );
+    diagnostics.into_iter().next().expect("one diagnostic")
+}
+
 fn validate(wgsl: &str) {
     let module = naga::front::wgsl::parse_str(wgsl)
         .unwrap_or_else(|error| panic!("WGSL parse failed:\n{}", error.emit_to_string(wgsl)));
@@ -27,6 +41,123 @@ fn validate(wgsl: &str) {
     )
     .validate(&module)
     .unwrap_or_else(|error| panic!("WGSL validation failed: {error:?}\n{wgsl}"));
+}
+
+#[test]
+fn uniform_stride_loop_with_conditional_binding_load_emits() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage, WorkgroupArray, workgroupArray, workgroupBarrier } from "./typegpu";
+@CStruct class Item { value: f32; constructor(value: f32) { this.value = value; } }
+class Layout { input!: Storage<Item>; }
+const partials: WorkgroupArray<f32> = workgroupArray<f32>(4);
+function reduction(res: Layout, ctx: ComputeInvocation): void {
+  const global: u32 = ctx.globalId.x;
+  const local: u32 = ctx.localIndex;
+  partials[local] = global < 4 ? res.input[global].value : 0.0;
+  workgroupBarrier();
+  let stride: u32 = 2;
+  while (stride > 0) {
+    if (local < stride) { partials[local] = partials[local] + partials[local + stride]; }
+    workgroupBarrier();
+    stride = stride / 2;
+  }
+}
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(reduction, { workgroupSize: [4, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert_eq!(wgsl.matches("workgroupBarrier();").count(), 2);
+    assert!(wgsl.contains("while (stride > 0u)"));
+    validate(wgsl);
+}
+
+#[test]
+fn k22_rejects_each_non_uniform_barrier_placement() {
+    let return_before = reject(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
+@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+class Layout { output!: MutStorage<Item>; }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  const lane: u32 = ctx.localIndex;
+  if (lane > 0) { return; }
+  workgroupBarrier();
+  res.output[0] = new Item(1);
+}
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [4, 1, 1] });
+"#,
+    );
+    assert!(return_before.message.contains("K22: `return` statement"));
+    assert!(return_before.message.contains("builtin `ctx.localIndex`"));
+
+    let builtin_if = reject(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
+@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+class Layout { output!: MutStorage<Item>; }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  if (ctx.localIndex === 0) { workgroupBarrier(); }
+  res.output[0] = new Item(1);
+}
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [4, 1, 1] });
+"#,
+    );
+    assert!(builtin_if.message.contains("barrier statement"));
+    assert!(builtin_if.message.contains("builtin `ctx.localIndex`"));
+
+    let binding_loop = reject(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage, workgroupBarrier } from "./typegpu";
+@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+class Layout { input!: Storage<Item>; }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  while (res.input[0].value > 0) { workgroupBarrier(); break; }
+}
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [4, 1, 1] });
+"#,
+    );
+    assert!(binding_loop.message.contains("barrier statement"));
+    assert!(binding_loop.message.contains("binding `input`"));
+}
+
+#[test]
+fn k22_rejects_non_uniform_loop_exit_and_helper_result() {
+    let loop_exit = reject(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
+@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+class Layout { output!: MutStorage<Item>; }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  let running: boolean = true;
+  while (running) {
+    if (ctx.localIndex === 0) { continue; }
+    workgroupBarrier();
+    running = false;
+  }
+  res.output[0] = new Item(1);
+}
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [4, 1, 1] });
+"#,
+    );
+    assert!(loop_exit.message.contains("`continue` statement"));
+    assert!(loop_exit.message.contains("builtin `ctx.localIndex`"));
+
+    let helper_result = reject(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
+@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+class Layout { output!: MutStorage<Item>; }
+function choose(): boolean { return true; }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  if (choose()) { workgroupBarrier(); }
+  res.output[0] = new Item(1);
+}
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [4, 1, 1] });
+"#,
+    );
+    assert!(helper_result.message.contains("barrier statement"));
+    assert!(helper_result.message.contains("helper result `choose`"));
 }
 
 #[test]

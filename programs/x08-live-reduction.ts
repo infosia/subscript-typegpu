@@ -53,8 +53,7 @@ const partials: WorkgroupArray<f32> = workgroupArray<f32>(256);
 function reductionKernel(res: ReductionLayout, ctx: ComputeInvocation): void {
   const global: u32 = ctx.globalId.x;
   const local: u32 = ctx.localIndex;
-  if (global >= 1024) { return; }
-  partials[local] = res.input[global].value;
+  partials[local] = global < 1024 ? res.input[global].value : 0.0;
   workgroupBarrier();
   let stride: u32 = 128;
   while (stride > 0) {
