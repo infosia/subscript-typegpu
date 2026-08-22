@@ -20,10 +20,11 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   takes `(res: L0, ctx: ComputeInvocation) => void`.
   `computePipeline2<L0, L1>`, `computePipeline3<L0, L1, L2>`, and
   `computePipeline4<L0, L1, L2, L3>` take the two-, three-, and
-  four-layout forms. Group index is parameter order. The names are
-  provisional until the RC-2 probe (plan §9) confirms that the
-  checker accepts a named function as a generic function argument
-  typed by a function type. The fallback is a string kernel name.
+  four-layout forms. Group index is parameter order. Measured
+  2026-08-22: the checker accepts a named function as a generic
+  function argument typed by a function type (RC-2 closed). The
+  generator reads the layout classes from the kernel's parameter
+  types and checks that each equals the declaration's type argument.
 - **PI3 — A layout class is a plain class of binding fields.** Every
   field is a binding wrapper (PI5). Binding index is declaration
   order from 0. No other member is legal. The class is not
@@ -69,13 +70,17 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   `@Descriptor` with one `GPUBuffer` field per binding, named as
   the layout field. Schema constants per SC11 continue.
 - **PI9 — The runtime class.** `lib/typegpu.ts` exports
-  `ComputePipeline` with `create(device, wgsl, entry, layouts:
-  BindGroupLayoutSpec[]): ComputePipeline` (a free function
-  `createComputePipeline`, because subscript has no static methods),
-  `bindGroupLayout(g): GPUBindGroupLayout`, `dispatch(encoder,
-  groups: GPUBindGroup[], x, y, z)`, `dispatchThreads(encoder,
-  groups, count)` (rounds up by the workgroup size), and `dispose()`.
-  It builds on `lib/webgpu.ts` only.
+  `createComputePipeline(device, wgsl, entry, layouts:
+  BindGroupLayoutSpec[], workgroup: FixedArray<u32, 3>):
+  ComputePipeline` (a free function, because subscript has no static
+  methods), `ComputePipeline.bindGroupLayout(g): GPUBindGroupLayout`,
+  `dispatch(encoder, groups: GPUBindGroup[], x, y, z)`,
+  `dispatchThreads(encoder, groups, x, y, z)` (rounds each axis up by
+  its workgroup size), `dispose()`, and `createBindGroup(device,
+  layout: GPUBindGroupLayout, spec: BindGroupLayoutSpec, buffers:
+  GPUBuffer[]): GPUBindGroup` (positional, binding order equals
+  declaration order, a count mismatch traps with both counts). It
+  builds on `lib/webgpu.ts` only.
 - **PI10 — The WGSL golden.** Per K16. The harness module
   `wgsl_goldens` compares every `<stem>.<name>.wgsl` and validates
   it with naga.

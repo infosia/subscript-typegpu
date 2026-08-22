@@ -275,11 +275,10 @@ Layout engine: a pure module over a schema type tree. Two modes,
 WGSL default and uniform. A C-layout function for the same tree,
 with the R33 override. A diagnostic where they differ (D4).
 
-Kernel emitter: type-directed, from `hir::Expr.ty`. The emitter keeps
-TypeGPU's snippet model — a value, its WGSL type, and its origin
-(uniform, storage, workgroup, private, local, argument) — because the
-origin decides `let` against `var`, copy against alias, and barrier
-uniformity.
+Kernel emitter: type-directed, from `hir::Expr.ty`. From P4 on the
+emitter carries TypeGPU's origin model — where a value lives
+(uniform, storage, workgroup, private, local, argument) — because
+barrier uniformity needs it. P2 carries no field it does not read.
 
 ### The harness
 
@@ -453,7 +452,7 @@ The lane is a gate module, not a new executable.
 | Id | Risk | Mitigation / trigger |
 |---|---|---|
 | RC-1 | ~~`@CStruct` has no alignment control~~ **Closed 2026-08-22.** R33 landed in subscript at `ba6aa2e` (compiler.md §62): `@CStruct({ align: N })`, `N` in `{2, 4, 8, 16}`, both tiers, `offsetof` proof for `Vec3f` 16/16, `Mixed` 32/16, `Mat3x3f` 48/16, `Vec2f` 8/8, measured on clang and MSVC | P0 slice 2 re-pins subscript to `ba6aa2e`. P1's layout gate is the end-to-end check, because `a141` pins values, not alignment numbers |
-| RC-2 | `computePipeline(fn, desc)` needs a function value of a named function and a descriptor literal in one expression. The checker can reject the combination | P0 probes the expression before P2's contract. Fallback: two statements, a `@Descriptor` const and a call |
+| RC-2 | ~~`computePipeline(fn, desc)` needs a function value of a named function and a descriptor literal in one expression~~ **Closed 2026-08-22.** The checker accepts `computePipeline<L>(step, { workgroupSize: [64, 1, 1] })` with a function-typed generic parameter | — |
 | RC-3 | A generic runtime class (`Buffer<T>`) needs per-`T` size and layout facts with no inference | The generator emits one `Layout` const per schema and the class takes it as a constructor argument |
 | RC-4 | `hir` is `#[non_exhaustive]`. A subscript re-pin adds a construct the emitter does not know | Wildcard arms emit a named diagnostic. The re-pin procedure runs the full gate |
 | RC-5 | Run-time loading fails on a platform or with a backend that needs a companion library (`libtint_shim`) | The loader reports the `dlopen` error text and the path it tried. The live lane checks `otool -L` before a Metal run |

@@ -57,7 +57,9 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 - **K9 — The expression set.** Literals, locals, parameters, field
   access, `FixedArray` index, binding access (PI6), unary `-`, `!`,
   `~`, binary `+ - * / %`, comparisons, `&&`, `||`, `&`, `|`, the
-  conditional `?:`, `as` casts among `f32`, `i32`, `u32`, calls to
+  conditional `?:` (lowered to `if`/`else` over a `var`, so both
+  sides keep short-circuit evaluation), `as` casts among `f32`,
+  `i32`, `u32`, calls to
   helpers, calls to library methods (K10), `new` of a library
   vector or matrix, `new` of a schema class with all fields set by
   its constructor, and the `v3f` family of factories. Any other
@@ -90,12 +92,19 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 ## Emission
 
 - **K14 — The emitted WGSL is deterministic.** Declaration order:
-  `enable` directives, schema structs in first-use order, binding
-  declarations in group and binding order, helpers in dependency
-  order, the entry function. Identifiers keep their subscript names.
-  A name that collides with a WGSL keyword or builtin gets a `_`
-  suffix. Whitespace is fixed: two-space indentation, one statement
-  per line, no trailing space.
+  `enable` directives, the schema structs the module references in
+  first-use order, binding declarations in group and binding order,
+  helpers in dependency order, the entry function. Identifiers keep
+  their subscript names. A name that collides with a WGSL reserved
+  word or a builtin function or type gets a `_` suffix, through one
+  function applied to every identifier the emitter writes: struct
+  names, field names, bindings, locals, helpers, the entry, and the
+  `_ENTRY` constant. The list of reserved words and builtins is
+  committed in `mapping.rs`, and a test compares it with naga's
+  lists. Parentheses appear only where precedence needs them.
+  Whitespace is fixed: two-space indentation, one statement per
+  line, no trailing space. A struct declaration carries no trailing
+  semicolon.
 - **K15 — Every emitted module validates.** Rev 1, 2026-08-22.
   `naga` is a dev-dependency (CLAUDE.md "Build time" rule 4), so the
   generator does not run it. The generator runs its own structural
@@ -116,7 +125,10 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 ## Diagnostics
 
 - **K17 — Each rejection is a named diagnostic with a red fixture
-  (T7).** The P2 set: a `string` local, a `T[]` parameter, a
+  (T7).** A diagnostic cites the rule it enforces (K5, K9, K10, K11,
+  K12, K7, K4), never this rule. A fixture header names that rule and
+  the fixture reaches that rule's check and no earlier one. The P2
+  set: a `string` local, a `T[]` parameter, a
   reference-class local, a lambda, `await`, a recursive helper, a
   helper that takes a layout class, a `Math` member outside K11, a
   cast to `f64`, a template string, an `f16` field read, a method
