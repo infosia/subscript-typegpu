@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/facade",
+    "crates/webgpu-gen",
+    "crates/harness",
+]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/infosia/subscript-typegpu"
+
+[workspace.dependencies]
+subscript-bindgen = { git = "https://github.com/infosia/subscript.git", rev = "4313dcfe74df3445dd98b5002b751ac6af28e77b" }
+libloading = "0.8"
+
+[profile.dev]
+debug = "line-tables-only"

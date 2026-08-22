@@ -1,0 +1,105 @@
+# Hand-authored fixture in the webgpu.yml dialect (T6 snapshot input).
+# Names deliberately differ from webgpu.h so pattern application is
+# proven generic, not name-matched.
+constants:
+  - name: strlen
+    value: usize_max
+enums:
+  - name: callback_mode
+    entries:
+      - null
+      - name: wait_any_only
+      - name: allow_process_events
+  - name: fetch_gizmo_status
+    entries:
+      - null
+      - name: success
+      - name: error
+bitflags:
+  - name: part_kind
+    entries:
+      - name: none
+      - name: solid
+      - name: hollow
+structs:
+  - name: hub_descriptor
+    type: extensible
+    members:
+      - name: label
+        type: string_with_default_empty
+  - name: part_descriptor
+    type: extensible
+    members:
+      - name: label
+        type: string_with_default_empty
+      - name: kind
+        type: bitflag.part_kind
+        default: none
+      - name: span
+        type: uint64
+      - name: prefilled
+        type: bool
+        default: false
+callbacks:
+  - name: fetch_gizmo
+    style: callback_mode
+    args:
+      - name: status
+        type: enum.fetch_gizmo_status
+      - name: gizmo
+        type: object.gizmo
+        passed_with_ownership: true
+      - name: message
+        type: out_string
+        passed_with_ownership: false
+functions:
+  - name: make_hub
+    returns:
+      type: object.hub
+      passed_with_ownership: true
+    args:
+      - name: descriptor
+        type: struct.hub_descriptor
+        pointer: immutable
+        optional: true
+objects:
+  - name: hub
+    methods:
+      - name: pump
+      - name: fetch_gizmo
+        callback: callback.fetch_gizmo
+        args:
+          - name: options
+            type: struct.hub_descriptor
+            pointer: immutable
+            optional: true
+  - name: gizmo
+    methods:
+      - name: get_tag
+        returns:
+          type: uint32
+      - name: create_part
+        returns:
+          type: object.part
+          passed_with_ownership: true
+        args:
+          - name: descriptor
+            type: struct.part_descriptor
+            pointer: immutable
+      - name: write_part
+        args:
+          - name: part
+            type: object.part
+          - name: at
+            type: uint64
+          - name: data
+            type: c_void
+            pointer: immutable
+          - name: size
+            type: usize
+      - name: self_destruct
+  - name: part
+    methods: []
+  - name: doodad
+    methods:
+      - name: ping

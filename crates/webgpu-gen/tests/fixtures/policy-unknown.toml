@@ -1,0 +1,21 @@
+# Red fixture: names a method that does not exist in mini.yml.
+
+[slice]
+future_anchor = "hub"
+objects = ["hub", "gizmo", "part"]
+
+[[functions]]
+name = "make_hub"
+pattern = "create"
+
+[[map]]
+method = "hub.pump"
+pattern = "sync"
+
+[[map]]
+method = "gizmo.frobnicate"
+pattern = "sync"
+
+[[exclude]]
+construct = "addref"
+reason = "F4 single-owner model"

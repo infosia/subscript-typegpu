@@ -1,0 +1,4110 @@
+# policy.toml — F18 policy for the facade area generator.
+#
+# Two-way validated against third_party/webgpu-headers/webgpu.yml:
+# unknown, dead, duplicate, and unpoliced entries each fail generation
+# with a named error (codegen/src/policy.rs). Subset-driven: exactly
+# the constructs the hand-written facade slice needs; everything else
+# on the subset objects is excluded here with an F18 reason.
+
+[slice]
+# The object anchoring the F6 future protocol.
+future_anchor = "instance"
+# Subset objects in subscript-typegpu.h typedef order (handle pattern: opaque
+# typedef + Release-only wrapper each; AddRef excluded below).
+objects = ["instance", "adapter", "device", "queue", "buffer", "texture", "texture_view", "sampler", "bind_group_layout", "bind_group", "pipeline_layout", "shader_module", "compute_pipeline", "render_pipeline", "command_encoder", "compute_pass_encoder", "render_pass_encoder", "command_buffer", "render_bundle_encoder", "render_bundle", "query_set"]
+
+# Freestanding webgpu.h functions in the subset.
+[[functions]]
+name = "create_instance"
+pattern = "create"
+doc = "Creates an instance with no descriptor."
+
+[[functions]]
+name = "get_instance_limits"
+pattern = "limits-fill"
+
+[[functions]]
+name = "has_instance_feature"
+pattern = "feature-probe"
+
+# Method rows in emission order. Reshape rows carry an F-rule reason.
+
+[[map]]
+method = "instance.process_events"
+pattern = "sync"
+
+[[map]]
+method = "instance.request_adapter"
+pattern = "future-poll"
+reason = "async op; F6 future-poll triple over the F7/F8 slot machinery"
+
+[[map]]
+method = "adapter.get_limits"
+pattern = "limits-fill"
+
+[[map]]
+method = "adapter.get_info"
+pattern = "adapter-info-fill"
+reason = "H3/F11 Rev 1 copies four owned strings and frees backend members internally"
+
+[[map]]
+method = "adapter.has_feature"
+pattern = "feature-probe"
+
+[[map]]
+method = "adapter.request_device"
+pattern = "future-poll"
+reason = "async op; F6 future-poll triple over the F7/F8 slot machinery"
+
+[[map]]
+method = "device.get_queue"
+pattern = "sync"
+
+[[map]]
+method = "device.destroy"
+pattern = "sync"
+
+[[map]]
+method = "device.set_label"
+pattern = "label"
+
+[[map]]
+method = "device.push_error_scope"
+pattern = "sync-args"
+
+[[map]]
+method = "device.pop_error_scope"
+pattern = "device-events"
+reason = "G1-G4/F6/F11/F14 pop-scope record future plus creation-time device event routing"
+
+[[map]]
+method = "device.get_limits"
+pattern = "limits-fill"
+
+[[map]]
+method = "device.get_adapter_info"
+pattern = "adapter-info-fill"
+reason = "H3/F11 Rev 1 copies four owned strings and frees backend members internally"
+
+[[map]]
+method = "device.has_feature"
+pattern = "feature-probe"
+
+[[map]]
+method = "device.create_buffer"
+pattern = "descriptor"
+reason = "F12 chain-free SubscriptTypegpuBufferDescriptor passed by pointer"
+
+[[map]]
+method = "device.create_texture"
+pattern = "descriptor"
+reason = "B2/F12 chain-free descriptor with nested Extent3D and enum-element viewFormats pair"
+
+[[map]]
+method = "device.create_sampler"
+pattern = "descriptor"
+reason = "B2/F12 chain-free descriptor; yml optionality is preserved"
+
+[[map]]
+method = "device.create_bind_group_layout"
+pattern = "descriptor"
+reason = "C1/C5/F12 count-first entry structs with nested chain-free binding layouts"
+
+[[map]]
+method = "device.create_bind_group"
+pattern = "descriptor"
+reason = "C1-C3/F12 nullable handle entry fields plus the size-zero whole-binding rule"
+
+[[map]]
+method = "device.create_pipeline_layout"
+pattern = "descriptor"
+reason = "C1/C5/F12 input-only count-first handle array"
+
+[[map]]
+method = "device.create_shader_module"
+pattern = "shader-wgsl"
+reason = "PL2/F12 flattens the private ShaderSourceWGSL extension chain into label plus code"
+
+[[map]]
+method = "device.create_compute_pipeline"
+pattern = "descriptor"
+reason = "PL3/F12 recursively lowers constants and nullable auto-layout"
+
+[[map]]
+method = "device.create_compute_pipeline_async"
+pattern = "descriptor-future-poll"
+reason = "PL4/F6 descriptor-backed future-poll triple with typed compute-pipeline take"
+
+[[map]]
+method = "device.create_render_pipeline"
+pattern = "descriptor"
+reason = "PL3/F12 recursively lowers vertex, primitive, depth, multisample, and nullable fragment state"
+
+[[map]]
+method = "device.create_render_pipeline_async"
+pattern = "descriptor-future-poll"
+reason = "PL4/F6 descriptor-backed future-poll triple with typed render-pipeline take"
+
+[[map]]
+method = "device.create_command_encoder"
+pattern = "descriptor"
+reason = "F12 chain-free optional command-encoder descriptor"
+
+[[map]]
+method = "device.create_render_bundle_encoder"
+pattern = "descriptor"
+reason = "F12 chain-free render-bundle descriptor with a color-formats pair"
+
+[[map]]
+method = "device.create_query_set"
+pattern = "descriptor"
+reason = "F12 chain-free query-set descriptor"
+
+[[map]]
+method = "queue.submit"
+pattern = "array"
+reason = "E1 count-first command-buffer handle pair collapses to commands: SubscriptTypegpuCommandBuffer[]"
+
+[[map]]
+method = "queue.on_submitted_work_done"
+pattern = "future-poll"
+reason = "F6 status-only future over the F7/F8 slot machinery"
+
+[[map]]
+method = "queue.write_buffer"
+pattern = "byte-pair"
+reason = "F20 reorders webgpu.h's size-last bytes to dataCount/data"
+
+[[map]]
+method = "queue.write_texture"
+pattern = "write-texture"
+reason = "B3/F20 reorders struct pointers and size-last bytes to dst/layout/extent/dataCount/data"
+
+[[map]]
+method = "queue.set_label"
+pattern = "label"
+
+[[map]]
+method = "buffer.map_async"
+pattern = "map-async"
+reason = "F6 future plus F15 explicit range and whole-resource variants"
+
+[[map]]
+method = "buffer.read_mapped_range"
+pattern = "byte-pair"
+reason = "F20 reorders webgpu.h's size-last mutable bytes to outCount/out"
+
+[[map]]
+method = "buffer.write_mapped_range"
+pattern = "byte-pair"
+reason = "F20 reorders webgpu.h's size-last bytes to dataCount/data"
+
+[[typed_pairs]]
+source = "queue.write_buffer"
+element = "float"
+reason = "S1-S3 add the only script-inexpressible typed element as a sibling over the byte view of the float run"
+
+[[typed_pairs]]
+source = "buffer.read_mapped_range"
+element = "float"
+reason = "S1-S3 add the float fill sibling over the byte view of the float run; mapped writes stay deferred"
+
+[[map]]
+method = "buffer.set_label"
+pattern = "label"
+
+[[map]]
+method = "buffer.get_usage"
+pattern = "sync"
+
+[[map]]
+method = "buffer.get_size"
+pattern = "sync"
+
+[[map]]
+method = "buffer.get_map_state"
+pattern = "sync"
+
+[[map]]
+method = "buffer.unmap"
+pattern = "sync"
+
+[[map]]
+method = "buffer.destroy"
+pattern = "sync"
+
+[[map]]
+method = "texture.create_view"
+pattern = "descriptor"
+reason = "B1/B2/F12 preserves the yml nullable chain-free descriptor pointer"
+
+[[map]]
+method = "texture.set_label"
+pattern = "label"
+
+[[map]]
+method = "texture.get_width"
+pattern = "sync"
+
+[[map]]
+method = "texture.get_height"
+pattern = "sync"
+
+[[map]]
+method = "texture.get_depth_or_array_layers"
+pattern = "sync"
+
+[[map]]
+method = "texture.get_mip_level_count"
+pattern = "sync"
+
+[[map]]
+method = "texture.get_sample_count"
+pattern = "sync"
+
+[[map]]
+method = "texture.get_dimension"
+pattern = "sync"
+
+[[map]]
+method = "texture.get_texture_binding_view_dimension"
+pattern = "sync"
+
+[[map]]
+method = "texture.get_format"
+pattern = "sync"
+
+[[map]]
+method = "texture.get_usage"
+pattern = "sync"
+
+[[map]]
+method = "texture.destroy"
+pattern = "sync"
+
+[[map]]
+method = "texture_view.set_label"
+pattern = "label"
+
+[[map]]
+method = "sampler.set_label"
+pattern = "label"
+
+[[map]]
+method = "bind_group_layout.set_label"
+pattern = "label"
+
+[[map]]
+method = "bind_group.set_label"
+pattern = "label"
+
+[[map]]
+method = "pipeline_layout.set_label"
+pattern = "label"
+
+[[map]]
+method = "shader_module.set_label"
+pattern = "label"
+
+[[map]]
+method = "compute_pipeline.get_bind_group_layout"
+pattern = "sync-scalar"
+
+[[map]]
+method = "compute_pipeline.set_label"
+pattern = "label"
+
+[[map]]
+method = "render_pipeline.get_bind_group_layout"
+pattern = "sync-scalar"
+
+[[map]]
+method = "render_pipeline.set_label"
+pattern = "label"
+
+[[map]]
+method = "command_encoder.finish"
+pattern = "descriptor"
+reason = "F12 chain-free optional command-buffer descriptor"
+
+[[map]]
+method = "command_encoder.begin_compute_pass"
+pattern = "descriptor"
+reason = "F12 chain-free optional compute-pass descriptor"
+
+[[map]]
+method = "command_encoder.begin_render_pass"
+pattern = "descriptor"
+reason = "E1 full render-pass descriptor composite with nested attachments"
+
+[[map]]
+method = "command_encoder.copy_buffer_to_buffer"
+pattern = "sync-args"
+
+[[map]]
+method = "command_encoder.copy_buffer_to_texture"
+pattern = "sync-args"
+
+[[map]]
+method = "command_encoder.copy_texture_to_buffer"
+pattern = "sync-args"
+
+[[map]]
+method = "command_encoder.copy_texture_to_texture"
+pattern = "sync-args"
+
+[[map]]
+method = "command_encoder.clear_buffer"
+pattern = "sync-args"
+
+[[map]]
+method = "command_encoder.resolve_query_set"
+pattern = "sync-args"
+
+[[map]]
+method = "command_encoder.write_timestamp"
+pattern = "sync-args"
+
+[[map]]
+method = "command_encoder.insert_debug_marker"
+pattern = "label"
+
+[[map]]
+method = "command_encoder.push_debug_group"
+pattern = "label"
+
+[[map]]
+method = "command_encoder.pop_debug_group"
+pattern = "sync"
+
+[[map]]
+method = "command_encoder.set_label"
+pattern = "label"
+
+[[map]]
+method = "compute_pass_encoder.set_pipeline"
+pattern = "sync-args"
+
+[[map]]
+method = "compute_pass_encoder.set_bind_group"
+pattern = "array"
+reason = "E1 count-first dynamic-offset scalar pair collapses beside group index and nullable bind group"
+
+[[map]]
+method = "compute_pass_encoder.dispatch_workgroups"
+pattern = "sync-args"
+
+[[map]]
+method = "compute_pass_encoder.dispatch_workgroups_indirect"
+pattern = "sync-args"
+
+[[map]]
+method = "compute_pass_encoder.insert_debug_marker"
+pattern = "label"
+
+[[map]]
+method = "compute_pass_encoder.push_debug_group"
+pattern = "label"
+
+[[map]]
+method = "compute_pass_encoder.pop_debug_group"
+pattern = "sync"
+
+[[map]]
+method = "compute_pass_encoder.end"
+pattern = "sync"
+
+[[map]]
+method = "compute_pass_encoder.set_label"
+pattern = "label"
+
+[[map]]
+method = "render_pass_encoder.set_pipeline"
+pattern = "sync-args"
+
+[[map]]
+method = "render_pass_encoder.set_bind_group"
+pattern = "array"
+reason = "E1 count-first dynamic-offset scalar pair collapses beside group index and nullable bind group"
+
+[[map]]
+method = "render_pass_encoder.set_vertex_buffer"
+pattern = "sync-args"
+
+[[map]]
+method = "render_pass_encoder.set_index_buffer"
+pattern = "sync-args"
+
+[[map]]
+method = "render_pass_encoder.draw"
+pattern = "sync-args"
+
+[[map]]
+method = "render_pass_encoder.draw_indexed"
+pattern = "sync-args"
+
+[[map]]
+method = "render_pass_encoder.draw_indirect"
+pattern = "sync-args"
+
+[[map]]
+method = "render_pass_encoder.draw_indexed_indirect"
+pattern = "sync-args"
+
+[[map]]
+method = "render_pass_encoder.set_viewport"
+pattern = "sync-args"
+
+[[map]]
+method = "render_pass_encoder.set_scissor_rect"
+pattern = "sync-args"
+
+[[map]]
+method = "render_pass_encoder.set_blend_constant"
+pattern = "sync-args"
+
+[[map]]
+method = "render_pass_encoder.set_stencil_reference"
+pattern = "sync-args"
+
+[[map]]
+method = "render_pass_encoder.begin_occlusion_query"
+pattern = "sync-args"
+
+[[map]]
+method = "render_pass_encoder.end_occlusion_query"
+pattern = "sync"
+
+[[map]]
+method = "render_pass_encoder.execute_bundles"
+pattern = "array"
+reason = "E1 count-first render-bundle handle pair collapses to bundles: SubscriptTypegpuRenderBundle[]"
+
+[[map]]
+method = "render_pass_encoder.insert_debug_marker"
+pattern = "label"
+
+[[map]]
+method = "render_pass_encoder.push_debug_group"
+pattern = "label"
+
+[[map]]
+method = "render_pass_encoder.pop_debug_group"
+pattern = "sync"
+
+[[map]]
+method = "render_pass_encoder.end"
+pattern = "sync"
+
+[[map]]
+method = "render_pass_encoder.set_label"
+pattern = "label"
+
+[[map]]
+method = "command_buffer.set_label"
+pattern = "label"
+
+[[map]]
+method = "render_bundle_encoder.set_pipeline"
+pattern = "sync-args"
+
+[[map]]
+method = "render_bundle_encoder.set_bind_group"
+pattern = "array"
+reason = "E1 count-first dynamic-offset scalar pair collapses beside group index and nullable bind group"
+
+[[map]]
+method = "render_bundle_encoder.set_vertex_buffer"
+pattern = "sync-args"
+
+[[map]]
+method = "render_bundle_encoder.set_index_buffer"
+pattern = "sync-args"
+
+[[map]]
+method = "render_bundle_encoder.draw"
+pattern = "sync-args"
+
+[[map]]
+method = "render_bundle_encoder.draw_indexed"
+pattern = "sync-args"
+
+[[map]]
+method = "render_bundle_encoder.draw_indirect"
+pattern = "sync-args"
+
+[[map]]
+method = "render_bundle_encoder.draw_indexed_indirect"
+pattern = "sync-args"
+
+[[map]]
+method = "render_bundle_encoder.insert_debug_marker"
+pattern = "label"
+
+[[map]]
+method = "render_bundle_encoder.push_debug_group"
+pattern = "label"
+
+[[map]]
+method = "render_bundle_encoder.pop_debug_group"
+pattern = "sync"
+
+[[map]]
+method = "render_bundle_encoder.finish"
+pattern = "descriptor"
+reason = "F12 chain-free optional render-bundle descriptor"
+
+[[map]]
+method = "render_bundle_encoder.set_label"
+pattern = "label"
+
+[[map]]
+method = "render_bundle.set_label"
+pattern = "label"
+
+[[map]]
+method = "query_set.get_type"
+pattern = "sync"
+
+[[map]]
+method = "query_set.get_count"
+pattern = "sync"
+
+[[map]]
+method = "query_set.destroy"
+pattern = "sync"
+
+[[map]]
+method = "query_set.set_label"
+pattern = "label"
+
+# --- F18 exclusion rows reachable from the
+# --- subset objects (catalogue reasons) ------------------------------
+
+[[exclude]]
+construct = "addref"
+reason = "F4 single-owner model excludes AddRef exports"
+
+[[exclude]]
+construct = "instance.wait_any"
+reason = "non-portable; ProcessEvents is the one pump, so wgpuInstanceWaitAny is excluded"
+
+[[exclude]]
+construct = "device.get_lost_future"
+reason = "F14 chose creation-callback delivery instead of GetLostFuture"
+
+[[exclude]]
+construct = "buffer.get_mapped_range"
+reason = "raw pointers never cross the boundary (F20)"
+
+[[exclude]]
+construct = "buffer.get_const_mapped_range"
+reason = "raw pointers never cross the boundary (F20)"
+
+[[exclude]]
+construct = "compute_pass_encoder.set_immediates"
+reason = "immediate data and SetImmediates are outside the portable slice"
+
+[[exclude]]
+construct = "render_pass_encoder.set_immediates"
+reason = "immediate data and SetImmediates are outside the portable slice"
+
+[[exclude]]
+construct = "render_bundle_encoder.set_immediates"
+reason = "immediate data and SetImmediates are outside the portable slice"
+
+# --- Exclusions deferred from the hand-written facade slice -----------
+
+[[exclude]]
+construct = "get_instance_features"
+reason = "feature enumeration needs the parked mutable-pair and enum-parameter-pair requests"
+
+[[exclude]]
+construct = "instance.get_WGSL_language_features"
+reason = "feature enumeration needs the parked mutable-pair and enum-parameter-pair requests"
+
+[[exclude]]
+construct = "instance.has_WGSL_language_feature"
+reason = "no consumer; probe pattern exists — map on evidence"
+
+[[exclude]]
+construct = "adapter.get_features"
+reason = "feature enumeration needs the parked mutable-pair and enum-parameter-pair requests"
+
+[[exclude]]
+construct = "device.get_features"
+reason = "feature enumeration needs the parked mutable-pair and enum-parameter-pair requests"
+
+[[exclude]]
+construct = "shader_module.get_compilation_info"
+reason = "compilation-info output records are deferred from the facade area work"
+
+# --- Constant sets emitted into generated.rs (values from yml) -------
+
+[[constants]]
+source = "bitflag.buffer_usage"
+reason = "usage bits cross as bare u64 scalars (F16); suite programs pass them as literals"
+
+[[constants]]
+source = "bitflag.map_mode"
+reason = "SubscriptTypegpuMapMode flags cross as a u64 typedef with bare constants (A3/F16)"
+
+[[constants]]
+source = "enum.buffer_map_state"
+reason = "buffer map-state getter returns the pinned yml enum verbatim (A5/F16)"
+
+[[constants]]
+source = "bitflag.texture_usage"
+reason = "B2/B4 usage fields and getter cross as bare u64 values (F16)"
+
+[[constants]]
+source = "enum.texture_dimension"
+reason = "B2/B4 descriptor and getter values cross verbatim (F16)"
+
+[[constants]]
+source = "enum.texture_format"
+reason = "B2/B4 descriptor, enum-element pair, and getter values cross verbatim (F16)"
+
+[[constants]]
+source = "enum.texture_view_dimension"
+reason = "B2/B4 explicit view descriptor and binding-view getter cross verbatim (F16)"
+
+[[constants]]
+source = "enum.texture_aspect"
+reason = "B2/B3 view and copy descriptors cross pinned enum values (F16)"
+
+[[constants]]
+source = "enum.address_mode"
+reason = "B2 sampler descriptor crosses pinned enum values (F16)"
+
+[[constants]]
+source = "enum.filter_mode"
+reason = "B2 sampler descriptor crosses pinned enum values (F16)"
+
+[[constants]]
+source = "enum.mipmap_filter_mode"
+reason = "B2 sampler descriptor crosses pinned enum values (F16)"
+
+[[constants]]
+source = "enum.compare_function"
+reason = "B2 sampler descriptor crosses pinned enum values (F16)"
+
+[[constants]]
+source = "bitflag.shader_stage"
+reason = "C4 bind-group-layout visibility flags cross as bare u64 values (F16)"
+
+[[constants]]
+source = "enum.buffer_binding_type"
+reason = "C2 buffer binding layout type crosses pinned enum values (F16)"
+
+[[constants]]
+source = "enum.sampler_binding_type"
+reason = "C2 sampler binding layout type crosses pinned enum values (F16)"
+
+[[constants]]
+source = "enum.texture_sample_type"
+reason = "C2 texture binding layout sample type crosses pinned enum values (F16)"
+
+[[constants]]
+source = "enum.storage_texture_access"
+reason = "C2 storage-texture binding layout access crosses pinned enum values (F16)"
+
+[[constants]]
+source = "enum.vertex_format"
+reason = "PL3 vertex buffer attributes cross pinned enum values (F16)"
+
+[[constants]]
+source = "enum.vertex_step_mode"
+reason = "PL3 vertex buffer layouts cross pinned enum values (F16)"
+
+[[constants]]
+source = "enum.primitive_topology"
+reason = "PL3 primitive state crosses pinned enum values (F16)"
+
+[[constants]]
+source = "enum.index_format"
+reason = "PL3 strip-index format crosses pinned enum values (F16)"
+
+[[constants]]
+source = "enum.front_face"
+reason = "PL3 primitive front-face crosses pinned enum values (F16)"
+
+[[constants]]
+source = "enum.cull_mode"
+reason = "PL3 primitive cull mode crosses pinned enum values (F16)"
+
+[[constants]]
+source = "enum.blend_operation"
+reason = "PL3 blend component operations cross pinned enum values (F16)"
+
+[[constants]]
+source = "enum.blend_factor"
+reason = "PL3 blend component factors cross pinned enum values (F16)"
+
+[[constants]]
+source = "bitflag.color_write_mask"
+reason = "PL3 color-target write masks stay u64 bitflags across the facade (F16)"
+
+[[constants]]
+source = "enum.optional_bool"
+reason = "PL3 depth-write enable preserves the pinned optional-bool enum (F16)"
+
+[[constants]]
+source = "enum.stencil_operation"
+reason = "PL3 depth-stencil faces cross pinned enum values (F16)"
+
+[[constants]]
+source = "enum.load_op"
+reason = "F16 render-pass attachment load operations cross pinned enum values"
+
+[[constants]]
+source = "enum.store_op"
+reason = "F16 render-pass attachment store operations cross pinned enum values"
+
+[[constants]]
+source = "enum.query_type"
+reason = "F16/E4 query-set descriptor and getter cross pinned enum values"
+
+[[constants]]
+source = "enum.error_filter"
+reason = "G2 error-scope filters cross pinned enum values (F16)"
+
+[[constants]]
+source = "enum.error_type"
+reason = "G2/G3 F11 error records expose pinned enum values (F16)"
+
+[[constants]]
+source = "enum.device_lost_reason"
+reason = "G4 F11 lost records expose pinned enum values (F16)"
+
+[[constants]]
+source = "enum.feature_name"
+reason = "H2/H5 required-feature arrays and scalar presence probes cross pinned enum values (F16)"
+
+[[constants]]
+source = "enum.instance_feature_name"
+reason = "H2/H5 scalar instance-feature presence probes cross pinned enum values (F16)"
+
+[[constants]]
+source = "enum.backend_type"
+reason = "H3 adapter-info fills expose the pinned backend-type enum (F16)"
+
+[[constants]]
+source = "enum.adapter_type"
+reason = "H3 adapter-info fills expose the pinned adapter-type enum (F16)"
+
+[[renames]]
+construct = "texture_descriptor.view_format_count"
+to = "viewFormatsCount"
+reason = "B1 pair audit requires pointer-field name + Count exactly"
+
+[[renames]]
+construct = "bind_group_layout_descriptor.entry_count"
+to = "entriesCount"
+reason = "C5 pair audit requires pointer-field name + Count exactly"
+
+[[renames]]
+construct = "bind_group_descriptor.entry_count"
+to = "entriesCount"
+reason = "C5 pair audit requires pointer-field name + Count exactly"
+
+[[renames]]
+construct = "pipeline_layout_descriptor.bind_group_layout_count"
+to = "bindGroupLayoutsCount"
+reason = "C5 pair audit requires pointer-field name + Count exactly"
+
+[[renames]]
+construct = "device.create_compute_pipeline_async"
+to = "subscript_typegpu_device_create_compute_pipeline_async_begin"
+reason = "PL4/F6 async requests use an explicit Begin suffix"
+
+[[renames]]
+construct = "device.create_render_pipeline_async"
+to = "subscript_typegpu_device_create_render_pipeline_async_begin"
+reason = "PL4/F6 async requests use an explicit Begin suffix"
+
+[[renames]]
+construct = "compute_state.constant_count"
+to = "constantsCount"
+reason = "PL6 pair audit requires pointer-field name + Count exactly"
+
+[[renames]]
+construct = "vertex_buffer_layout.attribute_count"
+to = "attributesCount"
+reason = "PL6 pair audit requires pointer-field name + Count exactly"
+
+[[renames]]
+construct = "vertex_state.constant_count"
+to = "constantsCount"
+reason = "PL6 pair audit requires pointer-field name + Count exactly"
+
+[[renames]]
+construct = "vertex_state.buffer_count"
+to = "buffersCount"
+reason = "PL6 pair audit requires pointer-field name + Count exactly"
+
+[[renames]]
+construct = "fragment_state.constant_count"
+to = "constantsCount"
+reason = "PL6 pair audit requires pointer-field name + Count exactly"
+
+[[renames]]
+construct = "fragment_state.target_count"
+to = "targetsCount"
+reason = "PL6 pair audit requires pointer-field name + Count exactly"
+
+[[renames]]
+construct = "render_bundle_encoder_descriptor.color_format_count"
+to = "colorFormatsCount"
+reason = "E6 pair audit requires pointer-field name + Count exactly"
+
+[[renames]]
+construct = "render_pass_descriptor.color_attachment_count"
+to = "colorAttachmentsCount"
+reason = "E6 pair audit requires pointer-field name + Count exactly"
+
+[[renames]]
+construct = "queue.submit.command_count"
+to = "commandsCount"
+reason = "E6 parameter-pair audit requires pointer-parameter name + Count exactly"
+
+[[renames]]
+construct = "compute_pass_encoder.set_bind_group.dynamic_offset_count"
+to = "dynamicOffsetsCount"
+reason = "E6 parameter-pair audit requires pointer-parameter name + Count exactly"
+
+[[renames]]
+construct = "render_pass_encoder.set_bind_group.dynamic_offset_count"
+to = "dynamicOffsetsCount"
+reason = "E6 parameter-pair audit requires pointer-parameter name + Count exactly"
+
+[[renames]]
+construct = "render_bundle_encoder.set_bind_group.dynamic_offset_count"
+to = "dynamicOffsetsCount"
+reason = "E6 parameter-pair audit requires pointer-parameter name + Count exactly"
+
+[[renames]]
+construct = "render_pass_encoder.execute_bundles.bundle_count"
+to = "bundlesCount"
+reason = "E6 parameter-pair audit requires pointer-parameter name + Count exactly"
+
+[[renames]]
+construct = "device_descriptor.required_feature_count"
+to = "requiredFeaturesCount"
+reason = "H2 pair audit requires pointer-field name + Count exactly"
+
+[[chain_flattenings]]
+construct = "shader_module_descriptor.shader_source_WGSL"
+fields = ["code"]
+reason = "PL2/F12 exposes WGSL code on the base descriptor while constructing the extension chain internally"
+
+[[sentinels]]
+construct = "bind_group_entry.size"
+zero_maps_to = "constant.whole_size"
+reason = "C3/F15 maps facade size 0 to the unrepresentable WGPU_WHOLE_SIZE sentinel"
+
+[[sentinels]]
+construct = "limits.max_uniform_buffer_binding_size"
+zero_maps_to = "constant.limit_u64_undefined"
+reason = "H2/F13 maps public zero to the backend u64 unspecified-limit sentinel"
+
+[[sentinels]]
+construct = "limits.max_storage_buffer_binding_size"
+zero_maps_to = "constant.limit_u64_undefined"
+reason = "H2/F13 maps public zero to the backend u64 unspecified-limit sentinel"
+
+[[sentinels]]
+construct = "limits.max_buffer_size"
+zero_maps_to = "constant.limit_u64_undefined"
+reason = "H2/F13 maps public zero to the backend u64 unspecified-limit sentinel"
+
+[api]
+interfaces = ["GPU", "GPUAdapter", "GPUDevice", "GPUBuffer", "GPUQueue", "GPUTexture", "GPUTextureView", "GPUSampler", "GPUBindGroupLayout", "GPUBindGroup", "GPUPipelineLayout", "GPUShaderModule", "GPUComputePipeline", "GPURenderPipeline", "GPUCommandEncoder", "GPUComputePassEncoder", "GPURenderPassEncoder", "GPUCommandBuffer", "GPURenderBundleEncoder", "GPURenderBundle", "GPUQuerySet"]
+dictionaries = ["GPUBufferDescriptor", "GPUTextureDescriptor", "GPUTextureViewDescriptor", "GPUSamplerDescriptor", "GPUExtent3DDict", "GPUOrigin3DDict", "GPUTexelCopyTextureInfo", "GPUTexelCopyBufferLayout", "GPUBufferBindingLayout", "GPUSamplerBindingLayout", "GPUTextureBindingLayout", "GPUStorageTextureBindingLayout", "GPUBindGroupLayoutEntry", "GPUBindGroupLayoutDescriptor", "GPUBindGroupEntry", "GPUBindGroupDescriptor", "GPUBufferBinding", "GPUPipelineLayoutDescriptor", "GPUShaderModuleDescriptor", "GPUProgrammableStage", "GPUComputePipelineDescriptor", "GPUVertexAttribute", "GPUVertexBufferLayout", "GPUVertexState", "GPUPrimitiveState", "GPUStencilFaceState", "GPUDepthStencilState", "GPUMultisampleState", "GPUBlendComponent", "GPUBlendState", "GPUColorTargetState", "GPUFragmentState", "GPURenderPipelineDescriptor", "GPUCommandEncoderDescriptor", "GPURenderBundleEncoderDescriptor", "GPUQuerySetDescriptor", "GPUCommandBufferDescriptor", "GPUComputePassTimestampWrites", "GPURenderPassTimestampWrites", "GPUComputePassDescriptor", "GPUColorDict", "GPURenderPassColorAttachment", "GPURenderPassDepthStencilAttachment", "GPURenderPassDescriptor", "GPUTexelCopyBufferInfo", "GPURenderBundleDescriptor", "GPUQueueDescriptor", "GPUDeviceDescriptor"]
+namespaces = ["GPUBufferUsage", "GPUMapMode", "GPUTextureUsage", "GPUShaderStage", "GPUColorWrite"]
+enums = ["GPUBufferMapState", "GPUTextureFormat", "GPUTextureDimension", "GPUTextureViewDimension", "GPUTextureAspect", "GPUAddressMode", "GPUFilterMode", "GPUMipmapFilterMode", "GPUCompareFunction", "GPUBufferBindingType", "GPUSamplerBindingType", "GPUTextureSampleType", "GPUStorageTextureAccess", "GPUVertexFormat", "GPUVertexStepMode", "GPUPrimitiveTopology", "GPUIndexFormat", "GPUFrontFace", "GPUCullMode", "GPUBlendFactor", "GPUBlendOperation", "GPUStencilOperation", "GPULoadOp", "GPUStoreOp", "GPUQueryType", "GPUErrorFilter", "GPUDeviceLostReason", "GPUFeatureName"]
+namespace_reason = "static fields and user-defined namespaces are unavailable, so WebIDL namespaces become numeric singleton objects"
+singleton_interface = "GPU"
+singleton_name = "gpu"
+singleton_boundary = "Instance"
+singleton_reason = "the exported gpu constant replaces navigator.gpu because the DOM surface is excluded"
+manual_dispose_reason = "J7 replaces JavaScript garbage-collection lifetime with explicit dispose()"
+
+[[api.enum_mappings]]
+enum_name = "GPUBufferMapState"
+member = "unmapped"
+mirror = "SUBSCRIPT_TYPEGPU_BUFFER_MAP_STATE_UNMAPPED"
+reason = "Q32 joins the IDL string spelling to the pinned facade integer constant"
+
+[[api.enum_mappings]]
+enum_name = "GPUBufferMapState"
+member = "pending"
+mirror = "SUBSCRIPT_TYPEGPU_BUFFER_MAP_STATE_PENDING"
+reason = "Q32 joins the IDL string spelling to the pinned facade integer constant"
+
+[[api.enum_mappings]]
+enum_name = "GPUBufferMapState"
+member = "mapped"
+mirror = "SUBSCRIPT_TYPEGPU_BUFFER_MAP_STATE_MAPPED"
+reason = "Q32 joins the IDL string spelling to the pinned facade integer constant"
+
+[[api.interface_parents]]
+interface = "GPUDevice"
+parent = "EventTarget"
+reason = "EventTarget is DOM-coupled and excluded from the headless API layer"
+
+[[api.interface_parents]]
+interface = "GPUValidationError"
+parent = "GPUError"
+reason = "the IDL subclass is flattened into the facade-owned GPUError result record"
+
+[[api.interface_parents]]
+interface = "GPUOutOfMemoryError"
+parent = "GPUError"
+reason = "the IDL subclass is flattened into the facade-owned GPUError result record"
+
+[[api.interface_parents]]
+interface = "GPUInternalError"
+parent = "GPUError"
+reason = "the IDL subclass is flattened into the facade-owned GPUError result record"
+
+[[api.result_records]]
+interface = "GPUError"
+boundary = "SubscriptTypegpuErrorRecord"
+nullable = true
+synthetic_field = "type"
+synthetic_enum = "GPUErrorType"
+synthetic_boundary_enum = "SubscriptTypegpuErrorType"
+synthetic_enum_mappings = ["validation=SUBSCRIPT_TYPEGPU_ERROR_TYPE_VALIDATION", "out-of-memory=SUBSCRIPT_TYPEGPU_ERROR_TYPE_OUT_OF_MEMORY", "internal=SUBSCRIPT_TYPEGPU_ERROR_TYPE_INTERNAL", "unknown=SUBSCRIPT_TYPEGPU_ERROR_TYPE_UNKNOWN"]
+synthetic_enum_exclusions = ["SUBSCRIPT_TYPEGPU_ERROR_TYPE_NO_ERROR"]
+reason = "F11 materializes the facade-owned type and message fill as an immutable API result; GPUErrorType is a project-defined discriminator rather than a pinned-IDL enum, GPUError gains a public constructor the IDL does not declare, and NoError becomes null rather than a GPUError"
+
+[[api.result_records]]
+interface = "GPUDeviceLostInfo"
+boundary = "SubscriptTypegpuLostRecord"
+nullable = false
+reason = "F11 materializes the facade-owned reason and message fill as an immutable API result"
+
+[[api.result_records]]
+interface = "GPUSupportedLimits"
+boundary = "SubscriptTypegpuLimits"
+nullable = false
+reason = "the pinned IDL exposes 36 readonly limit attributes while the facade fill carries 32; this API returns those 32 as an immutable result class with a public constructor, preserves all three u64 fields, and excludes the four stage-specific storage-limit attributes the facade does not carry"
+
+[[api.result_records]]
+interface = "GPUAdapterInfo"
+boundary = "SubscriptTypegpuAdapterInfo"
+nullable = false
+boundary_field_exclusions = ["backendType", "adapterType", "vendorID", "deviceID"]
+reason = "the pinned IDL exposes seven readonly adapter-info attributes while the facade fill carries only the four facade-public strings; this API returns those strings as an immutable result class with a public constructor, and does not invent public IDL surface for the facade-only backend type, adapter type, vendor ID, or device ID"
+
+[[api.flattened_interfaces]]
+interface = "GPUValidationError"
+target = "GPUError"
+reason = "the public GPUError type field preserves validation identity, but JavaScript subclass construction and err instanceof GPUValidationError are unavailable"
+
+[[api.flattened_interfaces]]
+interface = "GPUOutOfMemoryError"
+target = "GPUError"
+reason = "the public GPUError type field preserves out-of-memory identity, but JavaScript subclass construction and err instanceof GPUOutOfMemoryError are unavailable"
+
+[[api.flattened_interfaces]]
+interface = "GPUInternalError"
+target = "GPUError"
+reason = "the public GPUError type field preserves internal identity, but JavaScript subclass construction and err instanceof GPUInternalError are unavailable"
+
+[[api.namespace_mappings]]
+namespace = "GPUColorWrite"
+boundary = "SubscriptTypegpuColorWriteMask"
+reason = "the IDL namespace omits the facade's Mask suffix; this explicit join preserves the pinned SubscriptTypegpuColorWriteMask alias name"
+
+[[api.dictionary_mappings]]
+dictionary = "GPUExtent3DDict"
+api = "GPUExtent3D"
+idl_type = "GPUExtent3D"
+boundary = "SubscriptTypegpuExtent3D"
+reason = "the WebIDL dictionary-or-sequence union is represented by its dictionary branch because subscript cannot express that union"
+
+[[api.dictionary_mappings]]
+dictionary = "GPUOrigin3DDict"
+api = "GPUOrigin3D"
+idl_type = "GPUOrigin3D"
+boundary = "SubscriptTypegpuOrigin3D"
+reason = "the WebIDL dictionary-or-sequence union is represented by its dictionary branch because subscript cannot express that union"
+
+[[api.dictionary_mappings]]
+dictionary = "GPUColorDict"
+api = "GPUColor"
+idl_type = "GPUColor"
+boundary = "SubscriptTypegpuColor"
+reason = "GPUColor is a dictionary-or-sequence union; this API keeps the dictionary branch, so JavaScript's [r, g, b, a] sequence spelling is unavailable"
+
+[[api.dictionary_mappings]]
+dictionary = "GPUComputePassTimestampWrites"
+api = "GPUPassTimestampWrites"
+idl_type = "GPUComputePassTimestampWrites"
+boundary = "SubscriptTypegpuPassTimestampWrites"
+reason = "the facade uses one pass-timestamp aggregate for the structurally identical compute and render IDL dictionaries"
+
+[[api.dictionary_aliases]]
+dictionary = "GPURenderPassTimestampWrites"
+canonical = "GPUComputePassTimestampWrites"
+reason = "the structurally identical render timestamp dictionary shares GPUPassTimestampWrites with compute because the facade exposes one SubscriptTypegpuPassTimestampWrites aggregate"
+
+[[api.dictionary_nestings]]
+dictionary = "GPUTexelCopyBufferInfo"
+boundary_field = "layout"
+boundary = "SubscriptTypegpuTexelCopyBufferLayout"
+members = ["offset", "bytesPerRow", "rowsPerImage"]
+reason = "the public dictionary keeps IDL's inherited flat fields while the facade groups them in its nested layout aggregate"
+
+[[api.public_only_dictionaries]]
+dictionary = "GPUBufferBinding"
+field_types = ["buffer=SubscriptTypegpuBuffer", "offset=u64", "size=u64"]
+reason = "GPUBufferBinding remains a public IDL descriptor, but the flattened GPUBindingResource facade stores its fields directly in SubscriptTypegpuBindGroupEntry, so there is no standalone boundary aggregate"
+
+[[api.default_helper_renames]]
+member = "GPUSamplerBindingLayout.type"
+helper = "SamplerBindingType"
+reason = "the field name type already bridges GPUBufferBindingType with a different Q32 alias and default"
+
+[[api.default_helper_renames]]
+member = "GPUBindGroupEntry.buffer"
+helper = "BindGroupResourceBuffer"
+reason = "the flattened resource buffer handle shares a field name with the optional buffer-layout descriptor"
+
+[[api.default_helper_renames]]
+member = "GPUBindGroupEntry.sampler"
+helper = "BindGroupResourceSampler"
+reason = "the flattened resource sampler handle shares a field name with the optional sampler-layout descriptor"
+
+[[api.enum_exclusions]]
+enum_name = "GPUTextureFormat"
+mirror = "SUBSCRIPT_TYPEGPU_TEXTURE_FORMAT_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUTextureDimension"
+mirror = "SUBSCRIPT_TYPEGPU_TEXTURE_DIMENSION_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUTextureViewDimension"
+mirror = "SUBSCRIPT_TYPEGPU_TEXTURE_VIEW_DIMENSION_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUTextureAspect"
+mirror = "SUBSCRIPT_TYPEGPU_TEXTURE_ASPECT_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUAddressMode"
+mirror = "SUBSCRIPT_TYPEGPU_ADDRESS_MODE_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUFilterMode"
+mirror = "SUBSCRIPT_TYPEGPU_FILTER_MODE_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUMipmapFilterMode"
+mirror = "SUBSCRIPT_TYPEGPU_MIPMAP_FILTER_MODE_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUCompareFunction"
+mirror = "SUBSCRIPT_TYPEGPU_COMPARE_FUNCTION_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUBufferBindingType"
+mirror = "SUBSCRIPT_TYPEGPU_BUFFER_BINDING_TYPE_BINDING_NOT_USED"
+reason = "the facade sentinel represents an absent buffer layout and is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUBufferBindingType"
+mirror = "SUBSCRIPT_TYPEGPU_BUFFER_BINDING_TYPE_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUSamplerBindingType"
+mirror = "SUBSCRIPT_TYPEGPU_SAMPLER_BINDING_TYPE_BINDING_NOT_USED"
+reason = "the facade sentinel represents an absent sampler layout and is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUSamplerBindingType"
+mirror = "SUBSCRIPT_TYPEGPU_SAMPLER_BINDING_TYPE_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUTextureSampleType"
+mirror = "SUBSCRIPT_TYPEGPU_TEXTURE_SAMPLE_TYPE_BINDING_NOT_USED"
+reason = "the facade sentinel represents an absent texture layout and is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUTextureSampleType"
+mirror = "SUBSCRIPT_TYPEGPU_TEXTURE_SAMPLE_TYPE_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUStorageTextureAccess"
+mirror = "SUBSCRIPT_TYPEGPU_STORAGE_TEXTURE_ACCESS_BINDING_NOT_USED"
+reason = "the facade sentinel represents an absent storage-texture layout and is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUStorageTextureAccess"
+mirror = "SUBSCRIPT_TYPEGPU_STORAGE_TEXTURE_ACCESS_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.generate]]
+member = "GPUDevice.createBuffer"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUBuffer.destroy"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUBuffer.unmap"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUBufferDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBufferDescriptor.size"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBufferDescriptor.usage"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBufferDescriptor.mappedAtCreation"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBufferUsage.MAP_READ"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUBufferUsage.MAP_WRITE"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUBufferUsage.COPY_SRC"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUBufferUsage.COPY_DST"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUBufferUsage.INDEX"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUBufferUsage.VERTEX"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUBufferUsage.UNIFORM"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUBufferUsage.STORAGE"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUBufferUsage.INDIRECT"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUBufferUsage.QUERY_RESOLVE"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUMapMode.READ"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUMapMode.WRITE"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUBufferMapState.unmapped"
+pattern = "enum-value"
+
+# API-layer shaders and pipelines.
+
+[[api.dictionary_mappings]]
+dictionary = "GPUProgrammableStage"
+api = "GPUProgrammableStage"
+idl_type = "GPUProgrammableStage"
+boundary = "SubscriptTypegpuComputeState"
+reason = "the facade names the shared programmable-stage aggregate SubscriptTypegpuComputeState even though the same public dictionary shape seeds compute, vertex, and fragment state"
+
+[[api.enum_mappings]]
+enum_name = "GPUVertexFormat"
+member = "unorm10-10-10-2"
+mirror = "SUBSCRIPT_TYPEGPU_VERTEX_FORMAT_UNORM10_10_10_2"
+reason = "Q32 joins the hyphenated IDL spelling to the pinned facade constant that preserves webgpu.h's literal underscores"
+
+[[api.enum_mappings]]
+enum_name = "GPUVertexFormat"
+member = "unorm8x4-bgra"
+mirror = "SUBSCRIPT_TYPEGPU_VERTEX_FORMAT_UNORM8X4_BGRA"
+reason = "Q32 joins the hyphenated IDL spelling to the pinned facade acronym casing"
+
+[[api.enum_mappings]]
+enum_name = "GPUFrontFace"
+member = "ccw"
+mirror = "SUBSCRIPT_TYPEGPU_FRONT_FACE_CCW"
+reason = "Q32 joins the lowercase IDL acronym to the pinned facade acronym casing"
+
+[[api.enum_mappings]]
+enum_name = "GPUFrontFace"
+member = "cw"
+mirror = "SUBSCRIPT_TYPEGPU_FRONT_FACE_CW"
+reason = "Q32 joins the lowercase IDL acronym to the pinned facade acronym casing"
+
+[[api.enum_exclusions]]
+enum_name = "GPUVertexStepMode"
+mirror = "SUBSCRIPT_TYPEGPU_VERTEX_STEP_MODE_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUPrimitiveTopology"
+mirror = "SUBSCRIPT_TYPEGPU_PRIMITIVE_TOPOLOGY_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUIndexFormat"
+mirror = "SUBSCRIPT_TYPEGPU_INDEX_FORMAT_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel represents an omitted stripIndexFormat and is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUFrontFace"
+mirror = "SUBSCRIPT_TYPEGPU_FRONT_FACE_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUCullMode"
+mirror = "SUBSCRIPT_TYPEGPU_CULL_MODE_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUBlendFactor"
+mirror = "SUBSCRIPT_TYPEGPU_BLEND_FACTOR_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUBlendOperation"
+mirror = "SUBSCRIPT_TYPEGPU_BLEND_OPERATION_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.enum_exclusions]]
+enum_name = "GPUStencilOperation"
+mirror = "SUBSCRIPT_TYPEGPU_STENCIL_OPERATION_UNDEFINED"
+reason = "the facade's boundary-only undefined sentinel is not a WebIDL string-enum member"
+
+[[api.exclude]]
+member = "GPUShaderModule.getCompilationInfo"
+reason = "compilation-info records remain outside the selected API subset"
+
+[[api.deviations]]
+member = "GPUShaderModule.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.deviations]]
+member = "GPUComputePipeline.getBindGroupLayout"
+pattern = "operation"
+boundary_arguments = ["index=groupIndex"]
+reason = "the facade names the WebIDL index parameter groupIndex; the generated API keeps the IDL name and joins it explicitly"
+
+[[api.deviations]]
+member = "GPUComputePipeline.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.deviations]]
+member = "GPURenderPipeline.getBindGroupLayout"
+pattern = "operation"
+boundary_arguments = ["index=groupIndex"]
+reason = "the facade names the WebIDL index parameter groupIndex; the generated API keeps the IDL name and joins it explicitly"
+
+[[api.deviations]]
+member = "GPURenderPipeline.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.generate]]
+member = "GPUShaderModuleDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUShaderModuleDescriptor.code"
+pattern = "dictionary-field"
+
+[[api.exclude]]
+member = "GPUShaderModuleDescriptor.compilationHints"
+reason = "the facade's WGSL chain flattening has no compilation-hint field; JavaScript users lose performance hints, not shader semantics"
+
+[[api.generate]]
+member = "GPUProgrammableStage.module"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUProgrammableStage.entryPoint"
+pattern = "dictionary-required"
+required_field = true
+reason = "JavaScript may omit entryPoint when exactly one matching shader entry can be inferred, while this API requires the entry-point name explicitly"
+
+[[api.deviations]]
+member = "GPUProgrammableStage.constants"
+pattern = "dictionary-record-entries"
+field_default = "[]"
+record_entry_api = "GPUPipelineConstantEntry"
+record_entry_boundary = "SubscriptTypegpuConstantEntry"
+reason = "WebIDL's map literal { constants: { gain: 2.0 } } is not expressible, so JavaScript users must supply an entry array { constants: [{ key: \"gain\", value: 2.0 }] }; unlike a record, the array can contain duplicate keys, so duplicates become backend validation errors instead of an unrepresentable state"
+
+[[api.generate]]
+member = "GPUComputePipelineDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUComputePipelineDescriptor.layout"
+pattern = "dictionary-nullable-handle"
+field_default = "null"
+reason = "IDL requires a layout handle or the string \"auto\"; this API makes layout optional and replaces \"auto\" with null, so omission/null selects automatic layout *(docs)* and an accidentally omitted layout produces a pipeline whose bind groups cannot be shared through an explicit GPUPipelineLayout"
+
+[[api.generate]]
+member = "GPUComputePipelineDescriptor.compute"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUVertexAttribute.format"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUVertexAttribute.offset"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUVertexAttribute.shaderLocation"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUVertexBufferLayout.arrayStride"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUVertexBufferLayout.stepMode"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUVertexBufferLayout.attributes"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUVertexState.module"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUVertexState.entryPoint"
+pattern = "dictionary-required"
+required_field = true
+reason = "JavaScript may omit entryPoint when exactly one matching shader entry can be inferred, while this API requires the entry-point name explicitly"
+
+[[api.deviations]]
+member = "GPUVertexState.constants"
+pattern = "dictionary-record-entries"
+field_default = "[]"
+record_entry_api = "GPUPipelineConstantEntry"
+record_entry_boundary = "SubscriptTypegpuConstantEntry"
+reason = "WebIDL's pipeline-constant map is not expressible, so JavaScript users must supply key/value entry objects in an array; unlike a record, the array can contain duplicate keys, so duplicates become backend validation errors instead of an unrepresentable state"
+
+[[api.deviations]]
+member = "GPUVertexState.buffers"
+pattern = "dictionary-descriptor-array"
+reason = "the IDL sequence permits null holes for unused vertex-buffer slots, while the facade aggregate array cannot carry null elements, so JavaScript users can provide only concrete GPUVertexBufferLayout entries"
+
+[[api.generate]]
+member = "GPUPrimitiveState.topology"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUPrimitiveState.stripIndexFormat"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUPrimitiveState.frontFace"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUPrimitiveState.cullMode"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUPrimitiveState.unclippedDepth"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUStencilFaceState.compare"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUStencilFaceState.failOp"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUStencilFaceState.depthFailOp"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUStencilFaceState.passOp"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUDepthStencilState.format"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUDepthStencilState.depthWriteEnabled"
+pattern = "dictionary-required-optional-bool"
+required_field = true
+reason = "JavaScript distinguishes an absent depthWriteEnabled from false, but Q33 has no absence-capable boolean member; callers must state true or false and the facade receives that explicit optional-bool value"
+
+[[api.generate]]
+member = "GPUDepthStencilState.depthCompare"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUDepthStencilState.stencilFront"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUDepthStencilState.stencilBack"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUDepthStencilState.stencilReadMask"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUDepthStencilState.stencilWriteMask"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUDepthStencilState.depthBias"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUDepthStencilState.depthBiasSlopeScale"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUDepthStencilState.depthBiasClamp"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUMultisampleState.count"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUMultisampleState.mask"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUMultisampleState.alphaToCoverageEnabled"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBlendComponent.operation"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBlendComponent.srcFactor"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBlendComponent.dstFactor"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBlendState.color"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBlendState.alpha"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUColorTargetState.format"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUColorTargetState.blend"
+pattern = "dictionary-nullable-descriptor"
+field_default = "null"
+reason = "JavaScript expresses an absent blend member by omission; this API also accepts explicit null, and omission or null both disable blending"
+
+[[api.generate]]
+member = "GPUColorTargetState.writeMask"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUFragmentState.module"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUFragmentState.entryPoint"
+pattern = "dictionary-required"
+required_field = true
+reason = "JavaScript may omit entryPoint when exactly one matching shader entry can be inferred, while this API requires the entry-point name explicitly"
+
+[[api.deviations]]
+member = "GPUFragmentState.constants"
+pattern = "dictionary-record-entries"
+field_default = "[]"
+record_entry_api = "GPUPipelineConstantEntry"
+record_entry_boundary = "SubscriptTypegpuConstantEntry"
+reason = "WebIDL's pipeline-constant map is not expressible, so JavaScript users must supply key/value entry objects in an array; unlike a record, the array can contain duplicate keys, so duplicates become backend validation errors instead of an unrepresentable state"
+
+[[api.deviations]]
+member = "GPUFragmentState.targets"
+pattern = "dictionary-descriptor-array"
+reason = "the IDL sequence permits null holes for disabled color targets, while the facade aggregate array cannot carry null elements, so JavaScript users can provide only concrete GPUColorTargetState entries"
+
+[[api.generate]]
+member = "GPURenderPipelineDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPURenderPipelineDescriptor.layout"
+pattern = "dictionary-nullable-handle"
+field_default = "null"
+reason = "IDL requires a layout handle or the string \"auto\"; this API makes layout optional and replaces \"auto\" with null, so omission/null selects automatic layout *(docs)* and an accidentally omitted layout produces a pipeline whose bind groups cannot be shared through an explicit GPUPipelineLayout"
+
+[[api.generate]]
+member = "GPURenderPipelineDescriptor.vertex"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderPipelineDescriptor.primitive"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPURenderPipelineDescriptor.depthStencil"
+pattern = "dictionary-nullable-descriptor"
+field_default = "null"
+reason = "JavaScript omits depthStencil to disable depth/stencil state; this API also accepts explicit null, and omission or null both pass a null facade pointer"
+
+[[api.generate]]
+member = "GPURenderPipelineDescriptor.multisample"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPURenderPipelineDescriptor.fragment"
+pattern = "dictionary-nullable-descriptor"
+field_default = "null"
+reason = "JavaScript omits fragment for a no-color-output pipeline; this API also accepts explicit null, and omission or null both pass a null facade pointer"
+
+[[api.generate]]
+member = "GPUVertexFormat.uint8"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.uint8x2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.uint8x4"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.sint8"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.sint8x2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.sint8x4"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.unorm8"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.unorm8x2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.unorm8x4"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.snorm8"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.snorm8x2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.snorm8x4"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.uint16"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.uint16x2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.uint16x4"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.sint16"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.sint16x2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.sint16x4"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.unorm16"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.unorm16x2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.unorm16x4"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.snorm16"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.snorm16x2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.snorm16x4"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.float16"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.float16x2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.float16x4"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.float32"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.float32x2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.float32x3"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.float32x4"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.uint32"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.uint32x2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.uint32x3"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.uint32x4"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.sint32"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.sint32x2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.sint32x3"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.sint32x4"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.unorm10-10-10-2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexFormat.unorm8x4-bgra"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexStepMode.vertex"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUVertexStepMode.instance"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUPrimitiveTopology.point-list"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUPrimitiveTopology.line-list"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUPrimitiveTopology.line-strip"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUPrimitiveTopology.triangle-list"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUPrimitiveTopology.triangle-strip"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUIndexFormat.uint16"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUIndexFormat.uint32"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFrontFace.ccw"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFrontFace.cw"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUCullMode.none"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUCullMode.front"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUCullMode.back"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.zero"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.one"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.src"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.one-minus-src"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.src-alpha"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.one-minus-src-alpha"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.dst"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.one-minus-dst"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.dst-alpha"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.one-minus-dst-alpha"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.src-alpha-saturated"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.constant"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.one-minus-constant"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.src1"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.one-minus-src1"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.src1-alpha"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendFactor.one-minus-src1-alpha"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendOperation.add"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendOperation.subtract"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendOperation.reverse-subtract"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendOperation.min"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBlendOperation.max"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStencilOperation.keep"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStencilOperation.zero"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStencilOperation.replace"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStencilOperation.invert"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStencilOperation.increment-clamp"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStencilOperation.decrement-clamp"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStencilOperation.increment-wrap"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStencilOperation.decrement-wrap"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUColorWrite.RED"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUColorWrite.GREEN"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUColorWrite.BLUE"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUColorWrite.ALPHA"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUColorWrite.ALL"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUBufferMapState.pending"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBufferMapState.mapped"
+pattern = "enum-value"
+
+[[api.deviations]]
+member = "GPU.requestAdapter"
+pattern = "async-request"
+boundary_receiver = "Instance"
+drop_arguments = ["options"]
+reason = "the facade exports only subscript_typegpu_instance_request_adapter(instance) and no options-bearing entry point, so this API drops the IDL options argument and polls the facade future explicitly"
+
+[[api.deviations]]
+member = "GPUAdapter.requestDevice"
+pattern = "async-request"
+begin_function = "subscript_typegpu_adapter_request_device_with_descriptor"
+nullable_return = true
+reason = "GPUDeviceDescriptor is lowered through the facade's WithDescriptor route and requiredFeatures entries are passed without filtering, so an unsupported feature fails the request rather than being dropped; JavaScript rejects requestDevice with a DOMException on failure, while this API resolves null without an error reason or message"
+
+[[api.generate]]
+member = "GPUQueueDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUDeviceDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUDeviceDescriptor.requiredFeatures"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUDeviceDescriptor.requiredLimits"
+pattern = "dictionary-required-limits"
+required_limits_api = "GPURequiredLimits"
+required_limits_source = "GPUSupportedLimits"
+required_limits_u32_unspecified = 4294967295
+reason = "WebIDL accepts an open record<DOMString, GPUSize64>, while this API uses a fixed-key GPURequiredLimits descriptor for the 32 fields exposed by the facade (29 u32 and 3 u64), so arbitrary keys, the four compatibility-only limits, and values above u32 for narrowed fields are unavailable; public zero is reserved for omission and cannot request a real zero-valued limit, lowering u32 omission to WGPU_LIMIT_U32_UNDEFINED and leaving the three u64 fields for the facade's F13 zero-to-undefined rule"
+
+[[api.generate]]
+member = "GPUDeviceDescriptor.defaultQueue"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUDevice.@constructor"
+pattern = "host-owned-wrapper"
+reason = "JavaScript exposes no GPUDevice constructor; static methods are unavailable, so this API keeps a public owning constructor that accepts private raw-handle fields, acquires and caches one queue reference through subscript_typegpu_device_get_queue, and is paired with hostOwnedGPUDevice, whose GPUHostOwnedDevice wraps a host-owned device, exposes the same creation methods but neither dispose nor destroy, and returns a new owned queue wrapper from each queue call"
+
+[[api.deviations]]
+member = "GPUDevice.queue"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL attribute is a cached zero-argument method"
+
+[[api.deviations]]
+member = "GPUBuffer.size"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+
+[[api.deviations]]
+member = "GPUBuffer.usage"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+
+[[api.deviations]]
+member = "GPUBuffer.mapState"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL string-enum attribute is a zero-argument method with generated reverse lowering"
+
+[[api.deviations]]
+member = "GPUBuffer.mapAsync"
+pattern = "async-request"
+boolean_result = true
+reason = "the facade accepts explicit offset and size values and exposes mapping completion as Promise<boolean> while encapsulating future polling"
+
+[[api.deviations]]
+member = "GPUBuffer.getMappedRange"
+pattern = "mapped-range"
+reason = "ArrayBuffer and raw pointers are unavailable, so readMappedRange(offset, size) and writeMappedRange(offset, data) require explicit ranges; failed reads return an empty u8[] indistinguishable from zero-size success"
+
+[[api.deviations]]
+member = "GPUBuffer.readMappedRangeF32"
+pattern = "typed-read-f32"
+reason = "the IDL spells this element type as Float32Array inside BufferSource, and subscript has no typed-array view; offset counts bytes and count counts elements"
+
+[[api.deviations]]
+member = "GPUQueue.writeBuffer"
+pattern = "operation"
+drop_arguments = ["dataOffset", "size"]
+boundary_arguments = ["data=data"]
+reason = "the facade accepts a complete byte array and drops IDL's dataOffset and size arguments"
+
+[[api.deviations]]
+member = "GPUQueue.writeBufferF32"
+pattern = "typed-write-f32"
+reason = "the IDL spells this element type as Float32Array inside BufferSource, and subscript has no typed-array view; bufferOffset counts bytes and data length counts elements"
+
+[[api.deviations]]
+member = "GPUQueue.onSubmittedWorkDone"
+pattern = "async-request"
+boolean_result = true
+reason = "the facade exposes completion status as Promise<boolean> while encapsulating future polling"
+
+[[api.exclude]]
+member = "GPU.getPreferredCanvasFormat"
+reason = "canvas integration is outside the headless API slice"
+
+[[api.exclude]]
+member = "GPU.wgslLanguageFeatures"
+reason = "the facade exposes neither an instance WGSL-language-feature probe nor a WGSL feature-name enum, so this IDL setlike attribute has no facade surface to query"
+
+[[api.deviations]]
+member = "GPUAdapter.features"
+pattern = "feature-probe"
+reason = "the IDL GPUSupportedFeatures setlike attribute becomes hasFeature(name); without a set type or facade enumeration, callers lose the stable set object, iteration, size, and features.has(name) spelling"
+
+[[api.deviations]]
+member = "GPUAdapter.limits"
+pattern = "result-record-fill"
+reason = "the readonly SameObject limits attribute becomes limits(), which returns a fresh GPUSupportedLimits record; a failed i32 facade fill returns null rather than a success-looking zero record"
+
+[[api.deviations]]
+member = "GPUAdapter.info"
+pattern = "result-record-fill"
+reason = "the readonly SameObject info attribute becomes info(), which returns a fresh GPUAdapterInfo record; a failed boolean facade fill returns null rather than a success-looking empty record"
+
+[[api.deviations]]
+member = "GPUDevice.features"
+pattern = "feature-probe"
+reason = "the IDL GPUSupportedFeatures setlike attribute becomes hasFeature(name); without a set type or facade enumeration, callers lose the stable set object, iteration, size, and features.has(name) spelling"
+
+[[api.deviations]]
+member = "GPUDevice.limits"
+pattern = "result-record-fill"
+reason = "the readonly SameObject limits attribute becomes limits(), which returns a fresh GPUSupportedLimits record; a failed i32 facade fill returns null rather than a success-looking zero record"
+
+[[api.deviations]]
+member = "GPUDevice.adapterInfo"
+pattern = "result-record-fill"
+reason = "the readonly SameObject adapterInfo attribute becomes adapterInfo(), which returns a fresh GPUAdapterInfo record; a failed boolean facade fill returns null rather than a success-looking empty record"
+
+[[api.generate]]
+member = "GPUDevice.destroy"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUDevice.createTexture"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUDevice.createSampler"
+pattern = "operation"
+
+[[api.exclude]]
+member = "GPUDevice.importExternalTexture"
+reason = "DOM external-image integration is excluded"
+
+[[api.generate]]
+member = "GPUDevice.createBindGroupLayout"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUDevice.createPipelineLayout"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUDevice.createBindGroup"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUDevice.createShaderModule"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUDevice.createComputePipeline"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUDevice.createRenderPipeline"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPUDevice.createComputePipelineAsync"
+pattern = "async-request"
+nullable_return = true
+begin_function = "subscript_typegpu_device_create_compute_pipeline_async_begin"
+reason = "JavaScript rejects with a GPUPipelineError carrying reason and message, while this API resolves null and carries neither directly; callers must use a separate device error scope to obtain the backend error type and message"
+
+[[api.deviations]]
+member = "GPUDevice.createRenderPipelineAsync"
+pattern = "async-request"
+nullable_return = true
+begin_function = "subscript_typegpu_device_create_render_pipeline_async_begin"
+reason = "JavaScript rejects with a GPUPipelineError carrying reason and message, while this API resolves null and carries neither directly; callers must use a separate device error scope to obtain the backend error type and message"
+
+[[api.deviations]]
+member = "GPUDevice.createCommandEncoder"
+pattern = "operation"
+default_variant = "createCommandEncoderDefault"
+reason = "JavaScript omits the empty descriptor on createCommandEncoder(); this API keeps a typed createCommandEncoder(descriptor) and provides createCommandEncoderDefault() for omission"
+
+[[api.generate]]
+member = "GPUDevice.createRenderBundleEncoder"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUDevice.createQuerySet"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPUDevice.lost"
+pattern = "device-lost-poll"
+reason = "JavaScript exposes a once-resolving device.lost promise attribute that can be awaited at setup; without promise attributes this API provides non-consuming deviceLostInfo(), so callers must poll at chosen points and may read the same record repeatedly; each call pumps the instance event loop and can complete unrelated futures"
+
+[[api.generate]]
+member = "GPUDevice.pushErrorScope"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPUDevice.popErrorScope"
+pattern = "error-scope-pop"
+reason = "JavaScript rejects a failed pop and resolves a GPUError subclass or null; this API polls the F6 delivery separately, then converts a captured fill to flattened GPUError, so delivery-status failure, fill-take failure, and a successful NoError fill all resolve null and carry no rejection detail"
+
+[[api.deviations]]
+member = "GPUDevice.onuncapturederror"
+pattern = "uncaptured-error-drain"
+reason = "JavaScript handler registration becomes consuming nextUncapturedError() over the F11 FIFO; callers lose EventTarget delivery and preventDefault, errors are observed only when the program drains, and unlike deviceLostInfo() the drain does not pump the instance event loop"
+
+[[api.deviations]]
+member = "GPUDevice.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.deviations]]
+member = "GPUBuffer.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.deviations]]
+member = "GPUQueue.submit"
+pattern = "operation"
+boundary_arguments = ["commandBuffers=commands"]
+reason = "the public method keeps IDL's commandBuffers name while explicitly joining the facade's R11-collapsed commands handle array; the array shape is unchanged"
+
+[[api.deviations]]
+member = "GPUQueue.writeTexture"
+pattern = "operation"
+boundary_arguments = ["destination=dst", "dataLayout=layout", "size=extent", "data=data"]
+reason = "the facade reorders the IDL byte source after its three lowered copy dictionaries and accepts u8[] instead of AllowSharedBufferSource"
+
+[[api.exclude]]
+member = "GPUQueue.copyExternalImageToTexture"
+reason = "DOM external-image integration is excluded"
+
+[[api.deviations]]
+member = "GPUQueue.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.generate]]
+member = "GPUTexture.createView"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUTexture.destroy"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPUTexture.width"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+
+[[api.deviations]]
+member = "GPUTexture.height"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+
+[[api.deviations]]
+member = "GPUTexture.depthOrArrayLayers"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+
+[[api.deviations]]
+member = "GPUTexture.mipLevelCount"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+
+[[api.deviations]]
+member = "GPUTexture.sampleCount"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+
+[[api.deviations]]
+member = "GPUTexture.dimension"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL string-enum attribute is a zero-argument method with generated reverse lowering"
+
+[[api.deviations]]
+member = "GPUTexture.format"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL string-enum attribute is a zero-argument method with generated reverse lowering"
+
+[[api.deviations]]
+member = "GPUTexture.usage"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+
+[[api.exclude]]
+member = "GPUTexture.textureBindingViewDimension"
+reason = "Q32 literal-union aliases cannot be nullable, so the IDL enum-or-undefined attribute is parked until the language can express it"
+
+[[api.deviations]]
+member = "GPUTexture.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.deviations]]
+member = "GPUTextureView.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.deviations]]
+member = "GPUSampler.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.generate]]
+member = "GPUTextureDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureDescriptor.size"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureDescriptor.mipLevelCount"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureDescriptor.sampleCount"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureDescriptor.dimension"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureDescriptor.format"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureDescriptor.usage"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureDescriptor.viewFormats"
+pattern = "dictionary-field"
+
+[[api.exclude]]
+member = "GPUTextureDescriptor.textureBindingViewDimension"
+reason = "the F12 facade descriptor deliberately excludes the compatibility-only optional binding-view dimension"
+
+[[api.generate]]
+member = "GPUTextureViewDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureViewDescriptor.format"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureViewDescriptor.dimension"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureViewDescriptor.usage"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureViewDescriptor.aspect"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureViewDescriptor.baseMipLevel"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUTextureViewDescriptor.mipLevelCount"
+pattern = "dictionary-required"
+required_field = true
+reason = "WebIDL permits omission, while this API requires an explicit mipLevelCount instead of exposing the facade's undefined-count sentinel as a descriptor default, so callers lose backend-derived remaining-level selection"
+
+[[api.generate]]
+member = "GPUTextureViewDescriptor.baseArrayLayer"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUTextureViewDescriptor.arrayLayerCount"
+pattern = "dictionary-required"
+required_field = true
+reason = "WebIDL permits omission, while this API requires an explicit arrayLayerCount instead of exposing the facade's undefined-count sentinel as a descriptor default, so callers lose backend-derived remaining-layer selection"
+
+[[api.exclude]]
+member = "GPUTextureViewDescriptor.swizzle"
+reason = "the F12 facade descriptor does not expose the feature-gated texture-component swizzle field"
+
+[[api.generate]]
+member = "GPUSamplerDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUSamplerDescriptor.addressModeU"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUSamplerDescriptor.addressModeV"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUSamplerDescriptor.addressModeW"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUSamplerDescriptor.magFilter"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUSamplerDescriptor.minFilter"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUSamplerDescriptor.mipmapFilter"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUSamplerDescriptor.lodMinClamp"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUSamplerDescriptor.lodMaxClamp"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUSamplerDescriptor.compare"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUSamplerDescriptor.maxAnisotropy"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUExtent3DDict.width"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUExtent3DDict.height"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUExtent3DDict.depthOrArrayLayers"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUOrigin3DDict.x"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUOrigin3DDict.y"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUOrigin3DDict.z"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTexelCopyTextureInfo.texture"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTexelCopyTextureInfo.mipLevel"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTexelCopyTextureInfo.origin"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTexelCopyTextureInfo.aspect"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTexelCopyBufferLayout.offset"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUTexelCopyBufferLayout.bytesPerRow"
+pattern = "dictionary-required"
+required_field = true
+reason = "WebIDL permits omission, while this API requires an explicit bytesPerRow instead of exposing the facade's undefined-stride sentinel as a descriptor default, so callers lose the omission form where WebGPU permits inferred layout"
+
+[[api.deviations]]
+member = "GPUTexelCopyBufferLayout.rowsPerImage"
+pattern = "dictionary-required"
+required_field = true
+reason = "WebIDL permits omission, while this API requires an explicit rowsPerImage instead of exposing the facade's undefined-stride sentinel as a descriptor default, so callers lose the omission form where WebGPU permits inferred layout"
+
+[[api.generate]]
+member = "GPUTextureUsage.COPY_SRC"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUTextureUsage.COPY_DST"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUTextureUsage.TEXTURE_BINDING"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUTextureUsage.STORAGE_BINDING"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUTextureUsage.RENDER_ATTACHMENT"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUTextureUsage.TRANSIENT_ATTACHMENT"
+pattern = "namespace-constant"
+[[api.generate]]
+member = "GPUTextureDimension.1d"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureDimension.2d"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureDimension.3d"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureViewDimension.1d"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureViewDimension.2d"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureViewDimension.2d-array"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureViewDimension.cube"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureViewDimension.cube-array"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureViewDimension.3d"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureAspect.all"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureAspect.stencil-only"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureAspect.depth-only"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.r8unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.r8snorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.r8uint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.r8sint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.r16unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.r16snorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.r16uint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.r16sint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.r16float"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg8unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg8snorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg8uint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg8sint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.r32uint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.r32sint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.r32float"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg16unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg16snorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg16uint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg16sint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg16float"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba8unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba8unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba8snorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba8uint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba8sint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bgra8unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bgra8unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgb9e5ufloat"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgb10a2uint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgb10a2unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg11b10ufloat"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg32uint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg32sint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rg32float"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba16unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba16snorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba16uint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba16sint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba16float"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba32uint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba32sint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.rgba32float"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.stencil8"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.depth16unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.depth24plus"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.depth24plus-stencil8"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.depth32float"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.depth32float-stencil8"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc1-rgba-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc1-rgba-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc2-rgba-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc2-rgba-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc3-rgba-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc3-rgba-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc4-r-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc4-r-snorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc5-rg-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc5-rg-snorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc6h-rgb-ufloat"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc6h-rgb-float"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc7-rgba-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.bc7-rgba-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.etc2-rgb8unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.etc2-rgb8unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.etc2-rgb8a1unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.etc2-rgb8a1unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.etc2-rgba8unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.etc2-rgba8unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.eac-r11unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.eac-r11snorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.eac-rg11unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.eac-rg11snorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-4x4-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-4x4-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-5x4-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-5x4-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-5x5-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-5x5-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-6x5-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-6x5-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-6x6-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-6x6-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-8x5-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-8x5-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-8x6-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-8x6-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-8x8-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-8x8-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-10x5-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-10x5-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-10x6-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-10x6-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-10x8-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-10x8-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-10x10-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-10x10-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-12x10-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-12x10-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-12x12-unorm"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureFormat.astc-12x12-unorm-srgb"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUAddressMode.clamp-to-edge"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUAddressMode.repeat"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUAddressMode.mirror-repeat"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFilterMode.nearest"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFilterMode.linear"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUMipmapFilterMode.nearest"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUMipmapFilterMode.linear"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUCompareFunction.never"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUCompareFunction.less"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUCompareFunction.equal"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUCompareFunction.less-equal"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUCompareFunction.greater"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUCompareFunction.not-equal"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUCompareFunction.greater-equal"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUCompareFunction.always"
+pattern = "enum-value"
+
+[[api.deviations]]
+member = "GPUBindGroupLayout.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.deviations]]
+member = "GPUBindGroup.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.deviations]]
+member = "GPUPipelineLayout.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.generate]]
+member = "GPUBufferBindingLayout.type"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBufferBindingLayout.hasDynamicOffset"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBufferBindingLayout.minBindingSize"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUSamplerBindingLayout.type"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureBindingLayout.sampleType"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureBindingLayout.viewDimension"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUTextureBindingLayout.multisampled"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUStorageTextureBindingLayout.access"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUStorageTextureBindingLayout.format"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUStorageTextureBindingLayout.viewDimension"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUBindGroupLayoutEntry.binding"
+pattern = "dictionary-boundary-default"
+boundary_defaults = ["bindingArraySize=0"]
+reason = "the facade's bindingArraySize field is fixed to zero because JavaScript bind-group-layout entries have no binding-array member in the selected IDL"
+
+[[api.generate]]
+member = "GPUBindGroupLayoutEntry.visibility"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUBindGroupLayoutEntry.buffer"
+pattern = "dictionary-optional-descriptor"
+absent_boundary_values = ["SubscriptTypegpuBufferBindingType.SUBSCRIPT_TYPEGPU_BUFFER_BINDING_TYPE_BINDING_NOT_USED", "false", "0"]
+reason = "the optional JavaScript buffer layout becomes GPUBufferBindingLayout | null; null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error"
+
+[[api.deviations]]
+member = "GPUBindGroupLayoutEntry.sampler"
+pattern = "dictionary-optional-descriptor"
+absent_boundary_values = ["SubscriptTypegpuSamplerBindingType.SUBSCRIPT_TYPEGPU_SAMPLER_BINDING_TYPE_BINDING_NOT_USED"]
+reason = "the optional JavaScript sampler layout becomes GPUSamplerBindingLayout | null; null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error"
+
+[[api.deviations]]
+member = "GPUBindGroupLayoutEntry.texture"
+pattern = "dictionary-optional-descriptor"
+absent_boundary_values = ["SubscriptTypegpuTextureSampleType.SUBSCRIPT_TYPEGPU_TEXTURE_SAMPLE_TYPE_BINDING_NOT_USED", "SubscriptTypegpuTextureViewDimension.SUBSCRIPT_TYPEGPU_TEXTURE_VIEW_DIMENSION_UNDEFINED", "false"]
+reason = "the optional JavaScript texture layout becomes GPUTextureBindingLayout | null; null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error"
+
+[[api.deviations]]
+member = "GPUBindGroupLayoutEntry.storageTexture"
+pattern = "dictionary-optional-descriptor"
+absent_boundary_values = ["SubscriptTypegpuStorageTextureAccess.SUBSCRIPT_TYPEGPU_STORAGE_TEXTURE_ACCESS_BINDING_NOT_USED", "SubscriptTypegpuTextureFormat.SUBSCRIPT_TYPEGPU_TEXTURE_FORMAT_UNDEFINED", "SubscriptTypegpuTextureViewDimension.SUBSCRIPT_TYPEGPU_TEXTURE_VIEW_DIMENSION_UNDEFINED"]
+reason = "the optional JavaScript storage-texture layout becomes GPUStorageTextureBindingLayout | null; null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error"
+
+[[api.exclude]]
+member = "GPUBindGroupLayoutEntry.externalTexture"
+reason = "GPUExternalTexture and DOM external-image integration are excluded, so external-texture layout entries are unavailable"
+
+[[api.generate]]
+member = "GPUBindGroupLayoutDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBindGroupLayoutDescriptor.entries"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBindGroupEntry.binding"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUBindGroupEntry.resource"
+pattern = "binding-resource"
+reason = "the JavaScript API's one resource union becomes nullable buffer, sampler, and textureView members plus buffer offset and size; GPUTexture shorthand and GPUExternalTexture are unavailable, and setting none or more than one handle is a backend validation error rather than a type error"
+
+[[api.generate]]
+member = "GPUBindGroupDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBindGroupDescriptor.layout"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBindGroupDescriptor.entries"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBufferBinding.buffer"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUBufferBinding.offset"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUBufferBinding.size"
+pattern = "dictionary-default"
+field_default = "0"
+reason = "WebIDL omission means the rest of the buffer; the public default 0 lowers through the facade's 0-to-WGPU_WHOLE_SIZE rule, and zero is never a valid binding size, so no valid JavaScript size is conflated and this is not an R16 case"
+
+[[api.generate]]
+member = "GPUPipelineLayoutDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUPipelineLayoutDescriptor.bindGroupLayouts"
+pattern = "dictionary-handle-array"
+reason = "the IDL accepts null holes in the bind-group-layout sequence, but the facade handle-element array cannot carry null elements, so the public array accepts only concrete GPUBindGroupLayout wrappers"
+
+[[api.generate]]
+member = "GPUPipelineLayoutDescriptor.immediateSize"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUShaderStage.VERTEX"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUShaderStage.FRAGMENT"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUShaderStage.COMPUTE"
+pattern = "namespace-constant"
+
+[[api.generate]]
+member = "GPUBufferBindingType.uniform"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBufferBindingType.storage"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUBufferBindingType.read-only-storage"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUSamplerBindingType.filtering"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUSamplerBindingType.non-filtering"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUSamplerBindingType.comparison"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureSampleType.float"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureSampleType.unfilterable-float"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureSampleType.depth"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureSampleType.sint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUTextureSampleType.uint"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStorageTextureAccess.write-only"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStorageTextureAccess.read-only"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStorageTextureAccess.read-write"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPULoadOp.load"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPULoadOp.clear"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStoreOp.store"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUStoreOp.discard"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUQueryType.occlusion"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUQueryType.timestamp"
+pattern = "enum-value"
+
+[[api.enum_exclusions]]
+enum_name = "GPULoadOp"
+mirror = "SUBSCRIPT_TYPEGPU_LOAD_OP_UNDEFINED"
+reason = "the facade Undefined sentinel represents IDL absence and is not a public GPULoadOp string"
+
+[[api.enum_exclusions]]
+enum_name = "GPUStoreOp"
+mirror = "SUBSCRIPT_TYPEGPU_STORE_OP_UNDEFINED"
+reason = "the facade Undefined sentinel represents IDL absence and is not a public GPUStoreOp string"
+
+[[api.generate]]
+member = "GPUCommandEncoderDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderBundleEncoderDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPURenderBundleEncoderDescriptor.colorFormats"
+pattern = "dictionary-enum-array"
+reason = "JavaScript permits null holes for unused color attachments, while the facade enum array cannot carry null elements, so callers can provide only concrete GPUTextureFormat values"
+
+[[api.generate]]
+member = "GPURenderBundleEncoderDescriptor.depthStencilFormat"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderBundleEncoderDescriptor.sampleCount"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderBundleEncoderDescriptor.depthReadOnly"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderBundleEncoderDescriptor.stencilReadOnly"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUQuerySetDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUQuerySetDescriptor.type"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUQuerySetDescriptor.count"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUCommandBufferDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUComputePassTimestampWrites.querySet"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUComputePassTimestampWrites.beginningOfPassWriteIndex"
+pattern = "dictionary-default"
+field_default = "4294967295"
+reason = "IDL omission is represented by the pinned WGPU_QUERY_SET_INDEX_UNDEFINED u32 sentinel; the public default preserves omission without exposing an additional value"
+
+[[api.deviations]]
+member = "GPUComputePassTimestampWrites.endOfPassWriteIndex"
+pattern = "dictionary-default"
+field_default = "4294967295"
+reason = "IDL omission is represented by the pinned WGPU_QUERY_SET_INDEX_UNDEFINED u32 sentinel; the public default preserves omission without exposing an additional value"
+
+[[api.generate]]
+member = "GPURenderPassTimestampWrites.querySet"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPURenderPassTimestampWrites.beginningOfPassWriteIndex"
+pattern = "dictionary-default"
+field_default = "4294967295"
+reason = "IDL omission is represented by the pinned WGPU_QUERY_SET_INDEX_UNDEFINED u32 sentinel; the shared pass-timestamp descriptor preserves omission"
+
+[[api.deviations]]
+member = "GPURenderPassTimestampWrites.endOfPassWriteIndex"
+pattern = "dictionary-default"
+field_default = "4294967295"
+reason = "IDL omission is represented by the pinned WGPU_QUERY_SET_INDEX_UNDEFINED u32 sentinel; the shared pass-timestamp descriptor preserves omission"
+
+[[api.generate]]
+member = "GPUComputePassDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUComputePassDescriptor.timestampWrites"
+pattern = "dictionary-nullable-descriptor"
+field_default = "null"
+reason = "IDL omission disables pass timestamp writes; this API also accepts explicit null, and omission or null both pass a null facade pointer"
+
+[[api.generate]]
+member = "GPUColorDict.r"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUColorDict.g"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUColorDict.b"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPUColorDict.a"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPURenderPassColorAttachment.view"
+pattern = "dictionary-required-handle"
+reason = "IDL accepts a GPUTexture or GPUTextureView, while the facade accepts only a texture-view handle; callers lose the GPUTexture shorthand and must provide a GPUTextureView, which remains required"
+
+[[api.deviations]]
+member = "GPURenderPassColorAttachment.depthSlice"
+pattern = "dictionary-default"
+field_default = "4294967295"
+reason = "IDL omission is represented by the pinned WGPU_DEPTH_SLICE_UNDEFINED u32 sentinel, preserving the absence required by non-3d attachments"
+
+[[api.deviations]]
+member = "GPURenderPassColorAttachment.resolveTarget"
+pattern = "dictionary-nullable-handle"
+field_default = "null"
+reason = "IDL accepts a GPUTexture or GPUTextureView when present, while the facade accepts only a texture-view handle; callers lose the GPUTexture shorthand, and omission or null disables resolve"
+
+[[api.deviations]]
+member = "GPURenderPassColorAttachment.clearValue"
+pattern = "dictionary-union-descriptor"
+field_default = "{ r: 0, g: 0, b: 0, a: 0 }"
+reason = "GPUColor is a dictionary-or-sequence union; callers must use { r, g, b, a } and lose the [r, g, b, a] sequence spelling, while omission keeps the IDL zero-color default"
+
+[[api.generate]]
+member = "GPURenderPassColorAttachment.loadOp"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderPassColorAttachment.storeOp"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPURenderPassDepthStencilAttachment.view"
+pattern = "dictionary-required-handle"
+reason = "IDL accepts a GPUTexture or GPUTextureView, while the facade accepts only a texture-view handle; callers lose the GPUTexture shorthand and must provide a GPUTextureView"
+
+[[api.deviations]]
+member = "GPURenderPassDepthStencilAttachment.depthClearValue"
+pattern = "dictionary-required"
+required_field = true
+reason = "IDL absence uses a NaN sentinel that cannot cross the public API, so callers must state depthClearValue even when the selected load operation ignores it"
+
+[[api.generate]]
+member = "GPURenderPassDepthStencilAttachment.depthLoadOp"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderPassDepthStencilAttachment.depthStoreOp"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderPassDepthStencilAttachment.depthReadOnly"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderPassDepthStencilAttachment.stencilClearValue"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderPassDepthStencilAttachment.stencilLoadOp"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderPassDepthStencilAttachment.stencilStoreOp"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderPassDepthStencilAttachment.stencilReadOnly"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderPassDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPURenderPassDescriptor.colorAttachments"
+pattern = "dictionary-descriptor-array"
+reason = "IDL permits null holes for unused color attachments, while the facade aggregate array cannot carry null elements, so callers can provide only concrete GPURenderPassColorAttachment entries"
+
+[[api.deviations]]
+member = "GPURenderPassDescriptor.depthStencilAttachment"
+pattern = "dictionary-nullable-descriptor"
+field_default = "null"
+reason = "IDL omission disables the depth/stencil attachment; this API also accepts explicit null, and omission or null both pass a null facade pointer"
+
+[[api.deviations]]
+member = "GPURenderPassDescriptor.occlusionQuerySet"
+pattern = "dictionary-optional-handle"
+field_default = "null"
+reason = "IDL omission disables occlusion queries; this API also accepts explicit null, and omission or null both pass a null query-set handle"
+
+[[api.deviations]]
+member = "GPURenderPassDescriptor.timestampWrites"
+pattern = "dictionary-nullable-descriptor"
+field_default = "null"
+reason = "IDL omission disables render-pass timestamp writes; this API also accepts explicit null, and omission or null both pass a null facade pointer"
+
+[[api.exclude]]
+member = "GPURenderPassDescriptor.maxDrawCount"
+reason = "the facade follows the base WGPURenderPassDescriptor and does not expose the optional max-draw-count extension, so callers cannot override the IDL default of 50000000"
+
+[[api.generate]]
+member = "GPUTexelCopyBufferInfo.offset"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUTexelCopyBufferInfo.bytesPerRow"
+pattern = "dictionary-required"
+required_field = true
+reason = "WebIDL permits omission, while this API requires an explicit bytesPerRow instead of exposing the facade's undefined-stride sentinel as a descriptor default, so callers lose the omission form where WebGPU permits inferred layout"
+
+[[api.deviations]]
+member = "GPUTexelCopyBufferInfo.rowsPerImage"
+pattern = "dictionary-required"
+required_field = true
+reason = "WebIDL permits omission, while this API requires an explicit rowsPerImage instead of exposing the facade's undefined-stride sentinel as a descriptor default, so callers lose the omission form where WebGPU permits inferred layout"
+
+[[api.generate]]
+member = "GPUTexelCopyBufferInfo.buffer"
+pattern = "dictionary-field"
+
+[[api.generate]]
+member = "GPURenderBundleDescriptor.label"
+pattern = "dictionary-field"
+
+[[api.deviations]]
+member = "GPUCommandEncoder.copyBufferToBuffer"
+pattern = "operation"
+overload_arguments = ["source", "sourceOffset", "destination", "destinationOffset", "size"]
+reason = "this API keeps the explicit-offset overload and drops JavaScript's source/destination convenience overload; size is required because the facade does not expose the whole-size sentinel"
+
+[[api.generate]]
+member = "GPUCommandEncoder.beginRenderPass"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPUCommandEncoder.beginComputePass"
+pattern = "operation"
+default_variant = "beginComputePassDefault"
+reason = "JavaScript omits the empty compute-pass descriptor; this API keeps a typed beginComputePass(descriptor) and provides beginComputePassDefault() for omission"
+
+[[api.generate]]
+member = "GPUCommandEncoder.copyBufferToTexture"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUCommandEncoder.copyTextureToBuffer"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUCommandEncoder.copyTextureToTexture"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPUCommandEncoder.clearBuffer"
+pattern = "operation"
+required_arguments = ["offset"]
+reason = "JavaScript may omit offset and size to clear the rest of the buffer; the facade exposes no whole-size sentinel, so this API requires both an explicit offset and an explicit size"
+
+[[api.generate]]
+member = "GPUCommandEncoder.resolveQuerySet"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPUCommandEncoder.finish"
+pattern = "operation"
+default_variant = "finishDefault"
+reason = "JavaScript omits the empty command-buffer descriptor; this API keeps finish(descriptor) and provides finishDefault() for omission"
+
+[[api.generate]]
+member = "GPUCommandEncoder.pushDebugGroup"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUCommandEncoder.popDebugGroup"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUCommandEncoder.insertDebugMarker"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPUCommandEncoder.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.generate]]
+member = "GPUComputePassEncoder.setPipeline"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUComputePassEncoder.dispatchWorkgroups"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUComputePassEncoder.dispatchWorkgroupsIndirect"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUComputePassEncoder.end"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUComputePassEncoder.pushDebugGroup"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUComputePassEncoder.popDebugGroup"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPUComputePassEncoder.insertDebugMarker"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPUComputePassEncoder.setBindGroup"
+pattern = "operation"
+overload_arguments = ["index", "bindGroup", "dynamicOffsets"]
+boundary_arguments = ["index=groupIndex", "bindGroup=group"]
+reason = "this API keeps setBindGroup(index, bindGroup, dynamicOffsets = []) and drops the Uint32Array subrange overload with dynamicOffsetsDataStart/dynamicOffsetsDataLength; callers lose zero-copy subrange selection"
+
+[[api.exclude]]
+member = "GPUComputePassEncoder.setImmediates"
+reason = "the facade exposes immediateSize capability fields but no set-immediates command, so the API cannot expose this IDL operation"
+
+[[api.deviations]]
+member = "GPUComputePassEncoder.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.setViewport"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.setScissorRect"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.setBlendConstant"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.setStencilReference"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.beginOcclusionQuery"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.endOcclusionQuery"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.executeBundles"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.end"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.pushDebugGroup"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.popDebugGroup"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.insertDebugMarker"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPURenderPassEncoder.setBindGroup"
+pattern = "operation"
+overload_arguments = ["index", "bindGroup", "dynamicOffsets"]
+boundary_arguments = ["index=groupIndex", "bindGroup=group"]
+reason = "this API keeps setBindGroup(index, bindGroup, dynamicOffsets = []) and drops the Uint32Array subrange overload with dynamicOffsetsDataStart/dynamicOffsetsDataLength; callers lose zero-copy subrange selection"
+
+[[api.exclude]]
+member = "GPURenderPassEncoder.setImmediates"
+reason = "the facade exposes immediateSize capability fields but no set-immediates command, so the API cannot expose this IDL operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.setPipeline"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPURenderPassEncoder.setIndexBuffer"
+pattern = "operation"
+required_arguments = ["offset"]
+boundary_arguments = ["indexFormat=format"]
+reason = "JavaScript may omit offset and size to bind the rest of the index buffer; the facade exposes no whole-size sentinel, so this API requires both, while retaining the IDL indexFormat name"
+
+[[api.deviations]]
+member = "GPURenderPassEncoder.setVertexBuffer"
+pattern = "operation"
+required_arguments = ["offset"]
+reason = "JavaScript may omit offset and size to bind the rest of the vertex buffer; the facade exposes no whole-size sentinel, so this API requires both; a null buffer still unbinds the slot"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.draw"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.drawIndexed"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.drawIndirect"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderPassEncoder.drawIndexedIndirect"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPURenderPassEncoder.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.deviations]]
+member = "GPUCommandBuffer.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.deviations]]
+member = "GPURenderBundleEncoder.finish"
+pattern = "operation"
+default_variant = "finishDefault"
+reason = "JavaScript omits the empty render-bundle descriptor; this API keeps finish(descriptor) and provides finishDefault() for omission"
+
+[[api.generate]]
+member = "GPURenderBundleEncoder.pushDebugGroup"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderBundleEncoder.popDebugGroup"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderBundleEncoder.insertDebugMarker"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPURenderBundleEncoder.setBindGroup"
+pattern = "operation"
+overload_arguments = ["index", "bindGroup", "dynamicOffsets"]
+boundary_arguments = ["index=groupIndex", "bindGroup=group"]
+reason = "this API keeps setBindGroup(index, bindGroup, dynamicOffsets = []) and drops the Uint32Array subrange overload with dynamicOffsetsDataStart/dynamicOffsetsDataLength; callers lose zero-copy subrange selection"
+
+[[api.exclude]]
+member = "GPURenderBundleEncoder.setImmediates"
+reason = "the facade exposes immediateSize capability fields but no set-immediates command, so the API cannot expose this IDL operation"
+
+[[api.generate]]
+member = "GPURenderBundleEncoder.setPipeline"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPURenderBundleEncoder.setIndexBuffer"
+pattern = "operation"
+required_arguments = ["offset"]
+boundary_arguments = ["indexFormat=format"]
+reason = "JavaScript may omit offset and size to bind the rest of the index buffer; the facade exposes no whole-size sentinel, so this API requires both, while retaining the IDL indexFormat name"
+
+[[api.deviations]]
+member = "GPURenderBundleEncoder.setVertexBuffer"
+pattern = "operation"
+required_arguments = ["offset"]
+reason = "JavaScript may omit offset and size to bind the rest of the vertex buffer; the facade exposes no whole-size sentinel, so this API requires both; a null buffer still unbinds the slot"
+
+[[api.generate]]
+member = "GPURenderBundleEncoder.draw"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderBundleEncoder.drawIndexed"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderBundleEncoder.drawIndirect"
+pattern = "operation"
+
+[[api.generate]]
+member = "GPURenderBundleEncoder.drawIndexedIndirect"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPURenderBundleEncoder.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.deviations]]
+member = "GPURenderBundle.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.generate]]
+member = "GPUQuerySet.destroy"
+pattern = "operation"
+
+[[api.deviations]]
+member = "GPUQuerySet.type"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL type attribute is a zero-argument method"
+
+[[api.deviations]]
+member = "GPUQuerySet.count"
+pattern = "attribute-method"
+reason = "user-defined accessors are unavailable, so the IDL count attribute is a zero-argument method"
+
+[[api.deviations]]
+member = "GPUQuerySet.label"
+pattern = "label-method"
+reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+
+[[api.deviations]]
+member = "GPUError.message"
+pattern = "result-record-field"
+reason = "GPUValidationError, GPUOutOfMemoryError, and GPUInternalError are flattened into GPUError(type, message); callers retain a string type but lose subclass constructors and err instanceof GPUValidationError-style checks"
+
+[[api.generate]]
+member = "GPUDeviceLostInfo.reason"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUDeviceLostInfo.message"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxTextureDimension1D"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxTextureDimension2D"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxTextureDimension3D"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxTextureArrayLayers"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxBindGroups"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxBindGroupsPlusVertexBuffers"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxBindingsPerBindGroup"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxDynamicUniformBuffersPerPipelineLayout"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxDynamicStorageBuffersPerPipelineLayout"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxSampledTexturesPerShaderStage"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxSamplersPerShaderStage"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxStorageBuffersPerShaderStage"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxStorageTexturesPerShaderStage"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxUniformBuffersPerShaderStage"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxUniformBufferBindingSize"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxStorageBufferBindingSize"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.minUniformBufferOffsetAlignment"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.minStorageBufferOffsetAlignment"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxVertexBuffers"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxBufferSize"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxVertexAttributes"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxVertexBufferArrayStride"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxInterStageShaderVariables"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxColorAttachments"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxColorAttachmentBytesPerSample"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxComputeWorkgroupStorageSize"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxComputeInvocationsPerWorkgroup"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxComputeWorkgroupSizeX"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxComputeWorkgroupSizeY"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxComputeWorkgroupSizeZ"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxComputeWorkgroupsPerDimension"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUSupportedLimits.maxImmediateSize"
+pattern = "result-record-field"
+
+[[api.exclude]]
+member = "GPUSupportedLimits.maxStorageBuffersInVertexStage"
+reason = "this compatibility-only limit is reachable through the WGPUCompatibilityModeLimits chain, which F12 excludes"
+
+[[api.exclude]]
+member = "GPUSupportedLimits.maxStorageBuffersInFragmentStage"
+reason = "this compatibility-only limit is reachable through the WGPUCompatibilityModeLimits chain, which F12 excludes"
+
+[[api.exclude]]
+member = "GPUSupportedLimits.maxStorageTexturesInVertexStage"
+reason = "this compatibility-only limit is reachable through the WGPUCompatibilityModeLimits chain, which F12 excludes"
+
+[[api.exclude]]
+member = "GPUSupportedLimits.maxStorageTexturesInFragmentStage"
+reason = "this compatibility-only limit is reachable through the WGPUCompatibilityModeLimits chain, which F12 excludes"
+
+[[api.generate]]
+member = "GPUAdapterInfo.vendor"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUAdapterInfo.architecture"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUAdapterInfo.device"
+pattern = "result-record-field"
+
+[[api.generate]]
+member = "GPUAdapterInfo.description"
+pattern = "result-record-field"
+
+[[api.exclude]]
+member = "GPUAdapterInfo.subgroupMinSize"
+reason = "the plain WGPUAdapterInfo subgroup minimum is deliberately private to the facade; exposing it requires a facade-surface change"
+
+[[api.exclude]]
+member = "GPUAdapterInfo.subgroupMaxSize"
+reason = "the plain WGPUAdapterInfo subgroup maximum is deliberately private to the facade; exposing it requires a facade-surface change"
+
+[[api.exclude]]
+member = "GPUAdapterInfo.isFallbackAdapter"
+reason = "the pinned webgpu.h WGPUAdapterInfo has no isFallbackAdapter field"
+
+[[api.exclude]]
+member = "GPUValidationError.@constructor"
+reason = "the IDL subclass is flattened into GPUError(type, message), so direct GPUValidationError construction is unavailable"
+
+[[api.exclude]]
+member = "GPUOutOfMemoryError.@constructor"
+reason = "the IDL subclass is flattened into GPUError(type, message), so direct GPUOutOfMemoryError construction is unavailable"
+
+[[api.exclude]]
+member = "GPUInternalError.@constructor"
+reason = "the IDL subclass is flattened into GPUError(type, message), so direct GPUInternalError construction is unavailable"
+
+[[api.generate]]
+member = "GPUErrorFilter.validation"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUErrorFilter.out-of-memory"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUErrorFilter.internal"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUDeviceLostReason.unknown"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUDeviceLostReason.destroyed"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.core-features-and-limits"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.depth-clip-control"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.depth32float-stencil8"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.texture-compression-bc"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.texture-compression-bc-sliced-3d"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.texture-compression-etc2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.texture-compression-astc"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.texture-compression-astc-sliced-3d"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.timestamp-query"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.indirect-first-instance"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.shader-f16"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.rg11b10ufloat-renderable"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.bgra8unorm-storage"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.float32-filterable"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.float32-blendable"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.clip-distances"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.dual-source-blending"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.subgroups"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.texture-formats-tier1"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.texture-formats-tier2"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.primitive-index"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.texture-component-swizzle"
+pattern = "enum-value"
+
+[[api.generate]]
+member = "GPUFeatureName.subgroup-size-control"
+pattern = "enum-value"
+
+[[api.enum_exclusions]]
+enum_name = "GPUDeviceLostReason"
+mirror = "SUBSCRIPT_TYPEGPU_DEVICE_LOST_REASON_CALLBACK_CANCELLED"
+reason = "the facade records callback cancellation, but the pinned IDL has no public string member for it"
+
+[[api.enum_exclusions]]
+enum_name = "GPUDeviceLostReason"
+mirror = "SUBSCRIPT_TYPEGPU_DEVICE_LOST_REASON_FAILED_CREATION"
+reason = "the facade records failed creation, but the pinned IDL has no public string member for it"

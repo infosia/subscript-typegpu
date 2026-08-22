@@ -45,8 +45,28 @@ rules are restated in `facade-generator.md` and `api-layer.md`, and
 `rule-ids.txt` gates every citation. E2 was a drafting slip in the
 proof of concept and does not exist here.
 
-Round 2 handoff issued 2026-08-22 with every finding. Result:
-pending.
+Round 2 (2026-08-22) closed every finding. Round 3 closed two
+defects the planner found in round 2: the driver read the committed
+mirror as an input of the pass that wrote `webgpu.ts` (regeneration
+was not idempotent after a header change), and the driver edited
+bindgen's output to hide a `Q13` token. The split is now three
+libclang-free outputs (header, Rust, symbol table) and three
+libclang outputs (mirror, wire aliases, `webgpu.ts`). The rule-id
+scanner allows every `Q<n>` and `R<n>`.
+
+Planner verification at the slice close: `tools/gate.sh` green, 151
+tests in four executables (facade 3, harness 1, generator unit 1,
+generator integration 146), hygiene clean, facade closure
+`libloading` → `cfg-if`, three deleted outputs restored
+byte-identically by one `tools/regen.sh` run, two runs stable.
+Reds recorded by the coding agent: a removed symbol-table row fails
+T8 with the name, a one-byte change to `lib/webgpu.ts` fails T6 with
+`run tools/regen.sh`.
+
+Deviation: generator-import.md says each reshape item is one commit.
+The three rounds landed as one working tree, so slice 1 is one
+commit. The per-item evidence is in the handoff reports, restated
+above.
 
 ## Slice 2 — the first program
 
@@ -59,7 +79,7 @@ Not started.
 | 1 | `a01` byte-identical on both tiers and the golden | — |
 | 2 | Regeneration gate red then green | — |
 | 3 | Five build-time measurements recorded | `build-time.md` |
-| 4 | Facade deps: `libloading` alone. `syn` not a direct dependency | — |
-| 5 | No `[features]`, no `build.rs` | — |
-| 6 | I4–I9 green by their gates. I10 measured | — |
-| 7 | Test count before and after I8 equal | — |
+| 4 | Facade deps: `libloading` alone. `syn` not a direct dependency | Measured at the slice 1 close: `libloading` → `cfg-if` only, `cargo tree -e normal --depth 1` lists no `syn` |
+| 5 | No `[features]`, no `build.rs` | `tools/hygiene.sh` checks both, clean at the slice 1 close |
+| 6 | I4–I9 green by their gates. I10 measured | I10: the 28 aliases derive from `[api].enums`. One pass. Six outputs byte-identical before and after |
+| 7 | Test count before and after I8 equal | 143 → 143 at the merge. 146 after the round 2 and 3 additions |

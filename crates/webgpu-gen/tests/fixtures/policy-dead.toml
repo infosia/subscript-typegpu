@@ -1,0 +1,46 @@
+# Red fixture: excludes a method of an object outside the subset; no
+# generation step ever consults the row.
+
+[slice]
+future_anchor = "hub"
+objects = ["hub", "gizmo", "part"]
+
+[[functions]]
+name = "make_hub"
+pattern = "create"
+doc = "Creates a hub with no descriptor."
+
+[[map]]
+method = "hub.pump"
+pattern = "sync"
+
+[[map]]
+method = "hub.fetch_gizmo"
+pattern = "future-poll"
+reason = "fixture: async op; future-poll triple"
+
+[[map]]
+method = "gizmo.get_tag"
+pattern = "sync"
+
+[[map]]
+method = "gizmo.create_part"
+pattern = "descriptor"
+reason = "fixture: chain-free descriptor"
+
+[[map]]
+method = "gizmo.write_part"
+pattern = "byte-pair"
+reason = "fixture: size-last byte data reordered count-first"
+
+[[exclude]]
+construct = "addref"
+reason = "F4 single-owner model"
+
+[[exclude]]
+construct = "gizmo.self_destruct"
+reason = "fixture: excluded method"
+
+[[exclude]]
+construct = "doodad.ping"
+reason = "fixture: object is not in the subset, so nothing consumes this row"

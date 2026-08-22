@@ -1,0 +1,380 @@
+// GENERATED FILE — DO NOT EDIT.
+// Ambient CEnum aliases emitted from the API enum join and subscript_typegpu mirror values.
+// These aliases supply function-position wire mappings to generated mirrors.
+
+type GPUBufferMapState = CEnum<{
+  "unmapped": 1,
+  "pending": 2,
+  "mapped": 3,
+}>;
+
+type GPUTextureFormat = CEnum<{
+  "r8unorm": 1,
+  "r8snorm": 2,
+  "r8uint": 3,
+  "r8sint": 4,
+  "r16unorm": 5,
+  "r16snorm": 6,
+  "r16uint": 7,
+  "r16sint": 8,
+  "r16float": 9,
+  "rg8unorm": 10,
+  "rg8snorm": 11,
+  "rg8uint": 12,
+  "rg8sint": 13,
+  "r32uint": 15,
+  "r32sint": 16,
+  "r32float": 14,
+  "rg16unorm": 17,
+  "rg16snorm": 18,
+  "rg16uint": 19,
+  "rg16sint": 20,
+  "rg16float": 21,
+  "rgba8unorm": 22,
+  "rgba8unorm-srgb": 23,
+  "rgba8snorm": 24,
+  "rgba8uint": 25,
+  "rgba8sint": 26,
+  "bgra8unorm": 27,
+  "bgra8unorm-srgb": 28,
+  "rgb9e5ufloat": 32,
+  "rgb10a2uint": 29,
+  "rgb10a2unorm": 30,
+  "rg11b10ufloat": 31,
+  "rg32uint": 34,
+  "rg32sint": 35,
+  "rg32float": 33,
+  "rgba16unorm": 36,
+  "rgba16snorm": 37,
+  "rgba16uint": 38,
+  "rgba16sint": 39,
+  "rgba16float": 40,
+  "rgba32uint": 42,
+  "rgba32sint": 43,
+  "rgba32float": 41,
+  "stencil8": 44,
+  "depth16unorm": 45,
+  "depth24plus": 46,
+  "depth24plus-stencil8": 47,
+  "depth32float": 48,
+  "depth32float-stencil8": 49,
+  "bc1-rgba-unorm": 50,
+  "bc1-rgba-unorm-srgb": 51,
+  "bc2-rgba-unorm": 52,
+  "bc2-rgba-unorm-srgb": 53,
+  "bc3-rgba-unorm": 54,
+  "bc3-rgba-unorm-srgb": 55,
+  "bc4-r-unorm": 56,
+  "bc4-r-snorm": 57,
+  "bc5-rg-unorm": 58,
+  "bc5-rg-snorm": 59,
+  "bc6h-rgb-ufloat": 60,
+  "bc6h-rgb-float": 61,
+  "bc7-rgba-unorm": 62,
+  "bc7-rgba-unorm-srgb": 63,
+  "etc2-rgb8unorm": 64,
+  "etc2-rgb8unorm-srgb": 65,
+  "etc2-rgb8a1unorm": 66,
+  "etc2-rgb8a1unorm-srgb": 67,
+  "etc2-rgba8unorm": 68,
+  "etc2-rgba8unorm-srgb": 69,
+  "eac-r11unorm": 70,
+  "eac-r11snorm": 71,
+  "eac-rg11unorm": 72,
+  "eac-rg11snorm": 73,
+  "astc-4x4-unorm": 74,
+  "astc-4x4-unorm-srgb": 75,
+  "astc-5x4-unorm": 76,
+  "astc-5x4-unorm-srgb": 77,
+  "astc-5x5-unorm": 78,
+  "astc-5x5-unorm-srgb": 79,
+  "astc-6x5-unorm": 80,
+  "astc-6x5-unorm-srgb": 81,
+  "astc-6x6-unorm": 82,
+  "astc-6x6-unorm-srgb": 83,
+  "astc-8x5-unorm": 84,
+  "astc-8x5-unorm-srgb": 85,
+  "astc-8x6-unorm": 86,
+  "astc-8x6-unorm-srgb": 87,
+  "astc-8x8-unorm": 88,
+  "astc-8x8-unorm-srgb": 89,
+  "astc-10x5-unorm": 90,
+  "astc-10x5-unorm-srgb": 91,
+  "astc-10x6-unorm": 92,
+  "astc-10x6-unorm-srgb": 93,
+  "astc-10x8-unorm": 94,
+  "astc-10x8-unorm-srgb": 95,
+  "astc-10x10-unorm": 96,
+  "astc-10x10-unorm-srgb": 97,
+  "astc-12x10-unorm": 98,
+  "astc-12x10-unorm-srgb": 99,
+  "astc-12x12-unorm": 100,
+  "astc-12x12-unorm-srgb": 101,
+  "undefined": 0,
+}>;
+
+type GPUTextureDimension = CEnum<{
+  "1d": 1,
+  "2d": 2,
+  "3d": 3,
+  "undefined": 0,
+}>;
+
+type GPUTextureViewDimension = CEnum<{
+  "1d": 1,
+  "2d": 2,
+  "2d-array": 3,
+  "cube": 4,
+  "cube-array": 5,
+  "3d": 6,
+  "undefined": 0,
+}>;
+
+type GPUTextureAspect = CEnum<{
+  "all": 1,
+  "stencil-only": 2,
+  "depth-only": 3,
+  "undefined": 0,
+}>;
+
+type GPUAddressMode = CEnum<{
+  "clamp-to-edge": 1,
+  "repeat": 2,
+  "mirror-repeat": 3,
+  "undefined": 0,
+}>;
+
+type GPUFilterMode = CEnum<{
+  "nearest": 1,
+  "linear": 2,
+  "undefined": 0,
+}>;
+
+type GPUMipmapFilterMode = CEnum<{
+  "nearest": 1,
+  "linear": 2,
+  "undefined": 0,
+}>;
+
+type GPUCompareFunction = CEnum<{
+  "never": 1,
+  "less": 2,
+  "equal": 3,
+  "less-equal": 4,
+  "greater": 5,
+  "not-equal": 6,
+  "greater-equal": 7,
+  "always": 8,
+  "undefined": 0,
+}>;
+
+type GPUBufferBindingType = CEnum<{
+  "uniform": 2,
+  "storage": 3,
+  "read-only-storage": 4,
+  "binding-not-used": 0,
+  "undefined": 1,
+}>;
+
+type GPUSamplerBindingType = CEnum<{
+  "filtering": 2,
+  "non-filtering": 3,
+  "comparison": 4,
+  "binding-not-used": 0,
+  "undefined": 1,
+}>;
+
+type GPUTextureSampleType = CEnum<{
+  "float": 2,
+  "unfilterable-float": 3,
+  "depth": 4,
+  "sint": 5,
+  "uint": 6,
+  "binding-not-used": 0,
+  "undefined": 1,
+}>;
+
+type GPUStorageTextureAccess = CEnum<{
+  "write-only": 2,
+  "read-only": 3,
+  "read-write": 4,
+  "binding-not-used": 0,
+  "undefined": 1,
+}>;
+
+type GPUVertexFormat = CEnum<{
+  "uint8": 1,
+  "uint8x2": 2,
+  "uint8x4": 3,
+  "sint8": 4,
+  "sint8x2": 5,
+  "sint8x4": 6,
+  "unorm8": 7,
+  "unorm8x2": 8,
+  "unorm8x4": 9,
+  "snorm8": 10,
+  "snorm8x2": 11,
+  "snorm8x4": 12,
+  "uint16": 13,
+  "uint16x2": 14,
+  "uint16x4": 15,
+  "sint16": 16,
+  "sint16x2": 17,
+  "sint16x4": 18,
+  "unorm16": 19,
+  "unorm16x2": 20,
+  "unorm16x4": 21,
+  "snorm16": 22,
+  "snorm16x2": 23,
+  "snorm16x4": 24,
+  "float16": 25,
+  "float16x2": 26,
+  "float16x4": 27,
+  "float32": 28,
+  "float32x2": 29,
+  "float32x3": 30,
+  "float32x4": 31,
+  "uint32": 32,
+  "uint32x2": 33,
+  "uint32x3": 34,
+  "uint32x4": 35,
+  "sint32": 36,
+  "sint32x2": 37,
+  "sint32x3": 38,
+  "sint32x4": 39,
+  "unorm10-10-10-2": 40,
+  "unorm8x4-bgra": 41,
+}>;
+
+type GPUVertexStepMode = CEnum<{
+  "vertex": 1,
+  "instance": 2,
+  "undefined": 0,
+}>;
+
+type GPUPrimitiveTopology = CEnum<{
+  "point-list": 1,
+  "line-list": 2,
+  "line-strip": 3,
+  "triangle-list": 4,
+  "triangle-strip": 5,
+  "undefined": 0,
+}>;
+
+type GPUIndexFormat = CEnum<{
+  "uint16": 1,
+  "uint32": 2,
+  "undefined": 0,
+}>;
+
+type GPUFrontFace = CEnum<{
+  "ccw": 1,
+  "cw": 2,
+  "undefined": 0,
+}>;
+
+type GPUCullMode = CEnum<{
+  "none": 1,
+  "front": 2,
+  "back": 3,
+  "undefined": 0,
+}>;
+
+type GPUBlendFactor = CEnum<{
+  "zero": 1,
+  "one": 2,
+  "src": 3,
+  "one-minus-src": 4,
+  "src-alpha": 5,
+  "one-minus-src-alpha": 6,
+  "dst": 7,
+  "one-minus-dst": 8,
+  "dst-alpha": 9,
+  "one-minus-dst-alpha": 10,
+  "src-alpha-saturated": 11,
+  "constant": 12,
+  "one-minus-constant": 13,
+  "src1": 14,
+  "one-minus-src1": 15,
+  "src1-alpha": 16,
+  "one-minus-src1-alpha": 17,
+  "undefined": 0,
+}>;
+
+type GPUBlendOperation = CEnum<{
+  "add": 1,
+  "subtract": 2,
+  "reverse-subtract": 3,
+  "min": 4,
+  "max": 5,
+  "undefined": 0,
+}>;
+
+type GPUStencilOperation = CEnum<{
+  "keep": 1,
+  "zero": 2,
+  "replace": 3,
+  "invert": 4,
+  "increment-clamp": 5,
+  "decrement-clamp": 6,
+  "increment-wrap": 7,
+  "decrement-wrap": 8,
+  "undefined": 0,
+}>;
+
+type GPULoadOp = CEnum<{
+  "load": 1,
+  "clear": 2,
+  "undefined": 0,
+}>;
+
+type GPUStoreOp = CEnum<{
+  "store": 1,
+  "discard": 2,
+  "undefined": 0,
+}>;
+
+type GPUQueryType = CEnum<{
+  "occlusion": 1,
+  "timestamp": 2,
+}>;
+
+type GPUErrorFilter = CEnum<{
+  "validation": 1,
+  "out-of-memory": 2,
+  "internal": 3,
+}>;
+
+type GPUDeviceLostReason = CEnum<{
+  "unknown": 1,
+  "destroyed": 2,
+  "callback-cancelled": 3,
+  "failed-creation": 4,
+}>;
+
+type GPUFeatureName = CEnum<{
+  "core-features-and-limits": 1,
+  "depth-clip-control": 2,
+  "depth32float-stencil8": 3,
+  "texture-compression-bc": 4,
+  "texture-compression-bc-sliced-3d": 5,
+  "texture-compression-etc2": 6,
+  "texture-compression-astc": 7,
+  "texture-compression-astc-sliced-3d": 8,
+  "timestamp-query": 9,
+  "indirect-first-instance": 10,
+  "shader-f16": 11,
+  "rg11b10ufloat-renderable": 12,
+  "bgra8unorm-storage": 13,
+  "float32-filterable": 14,
+  "float32-blendable": 15,
+  "clip-distances": 16,
+  "dual-source-blending": 17,
+  "subgroups": 18,
+  "texture-formats-tier1": 19,
+  "texture-formats-tier2": 20,
+  "primitive-index": 21,
+  "texture-component-swizzle": 22,
+  "subgroup-size-control": 23,
+}>;
+

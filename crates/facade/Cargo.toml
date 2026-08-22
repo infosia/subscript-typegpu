@@ -1,0 +1,12 @@
+[package]
+name = "subscript-typegpu-facade"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["lib", "staticlib"]
+
+[dependencies]
+libloading.workspace = true

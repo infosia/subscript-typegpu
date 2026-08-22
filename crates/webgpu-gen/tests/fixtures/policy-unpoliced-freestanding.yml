@@ -1,0 +1,7 @@
+# Red fixture: the freestanding function has neither a function row
+# nor an exclusion.
+functions:
+  - name: inspect_hub
+objects:
+  - name: hub
+    methods: []

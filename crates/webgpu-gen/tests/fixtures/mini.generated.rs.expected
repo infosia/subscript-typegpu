@@ -1,0 +1,519 @@
+//! GENERATED FILE — DO NOT EDIT.
+//!
+//! `tools/regen.sh` emits this file from the pinned inputs and policy.
+//! The regeneration test compares the committed bytes.
+//!
+//! Async callbacks use AllowProcessEvents and copy borrowed messages.
+//! Backend handle cleanup occurs after each callback returns.
+
+#![allow(non_snake_case, non_upper_case_globals)]
+
+#![allow(clippy::not_unsafe_ptr_arg_deref, clippy::vec_box)]
+
+use std::ffi::{c_char, c_void, CStr};
+
+use crate::runtime;
+
+// ---------------------------------------------------------------------
+// webgpu.h FFI subset (emitted from webgpu.yml for the policy subset;
+// no rust-bindgen). webgpu.h names stay private to this module.
+// ---------------------------------------------------------------------
+
+/// Declares opaque handle/pointer-only types (never dereferenced
+/// here). The caller supplies the visibility: the WGPU set stays
+/// `pub(crate)` (webgpu.h internals never enter the crate's public
+/// API); only the `SubscriptTypegpu*` set is `pub`.
+macro_rules! opaque {
+    ($vis:vis $($name:ident),* $(,)?) => {
+        $(
+            #[repr(C)]
+            #[doc = "Opaque handle type (never dereferenced here)."]
+            $vis struct $name {
+                _private: [u8; 0],
+            }
+        )*
+    };
+}
+
+opaque!(
+    pub(crate)
+    WGPUHubImpl,
+    WGPUGizmoImpl,
+    WGPUPartImpl,
+    // Pointer-only in this subset (always null / never built):
+    WGPUChainedStruct,
+    WGPUHubDescriptor,
+);
+
+type WGPUHub = *mut WGPUHubImpl;
+type WGPUGizmo = *mut WGPUGizmoImpl;
+type WGPUPart = *mut WGPUPartImpl;
+
+/// `subscript-typegpu.h`: borrowed UTF-8 string view.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SubscriptTypegpuStringView {
+    /// Pointer to UTF-8 bytes.
+    pub data: *const c_char,
+    /// Byte length, or `usize::MAX` for null-terminated input.
+    pub length: usize,
+}
+
+/// webgpu.h `WGPUStringView`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct WGPUStringView {
+    data: *const c_char,
+    length: usize,
+}
+
+fn wgpu_string_view(view: SubscriptTypegpuStringView) -> WGPUStringView {
+    WGPUStringView {
+        data: view.data,
+        length: view.length,
+    }
+}
+
+/// webgpu.yml constant `strlen` (`usize_max`): marks a
+/// null-terminated `WGPUStringView`.
+const WGPU_STRLEN: usize = usize::MAX;
+
+/// webgpu.h `WGPUFuture { uint64_t id; }`.
+#[repr(C)]
+struct WGPUFuture {
+    id: u64,
+}
+
+/// webgpu.yml enum `callback_mode`, entry `allow_process_events`
+/// — the only mode the facade registers (CLAUDE.md invariant 3).
+const WGPUCallbackMode_AllowProcessEvents: i32 = 0x0000_0002;
+
+/// webgpu.yml enum value (`success`).
+const WGPUFetchGizmoStatus_Success: i32 = 0x0000_0001;
+
+/// webgpu.yml `bitflag.part_kind` value.
+#[allow(dead_code)]
+const WGPUPartKind_None: u64 = 0x0;
+/// webgpu.yml `bitflag.part_kind` value.
+#[allow(dead_code)]
+const WGPUPartKind_Solid: u64 = 0x1;
+/// webgpu.yml `bitflag.part_kind` value.
+#[allow(dead_code)]
+const WGPUPartKind_Hollow: u64 = 0x2;
+
+/// webgpu.h `WGPUFetchGizmoCallback` callback and userdata.
+type WGPUFetchGizmoCallback = Option<
+    unsafe extern "C" fn(
+        status: i32,
+        gizmo: WGPUGizmo,
+        message: WGPUStringView,
+        userdata1: *mut c_void,
+        userdata2: *mut c_void,
+    ),
+>;
+
+/// webgpu.h `WGPUFetchGizmoCallbackInfo` (passed by value).
+#[repr(C)]
+struct WGPUFetchGizmoCallbackInfo {
+    next_in_chain: *mut WGPUChainedStruct,
+    mode: i32,
+    callback: WGPUFetchGizmoCallback,
+    userdata1: *mut c_void,
+    userdata2: *mut c_void,
+}
+
+/// webgpu.h `WGPUPartDescriptor`.
+#[repr(C)]
+struct WGPUPartDescriptor {
+    next_in_chain: *mut WGPUChainedStruct,
+    label: WGPUStringView,
+    kind: u64,
+    span: u64,
+    prefilled: u32,
+}
+
+/// `subscript-typegpu.h`: chain-free struct.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SubscriptTypegpuPartDescriptor {
+    /// Struct field `label`.
+    pub label: SubscriptTypegpuStringView,
+    /// Struct field `kind`.
+    pub kind: u64,
+    /// Struct field `span`.
+    pub span: u64,
+    /// Struct field `prefilled`.
+    pub prefilled: bool,
+}
+
+#[allow(dead_code)]
+fn convert_part_descriptor(source: SubscriptTypegpuPartDescriptor) -> WGPUPartDescriptor {
+    WGPUPartDescriptor {
+        next_in_chain: std::ptr::null_mut(),
+        label: wgpu_string_view(source.label),
+        kind: source.kind,
+        span: source.span,
+        prefilled: u32::from(source.prefilled),
+    }
+}
+
+pub(crate) struct WebgpuTable {
+    _library: libloading::Library,
+    wgpuMakeHub: unsafe extern "C" fn(*const WGPUHubDescriptor)-> WGPUHub,
+    wgpuHubPump: unsafe extern "C" fn(WGPUHub),
+    wgpuHubRelease: unsafe extern "C" fn(WGPUHub),
+    wgpuHubFetchGizmo: unsafe extern "C" fn(WGPUHub, *const WGPUHubDescriptor, WGPUFetchGizmoCallbackInfo)-> WGPUFuture,
+    wgpuGizmoGetTag: unsafe extern "C" fn(WGPUGizmo)-> u32,
+    wgpuGizmoCreatePart: unsafe extern "C" fn(WGPUGizmo, *const WGPUPartDescriptor)-> WGPUPart,
+    wgpuGizmoWritePart: unsafe extern "C" fn(WGPUGizmo, WGPUPart, u64, *const c_void, usize),
+    wgpuPartRelease: unsafe extern "C" fn(WGPUPart),
+    wgpuGizmoRelease: unsafe extern "C" fn(WGPUGizmo),
+}
+
+impl WebgpuTable {
+    pub(crate) fn load(path: &std::path::Path) -> Result<Self, String> {
+        // SAFETY: the library stays owned by the returned table.
+        let library = unsafe { libloading::Library::new(path) }
+            .map_err(|error| format!("load {}: {error}", path.display()))?;
+        fn symbol<T: Copy>(
+            library: &libloading::Library,
+            path: &std::path::Path,
+            name: &'static [u8],
+        ) -> Result<T, String> {
+            // SAFETY: each call uses the pinned webgpu.h signature for this symbol.
+            unsafe { library.get::<T>(name) }
+                .map(|value| *value)
+                .map_err(|error| {
+                    let name = std::str::from_utf8(&name[..name.len() - 1]).unwrap_or("<invalid>");
+                    format!("missing symbol {name} in {}: {error}", path.display())
+                })
+        }
+        Ok(Self {
+            wgpuMakeHub: symbol(&library, path, b"wgpuMakeHub\0")?,
+            wgpuHubPump: symbol(&library, path, b"wgpuHubPump\0")?,
+            wgpuHubRelease: symbol(&library, path, b"wgpuHubRelease\0")?,
+            wgpuHubFetchGizmo: symbol(&library, path, b"wgpuHubFetchGizmo\0")?,
+            wgpuGizmoGetTag: symbol(&library, path, b"wgpuGizmoGetTag\0")?,
+            wgpuGizmoCreatePart: symbol(&library, path, b"wgpuGizmoCreatePart\0")?,
+            wgpuGizmoWritePart: symbol(&library, path, b"wgpuGizmoWritePart\0")?,
+            wgpuPartRelease: symbol(&library, path, b"wgpuPartRelease\0")?,
+            wgpuGizmoRelease: symbol(&library, path, b"wgpuGizmoRelease\0")?,
+            _library: library,
+        })
+    }
+}
+
+unsafe fn wgpuMakeHub(descriptor: *const WGPUHubDescriptor)-> WGPUHub {
+    let Some(table) = crate::runtime::table() else {
+        eprintln!("subscript-typegpu: cannot call wgpuMakeHub: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
+        std::process::abort();
+    };
+    // SAFETY: the table stores the pinned signature for this symbol.
+    unsafe { (table.wgpuMakeHub)(descriptor) }
+}
+
+unsafe fn wgpuHubPump(hub: WGPUHub) {
+    let Some(table) = crate::runtime::table() else {
+        eprintln!("subscript-typegpu: cannot call wgpuHubPump: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
+        std::process::abort();
+    };
+    // SAFETY: the table stores the pinned signature for this symbol.
+    unsafe { (table.wgpuHubPump)(hub) }
+}
+
+unsafe fn wgpuHubRelease(hub: WGPUHub) {
+    let Some(table) = crate::runtime::table() else {
+        eprintln!("subscript-typegpu: cannot call wgpuHubRelease: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
+        std::process::abort();
+    };
+    // SAFETY: the table stores the pinned signature for this symbol.
+    unsafe { (table.wgpuHubRelease)(hub) }
+}
+
+unsafe fn wgpuHubFetchGizmo(hub: WGPUHub, options: *const WGPUHubDescriptor, callback_info: WGPUFetchGizmoCallbackInfo,)-> WGPUFuture {
+    let Some(table) = crate::runtime::table() else {
+        eprintln!("subscript-typegpu: cannot call wgpuHubFetchGizmo: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
+        std::process::abort();
+    };
+    // SAFETY: the table stores the pinned signature for this symbol.
+    unsafe { (table.wgpuHubFetchGizmo)(hub, options, callback_info) }
+}
+
+unsafe fn wgpuGizmoGetTag(gizmo: WGPUGizmo)-> u32 {
+    let Some(table) = crate::runtime::table() else {
+        eprintln!("subscript-typegpu: cannot call wgpuGizmoGetTag: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
+        std::process::abort();
+    };
+    // SAFETY: the table stores the pinned signature for this symbol.
+    unsafe { (table.wgpuGizmoGetTag)(gizmo) }
+}
+
+unsafe fn wgpuGizmoCreatePart(gizmo: WGPUGizmo, descriptor: *const WGPUPartDescriptor)-> WGPUPart {
+    let Some(table) = crate::runtime::table() else {
+        eprintln!("subscript-typegpu: cannot call wgpuGizmoCreatePart: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
+        std::process::abort();
+    };
+    // SAFETY: the table stores the pinned signature for this symbol.
+    unsafe { (table.wgpuGizmoCreatePart)(gizmo, descriptor) }
+}
+
+unsafe fn wgpuGizmoWritePart(gizmo: WGPUGizmo, part: WGPUPart, at: u64, data: *const c_void, size: usize,) {
+    let Some(table) = crate::runtime::table() else {
+        eprintln!("subscript-typegpu: cannot call wgpuGizmoWritePart: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
+        std::process::abort();
+    };
+    // SAFETY: the table stores the pinned signature for this symbol.
+    unsafe { (table.wgpuGizmoWritePart)(gizmo, part, at, data, size) }
+}
+
+unsafe fn wgpuPartRelease(part: WGPUPart) {
+    let Some(table) = crate::runtime::table() else {
+        eprintln!("subscript-typegpu: cannot call wgpuPartRelease: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
+        std::process::abort();
+    };
+    // SAFETY: the table stores the pinned signature for this symbol.
+    unsafe { (table.wgpuPartRelease)(part) }
+}
+
+unsafe fn wgpuGizmoRelease(gizmo: WGPUGizmo) {
+    let Some(table) = crate::runtime::table() else {
+        eprintln!("subscript-typegpu: cannot call wgpuGizmoRelease: set SUBSCRIPT_TYPEGPU_BACKEND_LIB");
+        std::process::abort();
+    };
+    // SAFETY: the table stores the pinned signature for this symbol.
+    unsafe { (table.wgpuGizmoRelease)(gizmo) }
+}
+
+
+// ---------------------------------------------------------------------
+// subscript-typegpu.h surface and panic-free export bodies.
+// ---------------------------------------------------------------------
+
+opaque!(
+    pub
+    SubscriptTypegpuHubImpl,
+    SubscriptTypegpuGizmoImpl,
+    SubscriptTypegpuPartImpl,
+);
+
+/// `subscript-typegpu.h`: opaque hub handle.
+pub type SubscriptTypegpuHub = *mut SubscriptTypegpuHubImpl;
+/// `subscript-typegpu.h`: opaque gizmo handle.
+pub type SubscriptTypegpuGizmo = *mut SubscriptTypegpuGizmoImpl;
+/// `subscript-typegpu.h`: opaque part handle.
+pub type SubscriptTypegpuPart = *mut SubscriptTypegpuPartImpl;
+
+/// `subscript-typegpu.h`: `bitflag.part_kind` scalar set.
+pub type SubscriptTypegpuPartKind = u64;
+/// `subscript-typegpu.h`: `bitflag.part_kind` value.
+pub const SUBSCRIPT_TYPEGPU_PART_KIND_NONE: SubscriptTypegpuPartKind = 0x0;
+/// `subscript-typegpu.h`: `bitflag.part_kind` value.
+pub const SUBSCRIPT_TYPEGPU_PART_KIND_SOLID: SubscriptTypegpuPartKind = 0x1;
+/// `subscript-typegpu.h`: `bitflag.part_kind` value.
+pub const SUBSCRIPT_TYPEGPU_PART_KIND_HOLLOW: SubscriptTypegpuPartKind = 0x2;
+
+/// `subscript-typegpu.h`: facade-owned future id.
+pub type SubscriptTypegpuFutureId = u64;
+
+/// Runtime slot-kind tag for `fetch_gizmo` futures.
+const SLOT_KIND_FETCH_GIZMO: u32 = 0;
+
+/// Copies a callback-scope string view before the callback returns.
+///
+/// # Safety
+///
+/// `view` is valid for the callback duration.
+unsafe fn copy_string_view(view: WGPUStringView) -> String {
+    if view.data.is_null() {
+        return String::new();
+    }
+    let bytes: &[u8] = if view.length == WGPU_STRLEN {
+        CStr::from_ptr(view.data).to_bytes()
+    } else {
+        std::slice::from_raw_parts(view.data.cast::<u8>(), view.length)
+    };
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+unsafe extern "C" fn fetch_gizmo_callback(
+    status: i32,
+    gizmo: WGPUGizmo,
+    message: WGPUStringView,
+    userdata1: *mut c_void,
+    _userdata2: *mut c_void,
+) {
+    runtime::callback_guard(|| unsafe {
+        let message = copy_string_view(message);
+        runtime::complete_from_callback(
+            userdata1,
+            SLOT_KIND_FETCH_GIZMO,
+            status == WGPUFetchGizmoStatus_Success,
+            status,
+            gizmo as usize,
+            message,
+        );
+    });
+}
+
+fn release_owned_handle(handle: runtime::OwnedHandle) {
+    match handle.kind {
+        SLOT_KIND_FETCH_GIZMO => {
+            unsafe { wgpuGizmoRelease(handle.value as WGPUGizmo) };
+            runtime::note_owned_handle_release();
+        }
+        _ => {}
+    }
+}
+
+fn release_deferred_handles() {
+    for handle in runtime::drain_deferred_handles() {
+        release_owned_handle(handle);
+    }
+}
+
+/// `subscript-typegpu.h`: Creates a hub with no descriptor.
+#[no_mangle]
+pub extern "C" fn subscript_typegpu_make_hub() -> SubscriptTypegpuHub {
+    // SAFETY: NULL descriptor is explicitly allowed by webgpu.h.
+    unsafe { wgpuMakeHub(std::ptr::null()).cast() }
+}
+
+/// `subscript-typegpu.h`: forwards to `wgpuHubPump`.
+#[no_mangle]
+pub extern "C" fn subscript_typegpu_hub_pump(hub: SubscriptTypegpuHub) {
+    if hub.is_null() {
+        return;
+    }
+    // SAFETY: non-null handle owned by the caller.
+    unsafe { wgpuHubPump(hub.cast()) }
+    release_deferred_handles();
+}
+
+/// `subscript-typegpu.h`: releases the hub and every remaining future slot.
+#[no_mangle]
+pub extern "C" fn subscript_typegpu_hub_release(hub: SubscriptTypegpuHub) {
+    if hub.is_null() {
+        return;
+    }
+    // SAFETY: non-null handle owned by the caller.
+    unsafe { wgpuHubRelease(hub.cast()) }
+    for handle in runtime::release_all_slots(hub as usize) {
+        release_owned_handle(handle);
+    }
+}
+
+/// `subscript-typegpu.h`: begins the `wgpuHubFetchGizmo` request; poll after pumping.
+#[no_mangle]
+pub extern "C" fn subscript_typegpu_hub_fetch_gizmo(
+    hub: SubscriptTypegpuHub,
+) -> SubscriptTypegpuFutureId {
+    if hub.is_null() {
+        return 0;
+    }
+    let (id, userdata1) = runtime::new_pending_slot(hub as usize, SLOT_KIND_FETCH_GIZMO);
+    let info = WGPUFetchGizmoCallbackInfo {
+        next_in_chain: std::ptr::null_mut(),
+        mode: WGPUCallbackMode_AllowProcessEvents,
+        callback: Some(fetch_gizmo_callback),
+        userdata1,
+        userdata2: std::ptr::null_mut(),
+    };
+    // SAFETY: non-null receiver; NULL options is allowed and
+    // callback userdata remains live until completion or release.
+    let _ = unsafe { wgpuHubFetchGizmo(hub.cast(), std::ptr::null(), info) };
+    id
+}
+
+/// `subscript-typegpu.h`: 0 pending / 1 success / negative failure / -100 unknown.
+#[no_mangle]
+pub extern "C" fn subscript_typegpu_future_status(hub: SubscriptTypegpuHub, future: SubscriptTypegpuFutureId) -> i32 {
+    runtime::future_status(hub as usize, future)
+}
+
+/// `subscript-typegpu.h`: drops a future slot; pending slots become doomed.
+#[no_mangle]
+pub extern "C" fn subscript_typegpu_future_drop(hub: SubscriptTypegpuHub, future: SubscriptTypegpuFutureId) {
+    if let Some(handle) = runtime::drop_future(hub as usize, future) {
+        release_owned_handle(handle);
+    }
+}
+
+/// `subscript-typegpu.h`: takes the gizmo once and frees its slot.
+#[no_mangle]
+pub extern "C" fn subscript_typegpu_fetch_gizmo_take(
+    hub: SubscriptTypegpuHub,
+    future: SubscriptTypegpuFutureId,
+) -> SubscriptTypegpuGizmo {
+    runtime::take_handle(hub as usize, future, SLOT_KIND_FETCH_GIZMO) as SubscriptTypegpuGizmo
+}
+
+/// `subscript-typegpu.h`: forwards to `wgpuGizmoGetTag`.
+#[no_mangle]
+pub extern "C" fn subscript_typegpu_gizmo_get_tag(gizmo: SubscriptTypegpuGizmo) -> u32 {
+    if gizmo.is_null() {
+        return 0;
+    }
+    // SAFETY: non-null handle owned by the caller.
+    unsafe { wgpuGizmoGetTag(gizmo.cast()) }
+}
+
+/// `subscript-typegpu.h`: creates an object from a chain-free descriptor.
+#[no_mangle]
+pub extern "C" fn subscript_typegpu_gizmo_create_part(
+    gizmo: SubscriptTypegpuGizmo,
+    descriptor: *const SubscriptTypegpuPartDescriptor,
+) -> SubscriptTypegpuPart {
+    if gizmo.is_null() {
+        return std::ptr::null_mut();
+    }
+    if descriptor.is_null() {
+        return std::ptr::null_mut();
+    }
+    // SAFETY: the caller supplies a live descriptor for this call.
+    let source = unsafe { *descriptor };
+    let descriptor = convert_part_descriptor(source);
+    // SAFETY: the receiver is non-null and the converted descriptor
+    // outlives the backend call.
+    let created = unsafe { wgpuGizmoCreatePart(gizmo.cast(), &descriptor).cast() };
+    runtime::inherit_handle_instance(gizmo as usize, created as usize);
+    created
+}
+
+/// `subscript-typegpu.h`: forwards a count-first byte array (F20).
+#[no_mangle]
+pub extern "C" fn subscript_typegpu_gizmo_write_part(
+    gizmo: SubscriptTypegpuGizmo,
+    part: SubscriptTypegpuPart,
+    at: u64,
+    dataCount: usize,
+    data: *const u8,
+) {
+    if gizmo.is_null() || part.is_null() || (dataCount != 0 && data.is_null()) {
+        return;
+    }
+    // SAFETY: handles are non-null; a non-empty array has a non-null
+    // pointer valid for `dataCount` bytes for this call.
+    unsafe {
+        wgpuGizmoWritePart(gizmo.cast(), part.cast(), at, data.cast(), dataCount)
+    }
+}
+
+/// `subscript-typegpu.h`: releases the part handle.
+#[no_mangle]
+pub extern "C" fn subscript_typegpu_part_release(part: SubscriptTypegpuPart) {
+    if part.is_null() {
+        return;
+    }
+    // SAFETY: non-null handle owned by the caller.
+    unsafe { wgpuPartRelease(part.cast()) }
+}
+
+/// `subscript-typegpu.h`: releases the gizmo handle.
+#[no_mangle]
+pub extern "C" fn subscript_typegpu_gizmo_release(gizmo: SubscriptTypegpuGizmo) {
+    if gizmo.is_null() {
+        return;
+    }
+    // SAFETY: non-null handle owned by the caller.
+    unsafe { wgpuGizmoRelease(gizmo.cast()) }
+}
