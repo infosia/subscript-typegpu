@@ -44,6 +44,26 @@ sandbox at `9670180` (Metal): ok, 18.47 seconds, `x01`–`x09`
 atomic add equals the host sum, and the `switch` program decides
 every output as the host does.
 
+## Phase review (2026-08-23)
+
+A fresh reviewer ran the gate (green, 46.66 s) and found CRITICAL 1,
+MAJOR 8, MINOR 12. CRITICAL: the K22 taint ignored `break` and
+`continue`, so a local a loop writes stayed uniform after a
+non-uniform early exit, and a barrier guarded by that local passed
+(a counterexample kernel is in the review). MAJOR: the `for` step
+ran under the outer control, not the loop condition; an empty
+`default` case lost its shared body; the K7 and the
+workgroup-initializer fixtures proved other rules; plan exit
+criterion 4 still named naga (now §10 C1); the round 2 measurement
+row was missing; K18 forbade the `continue` two goldens use; an
+atomic receiver's `?:` index dropped its lowering. Resolutions in
+the specs: K22 Rev 3 states the break/continue and `for`-step rules
+and admits uniform-buffer reads and `length()`; K18 admits
+`continue` and `default` grouping; K19 folds with checked
+arithmetic; K21 rejects atomics in uniform and read-only storage;
+K14 names the constants' position; plan §10 C1. The code findings
+go to the coding agent.
+
 ## Exit criteria
 
 | # | Criterion | Evidence |

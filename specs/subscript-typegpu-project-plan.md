@@ -431,8 +431,8 @@ and an atomic add, and prints `PASS` — a result only correct
 barriers and atomics produce. (3) `x09-live-switch` decides a
 result through `switch`, `break`, and `continue`, and prints
 `PASS`. (4) Every K24 rejection has a red fixture, and a barrier
-under non-uniform control flow fails the harness with naga's
-diagnostic. (5) Budgets hold.
+under non-uniform control flow is a K22 generator diagnostic with a
+red fixture (corrected, §10 C1). (5) Budgets hold.
 
 ### P5 — textures and samplers (~10%)
 
@@ -488,8 +488,17 @@ The lane is a gate module, not a new executable.
 
 ## 10. Corrections
 
-None yet. A killed decision from §3 is recorded here with the
-evidence, the date, and the corrected claim.
+A killed decision from §3 or a changed exit criterion is recorded
+here with the evidence, the date, and the corrected claim.
+
+- **C1 — naga does not enforce barrier uniformity (2026-08-23).**
+  P4 exit criterion 4 said a barrier under non-uniform control flow
+  "fails the harness with naga's diagnostic". Measured: naga 29
+  accepted `x08`'s barrier after a non-uniform early return, yawgpu's
+  Tint compiled it, and Metal read the workgroup memory as zero.
+  Corrected claim: the generator enforces uniform placement (K22 Rev
+  1), and the criterion names a generator diagnostic. Evidence:
+  `specs/tracking/p4-kernel-depth.md`.
 
 ## 11. Open questions for the owner
 

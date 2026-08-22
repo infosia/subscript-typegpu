@@ -1,6 +1,8 @@
 # Block: kernel (K-rules)
 
-P2 contract. Rev 0, 2026-08-22. Plan §3 D2, D3, D7, D9 and §4
+P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
+2026-08-22. Rev 2 (K18–K24), 2026-08-23. Rev 3 (K18, K19, K22),
+2026-08-23. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -95,8 +97,9 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 
 - **K14 — The emitted WGSL is deterministic.** Declaration order:
   `enable` directives, the schema structs the module references in
-  first-use order, binding declarations in group and binding order,
-  helpers in dependency order, the entry function. Identifiers keep
+  first-use order, module constants and private and workgroup
+  variables in declaration order, binding declarations in group and
+  binding order, helpers in dependency order, the entry function. Identifiers keep
   their subscript names. A name that collides with a WGSL reserved
   word or a builtin function or type gets a `_` suffix, through one
   function applied to every identifier the emitter writes: struct
@@ -133,19 +136,23 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 
 - **K18 — More statements.** `switch` over an integer with a
   required `default`, `break`, `continue`, and a nested block join
-  K7. A `switch` case body ends with `break` or `return`, or is empty
-  and shares the next case's body: the emitter writes `case a, b:`.
+  K7. A `switch` case body ends with `break`, `continue`, or
+  `return`, or is empty and shares the next case's body, `default`
+  included: the emitter writes `case a, b:` or `case a, default:`.
   A case body that falls through with statements is a diagnostic.
   `break` and `continue` inside a `for`, `while`, or `switch` emit
   the WGSL statement of the same name. A `continue` inside a
   `switch` inside a loop targets the loop, as in WGSL.
-- **K19 — Module constants.** A module-level `const` of a scalar, a
-  library vector, or a library matrix type, with an initializer the
-  emitter can evaluate (a literal, a unary or binary expression of
-  literals and other module constants, a vector factory of such),
-  reaches a kernel as a WGSL `const` of the same name. Any other
-  initializer, or a mutable global, is a diagnostic when a kernel
-  reads it.
+- **K19 — Module constants.** Rev 3. A module-level `const` of a
+  scalar, a library vector, or a library matrix type reaches a
+  kernel as a WGSL `const` of the same name when the generator folds
+  its initializer: a literal, a unary or binary expression of
+  literals and other module constants, or a vector factory of such.
+  The fold uses checked arithmetic in the constant's type. A
+  division by zero, an overflow, a cycle, any other initializer, and
+  a mutable global are K19 diagnostics when a kernel reads the
+  constant. A rejected `privateVar` initializer is a K20
+  diagnostic.
 - **K20 — Private and workgroup variables.** A module-level `const`
   whose initializer is `privateVar<T>(init)`, `workgroupVar<T>()`,
   or `workgroupArray<T>(n)` (library generic functions with real
@@ -178,13 +185,20 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   workgroup value as zero (measured 2026-08-23, `x08`). The rule: a
   barrier statement is legal at the kernel body's top level, or
   inside `while`, `for`, and `if` statements whose conditions are
-  uniform, where a uniform expression reads only literals, module
-  constants, and locals that were assigned only uniform expressions
-  (a builtin, a binding read, and a helper result are non-uniform).
-  No `return` statement may precede a barrier in source order, and
-  no `break` or `continue` may leave a loop that contains a barrier
-  under a non-uniform condition. A violation is a K22 diagnostic
-  that names the statement and the non-uniform value. The harness
+  uniform. A uniform expression reads only literals, module
+  constants, `Uniform<T>` bindings, `length()` of a binding, and
+  locals that were assigned only uniform expressions under uniform
+  control. A builtin, a storage binding read, a workgroup or private
+  variable read, and a helper result are non-uniform. A local
+  assigned under a non-uniform condition is non-uniform from then
+  on, and a `break` or `continue` under a non-uniform condition
+  makes every local the loop writes non-uniform. A `for` step runs
+  under the loop's condition. No `return` statement precedes a
+  barrier in source order. No `break` or `continue` under a
+  non-uniform condition leaves a loop that contains a barrier. A
+  violation is a K22 diagnostic that names the statement and the
+  non-uniform value. The analysis is conservative: it rejects some
+  uniform programs and accepts no non-uniform barrier. The harness
   still runs naga. The idiom for a bounds check before a barrier is
   a conditional load: `partials[local] = global < n ?
   input[global].value : 0.0;`.
