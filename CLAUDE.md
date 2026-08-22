@@ -248,6 +248,42 @@ does not apply to chat with the user (which is Japanese), where the
 *spirit* still holds — short sentences, one meaning per word,
 condition before command, no hedging.
 
+## Artifacts stand alone
+
+An artifact is anything a reader uses without the conversation that
+produced it: code, comments, generated files and their headers,
+`lib/*.ts`, `tools/`, `programs/` headers, README and docs. An
+artifact reads as an intentional deliverable for its audience. It
+does not expose the prompt, the handoff, the review round, the
+constraint, the rejected alternative, or the production process.
+
+Classify every sentence before it enters an artifact:
+
+1. **Audience content** — what the reader needs. It enters.
+2. **Production guidance** — a constraint or a decision from the
+   conversation. It shapes the artifact's design and never appears
+   as prose. "The owner forbids X" becomes an artifact that does Y.
+3. **Residue** — a trace of how the artifact came to be. It is
+   deleted.
+
+Residue phrases, each a defect in an artifact: "as requested", "the
+owner wanted", "this was changed to", "unlike the previous version",
+"to satisfy the review", "the handoff said", "rewritten after", a
+date that records when a sentence was edited, a phase or slice name
+of this or any other project, a rule id that does not resolve in
+`specs/blocks/`, and a disclaimer about a tool the artifact does not
+use.
+
+Specs and tracking are not artifacts under this rule. They are the
+decision record. A dated owner decision, a correction with its
+evidence, a review finding, and a rule id are audience content there.
+The line is the directory: `specs/` records provenance, everything
+else hides it.
+
+Review: a reader with no context finds nothing in an artifact that
+explains why it was written this way. The phase review checks this
+for every artifact the phase touched.
+
 ## Rigor is proportional to the cost of being wrong
 
 The gates in this repository exist because a wrong facade signature
@@ -309,9 +345,9 @@ Practical limits:
 
 **Every phase ends with a mandatory Phase Review ("Clean Review Then
 Fix"):** a fresh no-context subagent reviews the phase's cumulative
-diff and emits `CRITICAL`/`MAJOR`/`MINOR` findings. Findings are fixed
-in severity order. A phase cannot be COMPLETE with any open
-CRITICAL/MAJOR.
+diff and emits `CRITICAL`/`MAJOR`/`MINOR` findings, including
+residue under "Artifacts stand alone". Findings are fixed in severity
+order. A phase cannot be COMPLETE with any open CRITICAL/MAJOR.
 
 **A gate result is evidence only when the citation names which gate
 ran and quotes its wall time and test count.**
