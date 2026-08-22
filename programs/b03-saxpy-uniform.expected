@@ -1,0 +1,9 @@
+pipeline:created
+Item_SIZE=4
+SaxpyParams_SIZE=8
+saxpy_WORKGROUP_X=64
+saxpy_WORKGROUP_Y=1
+saxpy_WORKGROUP_Z=1
+saxpy_WGSL_LINES=24
+dispatch:submitted
+PASS

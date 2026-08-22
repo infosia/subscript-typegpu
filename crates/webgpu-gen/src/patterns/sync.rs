@@ -4,6 +4,35 @@
 use crate::naming;
 use crate::plan::{CreateOp, MethodArg, Scalar, SyncOp, SyncRet};
 
+/// Private instance descriptor and yawgpu backend-select extension types.
+pub(crate) fn rust_instance_backend_types(instance_descriptor: &str) -> String {
+    "// Companion header: https://github.com/infosia/yawgpu/blob/main/ffi/webgpu-headers/yawgpu.h\n\
+     #[repr(C)]\n\
+     struct YawgpuChainedStruct {\n\
+         next: *mut YawgpuChainedStruct,\n\
+         s_type: i32,\n\
+     }\n\n\
+     #[repr(C)]\n\
+     struct YawgpuInstanceBackendSelect {\n\
+         chain: YawgpuChainedStruct,\n\
+         backend: u32,\n\
+     }\n\n\
+     #[repr(C)]\n\
+     struct $INSTANCE_DESCRIPTOR$ {\n\
+         next_in_chain: *mut YawgpuChainedStruct,\n\
+         required_feature_count: usize,\n\
+         required_features: *const i32,\n\
+         required_limits: *const WGPUInstanceLimits,\n\
+     }\n\n\
+     const YAWGPU_STYPE_INSTANCE_BACKEND_SELECT: i32 = 0x7000_0001;\n\
+     #[allow(dead_code)]\n\
+     const YAWGPU_INSTANCE_BACKEND_NOOP: u32 = 0;\n\
+     const YAWGPU_INSTANCE_BACKEND_METAL: u32 = 1;\n\
+     const YAWGPU_INSTANCE_BACKEND_VULKAN: u32 = 2;\n\
+     const YAWGPU_INSTANCE_BACKEND_GLES: u32 = 3;\n"
+        .replace("$INSTANCE_DESCRIPTOR$", instance_descriptor)
+}
+
 fn arg_name(arg: &MethodArg) -> &str {
     match arg {
         MethodArg::Scalar(name, _) | MethodArg::Bitflag(name, _) | MethodArg::Enum(name, _) => name,
@@ -134,21 +163,59 @@ pub(crate) fn rust_create_export(op: &CreateOp) -> String {
         .as_deref()
         .unwrap_or("creates the handle with no descriptor.");
     let (safety, call) = if op.returns_object == "instance" {
+        let instance_descriptor = &op
+            .dropped_arg
+            .as_ref()
+            .expect("instance creation has its validated descriptor")
+            .1;
         (
-            "    if !runtime::initialize_table() {\n        return std::ptr::null_mut();\n    }\n    // SAFETY: webgpu.h accepts a null instance descriptor.\n",
+            "    let requested_backend = std::env::var_os(\"SUBSCRIPT_TYPEGPU_BACKEND\");\n\
+             let backend = match requested_backend.as_deref().and_then(std::ffi::OsStr::to_str) {\n\
+                 None if requested_backend.is_none() => None,\n\
+                 Some(\"metal\") => Some((\"metal\", YAWGPU_INSTANCE_BACKEND_METAL)),\n\
+                 Some(\"vulkan\") => Some((\"vulkan\", YAWGPU_INSTANCE_BACKEND_VULKAN)),\n\
+                 Some(\"gles\") => Some((\"gles\", YAWGPU_INSTANCE_BACKEND_GLES)),\n\
+                 _ => {\n\
+                     let value = requested_backend.as_deref().map_or_else(\n\
+                         || \"<non-UTF-8>\".into(),\n\
+                         |value| value.to_string_lossy(),\n\
+                     );\n\
+                     eprintln!(\"subscript-typegpu: unknown SUBSCRIPT_TYPEGPU_BACKEND value `{value}`; expected metal, vulkan, or gles\");\n\
+                     return std::ptr::null_mut();\n\
+                 }\n\
+             };\n\
+             if !runtime::initialize_table() {\n\
+                 return std::ptr::null_mut();\n\
+             }\n\
+             let mut select = backend.map(|(_, backend)| YawgpuInstanceBackendSelect {\n\
+                 chain: YawgpuChainedStruct {\n\
+                     next: std::ptr::null_mut(),\n\
+                     s_type: YAWGPU_STYPE_INSTANCE_BACKEND_SELECT,\n\
+                 },\n\
+                 backend,\n\
+             });\n\
+             let descriptor = select.as_mut().map(|select| $INSTANCE_DESCRIPTOR$ {\n\
+                 next_in_chain: &mut select.chain,\n\
+                 required_feature_count: 0,\n\
+                 required_features: std::ptr::null(),\n\
+                 required_limits: std::ptr::null(),\n\
+             });\n\
+             let descriptor = descriptor.as_ref().map_or(std::ptr::null(), |value| value);\n\
+             // SAFETY: the optional descriptor and chain live through the backend call.\n"
+                .replace("$INSTANCE_DESCRIPTOR$", instance_descriptor),
             format!(
-                "    let instance = unsafe {{ {}(std::ptr::null()).cast() }};\n    runtime::register_instance(instance as usize);\n    instance\n",
+                "    let instance: SubscriptTypegpuInstance = unsafe {{ {}(descriptor).cast() }};\n    if instance.is_null() {{\n        if let Some((request, _)) = backend {{\n            let path = std::env::var_os(\"SUBSCRIPT_TYPEGPU_BACKEND_LIB\")\n                .map(std::path::PathBuf::from)\n                .map_or_else(|| \"<unset>\".into(), |path| path.display().to_string());\n            eprintln!(\"subscript-typegpu: backend request `{{request}}` returned a null instance from {{path}}\");\n        }}\n        return std::ptr::null_mut();\n    }}\n    runtime::register_instance(instance as usize);\n    instance\n",
                 op.wgpu_fn
             ),
         )
     } else {
         match &op.dropped_arg {
             Some(_) => (
-                "    // SAFETY: NULL descriptor is explicitly allowed by webgpu.h.\n",
+                "    // SAFETY: NULL descriptor is explicitly allowed by webgpu.h.\n".to_owned(),
                 format!("    unsafe {{ {}(std::ptr::null()).cast() }}\n", op.wgpu_fn),
             ),
             None => (
-                "    // SAFETY: no-argument creation.\n",
+                "    // SAFETY: no-argument creation.\n".to_owned(),
                 format!("    unsafe {{ {}().cast() }}\n", op.wgpu_fn),
             ),
         }
@@ -276,4 +343,55 @@ pub(crate) fn rust_sync_export(op: &SyncOp, drain_callbacks: bool) -> String {
         params = params.join(", "),
         null_ret = null_return(&op.ret),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{rust_create_export, rust_instance_backend_types};
+    use crate::plan::CreateOp;
+
+    #[test]
+    fn instance_backend_types_pin_the_yawgpu_extension() {
+        let source = rust_instance_backend_types("PinnedInstanceDescriptor");
+        for expected in [
+            "yawgpu/blob/main/ffi/webgpu-headers/yawgpu.h",
+            "struct PinnedInstanceDescriptor",
+            "YAWGPU_STYPE_INSTANCE_BACKEND_SELECT: i32 = 0x7000_0001",
+            "YAWGPU_INSTANCE_BACKEND_NOOP: u32 = 0",
+            "YAWGPU_INSTANCE_BACKEND_METAL: u32 = 1",
+            "YAWGPU_INSTANCE_BACKEND_VULKAN: u32 = 2",
+            "YAWGPU_INSTANCE_BACKEND_GLES: u32 = 3",
+        ] {
+            assert!(source.contains(expected), "missing `{expected}`");
+        }
+    }
+
+    #[test]
+    fn instance_create_reads_and_reports_the_backend_request() {
+        let source = rust_create_export(&CreateOp {
+            wgpu_fn: "wgpuCreateInstance".to_owned(),
+            subscript_typegpu_fn: "subscript_typegpu_create_instance".to_owned(),
+            returns_object: "instance".to_owned(),
+            dropped_arg: Some((
+                "descriptor".to_owned(),
+                "PinnedInstanceDescriptor".to_owned(),
+            )),
+            doc: None,
+        });
+        for expected in [
+            "var_os(\"SUBSCRIPT_TYPEGPU_BACKEND\")",
+            "Some(\"metal\")",
+            "Some(\"vulkan\")",
+            "Some(\"gles\")",
+            "PinnedInstanceDescriptor",
+            "unknown SUBSCRIPT_TYPEGPU_BACKEND value",
+            "backend request `{request}` returned a null instance from {path}",
+        ] {
+            assert!(
+                source.contains(expected),
+                "missing `{expected}` in:\n{source}"
+            );
+        }
+        assert!(!source.contains("set_var"));
+    }
 }

@@ -48,7 +48,12 @@ fn programs() -> Vec<PathBuf> {
         .collect::<Vec<_>>();
     assert_eq!(
         names,
-        ["b01-layout.ts", "b02-vecadd.ts"],
+        [
+            "b01-layout.ts",
+            "b02-vecadd.ts",
+            "b03-saxpy-uniform.ts",
+            "b04-particles.ts",
+        ],
         "C layout program set changed"
     );
     programs

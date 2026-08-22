@@ -152,11 +152,14 @@ fn binary_precedence(op: BinOp) -> u8 {
 }
 
 fn binary_operand(expr: &Expr, text: String, parent: BinOp, right: bool) -> String {
+    binary_operand_at(expr, text, binary_precedence(parent), right)
+}
+
+fn binary_operand_at(expr: &Expr, text: String, parent: u8, right: bool) -> String {
     let ExprKind::Binary { op, .. } = &expr.kind else {
         return text;
     };
     let child = binary_precedence(*op);
-    let parent = binary_precedence(parent);
     if child < parent || (right && child == parent) {
         format!("({text})")
     } else {
@@ -559,19 +562,27 @@ impl<'a> Emitter<'a> {
                         expr.pos.clone(),
                     ));
                 };
-                let args = args
+                let arg_texts = args
                     .iter()
                     .map(|arg| self.snippet(arg).map(|value| value.text))
                     .collect::<Result<Vec<_>, _>>()?;
                 let text = match emission {
-                    MethodEmission::Binary(op) if args.len() == 1 => {
-                        format!("({} {op} {})", recv_value.text, args[0])
+                    MethodEmission::Binary(op) if arg_texts.len() == 1 => {
+                        let precedence = match op {
+                            "+" | "-" => 7,
+                            "*" => 8,
+                            _ => 0,
+                        };
+                        let recv = binary_operand_at(recv, recv_value.text, precedence, false);
+                        let arg =
+                            binary_operand_at(&args[0], arg_texts[0].clone(), precedence, true);
+                        format!("{recv} {op} {arg}")
                     }
-                    MethodEmission::Builtin(builtin) if args.is_empty() => {
+                    MethodEmission::Builtin(builtin) if arg_texts.is_empty() => {
                         format!("{builtin}({})", recv_value.text)
                     }
                     MethodEmission::Builtin(builtin) => {
-                        format!("{builtin}({}, {})", recv_value.text, args.join(", "))
+                        format!("{builtin}({}, {})", recv_value.text, arg_texts.join(", "))
                     }
                     _ => {
                         return Err(diagnostic(

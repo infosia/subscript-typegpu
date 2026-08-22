@@ -1,0 +1,9 @@
+pipeline:created
+Particle_SIZE=32
+SimParams_SIZE=8
+particles_WORKGROUP_X=64
+particles_WORKGROUP_Y=1
+particles_WORKGROUP_Z=1
+particles_WGSL_LINES=31
+dispatch:submitted
+PASS

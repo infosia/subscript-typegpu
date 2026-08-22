@@ -46,12 +46,29 @@ one rule id and its owner, the keyword list equal to naga's, no
 support module under `programs/`. Measurement: 44 s / 0.2 s / 40 s
 / 25 s / 6.
 
+## Slice 2 — the backend request, the live lane, `b03`, `b04`, `x01`–`x03`
+
+Delivered 2026-08-22. Planner verification: `tools/gate.sh
+--require-backend` green, 191 tests in six executables (facade 4,
+typegpu-gen 7 and 15, harness 15 plus the ignored live test,
+webgpu-gen 3 and 147). `b03-saxpy-uniform` (a `Uniform` binding)
+and `b04-particles` (a `Vec3f` schema and a helper) equal on both
+tiers with their `.wgsl` goldens. The facade reads
+`SUBSCRIPT_TYPEGPU_BACKEND` and builds the yawgpu backend-select
+chain (L13), tested in a child process. `tools/live.sh` and the
+ignored `live` module exist. The live run is pending the owner.
+Measurement: 44 s / 0.2 s / 25 s / 22 s / 6.
+
+Noted for a later round: the generated Rust of the backend request
+carries no indentation (a template defect, `#[rustfmt::skip]` hides
+it).
+
 ## Exit criteria
 
 | # | Criterion | Evidence |
 |---|---|---|
-| 1 | `b02-vecadd`, `b03-saxpy-uniform`, `b04-particles` gate-green on both tiers with WGSL goldens | — |
+| 1 | `b02-vecadd`, `b03-saxpy-uniform`, `b04-particles` gate-green on both tiers with WGSL goldens | Slice 2 close: all three equal, goldens naga-valid |
 | 2 | `x01`–`x03` print `PASS` on a real adapter | — |
 | 3 | Every rejection rule has a red fixture | Slice 1: 30 fixtures, one rule id each |
 | 4 | Every generator diagnostic names its rule id and its owner | Slice 1: asserted per fixture |
-| 5 | Build-time budgets hold | — |
+| 5 | Build-time budgets hold | 44 s / 0.2 s / 25 s / 22 s / 6 at the slice 2 close |

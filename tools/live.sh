@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$repo_root"
+
+backend=${SUBSCRIPT_TYPEGPU_BACKEND:-}
+case "$backend" in
+  metal|vulkan) ;;
+  *)
+    echo "live: set SUBSCRIPT_TYPEGPU_BACKEND to metal or vulkan" >&2
+    exit 1
+    ;;
+esac
+
+backend_lib=${SUBSCRIPT_TYPEGPU_BACKEND_LIB:-}
+if [ -z "$backend_lib" ] || [ ! -f "$backend_lib" ]; then
+  echo "live: SUBSCRIPT_TYPEGPU_BACKEND_LIB must name a backend library file" >&2
+  exit 1
+fi
+
+if [ "$(uname -s)" = "Darwin" ] && [ "$backend" = "metal" ]; then
+  if ! otool -L "$backend_lib" | grep -F 'Metal.framework' >/dev/null; then
+    echo "live: the Metal backend library does not link Metal.framework" >&2
+    exit 1
+  fi
+fi
+
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}"
+cargo test --offline -p subscript-typegpu-harness --test main \
+  live::every_x_program_passes_on_a_real_adapter -- --ignored --exact --nocapture

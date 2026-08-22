@@ -60,7 +60,6 @@ opaque!(
     WGPURenderBundleImpl,
     WGPUQuerySetImpl,
     // Pointer-only in this subset (always null / never built):
-    WGPUInstanceDescriptor,
     WGPURequestAdapterOptions,
 );
 
@@ -85,6 +84,34 @@ type WGPUCommandBuffer = *mut WGPUCommandBufferImpl;
 type WGPURenderBundleEncoder = *mut WGPURenderBundleEncoderImpl;
 type WGPURenderBundle = *mut WGPURenderBundleImpl;
 type WGPUQuerySet = *mut WGPUQuerySetImpl;
+
+// Companion header: https://github.com/infosia/yawgpu/blob/main/ffi/webgpu-headers/yawgpu.h
+#[repr(C)]
+struct YawgpuChainedStruct {
+next: *mut YawgpuChainedStruct,
+s_type: i32,
+}
+
+#[repr(C)]
+struct YawgpuInstanceBackendSelect {
+chain: YawgpuChainedStruct,
+backend: u32,
+}
+
+#[repr(C)]
+struct WGPUInstanceDescriptor {
+next_in_chain: *mut YawgpuChainedStruct,
+required_feature_count: usize,
+required_features: *const i32,
+required_limits: *const WGPUInstanceLimits,
+}
+
+const YAWGPU_STYPE_INSTANCE_BACKEND_SELECT: i32 = 0x7000_0001;
+#[allow(dead_code)]
+const YAWGPU_INSTANCE_BACKEND_NOOP: u32 = 0;
+const YAWGPU_INSTANCE_BACKEND_METAL: u32 = 1;
+const YAWGPU_INSTANCE_BACKEND_VULKAN: u32 = 2;
+const YAWGPU_INSTANCE_BACKEND_GLES: u32 = 3;
 
 /// webgpu.h `WGPUChainedStruct`; concrete for WGSL source construction.
 #[repr(C)]
@@ -6675,11 +6702,49 @@ fn release_deferred_handles() {
 /// `subscript-typegpu.h`: Creates an instance with no descriptor.
 #[no_mangle]
 pub extern "C" fn subscript_typegpu_create_instance() -> SubscriptTypegpuInstance {
-    if !runtime::initialize_table() {
+    let requested_backend = std::env::var_os("SUBSCRIPT_TYPEGPU_BACKEND");
+let backend = match requested_backend.as_deref().and_then(std::ffi::OsStr::to_str) {
+None if requested_backend.is_none() => None,
+Some("metal") => Some(("metal", YAWGPU_INSTANCE_BACKEND_METAL)),
+Some("vulkan") => Some(("vulkan", YAWGPU_INSTANCE_BACKEND_VULKAN)),
+Some("gles") => Some(("gles", YAWGPU_INSTANCE_BACKEND_GLES)),
+_ => {
+let value = requested_backend.as_deref().map_or_else(
+|| "<non-UTF-8>".into(),
+|value| value.to_string_lossy(),
+);
+eprintln!("subscript-typegpu: unknown SUBSCRIPT_TYPEGPU_BACKEND value `{value}`; expected metal, vulkan, or gles");
+return std::ptr::null_mut();
+}
+};
+if !runtime::initialize_table() {
+return std::ptr::null_mut();
+}
+let mut select = backend.map(|(_, backend)| YawgpuInstanceBackendSelect {
+chain: YawgpuChainedStruct {
+next: std::ptr::null_mut(),
+s_type: YAWGPU_STYPE_INSTANCE_BACKEND_SELECT,
+},
+backend,
+});
+let descriptor = select.as_mut().map(|select| WGPUInstanceDescriptor {
+next_in_chain: &mut select.chain,
+required_feature_count: 0,
+required_features: std::ptr::null(),
+required_limits: std::ptr::null(),
+});
+let descriptor = descriptor.as_ref().map_or(std::ptr::null(), |value| value);
+// SAFETY: the optional descriptor and chain live through the backend call.
+    let instance: SubscriptTypegpuInstance = unsafe { wgpuCreateInstance(descriptor).cast() };
+    if instance.is_null() {
+        if let Some((request, _)) = backend {
+            let path = std::env::var_os("SUBSCRIPT_TYPEGPU_BACKEND_LIB")
+                .map(std::path::PathBuf::from)
+                .map_or_else(|| "<unset>".into(), |path| path.display().to_string());
+            eprintln!("subscript-typegpu: backend request `{request}` returned a null instance from {path}");
+        }
         return std::ptr::null_mut();
     }
-    // SAFETY: webgpu.h accepts a null instance descriptor.
-    let instance = unsafe { wgpuCreateInstance(std::ptr::null()).cast() };
     runtime::register_instance(instance as usize);
     instance
 }

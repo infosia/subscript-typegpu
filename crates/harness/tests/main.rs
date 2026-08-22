@@ -5,6 +5,7 @@ mod api;
 mod c_layout;
 mod differential;
 mod library;
+mod live;
 mod rejections;
 mod runtime;
 mod wgsl_goldens;

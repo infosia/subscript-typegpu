@@ -233,7 +233,16 @@ pub(crate) fn render(plan: &Plan) -> String {
     out.push('\n');
     out.push_str(handles::rust_opaque_macro());
     out.push('\n');
-    let pointer_only = plan.pointer_only.clone();
+    let instance_descriptor = plan
+        .creates
+        .iter()
+        .find(|create| create.returns_object == "instance")
+        .and_then(|create| create.dropped_arg.as_ref())
+        .map(|(_, descriptor)| descriptor.as_str());
+    let mut pointer_only = plan.pointer_only.clone();
+    if let Some(instance_descriptor) = instance_descriptor {
+        pointer_only.retain(|name| name != instance_descriptor);
+    }
     out.push_str(&handles::rust_wgpu_opaque_block(
         &all_objects,
         needs_opaque_chain,
@@ -241,6 +250,11 @@ pub(crate) fn render(plan: &Plan) -> String {
     ));
     out.push('\n');
     out.push_str(&handles::rust_wgpu_aliases(&all_objects));
+
+    if let Some(instance_descriptor) = instance_descriptor {
+        out.push('\n');
+        out.push_str(&sync::rust_instance_backend_types(instance_descriptor));
+    }
 
     for op in &shader_ops {
         out.push('\n');
