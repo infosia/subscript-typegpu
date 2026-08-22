@@ -465,6 +465,7 @@ The lane is a gate module, not a new executable.
 | RC-11 | The mirror regen test needs libclang at run time (`subscript-bindgen` loads it) | Loud `pending` when absent. The owner's machine has it through Xcode |
 | RC-12 | The imported generator's hard-coded pin canaries (IDL block count, policy accounting tuple) need a manual edit at every re-pin | They move into one `pins` module (I8). The re-pin procedure lists them |
 | RC-13 | A reshape item (I5, I10) costs more than the module it touches | D11's kill evidence. The module is rewritten, the rest stays imported |
+| RC-14 | No subscript construct yields the bytes of a value class or a `FixedArray` of one, and `subscript bind` maps no parameter that takes one by address. R33 gives layout identity, but the upload path still needs an encoder without a bytes view | Escalate as subscript request R34: `Context.bytesOf<T>(value: T): u8[]` and `Context.fromBytes<T>(bytes: u8[], offset: u32): T`, `T` a value class or a `FixedArray` of one, one `memcpy` each, both tiers. P1 slice 2 (`Buffer<T>` write and read) waits for it. Fallback: a generated per-schema encoder over `Math.f32ToBits`, the proof of concept's path, which the owner decides |
 
 ## 10. Corrections
 
