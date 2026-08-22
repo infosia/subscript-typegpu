@@ -9,6 +9,7 @@ import {
   computePipeline,
   ComputePipelineSpec,
   MutStorage,
+  simulateCompute,
   Uniform,
 } from "./typegpu";
 import { Vec3f } from "./typegpu-types";
@@ -20,6 +21,7 @@ import {
   createParticleLayoutResources,
   createParticlesBindGroup0,
   particles_ENTRY,
+  particles_HOST_RUNNABLE,
   particles_LAYOUT0,
   particles_WGSL,
   particles_WORKGROUP_X,
@@ -67,11 +69,12 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
   const settings: SimParams = res.params.get();
   const i: u32 = ctx.globalId.x;
   if (i < settings.count) {
-    res.particles[i] = integrate(res.particles[i], settings.dt);
+    res.particles.set(i, integrate(res.particles.get(i), settings.dt));
   }
 }
 
 export const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
+  name: "particles",
   workgroupSize: [64, 1, 1],
 });
 
@@ -119,6 +122,18 @@ export async function main(): Promise<void> {
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();
     device.queue().submit([command]);
+    const hostLayout = new ParticleLayout();
+    hostLayout.params = new Uniform<SimParams>(new SimParams(2.0, 1));
+    hostLayout.particles = new MutStorage<Particle>([
+      new Particle(new Vec3f(1.0, 2.0, 3.0), new Vec3f(0.5, 0.0, 0.0)),
+    ]);
+    simulateCompute<ParticleLayout>(
+      particleKernel,
+      hostLayout,
+      particles,
+      [1, 1, 1],
+      particles_HOST_RUNNABLE,
+    );
     print("pipeline:created");
     print(`Particle_SIZE=${Particle_SIZE}`);
     print(`SimParams_SIZE=${SimParams_SIZE}`);
@@ -127,6 +142,7 @@ export async function main(): Promise<void> {
     print(`particles_WORKGROUP_Z=${particles_WORKGROUP_Z}`);
     print(`particles_WGSL_LINES=${particles_WGSL.split("\n").length}`);
     print("dispatch:submitted");
+    print(`host:out=${hostLayout.particles.get(0).pos.x}`);
   }
   gpu.dispose();
   print("PASS");

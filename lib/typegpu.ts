@@ -256,11 +256,25 @@ export function createBuffer<T>(
 }
 
 export class ComputeInvocation {
-  globalId!: Vec3u;
-  localId!: Vec3u;
-  workgroupId!: Vec3u;
-  numWorkgroups!: Vec3u;
-  localIndex!: u32;
+  globalId: Vec3u;
+  localId: Vec3u;
+  workgroupId: Vec3u;
+  numWorkgroups: Vec3u;
+  localIndex: u32;
+
+  constructor(
+    globalId: Vec3u,
+    localId: Vec3u,
+    workgroupId: Vec3u,
+    numWorkgroups: Vec3u,
+    localIndex: u32,
+  ) {
+    this.globalId = globalId;
+    this.localId = localId;
+    this.workgroupId = workgroupId;
+    this.numWorkgroups = numWorkgroups;
+    this.localIndex = localIndex;
+  }
 }
 
 export class VertexInvocation {
@@ -404,34 +418,220 @@ export function storageBarrier(): void {}
 @Descriptor
 export class ComputePipelineSpec {
   workgroupSize!: FixedArray<u32, 3>;
+  name?: string = "";
 }
 
 export function computePipeline<L>(
   kernel: (res: L, ctx: ComputeInvocation) => void,
   spec: ComputePipelineSpec,
 ): ComputePipelineSpec {
-  return { workgroupSize: spec.workgroupSize };
+  return { workgroupSize: spec.workgroupSize, name: spec.name };
 }
 
 export function computePipeline2<L0, L1>(
   kernel: (res0: L0, res1: L1, ctx: ComputeInvocation) => void,
   spec: ComputePipelineSpec,
 ): ComputePipelineSpec {
-  return { workgroupSize: spec.workgroupSize };
+  return { workgroupSize: spec.workgroupSize, name: spec.name };
 }
 
 export function computePipeline3<L0, L1, L2>(
   kernel: (res0: L0, res1: L1, res2: L2, ctx: ComputeInvocation) => void,
   spec: ComputePipelineSpec,
 ): ComputePipelineSpec {
-  return { workgroupSize: spec.workgroupSize };
+  return { workgroupSize: spec.workgroupSize, name: spec.name };
 }
 
 export function computePipeline4<L0, L1, L2, L3>(
   kernel: (res0: L0, res1: L1, res2: L2, res3: L3, ctx: ComputeInvocation) => void,
   spec: ComputePipelineSpec,
 ): ComputePipelineSpec {
-  return { workgroupSize: spec.workgroupSize };
+  return { workgroupSize: spec.workgroupSize, name: spec.name };
+}
+
+function requireHostRunnable(
+  method: string,
+  spec: ComputePipelineSpec,
+  hostRunnable: boolean,
+): void {
+  if (!hostRunnable) {
+    authorTrap("CL2", method, `pipeline=${spec.name}`);
+  }
+}
+
+function hostInvocation(
+  spec: ComputePipelineSpec,
+  workgroups: FixedArray<u32, 3>,
+  workgroupX: u32,
+  workgroupY: u32,
+  workgroupZ: u32,
+  localX: u32,
+  localY: u32,
+  localZ: u32,
+): ComputeInvocation {
+  return new ComputeInvocation(
+    new Vec3u(
+      workgroupX * spec.workgroupSize[0] + localX,
+      workgroupY * spec.workgroupSize[1] + localY,
+      workgroupZ * spec.workgroupSize[2] + localZ,
+    ),
+    new Vec3u(localX, localY, localZ),
+    new Vec3u(workgroupX, workgroupY, workgroupZ),
+    new Vec3u(workgroups[0], workgroups[1], workgroups[2]),
+    (localZ * spec.workgroupSize[1] + localY) * spec.workgroupSize[0] + localX,
+  );
+}
+
+export function simulateCompute<L>(
+  kernel: (res: L, ctx: ComputeInvocation) => void,
+  res: L,
+  spec: ComputePipelineSpec,
+  workgroups: FixedArray<u32, 3>,
+  hostRunnable: boolean,
+): void {
+  requireHostRunnable("simulateCompute", spec, hostRunnable);
+  for (let workgroupZ: u32 = 0; workgroupZ < workgroups[2]; workgroupZ += 1) {
+    for (let workgroupY: u32 = 0; workgroupY < workgroups[1]; workgroupY += 1) {
+      for (let workgroupX: u32 = 0; workgroupX < workgroups[0]; workgroupX += 1) {
+        for (let localZ: u32 = 0; localZ < spec.workgroupSize[2]; localZ += 1) {
+          for (let localY: u32 = 0; localY < spec.workgroupSize[1]; localY += 1) {
+            for (let localX: u32 = 0; localX < spec.workgroupSize[0]; localX += 1) {
+              kernel(
+                res,
+                hostInvocation(
+                  spec,
+                  workgroups,
+                  workgroupX,
+                  workgroupY,
+                  workgroupZ,
+                  localX,
+                  localY,
+                  localZ,
+                ),
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+export function simulateCompute2<L0, L1>(
+  kernel: (res0: L0, res1: L1, ctx: ComputeInvocation) => void,
+  res0: L0,
+  res1: L1,
+  spec: ComputePipelineSpec,
+  workgroups: FixedArray<u32, 3>,
+  hostRunnable: boolean,
+): void {
+  requireHostRunnable("simulateCompute2", spec, hostRunnable);
+  for (let workgroupZ: u32 = 0; workgroupZ < workgroups[2]; workgroupZ += 1) {
+    for (let workgroupY: u32 = 0; workgroupY < workgroups[1]; workgroupY += 1) {
+      for (let workgroupX: u32 = 0; workgroupX < workgroups[0]; workgroupX += 1) {
+        for (let localZ: u32 = 0; localZ < spec.workgroupSize[2]; localZ += 1) {
+          for (let localY: u32 = 0; localY < spec.workgroupSize[1]; localY += 1) {
+            for (let localX: u32 = 0; localX < spec.workgroupSize[0]; localX += 1) {
+              kernel(
+                res0,
+                res1,
+                hostInvocation(
+                  spec,
+                  workgroups,
+                  workgroupX,
+                  workgroupY,
+                  workgroupZ,
+                  localX,
+                  localY,
+                  localZ,
+                ),
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+export function simulateCompute3<L0, L1, L2>(
+  kernel: (res0: L0, res1: L1, res2: L2, ctx: ComputeInvocation) => void,
+  res0: L0,
+  res1: L1,
+  res2: L2,
+  spec: ComputePipelineSpec,
+  workgroups: FixedArray<u32, 3>,
+  hostRunnable: boolean,
+): void {
+  requireHostRunnable("simulateCompute3", spec, hostRunnable);
+  for (let workgroupZ: u32 = 0; workgroupZ < workgroups[2]; workgroupZ += 1) {
+    for (let workgroupY: u32 = 0; workgroupY < workgroups[1]; workgroupY += 1) {
+      for (let workgroupX: u32 = 0; workgroupX < workgroups[0]; workgroupX += 1) {
+        for (let localZ: u32 = 0; localZ < spec.workgroupSize[2]; localZ += 1) {
+          for (let localY: u32 = 0; localY < spec.workgroupSize[1]; localY += 1) {
+            for (let localX: u32 = 0; localX < spec.workgroupSize[0]; localX += 1) {
+              kernel(
+                res0,
+                res1,
+                res2,
+                hostInvocation(
+                  spec,
+                  workgroups,
+                  workgroupX,
+                  workgroupY,
+                  workgroupZ,
+                  localX,
+                  localY,
+                  localZ,
+                ),
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+export function simulateCompute4<L0, L1, L2, L3>(
+  kernel: (res0: L0, res1: L1, res2: L2, res3: L3, ctx: ComputeInvocation) => void,
+  res0: L0,
+  res1: L1,
+  res2: L2,
+  res3: L3,
+  spec: ComputePipelineSpec,
+  workgroups: FixedArray<u32, 3>,
+  hostRunnable: boolean,
+): void {
+  requireHostRunnable("simulateCompute4", spec, hostRunnable);
+  for (let workgroupZ: u32 = 0; workgroupZ < workgroups[2]; workgroupZ += 1) {
+    for (let workgroupY: u32 = 0; workgroupY < workgroups[1]; workgroupY += 1) {
+      for (let workgroupX: u32 = 0; workgroupX < workgroups[0]; workgroupX += 1) {
+        for (let localZ: u32 = 0; localZ < spec.workgroupSize[2]; localZ += 1) {
+          for (let localY: u32 = 0; localY < spec.workgroupSize[1]; localY += 1) {
+            for (let localX: u32 = 0; localX < spec.workgroupSize[0]; localX += 1) {
+              kernel(
+                res0,
+                res1,
+                res2,
+                res3,
+                hostInvocation(
+                  spec,
+                  workgroups,
+                  workgroupX,
+                  workgroupY,
+                  workgroupZ,
+                  localX,
+                  localY,
+                  localZ,
+                ),
+              );
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 @Descriptor

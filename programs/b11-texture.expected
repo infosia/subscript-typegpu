@@ -3,4 +3,5 @@ linear.kind=sampler
 target.kind=storageTexture
 params.kind=uniform
 texturePass_WGSL_LINES=23
+host:out=1
 PASS

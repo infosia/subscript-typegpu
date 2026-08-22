@@ -16,6 +16,7 @@ import {
   createBindGroup,
   createComputePipeline,
   samplerResource,
+  simulateCompute2,
   textureResource,
 } from "./typegpu";
 import { Vec2f, Vec2i, Vec4f } from "./typegpu-types";
@@ -29,6 +30,7 @@ import {
 import {
   SampleParams_SIZE,
   texturePass_ENTRY,
+  texturePass_HOST_RUNNABLE,
   texturePass_LAYOUT0,
   texturePass_LAYOUT1,
   texturePass_WGSL,
@@ -77,7 +79,7 @@ function textureKernel(
 
 export const texturePass: ComputePipelineSpec = computePipeline2<TextureLayout, ParamsLayout>(
   textureKernel,
-  { workgroupSize: [4, 4, 1] },
+  { name: "texturePass", workgroupSize: [4, 4, 1] },
 );
 
 export async function main(): Promise<void> {
@@ -127,11 +129,28 @@ export async function main(): Promise<void> {
     pipeline.dispatchThreads(encoder, [group0, group1], 4, 4, 1);
     using command = encoder.finishDefault();
     device.queue().submit([command]);
+    const hostSourcePixels: Vec4f[] = [new Vec4f(1.0, 0.0, 0.0, 1.0)];
+    const hostTargetPixels: Vec4f[] = [new Vec4f(0.0, 0.0, 0.0, 0.0)];
+    const hostTextures = new TextureLayout();
+    hostTextures.source = new Texture2d<f32>(hostSourcePixels, 1, 1);
+    hostTextures.linear = new Sampler("nearest");
+    hostTextures.target = new StorageTexture2d<Rgba8unorm>(hostTargetPixels, 1, 1);
+    const hostParams = new ParamsLayout();
+    hostParams.params = new Uniform<SampleParams>(new SampleParams(1, 1));
+    simulateCompute2<TextureLayout, ParamsLayout>(
+      textureKernel,
+      hostTextures,
+      hostParams,
+      texturePass,
+      [1, 1, 1],
+      texturePass_HOST_RUNNABLE,
+    );
     print(`source.kind=${texturePass_LAYOUT0.entries[0].kind}`);
     print(`linear.kind=${texturePass_LAYOUT0.entries[1].kind}`);
     print(`target.kind=${texturePass_LAYOUT0.entries[2].kind}`);
     print(`params.kind=${texturePass_LAYOUT1.entries[0].kind}`);
     print(`texturePass_WGSL_LINES=${texturePass_WGSL.split("\n").length}`);
+    print(`host:out=${hostTargetPixels[0].x}`);
   }
   gpu.dispose();
   print("PASS");

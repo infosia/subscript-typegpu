@@ -10,6 +10,7 @@ import {
   computePipeline,
   ComputePipelineSpec,
   MutStorage,
+  simulateCompute,
   Storage,
   Uniform,
   bufferResource,
@@ -19,6 +20,7 @@ import {
   Item_SIZE,
   SaxpyParams_SIZE,
   saxpy_ENTRY,
+  saxpy_HOST_RUNNABLE,
   saxpy_LAYOUT0,
   saxpy_WGSL,
   saxpy_WORKGROUP_X,
@@ -56,13 +58,14 @@ function saxpyKernel(res: SaxpyLayout, ctx: ComputeInvocation): void {
   const settings: SaxpyParams = res.params.get();
   const i: u32 = ctx.globalId.x;
   if (i < settings.count) {
-    const xItem: Item = res.x[i];
-    const yItem: Item = res.y[i];
-    res.y[i] = new Item(settings.a * xItem.value + yItem.value);
+    const xItem: Item = res.x.get(i);
+    const yItem: Item = res.y.get(i);
+    res.y.set(i, new Item(settings.a * xItem.value + yItem.value));
   }
 }
 
 export const saxpy: ComputePipelineSpec = computePipeline<SaxpyLayout>(saxpyKernel, {
+  name: "saxpy",
   workgroupSize: [64, 1, 1],
 });
 
@@ -113,6 +116,17 @@ export async function main(): Promise<void> {
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();
     device.queue().submit([command]);
+    const hostLayout = new SaxpyLayout();
+    hostLayout.params = new Uniform<SaxpyParams>(new SaxpyParams(2.0, 2));
+    hostLayout.x = new Storage<Item>([new Item(3.0), new Item(4.0)]);
+    hostLayout.y = new MutStorage<Item>([new Item(1.0), new Item(2.0)]);
+    simulateCompute<SaxpyLayout>(
+      saxpyKernel,
+      hostLayout,
+      saxpy,
+      [1, 1, 1],
+      saxpy_HOST_RUNNABLE,
+    );
     print("pipeline:created");
     print(`Item_SIZE=${Item_SIZE}`);
     print(`SaxpyParams_SIZE=${SaxpyParams_SIZE}`);
@@ -121,6 +135,7 @@ export async function main(): Promise<void> {
     print(`saxpy_WORKGROUP_Z=${saxpy_WORKGROUP_Z}`);
     print(`saxpy_WGSL_LINES=${saxpy_WGSL.split("\n").length}`);
     print("dispatch:submitted");
+    print(`host:out=${hostLayout.y.get(0).value},${hostLayout.y.get(1).value}`);
   }
   gpu.dispose();
   print("PASS");

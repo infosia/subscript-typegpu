@@ -13,12 +13,14 @@ import {
   createBuffer,
   createComputePipeline,
   readBuffer,
+  simulateCompute,
   bufferResource,
 } from "./typegpu";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice, GPUMapMode } from "./webgpu";
 import {
   SwitchValue_STRIDE,
   liveSwitch_ENTRY,
+  liveSwitch_HOST_RUNNABLE,
   liveSwitch_LAYOUT0,
   liveSwitch_WGSL,
   liveSwitch_WORKGROUP_X,
@@ -50,10 +52,11 @@ function liveSwitchKernel(res: SwitchLayout, ctx: ComputeInvocation): void {
     }
     iteration += 1;
   }
-  res.output[ctx.globalId.x] = new SwitchValue(value);
+  res.output.set(ctx.globalId.x, new SwitchValue(value));
 }
 
 export const liveSwitch: ComputePipelineSpec = computePipeline<SwitchLayout>(liveSwitchKernel, {
+  name: "liveSwitch",
   workgroupSize: [16, 1, 1],
 });
 
@@ -68,6 +71,21 @@ export async function main(): Promise<void> {
     using adapter = adapterResult;
     using device = deviceResult;
     const count: u32 = 16;
+    const hostValues: SwitchValue[] = [];
+    let index: u32 = 0;
+    while (index < count) {
+      hostValues.push(new SwitchValue(0));
+      index += 1;
+    }
+    const hostLayout = new SwitchLayout();
+    hostLayout.output = new MutStorage<SwitchValue>(hostValues);
+    simulateCompute<SwitchLayout>(
+      liveSwitchKernel,
+      hostLayout,
+      liveSwitch,
+      [1, 1, 1],
+      liveSwitch_HOST_RUNNABLE,
+    );
     using output: Buffer<SwitchValue> = createBuffer<SwitchValue>(
       device,
       SwitchValue_STRIDE,
@@ -109,10 +127,9 @@ export async function main(): Promise<void> {
       0,
     );
     print("readback:mapped");
-    let index: u32 = 0;
+    index = 0;
     while (index < count) {
-      const mode: u32 = index % 4;
-      const expected: u32 = mode === 0 ? 4 : (mode === 1 ? 8 : 12);
+      const expected: u32 = hostLayout.output.get(index).value;
       if (result[index as i32].value !== expected) {
         print(`FAIL ${index} expected=${expected} got=${result[index as i32].value}`);
         return;

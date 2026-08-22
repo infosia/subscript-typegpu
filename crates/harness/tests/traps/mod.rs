@@ -82,6 +82,10 @@ fn runtime_traps_are_named_and_numbered() {
             "unknown-layout-kind.ts",
             "TX5 bind group layout binding=4 has unknown kind=mystery",
         ),
+        (
+            "simulate-barrier.ts",
+            "CL2 simulateCompute pipeline=blocked",
+        ),
     ] {
         assert_trap(&directory.join(name), expected);
     }

@@ -158,6 +158,7 @@ fn generated_export_names(
             format!("{}_WORKGROUP_X", pipeline.declaration),
             format!("{}_WORKGROUP_Y", pipeline.declaration),
             format!("{}_WORKGROUP_Z", pipeline.declaration),
+            format!("{}_HOST_RUNNABLE", pipeline.declaration),
         ]);
         for layout in &pipeline.layouts {
             names.insert(format!("{}_LAYOUT{}", pipeline.declaration, layout.group));

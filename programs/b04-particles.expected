@@ -6,4 +6,5 @@ particles_WORKGROUP_Y=1
 particles_WORKGROUP_Z=1
 particles_WGSL_LINES=31
 dispatch:submitted
+host:out=2
 PASS

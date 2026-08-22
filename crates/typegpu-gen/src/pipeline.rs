@@ -104,6 +104,7 @@ pub(crate) struct Pipeline {
     pub(crate) declaration: String,
     pub(crate) entry: String,
     pub(crate) workgroup: [u32; 3],
+    pub(crate) host_runnable: bool,
     pub(crate) layouts: Vec<Layout>,
     pub(crate) pos: Pos,
 }
@@ -578,11 +579,19 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
             ));
             continue;
         };
+        let host_runnable = match crate::kernel::host_runnable(module, kernel) {
+            Ok(value) => value,
+            Err(error) => {
+                diagnostics.push(error);
+                continue;
+            }
+        };
         match workgroup(module, options) {
             Ok(workgroup) if layouts.len() == arity => pipelines.push(Pipeline {
                 declaration: global.name.clone(),
                 entry: entry.clone(),
                 workgroup,
+                host_runnable,
                 layouts,
                 pos: global.pos.clone(),
             }),

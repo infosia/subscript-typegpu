@@ -115,6 +115,14 @@ pub(crate) struct ProgramOutput {
 }
 
 impl ProgramOutput {
+    pub(crate) fn program(&self) -> &Path {
+        &self.program
+    }
+
+    pub(crate) fn dev(&self) -> &[u8] {
+        &self.dev
+    }
+
     pub(crate) fn coverage(&self) -> &[String] {
         &self.coverage
     }

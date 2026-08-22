@@ -386,6 +386,131 @@ fn kernel_globals(module: &Module, kernel: &Function) -> Result<Vec<KernelGlobal
     Ok(globals)
 }
 
+fn expression_blocks_host(module: &Module, expression: &Expr) -> bool {
+    match &expression.kind {
+        ExprKind::Unary { operand, .. }
+        | ExprKind::Cast(operand)
+        | ExprKind::Length(operand)
+        | ExprKind::Field { obj: operand, .. }
+        | ExprKind::JsonResultValue(operand) => expression_blocks_host(module, operand),
+        ExprKind::Binary { left, right, .. }
+        | ExprKind::Assign {
+            target: left,
+            value: right,
+            ..
+        } => expression_blocks_host(module, left) || expression_blocks_host(module, right),
+        ExprKind::Call { callee, args } => {
+            let callee_blocks = match callee {
+                Callee::Func(name) => {
+                    matches!(
+                        name.split('<').next().unwrap_or(name),
+                        "workgroupBarrier" | "storageBarrier"
+                    ) && function_declared_in(module, name, "typegpu.ts")
+                }
+                Callee::Method { recv, .. } => {
+                    atomic_scalar(module, &recv.ty).is_some()
+                        || expression_blocks_host(module, recv)
+                }
+                Callee::Value(value) => expression_blocks_host(module, value),
+                _ => false,
+            };
+            callee_blocks || args.iter().any(|arg| expression_blocks_host(module, arg))
+        }
+        ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => {
+            args.iter().any(|arg| expression_blocks_host(module, arg))
+        }
+        ExprKind::DescriptorLit { fields, .. } => fields
+            .iter()
+            .flatten()
+            .any(|value| expression_blocks_host(module, value)),
+        ExprKind::Index { obj, index, .. } => {
+            expression_blocks_host(module, obj) || expression_blocks_host(module, index)
+        }
+        ExprKind::Cond { cond, then, els } => {
+            expression_blocks_host(module, cond)
+                || expression_blocks_host(module, then)
+                || expression_blocks_host(module, els)
+        }
+        _ => false,
+    }
+}
+
+fn statements_block_host(module: &Module, statements: &[Stmt]) -> bool {
+    statements.iter().any(|statement| match statement {
+        Stmt::Let { init, .. } | Stmt::Expr(init) => expression_blocks_host(module, init),
+        Stmt::Return { value, .. } => value
+            .as_ref()
+            .is_some_and(|value| expression_blocks_host(module, value)),
+        Stmt::If {
+            cond, then, els, ..
+        } => {
+            expression_blocks_host(module, cond)
+                || statements_block_host(module, then)
+                || els
+                    .as_ref()
+                    .is_some_and(|items| statements_block_host(module, items))
+        }
+        Stmt::While { cond, body, .. } => {
+            expression_blocks_host(module, cond) || statements_block_host(module, body)
+        }
+        Stmt::For {
+            init,
+            cond,
+            step,
+            body,
+            ..
+        } => {
+            init.as_deref()
+                .is_some_and(|item| statements_block_host(module, std::slice::from_ref(item)))
+                || cond
+                    .as_ref()
+                    .is_some_and(|value| expression_blocks_host(module, value))
+                || step
+                    .as_ref()
+                    .is_some_and(|value| expression_blocks_host(module, value))
+                || statements_block_host(module, body)
+        }
+        Stmt::ForOf { subject, body, .. } => {
+            expression_blocks_host(module, subject) || statements_block_host(module, body)
+        }
+        Stmt::Switch { disc, cases, .. } => {
+            expression_blocks_host(module, disc)
+                || cases.iter().any(|case| {
+                    case.test
+                        .as_ref()
+                        .is_some_and(|test| expression_blocks_host(module, test))
+                        || statements_block_host(module, &case.body)
+                })
+        }
+        Stmt::Block(body) => statements_block_host(module, body),
+        Stmt::Break(_) | Stmt::Continue(_) => false,
+        _ => false,
+    })
+}
+
+pub(crate) fn host_runnable(module: &Module, kernel: &Function) -> Result<bool, Diagnostic> {
+    let globals = kernel_globals(module, kernel)?;
+    if globals.iter().any(|global| {
+        matches!(
+            global.kind,
+            KernelGlobalKind::WorkgroupVar | KernelGlobalKind::WorkgroupArray(_)
+        )
+    }) {
+        return Ok(false);
+    }
+    if statements_block_host(module, &kernel.body) {
+        return Ok(false);
+    }
+    for helper in dependencies(module, kernel)? {
+        if function(module, &helper)
+            .is_some_and(|function| statements_block_host(module, &function.body))
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String, Diagnostic> {
     Ok(match ty {
         Type::F32 => "f32".to_owned(),

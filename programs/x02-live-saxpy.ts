@@ -13,6 +13,7 @@ import {
   computePipeline,
   ComputePipelineSpec,
   MutStorage,
+  simulateCompute,
   Storage,
   Uniform,
   bufferResource,
@@ -28,6 +29,7 @@ import {
   Item_STRIDE,
   SaxpyParams_STRIDE,
   saxpy_ENTRY,
+  saxpy_HOST_RUNNABLE,
   saxpy_LAYOUT0,
   saxpy_WGSL,
   saxpy_WORKGROUP_X,
@@ -65,13 +67,14 @@ function saxpyKernel(res: SaxpyLayout, ctx: ComputeInvocation): void {
   const settings: SaxpyParams = res.params.get();
   const i: u32 = ctx.globalId.x;
   if (i < settings.count) {
-    const xItem: Item = res.x[i];
-    const yItem: Item = res.y[i];
-    res.y[i] = new Item(settings.a * xItem.value + yItem.value);
+    const xItem: Item = res.x.get(i);
+    const yItem: Item = res.y.get(i);
+    res.y.set(i, new Item(settings.a * xItem.value + yItem.value));
   }
 }
 
 export const saxpy: ComputePipelineSpec = computePipeline<SaxpyLayout>(saxpyKernel, {
+  name: "saxpy",
   workgroupSize: [64, 1, 1],
 });
 
@@ -120,16 +123,29 @@ export async function main(): Promise<void> {
     const itemBytes: u64 = (Item_STRIDE as u64) * (count as u64);
     const xValues: FixedArray<Item, 64> = itemArray();
     const yValues: FixedArray<Item, 64> = itemArray();
-    const expected: FixedArray<Item, 64> = itemArray();
+    const hostX: Item[] = [];
+    const hostY: Item[] = [];
     let index: i32 = 0;
     while (index < 64) {
       const xValue: f32 = (index as f32) * 0.125;
       const yValue: f32 = (((index as u32) % 7) as f32) * 0.25;
       xValues[index] = new Item(xValue);
       yValues[index] = new Item(yValue);
-      expected[index] = new Item(aValue * xValue + yValue);
+      hostX.push(new Item(xValue));
+      hostY.push(new Item(yValue));
       index = index + 1;
     }
+    const hostLayout = new SaxpyLayout();
+    hostLayout.params = new Uniform<SaxpyParams>(new SaxpyParams(aValue, count));
+    hostLayout.x = new Storage<Item>(hostX);
+    hostLayout.y = new MutStorage<Item>(hostY);
+    simulateCompute<SaxpyLayout>(
+      saxpyKernel,
+      hostLayout,
+      saxpy,
+      [1, 1, 1],
+      saxpy_HOST_RUNNABLE,
+    );
     using params: Buffer<SaxpyParams> = createBuffer<SaxpyParams>(
       device,
       SaxpyParams_STRIDE,
@@ -195,8 +211,9 @@ export async function main(): Promise<void> {
     print("readback:mapped");
     index = 0;
     while (index < 64) {
-      if (result[index].value !== expected[index].value) {
-        print(`FAIL ${index} expected=${expected[index].value} got=${result[index].value}`);
+      const expected: f32 = hostLayout.y.get(index as u32).value;
+      if (result[index].value !== expected) {
+        print(`FAIL ${index} expected=${expected} got=${result[index].value}`);
         return;
       }
       index = index + 1;

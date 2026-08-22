@@ -15,11 +15,13 @@ import {
   createBuffer,
   createComputePipeline,
   readBuffer,
+  simulateCompute,
 } from "./typegpu";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice, GPUMapMode } from "./webgpu";
 import {
   Item_STRIDE,
   controlFlow_ENTRY,
+  controlFlow_HOST_RUNNABLE,
   controlFlow_LAYOUT0,
   controlFlow_WGSL,
   controlFlow_WORKGROUP_X,
@@ -42,15 +44,16 @@ function controlFlowKernel(res: ControlLayout, ctx: ComputeInvocation): void {
   let index: u32 = 0;
   let total: f32 = 0.0;
   while (index < (4 as u32) ? true : false) {
-    const source: f32 = res.input[index].value;
+    const source: f32 = res.input.get(index).value;
     const chosen: f32 = source > 0.0 ? (source > 2.0 ? source : 2.0) : 1.0;
     total += chosen;
     index += 1;
   }
-  res.output[0] = new Item(total);
+  res.output.set(0, new Item(total));
 }
 
 export const controlFlow: ComputePipelineSpec = computePipeline<ControlLayout>(controlFlowKernel, {
+  name: "controlFlow",
   workgroupSize: [1, 1, 1],
 });
 
@@ -63,6 +66,18 @@ export async function main(): Promise<void> {
     using adapter = adapterResult;
     using device = deviceResult;
     const inputValues: FixedArray<Item, 4> = [new Item(-1.0), new Item(1.0), new Item(3.0), new Item(4.0)];
+    const hostLayout = new ControlLayout();
+    hostLayout.input = new Storage<Item>([
+      new Item(-1.0), new Item(1.0), new Item(3.0), new Item(4.0),
+    ]);
+    hostLayout.output = new MutStorage<Item>([new Item(0.0)]);
+    simulateCompute<ControlLayout>(
+      controlFlowKernel,
+      hostLayout,
+      controlFlow,
+      [1, 1, 1],
+      controlFlow_HOST_RUNNABLE,
+    );
     using input: Buffer<Item> = createBuffer<Item>(device, Item_STRIDE, 4, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST, "x04-input");
     using output: Buffer<Item> = createBuffer<Item>(device, Item_STRIDE, 1, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_SRC, "x04-output");
     using readback: Buffer<Item> = createBuffer<Item>(device, Item_STRIDE, 1, GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST, "x04-readback");
@@ -78,7 +93,8 @@ export async function main(): Promise<void> {
     queue.submit([command]);
     if (!await readback.handle().mapAsync(GPUMapMode.READ, 0, Item_STRIDE as u64)) { print("FAIL map"); return; }
     const result: FixedArray<Item, 1> = Context.fromBytes<FixedArray<Item, 1>>(readBuffer<Item>(readback, 0, 1), 0);
-    if (result[0].value !== 10.0) { print(`FAIL expected=10 got=${result[0].value}`); return; }
+    const expected: f32 = hostLayout.output.get(0).value;
+    if (result[0].value !== expected) { print(`FAIL expected=${expected} got=${result[0].value}`); return; }
     readback.handle().unmap();
   }
   gpu.dispose();

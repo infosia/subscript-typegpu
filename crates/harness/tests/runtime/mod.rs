@@ -49,6 +49,7 @@ export function main(): void {
   storage.store(new Vec2i(0, 0), sampled);
   print(`texture=${dimensions.x},${dimensions.y},${loaded.x},${loaded.y},${sampled.x},${sampled.y},${storagePixels[0].x},nearest=${sampler.isNearest()}`);
 }
+
 "#).expect("write runtime test program");
     let result = std::process::Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-harness"))
         .arg("dev")
@@ -67,6 +68,55 @@ export function main(): void {
         output,
         b"runtime=7,3,2,9,2\nvariables=7,8,9,10,2\natomic=10,15,12,12,20,7\nsigned=4,-2,-3,9,1\ntexture=2,1,0,1,1,0,1,nearest=true\n"
     );
+}
+
+#[test]
+fn simulate_compute_forms_run_every_invocation_in_row_major_order() {
+    let directory =
+        std::env::temp_dir().join(format!("subscript-typegpu-simulate-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).expect("create simulate test directory");
+    let program = directory.join("simulate-host.ts");
+    std::fs::write(
+        &program,
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, simulateCompute, simulateCompute2, simulateCompute3, simulateCompute4 } from "./typegpu";
+class State {
+  values: u32[];
+  constructor() { this.values = []; }
+}
+function one(a: State, ctx: ComputeInvocation): void { a.values.push(ctx.globalId.x + ctx.globalId.y * 10 + ctx.globalId.z * 100); }
+function two(a: State, b: State, ctx: ComputeInvocation): void { a.values.push(ctx.localIndex); b.values.push(ctx.localIndex); }
+function three(a: State, b: State, c: State, ctx: ComputeInvocation): void { a.values.push(ctx.localIndex); b.values.push(ctx.localIndex); c.values.push(ctx.localIndex); }
+function four(a: State, b: State, c: State, d: State, ctx: ComputeInvocation): void { a.values.push(ctx.localIndex); b.values.push(ctx.localIndex); c.values.push(ctx.localIndex); d.values.push(ctx.localIndex); }
+export function main(): void {
+  const spec: ComputePipelineSpec = { name: "runtime", workgroupSize: [2, 2, 2] };
+  const a = new State();
+  const b = new State();
+  const c = new State();
+  const d = new State();
+  simulateCompute<State>(one, a, spec, [2, 1, 1], true);
+  print(`order=${a.values[0]},${a.values[7]},${a.values[8]},${a.values[15]}`);
+  simulateCompute2<State, State>(two, a, b, spec, [2, 1, 1], true);
+  simulateCompute3<State, State, State>(three, a, b, c, spec, [2, 1, 1], true);
+  simulateCompute4<State, State, State, State>(four, a, b, c, d, spec, [2, 1, 1], true);
+  print(`counts=${a.values.length},${b.values.length},${c.values.length},${d.values.length}`);
+}
+"#,
+    )
+    .expect("write simulate test program");
+    let result = std::process::Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-harness"))
+        .arg("dev")
+        .arg(&program)
+        .output()
+        .expect("spawn simulate test program");
+    assert!(
+        result.status.success(),
+        "simulate test program: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    std::fs::remove_file(&program).expect("remove simulate test program");
+    std::fs::remove_dir(&directory).expect("remove simulate test directory");
+    assert_eq!(result.stdout, b"order=0,111,2,113\ncounts=64,48,32,16\n");
 }
 
 #[test]

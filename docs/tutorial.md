@@ -67,7 +67,7 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
   const settings: SimParams = res.params.get();
   const i: u32 = ctx.globalId.x;
   if (i < settings.count) {
-    res.particles[i] = integrate(res.particles[i], settings.dt);
+    res.particles.set(i, integrate(res.particles.get(i), settings.dt));
   }
 }
 ```
@@ -78,6 +78,7 @@ The declaration connects the layout type, the kernel function, and the workgroup
 
 ```ts program=programs/b04-particles.ts
 export const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
+  name: "particles",
   workgroupSize: [64, 1, 1],
 });
 ```

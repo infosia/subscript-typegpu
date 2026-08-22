@@ -374,13 +374,15 @@ pub(crate) fn support_module(
              export const {name}_ENTRY: string = \"{entry}\";\n\
              export const {name}_WORKGROUP_X: u32 = {x};\n\
              export const {name}_WORKGROUP_Y: u32 = {y};\n\
-             export const {name}_WORKGROUP_Z: u32 = {z};\n",
+             export const {name}_WORKGROUP_Z: u32 = {z};\n\
+             export const {name}_HOST_RUNNABLE: boolean = {host_runnable};\n",
             name = pipeline.declaration,
             wgsl = escape_string(text),
             entry = crate::mapping::ident(&pipeline.entry),
             x = pipeline.workgroup[0],
             y = pipeline.workgroup[1],
             z = pipeline.workgroup[2],
+            host_runnable = pipeline.host_runnable,
         ));
         for layout in &pipeline.layouts {
             out.push_str(&format!(

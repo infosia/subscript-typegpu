@@ -13,6 +13,7 @@ import {
   computePipeline,
   ComputePipelineSpec,
   MutStorage,
+  simulateCompute,
   Uniform,
   bufferResource,
 } from "./typegpu";
@@ -28,6 +29,7 @@ import {
   Particle_STRIDE,
   SimParams_STRIDE,
   particles_ENTRY,
+  particles_HOST_RUNNABLE,
   particles_LAYOUT0,
   particles_WGSL,
   particles_WORKGROUP_X,
@@ -75,11 +77,12 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
   const settings: SimParams = res.params.get();
   const i: u32 = ctx.globalId.x;
   if (i < settings.count) {
-    res.particles[i] = integrate(res.particles[i], settings.dt);
+    res.particles.set(i, integrate(res.particles.get(i), settings.dt));
   }
 }
 
 export const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
+  name: "particles",
   workgroupSize: [64, 1, 1],
 });
 
@@ -130,7 +133,7 @@ export async function main(): Promise<void> {
     const steps: u32 = 4;
     const size: u64 = (Particle_STRIDE as u64) * (count as u64);
     const particleValues: FixedArray<Particle, 64> = particleArray();
-    const expected: FixedArray<Particle, 64> = particleArray();
+    const hostParticles: Particle[] = [];
     let index: i32 = 0;
     while (index < 64) {
       const particle = new Particle(
@@ -138,16 +141,21 @@ export async function main(): Promise<void> {
         new Vec3f(0.5, -0.25, 0.125),
       );
       particleValues[index] = particle;
-      expected[index] = particle;
+      hostParticles.push(particle);
       index = index + 1;
     }
+    const hostLayout = new ParticleLayout();
+    hostLayout.params = new Uniform<SimParams>(new SimParams(dt, count));
+    hostLayout.particles = new MutStorage<Particle>(hostParticles);
     let step: u32 = 0;
     while (step < steps) {
-      index = 0;
-      while (index < 64) {
-        expected[index] = integrate(expected[index], dt);
-        index = index + 1;
-      }
+      simulateCompute<ParticleLayout>(
+        particleKernel,
+        hostLayout,
+        particles,
+        [1, 1, 1],
+        particles_HOST_RUNNABLE,
+      );
       step = step + 1;
     }
     using params: Buffer<SimParams> = createBuffer<SimParams>(
@@ -215,7 +223,7 @@ export async function main(): Promise<void> {
     print("readback:mapped");
     index = 0;
     while (index < 64) {
-      if (!equalParticle(result[index], expected[index])) {
+      if (!equalParticle(result[index], hostLayout.particles.get(index as u32))) {
         print(`FAIL ${index}`);
         return;
       }

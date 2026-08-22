@@ -11,12 +11,14 @@ import {
   createBindGroup,
   createComputePipeline,
   bufferResource,
+  simulateCompute,
 } from "./typegpu";
 import { Vec2u, v2u } from "./typegpu-types";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
 import {
   DepthItem_SIZE,
   kernelDepth_ENTRY,
+  kernelDepth_HOST_RUNNABLE,
   kernelDepth_LAYOUT0,
   kernelDepth_WGSL,
   kernelDepth_WORKGROUP_X,
@@ -50,10 +52,11 @@ function depthKernel(res: DepthLayout, ctx: ComputeInvocation): void {
     { value += 1; }
     iteration += 1;
   }
-  res.output[ctx.globalId.x] = new DepthItem(value);
+  res.output.set(ctx.globalId.x, new DepthItem(value));
 }
 
 export const kernelDepth: ComputePipelineSpec = computePipeline<DepthLayout>(depthKernel, {
+  name: "kernelDepth",
   workgroupSize: [8, 1, 1],
 });
 
@@ -84,6 +87,21 @@ export async function main(): Promise<void> {
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();
     device.queue().submit([command]);
+    const hostValues: DepthItem[] = [];
+    let hostIndex: u32 = 0;
+    while (hostIndex < count) {
+      hostValues.push(new DepthItem(0));
+      hostIndex += 1;
+    }
+    const hostLayout = new DepthLayout();
+    hostLayout.output = new MutStorage<DepthItem>(hostValues);
+    simulateCompute<DepthLayout>(
+      depthKernel,
+      hostLayout,
+      kernelDepth,
+      [1, 1, 1],
+      kernelDepth_HOST_RUNNABLE,
+    );
     print("pipeline:created");
     print(`DepthItem_SIZE=${DepthItem_SIZE}`);
     print(`kernelDepth_WORKGROUP_X=${kernelDepth_WORKGROUP_X}`);
@@ -91,6 +109,7 @@ export async function main(): Promise<void> {
     print(`kernelDepth_WORKGROUP_Z=${kernelDepth_WORKGROUP_Z}`);
     print(`kernelDepth_WGSL_LINES=${kernelDepth_WGSL.split("\n").length}`);
     print("dispatch:submitted");
+    print(`host:out=${hostLayout.output.get(0).value},${hostLayout.output.get(7).value}`);
   }
   gpu.dispose();
   print("PASS");

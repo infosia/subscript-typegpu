@@ -10,6 +10,7 @@ mod library;
 mod live;
 mod rejections;
 mod runtime;
+mod simulate;
 mod traps;
 mod uniformity;
 mod wgsl_goldens;

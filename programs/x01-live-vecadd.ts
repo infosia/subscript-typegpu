@@ -13,6 +13,7 @@ import {
   computePipeline,
   ComputePipelineSpec,
   MutStorage,
+  simulateCompute,
   Storage,
   bufferResource,
 } from "./typegpu";
@@ -26,6 +27,7 @@ import {
 import {
   Item_STRIDE,
   vecAdd_ENTRY,
+  vecAdd_HOST_RUNNABLE,
   vecAdd_LAYOUT0,
   vecAdd_WGSL,
   vecAdd_WORKGROUP_X,
@@ -51,13 +53,14 @@ class VecAddLayout {
 function vecAddKernel(res: VecAddLayout, ctx: ComputeInvocation): void {
   const i: u32 = ctx.globalId.x;
   if (i < res.out.length()) {
-    const left: Item = res.a[i];
-    const right: Item = res.b[i];
-    res.out[i] = new Item(left.value + right.value);
+    const left: Item = res.a.get(i);
+    const right: Item = res.b.get(i);
+    res.out.set(i, new Item(left.value + right.value));
   }
 }
 
 export const vecAdd: ComputePipelineSpec = computePipeline<VecAddLayout>(vecAddKernel, {
+  name: "vecAdd",
   workgroupSize: [64, 1, 1],
 });
 
@@ -105,16 +108,31 @@ export async function main(): Promise<void> {
     const itemBytes: u64 = (Item_STRIDE as u64) * (count as u64);
     const aValues: FixedArray<Item, 64> = itemArray();
     const bValues: FixedArray<Item, 64> = itemArray();
-    const expected: FixedArray<Item, 64> = itemArray();
+    const hostA: Item[] = [];
+    const hostB: Item[] = [];
+    const hostOut: Item[] = [];
     let index: i32 = 0;
     while (index < 64) {
       const aValue: f32 = (index as f32) * 0.5;
       const bValue: f32 = ((count - (index as u32)) as f32) * 0.25;
       aValues[index] = new Item(aValue);
       bValues[index] = new Item(bValue);
-      expected[index] = new Item(aValue + bValue);
+      hostA.push(new Item(aValue));
+      hostB.push(new Item(bValue));
+      hostOut.push(new Item(0.0));
       index = index + 1;
     }
+    const hostLayout = new VecAddLayout();
+    hostLayout.a = new Storage<Item>(hostA);
+    hostLayout.b = new Storage<Item>(hostB);
+    hostLayout.out = new MutStorage<Item>(hostOut);
+    simulateCompute<VecAddLayout>(
+      vecAddKernel,
+      hostLayout,
+      vecAdd,
+      [1, 1, 1],
+      vecAdd_HOST_RUNNABLE,
+    );
     using a: Buffer<Item> = createBuffer<Item>(
       device,
       Item_STRIDE,
@@ -179,8 +197,9 @@ export async function main(): Promise<void> {
     print("readback:mapped");
     index = 0;
     while (index < 64) {
-      if (result[index].value !== expected[index].value) {
-        print(`FAIL ${index} expected=${expected[index].value} got=${result[index].value}`);
+      const expected: f32 = hostLayout.out.get(index as u32).value;
+      if (result[index].value !== expected) {
+        print(`FAIL ${index} expected=${expected} got=${result[index].value}`);
         return;
       }
       index = index + 1;

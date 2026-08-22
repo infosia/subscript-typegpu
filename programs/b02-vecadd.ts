@@ -9,6 +9,7 @@ import {
   computePipeline,
   ComputePipelineSpec,
   MutStorage,
+  simulateCompute,
   Storage,
 } from "./typegpu";
 import {
@@ -23,6 +24,7 @@ import {
   createVecAddLayoutResources,
   createVecAddBindGroup0,
   vecAdd_ENTRY,
+  vecAdd_HOST_RUNNABLE,
   vecAdd_LAYOUT0,
   vecAdd_WGSL,
   vecAdd_WORKGROUP_X,
@@ -48,14 +50,15 @@ class VecAddLayout {
 function vecAddKernel(res: VecAddLayout, ctx: ComputeInvocation): void {
   const i: u32 = ctx.globalId.x;
   if (i < res.out.length()) {
-    const left: Item = res.a[i];
-    const right: Item = res.b[i];
+    const left: Item = res.a.get(i);
+    const right: Item = res.b.get(i);
     const sum: Item = new Item(left.value + right.value);
-    res.out[i] = sum;
+    res.out.set(i, sum);
   }
 }
 
 export const vecAdd: ComputePipelineSpec = computePipeline<VecAddLayout>(vecAddKernel, {
+  name: "vecAdd",
   workgroupSize: [64, 1, 1],
 });
 
@@ -106,6 +109,17 @@ export async function main(): Promise<void> {
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();
     device.queue().submit([command]);
+    const hostLayout = new VecAddLayout();
+    hostLayout.a = new Storage<Item>([new Item(1.0), new Item(2.0), new Item(3.0)]);
+    hostLayout.b = new Storage<Item>([new Item(4.0), new Item(5.0), new Item(6.0)]);
+    hostLayout.out = new MutStorage<Item>([new Item(0.0), new Item(0.0), new Item(0.0)]);
+    simulateCompute<VecAddLayout>(
+      vecAddKernel,
+      hostLayout,
+      vecAdd,
+      [1, 1, 1],
+      vecAdd_HOST_RUNNABLE,
+    );
     print("pipeline:created");
     print(`Item_SIZE=${Item_SIZE}`);
     print(`vecAdd_WORKGROUP_X=${vecAdd_WORKGROUP_X}`);
@@ -113,6 +127,7 @@ export async function main(): Promise<void> {
     print(`vecAdd_WORKGROUP_Z=${vecAdd_WORKGROUP_Z}`);
     print(`vecAdd_WGSL_LINES=${vecAdd_WGSL.split("\n").length}`);
     print("dispatch:submitted");
+    print(`host:out=${hostLayout.out.get(0).value},${hostLayout.out.get(1).value},${hostLayout.out.get(2).value}`);
   }
   gpu.dispose();
   print("PASS");
