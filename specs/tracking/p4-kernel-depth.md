@@ -37,12 +37,19 @@ condition and barriers unconditionally. Observation for the
 backend's owner: Dawn rejects this module at pipeline creation
 (docs), yawgpu accepted it.
 
+Round 2 landed at `9670180`: the taint rule, the conditional load in
+`x08`, three K24 fixtures. Live run by the planner outside the
+sandbox at `9670180` (Metal): ok, 18.47 seconds, `x01`–`x09`
+`PASS` — the four-workgroup tree reduction with barriers and an
+atomic add equals the host sum, and the `switch` program decides
+every output as the host does.
+
 ## Exit criteria
 
 | # | Criterion | Evidence |
 |---|---|---|
-| 1 | `b09-kernel-depth` and `b10-workgroup` gate-green with WGSL goldens | — |
-| 2 | `x08-live-reduction` `PASS` | — |
-| 3 | `x09-live-switch` `PASS` | — |
-| 4 | Every K24 rejection has a red fixture, a non-uniform barrier fails naga in the harness | — |
-| 5 | Budgets hold | — |
+| 1 | `b09-kernel-depth` and `b10-workgroup` gate-green with WGSL goldens | Slice 1 and round 2, `--require-backend` green |
+| 2 | `x08-live-reduction` `PASS` | Metal at `9670180`, after the K22 Rev 1 fix |
+| 3 | `x09-live-switch` `PASS` | Metal at `010e846` and `9670180` |
+| 4 | Every K24 rejection has a red fixture, a non-uniform barrier is a generator diagnostic | Eleven fixtures, one diagnostic each |
+| 5 | Budgets hold | 44 s / 0.2 s / 48 s / 47 s / 6 |
