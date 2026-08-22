@@ -422,9 +422,15 @@ has a red fixture. (4) Budgets hold.
 acyclic call graph, module constants, private and workgroup
 variables, atomics, barriers under uniform control flow.
 
-Exit: one gate program per construct with WGSL goldens, one live
-reduction across workgroups that prints `PASS`, reds for recursion,
-fallthrough, and a barrier under non-uniform control flow.
+Exit: (1) `b08-kernel-depth` (K18, K19) and `b09-workgroup` (K20,
+K21, K22, K23) gate-green with WGSL goldens. (2) `x07-live-reduction`
+sums across several workgroups with a workgroup array, a barrier,
+and an atomic add, and prints `PASS` — a result only correct
+barriers and atomics produce. (3) `x08-live-switch` decides a
+result through `switch`, `break`, and `continue`, and prints
+`PASS`. (4) Every K24 rejection has a red fixture, and a barrier
+under non-uniform control flow fails the harness with naga's
+diagnostic. (5) Budgets hold.
 
 ### P5 — textures and samplers (~10%)
 

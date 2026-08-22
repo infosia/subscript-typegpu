@@ -129,6 +129,61 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   golden output prints the module's line count by name, never the
   text.
 
+## P4 — kernel depth (Rev 2, 2026-08-23)
+
+- **K18 — More statements.** `switch` over an integer with a
+  required `default`, `break`, `continue`, and a nested block join
+  K7. A `switch` case body ends with `break` or `return`, or is empty
+  and shares the next case's body: the emitter writes `case a, b:`.
+  A case body that falls through with statements is a diagnostic.
+  `break` and `continue` inside a `for`, `while`, or `switch` emit
+  the WGSL statement of the same name. A `continue` inside a
+  `switch` inside a loop targets the loop, as in WGSL.
+- **K19 — Module constants.** A module-level `const` of a scalar, a
+  library vector, or a library matrix type, with an initializer the
+  emitter can evaluate (a literal, a unary or binary expression of
+  literals and other module constants, a vector factory of such),
+  reaches a kernel as a WGSL `const` of the same name. Any other
+  initializer, or a mutable global, is a diagnostic when a kernel
+  reads it.
+- **K20 — Private and workgroup variables.** A module-level `const`
+  whose initializer is `privateVar<T>(init)`, `workgroupVar<T>()`,
+  or `workgroupArray<T>(n)` (library generic functions with real
+  bodies over a `T` or a `T[]`, `n` a literal) declares a variable
+  the kernel reaches by name. The emitter writes `var<private> x: T
+  = init;`, `var<workgroup> x: T;`, or `var<workgroup> x: array<T,
+  n>;`. `T` is a scalar, a library vector or matrix, or a schema
+  class. Access is `x.get()`, `x.set(v)`, `x[i]`, `x[i] = v`,
+  `x.length()`, as the binding wrappers (PI6). A private or
+  workgroup variable initialized with a value in WGSL's forbidden
+  positions (a workgroup variable with an initializer) is a
+  diagnostic.
+- **K21 — Atomics.** `AtomicU32` and `AtomicI32` are library value
+  classes (`@CStruct`, one field, size 4, align 4) legal as a schema
+  field and as a workgroup variable type. Their methods `load()`,
+  `store(v)`, `add(v)`, `sub(v)`, `min(v)`, `max(v)`, `exchange(v)`
+  (each returning the old value where WGSL does) have real host
+  bodies and emit `atomicLoad(&p)`, `atomicStore(&p, v)`,
+  `atomicAdd(&p, v)` and family, where `p` is the emitted place of
+  the receiver. The receiver must be a place inside a storage
+  binding or a workgroup variable. A schema that holds an atomic
+  cannot be copied to a local or written as a whole: both are
+  diagnostics.
+- **K22 — Barriers.** `workgroupBarrier()` and `storageBarrier()`
+  are library free functions with empty host bodies, legal only as
+  a statement directly in the kernel body or in a block the kernel
+  body contains, never in a helper. WGSL's uniformity rule is
+  `naga`'s to enforce: the harness reports a uniformity failure
+  with the kernel name and naga's diagnostic, owner the author.
+- **K23 — The workgroup builtins.** `ComputeInvocation.localId`,
+  `workgroupId`, `numWorkgroups`, and `localIndex` emit their
+  `@builtin` parameters when read (PI4).
+- **K24 — The P4 rejections.** A `switch` with no `default`, a
+  fallthrough with statements, a mutable global read in a kernel, a
+  workgroup variable with an initializer, an atomic schema copied to
+  a local, a barrier in a helper, an atomic method on a local. Each
+  with a fixture and one diagnostic.
+
 ## Diagnostics
 
 - **K17 — Each rejection is a named diagnostic with a red fixture
