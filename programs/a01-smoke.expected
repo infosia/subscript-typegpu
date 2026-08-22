@@ -1,0 +1,11 @@
+adapter:ready
+device:ready
+buffers:size=16
+write:bytes=16
+copy:size=16
+submit:commands=1
+queue:completed
+map:range=0+16
+read:match
+buffers:unmapped
+PASS

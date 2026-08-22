@@ -1,6 +1,9 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
+mod api;
+mod differential;
+
 fn repository_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .ancestors()

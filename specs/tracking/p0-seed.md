@@ -70,15 +70,38 @@ above.
 
 ## Slice 2 — the first program
 
-Not started.
+Round 1 (2026-08-22): the harness crate (source-file set, facade
+`NativeLibrary`, ship link inputs from a nested release build into
+`target/ship-build`, dev and ship runners, the `dev`/`ship` CLI),
+the differential module, `a01-smoke`, and `tools/gate.sh --measure`.
+Planner verification: gate green with the backend (153 tests), the
+CLI's dev output equals the golden, and the five measurements
+(`build-time.md`).
+
+Slice review (a fresh reviewer, 2026-08-22): CRITICAL 0, MAJOR 6,
+MINOR 11. M1: the golden held backend-returned bytes (T2). M2:
+`set_var` on a test thread. M3, M4: the cold measurement excluded
+the ship-tier release build, and the program-change gate paid for a
+restore. M5 doubted the 27-second cold build. The planner's own
+clean-and-build measured 34 seconds with no user-wide build cache and
+a 1.5 GB rebuilt `target/`, so M5 is refuted and only its emptiness
+assertion was adopted. M6: no direct tests for the harness API.
+Round 2 closed every item. T5, T12, and T14 changed at `481782f` to
+carry the child-process rule, the measurement order, and `--offline`.
+
+Planner verification at the slice close: gate green, 156 tests in
+four executables (facade 3, harness 6, generator unit 1, generator
+integration 146), the golden holds markers and host comparisons
+only, `set_var` exists only in the harness binary's single-threaded
+start, hygiene clean.
 
 ## Exit criteria
 
 | # | Criterion | Evidence |
 |---|---|---|
-| 1 | `a01` byte-identical on both tiers and the golden | — |
-| 2 | Regeneration gate red then green | — |
-| 3 | Five build-time measurements recorded | `build-time.md` |
+| 1 | `a01` byte-identical on both tiers and the golden | Slice 2 close: dev, ship, golden equal. A one-byte golden change fails both tiers with the offset and both lines |
+| 2 | Regeneration gate red then green | Slice 1: a one-byte change to `lib/webgpu.ts` fails T6 naming `tools/regen.sh`, green after regen |
+| 3 | Five build-time measurements recorded | `build-time.md`: two rows, both inside budget |
 | 4 | Facade deps: `libloading` alone. `syn` not a direct dependency | Measured at the slice 1 close: `libloading` → `cfg-if` only, `cargo tree -e normal --depth 1` lists no `syn` |
 | 5 | No `[features]`, no `build.rs` | `tools/hygiene.sh` checks both, clean at the slice 1 close |
 | 6 | I4–I9 green by their gates. I10 measured | I10: the 28 aliases derive from `[api].enums`. One pass. Six outputs byte-identical before and after |

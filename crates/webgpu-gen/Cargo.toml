@@ -8,6 +8,7 @@ repository.workspace = true
 [[bin]]
 name = "subscript-typegpu-webgpu-gen"
 path = "src/main.rs"
+test = false
 
 [dependencies]
 serde.workspace = true
