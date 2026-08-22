@@ -143,6 +143,7 @@ const WGPU_STRLEN: usize = usize::MAX;
 /// webgpu.h request-device descriptor types used to install F14 callbacks.
 type WGPUFeatureName = i32;
 type WGPUDeviceLostCallback = Option<
+    // SAFETY: the callback signature matches the pinned webgpu.h declaration.
     unsafe extern "C" fn(
         device: *const WGPUDevice,
         reason: i32,
@@ -160,6 +161,7 @@ struct WGPUDeviceLostCallbackInfo {
     userdata2: *mut c_void,
 }
 type WGPUUncapturedErrorCallback = Option<
+    // SAFETY: the callback signature matches the pinned webgpu.h declaration.
     unsafe extern "C" fn(
         device: *const WGPUDevice,
         error_type: i32,
@@ -188,6 +190,7 @@ struct WGPUDeviceDescriptor {
 }
 /// webgpu.h `WGPUPopErrorScopeCallback` callback and info.
 type WGPUPopErrorScopeCallback = Option<
+    // SAFETY: the callback signature matches the pinned webgpu.h declaration.
     unsafe extern "C" fn(
         status: i32,
         error_type: i32,
@@ -1336,6 +1339,7 @@ const WGPUStatus_Success: i32 = 0x0000_0001;
 
 /// webgpu.h `WGPURequestAdapterCallback` callback and userdata.
 type WGPURequestAdapterCallback = Option<
+    // SAFETY: the callback signature matches the pinned webgpu.h declaration.
     unsafe extern "C" fn(
         status: i32,
         adapter: WGPUAdapter,
@@ -1357,6 +1361,7 @@ struct WGPURequestAdapterCallbackInfo {
 
 /// webgpu.h `WGPURequestDeviceCallback` callback and userdata.
 type WGPURequestDeviceCallback = Option<
+    // SAFETY: the callback signature matches the pinned webgpu.h declaration.
     unsafe extern "C" fn(
         status: i32,
         device: WGPUDevice,
@@ -1378,6 +1383,7 @@ struct WGPURequestDeviceCallbackInfo {
 
 /// webgpu.h `WGPUCreateComputePipelineAsyncCallback` callback and userdata.
 type WGPUCreateComputePipelineAsyncCallback = Option<
+    // SAFETY: the callback signature matches the pinned webgpu.h declaration.
     unsafe extern "C" fn(
         status: i32,
         computePipeline: WGPUComputePipeline,
@@ -1399,6 +1405,7 @@ struct WGPUCreateComputePipelineAsyncCallbackInfo {
 
 /// webgpu.h `WGPUCreateRenderPipelineAsyncCallback` callback and userdata.
 type WGPUCreateRenderPipelineAsyncCallback = Option<
+    // SAFETY: the callback signature matches the pinned webgpu.h declaration.
     unsafe extern "C" fn(
         status: i32,
         renderPipeline: WGPURenderPipeline,
@@ -1420,6 +1427,7 @@ struct WGPUCreateRenderPipelineAsyncCallbackInfo {
 
 /// webgpu.h `WGPUQueueWorkDoneCallback` callback and userdata.
 type WGPUQueueWorkDoneCallback = Option<
+    // SAFETY: the callback signature matches the pinned webgpu.h declaration.
     unsafe extern "C" fn(
         status: i32,
         message: WGPUStringView,
@@ -1440,6 +1448,7 @@ struct WGPUQueueWorkDoneCallbackInfo {
 
 /// webgpu.h `WGPUBufferMapCallback` callback and userdata.
 type WGPUBufferMapCallback = Option<
+    // SAFETY: the callback signature matches the pinned webgpu.h declaration.
     unsafe extern "C" fn(
         status: i32,
         message: WGPUStringView,
@@ -3584,157 +3593,308 @@ fn convert_render_bundle_descriptor(source: SubscriptTypegpuRenderBundleDescript
 
 pub(crate) struct WebgpuTable {
     _library: libloading::Library,
-    wgpuCreateInstance: unsafe extern "C" fn(*const WGPUInstanceDescriptor)-> WGPUInstance,
-    wgpuInstanceProcessEvents: unsafe extern "C" fn(WGPUInstance),
-    wgpuInstanceRelease: unsafe extern "C" fn(WGPUInstance),
-    wgpuGetInstanceLimits: unsafe extern "C" fn(*mut WGPUInstanceLimits)-> i32,
-    wgpuHasInstanceFeature: unsafe extern "C" fn(i32)-> u32,
-    wgpuInstanceRequestAdapter: unsafe extern "C" fn(WGPUInstance, *const WGPURequestAdapterOptions, WGPURequestAdapterCallbackInfo)-> WGPUFuture,
-    wgpuAdapterGetLimits: unsafe extern "C" fn(WGPUAdapter, *mut WGPULimits)-> i32,
-    wgpuAdapterGetInfo: unsafe extern "C" fn(WGPUAdapter, *mut WGPUAdapterInfo)-> i32,
-    wgpuAdapterHasFeature: unsafe extern "C" fn(WGPUAdapter, i32)-> u32,
-    wgpuAdapterRequestDevice: unsafe extern "C" fn(WGPUAdapter, *const WGPUDeviceDescriptor, WGPURequestDeviceCallbackInfo)-> WGPUFuture,
-    wgpuDeviceGetQueue: unsafe extern "C" fn(WGPUDevice)-> WGPUQueue,
-    wgpuDeviceDestroy: unsafe extern "C" fn(WGPUDevice),
-    wgpuDeviceSetLabel: unsafe extern "C" fn(WGPUDevice, WGPUStringView),
-    wgpuDevicePushErrorScope: unsafe extern "C" fn(WGPUDevice, i32),
-    wgpuDevicePopErrorScope: unsafe extern "C" fn(WGPUDevice, WGPUPopErrorScopeCallbackInfo)-> WGPUFuture,
-    wgpuDeviceGetLimits: unsafe extern "C" fn(WGPUDevice, *mut WGPULimits)-> i32,
-    wgpuDeviceGetAdapterInfo: unsafe extern "C" fn(WGPUDevice, *mut WGPUAdapterInfo)-> i32,
-    wgpuDeviceHasFeature: unsafe extern "C" fn(WGPUDevice, i32)-> u32,
-    wgpuDeviceCreateBuffer: unsafe extern "C" fn(WGPUDevice, *const WGPUBufferDescriptor)-> WGPUBuffer,
-    wgpuDeviceCreateTexture: unsafe extern "C" fn(WGPUDevice, *const WGPUTextureDescriptor)-> WGPUTexture,
-    wgpuDeviceCreateSampler: unsafe extern "C" fn(WGPUDevice, *const WGPUSamplerDescriptor)-> WGPUSampler,
-    wgpuDeviceCreateBindGroupLayout: unsafe extern "C" fn(WGPUDevice, *const WGPUBindGroupLayoutDescriptor)-> WGPUBindGroupLayout,
-    wgpuDeviceCreateBindGroup: unsafe extern "C" fn(WGPUDevice, *const WGPUBindGroupDescriptor)-> WGPUBindGroup,
-    wgpuDeviceCreatePipelineLayout: unsafe extern "C" fn(WGPUDevice, *const WGPUPipelineLayoutDescriptor)-> WGPUPipelineLayout,
-    wgpuDeviceCreateShaderModule: unsafe extern "C" fn(WGPUDevice, *const WGPUShaderModuleDescriptor)-> WGPUShaderModule,
-    wgpuDeviceCreateComputePipeline: unsafe extern "C" fn(WGPUDevice, *const WGPUComputePipelineDescriptor)-> WGPUComputePipeline,
-    wgpuDeviceCreateComputePipelineAsync: unsafe extern "C" fn(WGPUDevice, *const WGPUComputePipelineDescriptor, WGPUCreateComputePipelineAsyncCallbackInfo)-> WGPUFuture,
-    wgpuDeviceCreateRenderPipeline: unsafe extern "C" fn(WGPUDevice, *const WGPURenderPipelineDescriptor)-> WGPURenderPipeline,
-    wgpuDeviceCreateRenderPipelineAsync: unsafe extern "C" fn(WGPUDevice, *const WGPURenderPipelineDescriptor, WGPUCreateRenderPipelineAsyncCallbackInfo)-> WGPUFuture,
-    wgpuDeviceCreateCommandEncoder: unsafe extern "C" fn(WGPUDevice, *const WGPUCommandEncoderDescriptor)-> WGPUCommandEncoder,
-    wgpuDeviceCreateRenderBundleEncoder: unsafe extern "C" fn(WGPUDevice, *const WGPURenderBundleEncoderDescriptor)-> WGPURenderBundleEncoder,
-    wgpuDeviceCreateQuerySet: unsafe extern "C" fn(WGPUDevice, *const WGPUQuerySetDescriptor)-> WGPUQuerySet,
-    wgpuQueueSubmit: unsafe extern "C" fn(WGPUQueue, usize, *const WGPUCommandBuffer),
-    wgpuQueueOnSubmittedWorkDone: unsafe extern "C" fn(WGPUQueue, WGPUQueueWorkDoneCallbackInfo)-> WGPUFuture,
-    wgpuQueueWriteBuffer: unsafe extern "C" fn(WGPUQueue, WGPUBuffer, u64, *const c_void, usize),
-    wgpuQueueWriteTexture: unsafe extern "C" fn(WGPUQueue, *const WGPUTexelCopyTextureInfo, *const std::ffi::c_void, usize, *const WGPUTexelCopyBufferLayout, *const WGPUExtent3D),
-    wgpuQueueSetLabel: unsafe extern "C" fn(WGPUQueue, WGPUStringView),
-    wgpuBufferMapAsync: unsafe extern "C" fn(WGPUBuffer, u64, usize, usize, WGPUBufferMapCallbackInfo)-> WGPUFuture,
-    wgpuBufferReadMappedRange: unsafe extern "C" fn(WGPUBuffer, usize, *mut c_void, usize)-> i32,
-    wgpuBufferWriteMappedRange: unsafe extern "C" fn(WGPUBuffer, usize, *const c_void, usize)-> i32,
-    wgpuBufferSetLabel: unsafe extern "C" fn(WGPUBuffer, WGPUStringView),
-    wgpuBufferGetUsage: unsafe extern "C" fn(WGPUBuffer)-> u64,
-    wgpuBufferGetSize: unsafe extern "C" fn(WGPUBuffer)-> u64,
-    wgpuBufferGetMapState: unsafe extern "C" fn(WGPUBuffer)-> i32,
-    wgpuBufferUnmap: unsafe extern "C" fn(WGPUBuffer),
-    wgpuBufferDestroy: unsafe extern "C" fn(WGPUBuffer),
-    wgpuTextureCreateView: unsafe extern "C" fn(WGPUTexture, *const WGPUTextureViewDescriptor)-> WGPUTextureView,
-    wgpuTextureSetLabel: unsafe extern "C" fn(WGPUTexture, WGPUStringView),
-    wgpuTextureGetWidth: unsafe extern "C" fn(WGPUTexture)-> u32,
-    wgpuTextureGetHeight: unsafe extern "C" fn(WGPUTexture)-> u32,
-    wgpuTextureGetDepthOrArrayLayers: unsafe extern "C" fn(WGPUTexture)-> u32,
-    wgpuTextureGetMipLevelCount: unsafe extern "C" fn(WGPUTexture)-> u32,
-    wgpuTextureGetSampleCount: unsafe extern "C" fn(WGPUTexture)-> u32,
-    wgpuTextureGetDimension: unsafe extern "C" fn(WGPUTexture)-> i32,
-    wgpuTextureGetTextureBindingViewDimension: unsafe extern "C" fn(WGPUTexture)-> i32,
-    wgpuTextureGetFormat: unsafe extern "C" fn(WGPUTexture)-> i32,
-    wgpuTextureGetUsage: unsafe extern "C" fn(WGPUTexture)-> u64,
-    wgpuTextureDestroy: unsafe extern "C" fn(WGPUTexture),
-    wgpuTextureViewSetLabel: unsafe extern "C" fn(WGPUTextureView, WGPUStringView),
-    wgpuSamplerSetLabel: unsafe extern "C" fn(WGPUSampler, WGPUStringView),
-    wgpuBindGroupLayoutSetLabel: unsafe extern "C" fn(WGPUBindGroupLayout, WGPUStringView),
-    wgpuBindGroupSetLabel: unsafe extern "C" fn(WGPUBindGroup, WGPUStringView),
-    wgpuPipelineLayoutSetLabel: unsafe extern "C" fn(WGPUPipelineLayout, WGPUStringView),
-    wgpuShaderModuleSetLabel: unsafe extern "C" fn(WGPUShaderModule, WGPUStringView),
-    wgpuComputePipelineGetBindGroupLayout: unsafe extern "C" fn(WGPUComputePipeline, u32)-> WGPUBindGroupLayout,
-    wgpuComputePipelineSetLabel: unsafe extern "C" fn(WGPUComputePipeline, WGPUStringView),
-    wgpuRenderPipelineGetBindGroupLayout: unsafe extern "C" fn(WGPURenderPipeline, u32)-> WGPUBindGroupLayout,
-    wgpuRenderPipelineSetLabel: unsafe extern "C" fn(WGPURenderPipeline, WGPUStringView),
-    wgpuCommandEncoderFinish: unsafe extern "C" fn(WGPUCommandEncoder, *const WGPUCommandBufferDescriptor)-> WGPUCommandBuffer,
-    wgpuCommandEncoderBeginComputePass: unsafe extern "C" fn(WGPUCommandEncoder, *const WGPUComputePassDescriptor)-> WGPUComputePassEncoder,
-    wgpuCommandEncoderBeginRenderPass: unsafe extern "C" fn(WGPUCommandEncoder, *const WGPURenderPassDescriptor)-> WGPURenderPassEncoder,
-    wgpuCommandEncoderCopyBufferToBuffer: unsafe extern "C" fn(WGPUCommandEncoder, WGPUBuffer, u64, WGPUBuffer, u64, u64),
-    wgpuCommandEncoderCopyBufferToTexture: unsafe extern "C" fn(WGPUCommandEncoder, *const WGPUTexelCopyBufferInfo, *const WGPUTexelCopyTextureInfo, *const WGPUExtent3D),
-    wgpuCommandEncoderCopyTextureToBuffer: unsafe extern "C" fn(WGPUCommandEncoder, *const WGPUTexelCopyTextureInfo, *const WGPUTexelCopyBufferInfo, *const WGPUExtent3D),
-    wgpuCommandEncoderCopyTextureToTexture: unsafe extern "C" fn(WGPUCommandEncoder, *const WGPUTexelCopyTextureInfo, *const WGPUTexelCopyTextureInfo, *const WGPUExtent3D),
-    wgpuCommandEncoderClearBuffer: unsafe extern "C" fn(WGPUCommandEncoder, WGPUBuffer, u64, u64),
-    wgpuCommandEncoderResolveQuerySet: unsafe extern "C" fn(WGPUCommandEncoder, WGPUQuerySet, u32, u32, WGPUBuffer, u64),
-    wgpuCommandEncoderWriteTimestamp: unsafe extern "C" fn(WGPUCommandEncoder, WGPUQuerySet, u32),
-    wgpuCommandEncoderInsertDebugMarker: unsafe extern "C" fn(WGPUCommandEncoder, WGPUStringView),
-    wgpuCommandEncoderPushDebugGroup: unsafe extern "C" fn(WGPUCommandEncoder, WGPUStringView),
-    wgpuCommandEncoderPopDebugGroup: unsafe extern "C" fn(WGPUCommandEncoder),
-    wgpuCommandEncoderSetLabel: unsafe extern "C" fn(WGPUCommandEncoder, WGPUStringView),
-    wgpuComputePassEncoderSetPipeline: unsafe extern "C" fn(WGPUComputePassEncoder, WGPUComputePipeline),
-    wgpuComputePassEncoderSetBindGroup: unsafe extern "C" fn(WGPUComputePassEncoder, u32, WGPUBindGroup, usize, *const u32),
-    wgpuComputePassEncoderDispatchWorkgroups: unsafe extern "C" fn(WGPUComputePassEncoder, u32, u32, u32),
-    wgpuComputePassEncoderDispatchWorkgroupsIndirect: unsafe extern "C" fn(WGPUComputePassEncoder, WGPUBuffer, u64),
-    wgpuComputePassEncoderInsertDebugMarker: unsafe extern "C" fn(WGPUComputePassEncoder, WGPUStringView),
-    wgpuComputePassEncoderPushDebugGroup: unsafe extern "C" fn(WGPUComputePassEncoder, WGPUStringView),
-    wgpuComputePassEncoderPopDebugGroup: unsafe extern "C" fn(WGPUComputePassEncoder),
-    wgpuComputePassEncoderEnd: unsafe extern "C" fn(WGPUComputePassEncoder),
-    wgpuComputePassEncoderSetLabel: unsafe extern "C" fn(WGPUComputePassEncoder, WGPUStringView),
-    wgpuRenderPassEncoderSetPipeline: unsafe extern "C" fn(WGPURenderPassEncoder, WGPURenderPipeline),
-    wgpuRenderPassEncoderSetBindGroup: unsafe extern "C" fn(WGPURenderPassEncoder, u32, WGPUBindGroup, usize, *const u32),
-    wgpuRenderPassEncoderSetVertexBuffer: unsafe extern "C" fn(WGPURenderPassEncoder, u32, WGPUBuffer, u64, u64),
-    wgpuRenderPassEncoderSetIndexBuffer: unsafe extern "C" fn(WGPURenderPassEncoder, WGPUBuffer, i32, u64, u64),
-    wgpuRenderPassEncoderDraw: unsafe extern "C" fn(WGPURenderPassEncoder, u32, u32, u32, u32),
-    wgpuRenderPassEncoderDrawIndexed: unsafe extern "C" fn(WGPURenderPassEncoder, u32, u32, u32, i32, u32),
-    wgpuRenderPassEncoderDrawIndirect: unsafe extern "C" fn(WGPURenderPassEncoder, WGPUBuffer, u64),
-    wgpuRenderPassEncoderDrawIndexedIndirect: unsafe extern "C" fn(WGPURenderPassEncoder, WGPUBuffer, u64),
-    wgpuRenderPassEncoderSetViewport: unsafe extern "C" fn(WGPURenderPassEncoder, f32, f32, f32, f32, f32, f32),
-    wgpuRenderPassEncoderSetScissorRect: unsafe extern "C" fn(WGPURenderPassEncoder, u32, u32, u32, u32),
-    wgpuRenderPassEncoderSetBlendConstant: unsafe extern "C" fn(WGPURenderPassEncoder, *const WGPUColor),
-    wgpuRenderPassEncoderSetStencilReference: unsafe extern "C" fn(WGPURenderPassEncoder, u32),
-    wgpuRenderPassEncoderBeginOcclusionQuery: unsafe extern "C" fn(WGPURenderPassEncoder, u32),
-    wgpuRenderPassEncoderEndOcclusionQuery: unsafe extern "C" fn(WGPURenderPassEncoder),
-    wgpuRenderPassEncoderExecuteBundles: unsafe extern "C" fn(WGPURenderPassEncoder, usize, *const WGPURenderBundle),
-    wgpuRenderPassEncoderInsertDebugMarker: unsafe extern "C" fn(WGPURenderPassEncoder, WGPUStringView),
-    wgpuRenderPassEncoderPushDebugGroup: unsafe extern "C" fn(WGPURenderPassEncoder, WGPUStringView),
-    wgpuRenderPassEncoderPopDebugGroup: unsafe extern "C" fn(WGPURenderPassEncoder),
-    wgpuRenderPassEncoderEnd: unsafe extern "C" fn(WGPURenderPassEncoder),
-    wgpuRenderPassEncoderSetLabel: unsafe extern "C" fn(WGPURenderPassEncoder, WGPUStringView),
-    wgpuCommandBufferSetLabel: unsafe extern "C" fn(WGPUCommandBuffer, WGPUStringView),
-    wgpuRenderBundleEncoderSetPipeline: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPURenderPipeline),
-    wgpuRenderBundleEncoderSetBindGroup: unsafe extern "C" fn(WGPURenderBundleEncoder, u32, WGPUBindGroup, usize, *const u32),
-    wgpuRenderBundleEncoderSetVertexBuffer: unsafe extern "C" fn(WGPURenderBundleEncoder, u32, WGPUBuffer, u64, u64),
-    wgpuRenderBundleEncoderSetIndexBuffer: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPUBuffer, i32, u64, u64),
-    wgpuRenderBundleEncoderDraw: unsafe extern "C" fn(WGPURenderBundleEncoder, u32, u32, u32, u32),
-    wgpuRenderBundleEncoderDrawIndexed: unsafe extern "C" fn(WGPURenderBundleEncoder, u32, u32, u32, i32, u32),
-    wgpuRenderBundleEncoderDrawIndirect: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPUBuffer, u64),
-    wgpuRenderBundleEncoderDrawIndexedIndirect: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPUBuffer, u64),
-    wgpuRenderBundleEncoderInsertDebugMarker: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPUStringView),
-    wgpuRenderBundleEncoderPushDebugGroup: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPUStringView),
-    wgpuRenderBundleEncoderPopDebugGroup: unsafe extern "C" fn(WGPURenderBundleEncoder),
-    wgpuRenderBundleEncoderFinish: unsafe extern "C" fn(WGPURenderBundleEncoder, *const WGPURenderBundleDescriptor)-> WGPURenderBundle,
-    wgpuRenderBundleEncoderSetLabel: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPUStringView),
-    wgpuRenderBundleSetLabel: unsafe extern "C" fn(WGPURenderBundle, WGPUStringView),
-    wgpuQuerySetGetType: unsafe extern "C" fn(WGPUQuerySet)-> i32,
-    wgpuQuerySetGetCount: unsafe extern "C" fn(WGPUQuerySet)-> u32,
-    wgpuQuerySetDestroy: unsafe extern "C" fn(WGPUQuerySet),
-    wgpuQuerySetSetLabel: unsafe extern "C" fn(WGPUQuerySet, WGPUStringView),
-    wgpuAdapterInfoFreeMembers: unsafe extern "C" fn(WGPUAdapterInfo),
-    wgpuQuerySetRelease: unsafe extern "C" fn(WGPUQuerySet),
-    wgpuRenderBundleRelease: unsafe extern "C" fn(WGPURenderBundle),
-    wgpuRenderBundleEncoderRelease: unsafe extern "C" fn(WGPURenderBundleEncoder),
-    wgpuCommandBufferRelease: unsafe extern "C" fn(WGPUCommandBuffer),
-    wgpuRenderPassEncoderRelease: unsafe extern "C" fn(WGPURenderPassEncoder),
-    wgpuComputePassEncoderRelease: unsafe extern "C" fn(WGPUComputePassEncoder),
-    wgpuCommandEncoderRelease: unsafe extern "C" fn(WGPUCommandEncoder),
-    wgpuRenderPipelineRelease: unsafe extern "C" fn(WGPURenderPipeline),
-    wgpuComputePipelineRelease: unsafe extern "C" fn(WGPUComputePipeline),
-    wgpuShaderModuleRelease: unsafe extern "C" fn(WGPUShaderModule),
-    wgpuPipelineLayoutRelease: unsafe extern "C" fn(WGPUPipelineLayout),
-    wgpuBindGroupRelease: unsafe extern "C" fn(WGPUBindGroup),
-    wgpuBindGroupLayoutRelease: unsafe extern "C" fn(WGPUBindGroupLayout),
-    wgpuSamplerRelease: unsafe extern "C" fn(WGPUSampler),
-    wgpuTextureViewRelease: unsafe extern "C" fn(WGPUTextureView),
-    wgpuTextureRelease: unsafe extern "C" fn(WGPUTexture),
-    wgpuBufferRelease: unsafe extern "C" fn(WGPUBuffer),
-    wgpuQueueRelease: unsafe extern "C" fn(WGPUQueue),
-    wgpuDeviceRelease: unsafe extern "C" fn(WGPUDevice),
-    wgpuAdapterRelease: unsafe extern "C" fn(WGPUAdapter),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCreateInstance: unsafe extern "C" fn(*const WGPUInstanceDescriptor)-> WGPUInstance,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuInstanceProcessEvents: unsafe extern "C" fn(WGPUInstance),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuInstanceRelease: unsafe extern "C" fn(WGPUInstance),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuGetInstanceLimits: unsafe extern "C" fn(*mut WGPUInstanceLimits)-> i32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuHasInstanceFeature: unsafe extern "C" fn(i32)-> u32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuInstanceRequestAdapter: unsafe extern "C" fn(WGPUInstance, *const WGPURequestAdapterOptions, WGPURequestAdapterCallbackInfo)-> WGPUFuture,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuAdapterGetLimits: unsafe extern "C" fn(WGPUAdapter, *mut WGPULimits)-> i32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuAdapterGetInfo: unsafe extern "C" fn(WGPUAdapter, *mut WGPUAdapterInfo)-> i32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuAdapterHasFeature: unsafe extern "C" fn(WGPUAdapter, i32)-> u32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuAdapterRequestDevice: unsafe extern "C" fn(WGPUAdapter, *const WGPUDeviceDescriptor, WGPURequestDeviceCallbackInfo)-> WGPUFuture,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceGetQueue: unsafe extern "C" fn(WGPUDevice)-> WGPUQueue,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceDestroy: unsafe extern "C" fn(WGPUDevice),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceSetLabel: unsafe extern "C" fn(WGPUDevice, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDevicePushErrorScope: unsafe extern "C" fn(WGPUDevice, i32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDevicePopErrorScope: unsafe extern "C" fn(WGPUDevice, WGPUPopErrorScopeCallbackInfo)-> WGPUFuture,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceGetLimits: unsafe extern "C" fn(WGPUDevice, *mut WGPULimits)-> i32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceGetAdapterInfo: unsafe extern "C" fn(WGPUDevice, *mut WGPUAdapterInfo)-> i32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceHasFeature: unsafe extern "C" fn(WGPUDevice, i32)-> u32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateBuffer: unsafe extern "C" fn(WGPUDevice, *const WGPUBufferDescriptor)-> WGPUBuffer,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateTexture: unsafe extern "C" fn(WGPUDevice, *const WGPUTextureDescriptor)-> WGPUTexture,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateSampler: unsafe extern "C" fn(WGPUDevice, *const WGPUSamplerDescriptor)-> WGPUSampler,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateBindGroupLayout: unsafe extern "C" fn(WGPUDevice, *const WGPUBindGroupLayoutDescriptor)-> WGPUBindGroupLayout,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateBindGroup: unsafe extern "C" fn(WGPUDevice, *const WGPUBindGroupDescriptor)-> WGPUBindGroup,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreatePipelineLayout: unsafe extern "C" fn(WGPUDevice, *const WGPUPipelineLayoutDescriptor)-> WGPUPipelineLayout,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateShaderModule: unsafe extern "C" fn(WGPUDevice, *const WGPUShaderModuleDescriptor)-> WGPUShaderModule,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateComputePipeline: unsafe extern "C" fn(WGPUDevice, *const WGPUComputePipelineDescriptor)-> WGPUComputePipeline,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateComputePipelineAsync: unsafe extern "C" fn(WGPUDevice, *const WGPUComputePipelineDescriptor, WGPUCreateComputePipelineAsyncCallbackInfo)-> WGPUFuture,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateRenderPipeline: unsafe extern "C" fn(WGPUDevice, *const WGPURenderPipelineDescriptor)-> WGPURenderPipeline,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateRenderPipelineAsync: unsafe extern "C" fn(WGPUDevice, *const WGPURenderPipelineDescriptor, WGPUCreateRenderPipelineAsyncCallbackInfo)-> WGPUFuture,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateCommandEncoder: unsafe extern "C" fn(WGPUDevice, *const WGPUCommandEncoderDescriptor)-> WGPUCommandEncoder,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateRenderBundleEncoder: unsafe extern "C" fn(WGPUDevice, *const WGPURenderBundleEncoderDescriptor)-> WGPURenderBundleEncoder,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceCreateQuerySet: unsafe extern "C" fn(WGPUDevice, *const WGPUQuerySetDescriptor)-> WGPUQuerySet,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuQueueSubmit: unsafe extern "C" fn(WGPUQueue, usize, *const WGPUCommandBuffer),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuQueueOnSubmittedWorkDone: unsafe extern "C" fn(WGPUQueue, WGPUQueueWorkDoneCallbackInfo)-> WGPUFuture,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuQueueWriteBuffer: unsafe extern "C" fn(WGPUQueue, WGPUBuffer, u64, *const c_void, usize),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuQueueWriteTexture: unsafe extern "C" fn(WGPUQueue, *const WGPUTexelCopyTextureInfo, *const std::ffi::c_void, usize, *const WGPUTexelCopyBufferLayout, *const WGPUExtent3D),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuQueueSetLabel: unsafe extern "C" fn(WGPUQueue, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBufferMapAsync: unsafe extern "C" fn(WGPUBuffer, u64, usize, usize, WGPUBufferMapCallbackInfo)-> WGPUFuture,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBufferReadMappedRange: unsafe extern "C" fn(WGPUBuffer, usize, *mut c_void, usize)-> i32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBufferWriteMappedRange: unsafe extern "C" fn(WGPUBuffer, usize, *const c_void, usize)-> i32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBufferSetLabel: unsafe extern "C" fn(WGPUBuffer, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBufferGetUsage: unsafe extern "C" fn(WGPUBuffer)-> u64,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBufferGetSize: unsafe extern "C" fn(WGPUBuffer)-> u64,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBufferGetMapState: unsafe extern "C" fn(WGPUBuffer)-> i32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBufferUnmap: unsafe extern "C" fn(WGPUBuffer),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBufferDestroy: unsafe extern "C" fn(WGPUBuffer),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureCreateView: unsafe extern "C" fn(WGPUTexture, *const WGPUTextureViewDescriptor)-> WGPUTextureView,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureSetLabel: unsafe extern "C" fn(WGPUTexture, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureGetWidth: unsafe extern "C" fn(WGPUTexture)-> u32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureGetHeight: unsafe extern "C" fn(WGPUTexture)-> u32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureGetDepthOrArrayLayers: unsafe extern "C" fn(WGPUTexture)-> u32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureGetMipLevelCount: unsafe extern "C" fn(WGPUTexture)-> u32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureGetSampleCount: unsafe extern "C" fn(WGPUTexture)-> u32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureGetDimension: unsafe extern "C" fn(WGPUTexture)-> i32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureGetTextureBindingViewDimension: unsafe extern "C" fn(WGPUTexture)-> i32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureGetFormat: unsafe extern "C" fn(WGPUTexture)-> i32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureGetUsage: unsafe extern "C" fn(WGPUTexture)-> u64,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureDestroy: unsafe extern "C" fn(WGPUTexture),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureViewSetLabel: unsafe extern "C" fn(WGPUTextureView, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuSamplerSetLabel: unsafe extern "C" fn(WGPUSampler, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBindGroupLayoutSetLabel: unsafe extern "C" fn(WGPUBindGroupLayout, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBindGroupSetLabel: unsafe extern "C" fn(WGPUBindGroup, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuPipelineLayoutSetLabel: unsafe extern "C" fn(WGPUPipelineLayout, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuShaderModuleSetLabel: unsafe extern "C" fn(WGPUShaderModule, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePipelineGetBindGroupLayout: unsafe extern "C" fn(WGPUComputePipeline, u32)-> WGPUBindGroupLayout,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePipelineSetLabel: unsafe extern "C" fn(WGPUComputePipeline, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPipelineGetBindGroupLayout: unsafe extern "C" fn(WGPURenderPipeline, u32)-> WGPUBindGroupLayout,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPipelineSetLabel: unsafe extern "C" fn(WGPURenderPipeline, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderFinish: unsafe extern "C" fn(WGPUCommandEncoder, *const WGPUCommandBufferDescriptor)-> WGPUCommandBuffer,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderBeginComputePass: unsafe extern "C" fn(WGPUCommandEncoder, *const WGPUComputePassDescriptor)-> WGPUComputePassEncoder,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderBeginRenderPass: unsafe extern "C" fn(WGPUCommandEncoder, *const WGPURenderPassDescriptor)-> WGPURenderPassEncoder,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderCopyBufferToBuffer: unsafe extern "C" fn(WGPUCommandEncoder, WGPUBuffer, u64, WGPUBuffer, u64, u64),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderCopyBufferToTexture: unsafe extern "C" fn(WGPUCommandEncoder, *const WGPUTexelCopyBufferInfo, *const WGPUTexelCopyTextureInfo, *const WGPUExtent3D),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderCopyTextureToBuffer: unsafe extern "C" fn(WGPUCommandEncoder, *const WGPUTexelCopyTextureInfo, *const WGPUTexelCopyBufferInfo, *const WGPUExtent3D),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderCopyTextureToTexture: unsafe extern "C" fn(WGPUCommandEncoder, *const WGPUTexelCopyTextureInfo, *const WGPUTexelCopyTextureInfo, *const WGPUExtent3D),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderClearBuffer: unsafe extern "C" fn(WGPUCommandEncoder, WGPUBuffer, u64, u64),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderResolveQuerySet: unsafe extern "C" fn(WGPUCommandEncoder, WGPUQuerySet, u32, u32, WGPUBuffer, u64),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderWriteTimestamp: unsafe extern "C" fn(WGPUCommandEncoder, WGPUQuerySet, u32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderInsertDebugMarker: unsafe extern "C" fn(WGPUCommandEncoder, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderPushDebugGroup: unsafe extern "C" fn(WGPUCommandEncoder, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderPopDebugGroup: unsafe extern "C" fn(WGPUCommandEncoder),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderSetLabel: unsafe extern "C" fn(WGPUCommandEncoder, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePassEncoderSetPipeline: unsafe extern "C" fn(WGPUComputePassEncoder, WGPUComputePipeline),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePassEncoderSetBindGroup: unsafe extern "C" fn(WGPUComputePassEncoder, u32, WGPUBindGroup, usize, *const u32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePassEncoderDispatchWorkgroups: unsafe extern "C" fn(WGPUComputePassEncoder, u32, u32, u32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePassEncoderDispatchWorkgroupsIndirect: unsafe extern "C" fn(WGPUComputePassEncoder, WGPUBuffer, u64),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePassEncoderInsertDebugMarker: unsafe extern "C" fn(WGPUComputePassEncoder, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePassEncoderPushDebugGroup: unsafe extern "C" fn(WGPUComputePassEncoder, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePassEncoderPopDebugGroup: unsafe extern "C" fn(WGPUComputePassEncoder),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePassEncoderEnd: unsafe extern "C" fn(WGPUComputePassEncoder),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePassEncoderSetLabel: unsafe extern "C" fn(WGPUComputePassEncoder, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderSetPipeline: unsafe extern "C" fn(WGPURenderPassEncoder, WGPURenderPipeline),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderSetBindGroup: unsafe extern "C" fn(WGPURenderPassEncoder, u32, WGPUBindGroup, usize, *const u32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderSetVertexBuffer: unsafe extern "C" fn(WGPURenderPassEncoder, u32, WGPUBuffer, u64, u64),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderSetIndexBuffer: unsafe extern "C" fn(WGPURenderPassEncoder, WGPUBuffer, i32, u64, u64),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderDraw: unsafe extern "C" fn(WGPURenderPassEncoder, u32, u32, u32, u32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderDrawIndexed: unsafe extern "C" fn(WGPURenderPassEncoder, u32, u32, u32, i32, u32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderDrawIndirect: unsafe extern "C" fn(WGPURenderPassEncoder, WGPUBuffer, u64),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderDrawIndexedIndirect: unsafe extern "C" fn(WGPURenderPassEncoder, WGPUBuffer, u64),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderSetViewport: unsafe extern "C" fn(WGPURenderPassEncoder, f32, f32, f32, f32, f32, f32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderSetScissorRect: unsafe extern "C" fn(WGPURenderPassEncoder, u32, u32, u32, u32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderSetBlendConstant: unsafe extern "C" fn(WGPURenderPassEncoder, *const WGPUColor),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderSetStencilReference: unsafe extern "C" fn(WGPURenderPassEncoder, u32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderBeginOcclusionQuery: unsafe extern "C" fn(WGPURenderPassEncoder, u32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderEndOcclusionQuery: unsafe extern "C" fn(WGPURenderPassEncoder),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderExecuteBundles: unsafe extern "C" fn(WGPURenderPassEncoder, usize, *const WGPURenderBundle),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderInsertDebugMarker: unsafe extern "C" fn(WGPURenderPassEncoder, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderPushDebugGroup: unsafe extern "C" fn(WGPURenderPassEncoder, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderPopDebugGroup: unsafe extern "C" fn(WGPURenderPassEncoder),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderEnd: unsafe extern "C" fn(WGPURenderPassEncoder),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderSetLabel: unsafe extern "C" fn(WGPURenderPassEncoder, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandBufferSetLabel: unsafe extern "C" fn(WGPUCommandBuffer, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderSetPipeline: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPURenderPipeline),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderSetBindGroup: unsafe extern "C" fn(WGPURenderBundleEncoder, u32, WGPUBindGroup, usize, *const u32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderSetVertexBuffer: unsafe extern "C" fn(WGPURenderBundleEncoder, u32, WGPUBuffer, u64, u64),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderSetIndexBuffer: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPUBuffer, i32, u64, u64),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderDraw: unsafe extern "C" fn(WGPURenderBundleEncoder, u32, u32, u32, u32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderDrawIndexed: unsafe extern "C" fn(WGPURenderBundleEncoder, u32, u32, u32, i32, u32),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderDrawIndirect: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPUBuffer, u64),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderDrawIndexedIndirect: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPUBuffer, u64),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderInsertDebugMarker: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderPushDebugGroup: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderPopDebugGroup: unsafe extern "C" fn(WGPURenderBundleEncoder),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderFinish: unsafe extern "C" fn(WGPURenderBundleEncoder, *const WGPURenderBundleDescriptor)-> WGPURenderBundle,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderSetLabel: unsafe extern "C" fn(WGPURenderBundleEncoder, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleSetLabel: unsafe extern "C" fn(WGPURenderBundle, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuQuerySetGetType: unsafe extern "C" fn(WGPUQuerySet)-> i32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuQuerySetGetCount: unsafe extern "C" fn(WGPUQuerySet)-> u32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuQuerySetDestroy: unsafe extern "C" fn(WGPUQuerySet),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuQuerySetSetLabel: unsafe extern "C" fn(WGPUQuerySet, WGPUStringView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuAdapterInfoFreeMembers: unsafe extern "C" fn(WGPUAdapterInfo),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuQuerySetRelease: unsafe extern "C" fn(WGPUQuerySet),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleRelease: unsafe extern "C" fn(WGPURenderBundle),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderBundleEncoderRelease: unsafe extern "C" fn(WGPURenderBundleEncoder),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandBufferRelease: unsafe extern "C" fn(WGPUCommandBuffer),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPassEncoderRelease: unsafe extern "C" fn(WGPURenderPassEncoder),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePassEncoderRelease: unsafe extern "C" fn(WGPUComputePassEncoder),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuCommandEncoderRelease: unsafe extern "C" fn(WGPUCommandEncoder),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuRenderPipelineRelease: unsafe extern "C" fn(WGPURenderPipeline),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuComputePipelineRelease: unsafe extern "C" fn(WGPUComputePipeline),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuShaderModuleRelease: unsafe extern "C" fn(WGPUShaderModule),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuPipelineLayoutRelease: unsafe extern "C" fn(WGPUPipelineLayout),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBindGroupRelease: unsafe extern "C" fn(WGPUBindGroup),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBindGroupLayoutRelease: unsafe extern "C" fn(WGPUBindGroupLayout),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuSamplerRelease: unsafe extern "C" fn(WGPUSampler),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureViewRelease: unsafe extern "C" fn(WGPUTextureView),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuTextureRelease: unsafe extern "C" fn(WGPUTexture),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuBufferRelease: unsafe extern "C" fn(WGPUBuffer),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuQueueRelease: unsafe extern "C" fn(WGPUQueue),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuDeviceRelease: unsafe extern "C" fn(WGPUDevice),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuAdapterRelease: unsafe extern "C" fn(WGPUAdapter),
 }
 
 impl WebgpuTable {
@@ -6281,6 +6441,7 @@ unsafe fn copy_string_view(view: WGPUStringView) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 
+// SAFETY: the callback signature matches the pinned webgpu.h declaration.
 unsafe extern "C" fn request_adapter_callback(
     status: i32,
     adapter: WGPUAdapter,
@@ -6288,6 +6449,7 @@ unsafe extern "C" fn request_adapter_callback(
     userdata1: *mut c_void,
     _userdata2: *mut c_void,
 ) {
+    // SAFETY: callback pointers and views remain valid for this callback.
     runtime::callback_guard(|| unsafe {
         let message = copy_string_view(message);
         runtime::complete_from_callback(
@@ -6301,6 +6463,7 @@ unsafe extern "C" fn request_adapter_callback(
     });
 }
 
+// SAFETY: the callback signature matches the pinned webgpu.h declaration.
 unsafe extern "C" fn request_device_callback(
     status: i32,
     device: WGPUDevice,
@@ -6308,6 +6471,7 @@ unsafe extern "C" fn request_device_callback(
     userdata1: *mut c_void,
     userdata2: *mut c_void,
 ) {
+    // SAFETY: callback pointers and views remain valid for this callback.
     runtime::callback_guard(|| unsafe {
         let message = copy_string_view(message);
         let event_id = userdata2 as usize;
@@ -6327,6 +6491,7 @@ unsafe extern "C" fn request_device_callback(
     });
 }
 
+// SAFETY: the callback signature matches the pinned webgpu.h declaration.
 unsafe extern "C" fn create_compute_pipeline_async_callback(
     status: i32,
     computePipeline: WGPUComputePipeline,
@@ -6334,6 +6499,7 @@ unsafe extern "C" fn create_compute_pipeline_async_callback(
     userdata1: *mut c_void,
     _userdata2: *mut c_void,
 ) {
+    // SAFETY: callback pointers and views remain valid for this callback.
     runtime::callback_guard(|| unsafe {
         let message = copy_string_view(message);
         runtime::complete_from_callback(
@@ -6347,6 +6513,7 @@ unsafe extern "C" fn create_compute_pipeline_async_callback(
     });
 }
 
+// SAFETY: the callback signature matches the pinned webgpu.h declaration.
 unsafe extern "C" fn create_render_pipeline_async_callback(
     status: i32,
     renderPipeline: WGPURenderPipeline,
@@ -6354,6 +6521,7 @@ unsafe extern "C" fn create_render_pipeline_async_callback(
     userdata1: *mut c_void,
     _userdata2: *mut c_void,
 ) {
+    // SAFETY: callback pointers and views remain valid for this callback.
     runtime::callback_guard(|| unsafe {
         let message = copy_string_view(message);
         runtime::complete_from_callback(
@@ -6367,12 +6535,14 @@ unsafe extern "C" fn create_render_pipeline_async_callback(
     });
 }
 
+// SAFETY: the callback signature matches the pinned webgpu.h declaration.
 unsafe extern "C" fn queue_work_done_callback(
     status: i32,
     message: WGPUStringView,
     userdata1: *mut c_void,
     _userdata2: *mut c_void,
 ) {
+    // SAFETY: callback pointers and views remain valid for this callback.
     runtime::callback_guard(|| unsafe {
         let message = copy_string_view(message);
         runtime::complete_from_callback(
@@ -6386,12 +6556,14 @@ unsafe extern "C" fn queue_work_done_callback(
     });
 }
 
+// SAFETY: the callback signature matches the pinned webgpu.h declaration.
 unsafe extern "C" fn buffer_map_callback(
     status: i32,
     message: WGPUStringView,
     userdata1: *mut c_void,
     _userdata2: *mut c_void,
 ) {
+    // SAFETY: callback pointers and views remain valid for this callback.
     runtime::callback_guard(|| unsafe {
         let message = copy_string_view(message);
         runtime::complete_from_callback(
@@ -6410,6 +6582,7 @@ const WGPUPopErrorScopeStatus_Success: i32 = 0x0000_0001;
 /// Runtime slot-kind tag for pop-error-scope futures.
 const SLOT_KIND_POP_ERROR_SCOPE: u32 = 2;
 
+// SAFETY: the callback signature matches the pinned webgpu.h declaration.
 unsafe extern "C" fn device_lost_callback(
     _device: *const WGPUDevice,
     reason: i32,
@@ -6417,6 +6590,7 @@ unsafe extern "C" fn device_lost_callback(
     userdata1: *mut c_void,
     _userdata2: *mut c_void,
 ) {
+    // SAFETY: callback pointers and views remain valid for this callback.
     runtime::callback_guard(|| unsafe {
         runtime::record_device_lost(
             userdata1 as usize,
@@ -6426,6 +6600,7 @@ unsafe extern "C" fn device_lost_callback(
     });
 }
 
+// SAFETY: the callback signature matches the pinned webgpu.h declaration.
 unsafe extern "C" fn uncaptured_error_callback(
     _device: *const WGPUDevice,
     error_type: i32,
@@ -6433,6 +6608,7 @@ unsafe extern "C" fn uncaptured_error_callback(
     userdata1: *mut c_void,
     _userdata2: *mut c_void,
 ) {
+    // SAFETY: callback pointers and views remain valid for this callback.
     runtime::callback_guard(|| unsafe {
         runtime::enqueue_uncaptured_error(
             userdata1 as usize,
@@ -6442,6 +6618,7 @@ unsafe extern "C" fn uncaptured_error_callback(
     });
 }
 
+// SAFETY: the callback signature matches the pinned webgpu.h declaration.
 unsafe extern "C" fn pop_error_scope_callback(
     status: i32,
     error_type: i32,
@@ -6449,6 +6626,7 @@ unsafe extern "C" fn pop_error_scope_callback(
     userdata1: *mut c_void,
     _userdata2: *mut c_void,
 ) {
+    // SAFETY: callback pointers and views remain valid for this callback.
     runtime::callback_guard(|| unsafe {
         runtime::complete_record_from_callback(
             userdata1,
@@ -6464,19 +6642,23 @@ unsafe extern "C" fn pop_error_scope_callback(
 fn release_owned_handle(handle: runtime::OwnedHandle) {
     match handle.kind {
         SLOT_KIND_REQUEST_ADAPTER => {
+            // SAFETY: the owned handle matches this slot kind and is released once.
             unsafe { wgpuAdapterRelease(handle.value as WGPUAdapter) };
             runtime::note_owned_handle_release();
         }
         SLOT_KIND_REQUEST_DEVICE => {
+            // SAFETY: the owned handle matches this slot kind and is released once.
             unsafe { wgpuDeviceRelease(handle.value as WGPUDevice) };
             runtime::release_device_events(handle.value);
             runtime::note_owned_handle_release();
         }
         SLOT_KIND_CREATE_COMPUTE_PIPELINE_ASYNC => {
+            // SAFETY: the owned handle matches this slot kind and is released once.
             unsafe { wgpuComputePipelineRelease(handle.value as WGPUComputePipeline) };
             runtime::note_owned_handle_release();
         }
         SLOT_KIND_CREATE_RENDER_PIPELINE_ASYNC => {
+            // SAFETY: the owned handle matches this slot kind and is released once.
             unsafe { wgpuRenderPipelineRelease(handle.value as WGPURenderPipeline) };
             runtime::note_owned_handle_release();
         }
@@ -6672,9 +6854,13 @@ pub extern "C" fn subscript_typegpu_adapter_get_info(
     let strings = runtime::store_adapter_info_strings(
         adapter as usize,
         [
+            // SAFETY: backend string views remain valid until free-members runs.
             unsafe { copy_string_view(info.vendor) },
+            // SAFETY: backend string views remain valid until free-members runs.
             unsafe { copy_string_view(info.architecture) },
+            // SAFETY: backend string views remain valid until free-members runs.
             unsafe { copy_string_view(info.device) },
+            // SAFETY: backend string views remain valid until free-members runs.
             unsafe { copy_string_view(info.description) },
         ],
     );
@@ -6882,6 +7068,7 @@ pub extern "C" fn subscript_typegpu_pop_error_scope_take(
     ) else {
         return false;
     };
+    // SAFETY: out is non-null and writable for one record.
     unsafe {
         out.write(SubscriptTypegpuErrorRecord {
             r#type: record.value,
@@ -6910,6 +7097,7 @@ pub extern "C" fn subscript_typegpu_device_next_uncaptured_error(
     let Some(record) = runtime::next_uncaptured_error(device as usize) else {
         return false;
     };
+    // SAFETY: out is non-null and writable for one record.
     unsafe {
         out.write(SubscriptTypegpuErrorRecord {
             r#type: record.value,
@@ -6931,6 +7119,7 @@ pub extern "C" fn subscript_typegpu_device_lost_info(
     let Some(record) = runtime::device_lost_info(device as usize) else {
         return false;
     };
+    // SAFETY: out is non-null and writable for one record.
     unsafe {
         out.write(SubscriptTypegpuLostRecord {
             reason: record.value,
@@ -7021,9 +7210,13 @@ pub extern "C" fn subscript_typegpu_device_get_adapter_info(
     let strings = runtime::store_adapter_info_strings(
         device as usize,
         [
+            // SAFETY: backend string views remain valid until free-members runs.
             unsafe { copy_string_view(info.vendor) },
+            // SAFETY: backend string views remain valid until free-members runs.
             unsafe { copy_string_view(info.architecture) },
+            // SAFETY: backend string views remain valid until free-members runs.
             unsafe { copy_string_view(info.device) },
+            // SAFETY: backend string views remain valid until free-members runs.
             unsafe { copy_string_view(info.description) },
         ],
     );

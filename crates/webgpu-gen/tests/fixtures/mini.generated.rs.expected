@@ -103,6 +103,7 @@ const WGPUPartKind_Hollow: u64 = 0x2;
 
 /// webgpu.h `WGPUFetchGizmoCallback` callback and userdata.
 type WGPUFetchGizmoCallback = Option<
+    // SAFETY: the callback signature matches the pinned webgpu.h declaration.
     unsafe extern "C" fn(
         status: i32,
         gizmo: WGPUGizmo,
@@ -159,15 +160,24 @@ fn convert_part_descriptor(source: SubscriptTypegpuPartDescriptor) -> WGPUPartDe
 
 pub(crate) struct WebgpuTable {
     _library: libloading::Library,
-    wgpuMakeHub: unsafe extern "C" fn(*const WGPUHubDescriptor)-> WGPUHub,
-    wgpuHubPump: unsafe extern "C" fn(WGPUHub),
-    wgpuHubRelease: unsafe extern "C" fn(WGPUHub),
-    wgpuHubFetchGizmo: unsafe extern "C" fn(WGPUHub, *const WGPUHubDescriptor, WGPUFetchGizmoCallbackInfo)-> WGPUFuture,
-    wgpuGizmoGetTag: unsafe extern "C" fn(WGPUGizmo)-> u32,
-    wgpuGizmoCreatePart: unsafe extern "C" fn(WGPUGizmo, *const WGPUPartDescriptor)-> WGPUPart,
-    wgpuGizmoWritePart: unsafe extern "C" fn(WGPUGizmo, WGPUPart, u64, *const c_void, usize),
-    wgpuPartRelease: unsafe extern "C" fn(WGPUPart),
-    wgpuGizmoRelease: unsafe extern "C" fn(WGPUGizmo),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuMakeHub: unsafe extern "C" fn(*const WGPUHubDescriptor)-> WGPUHub,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuHubPump: unsafe extern "C" fn(WGPUHub),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuHubRelease: unsafe extern "C" fn(WGPUHub),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuHubFetchGizmo: unsafe extern "C" fn(WGPUHub, *const WGPUHubDescriptor, WGPUFetchGizmoCallbackInfo)-> WGPUFuture,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuGizmoGetTag: unsafe extern "C" fn(WGPUGizmo)-> u32,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuGizmoCreatePart: unsafe extern "C" fn(WGPUGizmo, *const WGPUPartDescriptor)-> WGPUPart,
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuGizmoWritePart: unsafe extern "C" fn(WGPUGizmo, WGPUPart, u64, *const c_void, usize),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuPartRelease: unsafe extern "C" fn(WGPUPart),
+    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
+wgpuGizmoRelease: unsafe extern "C" fn(WGPUGizmo),
 }
 
 impl WebgpuTable {
@@ -335,6 +345,7 @@ unsafe fn copy_string_view(view: WGPUStringView) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 
+// SAFETY: the callback signature matches the pinned webgpu.h declaration.
 unsafe extern "C" fn fetch_gizmo_callback(
     status: i32,
     gizmo: WGPUGizmo,
@@ -342,6 +353,7 @@ unsafe extern "C" fn fetch_gizmo_callback(
     userdata1: *mut c_void,
     _userdata2: *mut c_void,
 ) {
+    // SAFETY: callback pointers and views remain valid for this callback.
     runtime::callback_guard(|| unsafe {
         let message = copy_string_view(message);
         runtime::complete_from_callback(
@@ -358,6 +370,7 @@ unsafe extern "C" fn fetch_gizmo_callback(
 fn release_owned_handle(handle: runtime::OwnedHandle) {
     match handle.kind {
         SLOT_KIND_FETCH_GIZMO => {
+            // SAFETY: the owned handle matches this slot kind and is released once.
             unsafe { wgpuGizmoRelease(handle.value as WGPUGizmo) };
             runtime::note_owned_handle_release();
         }

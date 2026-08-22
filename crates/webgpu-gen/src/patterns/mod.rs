@@ -1,6 +1,5 @@
-//! One module per emission pattern (HANDOFF scope rule: a new pattern
-//! is a new module, not a rewrite). Each module renders both the C
-//! declarations for `subscript-typegpu.h` and the Rust for `generated.rs`.
+//! A new pattern is a new module, not a rewrite. Each module renders
+//! the C declarations and Rust facade definitions for its pattern.
 
 pub(crate) mod adapter_limits;
 pub(crate) mod byte_pair;

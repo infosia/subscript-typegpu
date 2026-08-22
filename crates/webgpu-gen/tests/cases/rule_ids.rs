@@ -88,6 +88,10 @@ fn every_cited_rule_id_resolves() {
     let mut files = Vec::new();
     collect_files(&root.join("crates/webgpu-gen/src"), &mut files);
     collect_files(&root.join("crates/webgpu-gen/tests"), &mut files);
+    collect_files(&root.join("crates/harness/src"), &mut files);
+    collect_files(&root.join("crates/harness/tests"), &mut files);
+    collect_files(&root.join("programs"), &mut files);
+    collect_files(&root.join("tools"), &mut files);
     files.push(root.join("crates/webgpu-gen/policy.toml"));
     files.extend([
         root.join("crates/facade/src/runtime.rs"),

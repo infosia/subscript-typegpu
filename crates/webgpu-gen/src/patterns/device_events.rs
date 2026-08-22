@@ -39,6 +39,7 @@ pub(crate) fn rust_private_types(op: &DeviceEventsOp) -> String {
         "/// webgpu.h request-device descriptor types used to install F14 callbacks.\n\
          type WGPUFeatureName = i32;\n\
          type WGPUDeviceLostCallback = Option<\n\
+         \x20   // SAFETY: the callback signature matches the pinned webgpu.h declaration.\n\
          \x20   unsafe extern \"C\" fn(\n\
          \x20       device: *const WGPUDevice,\n\
          \x20       reason: i32,\n\
@@ -56,6 +57,7 @@ pub(crate) fn rust_private_types(op: &DeviceEventsOp) -> String {
          \x20   userdata2: *mut c_void,\n\
          }}\n\
          type WGPUUncapturedErrorCallback = Option<\n\
+         \x20   // SAFETY: the callback signature matches the pinned webgpu.h declaration.\n\
          \x20   unsafe extern \"C\" fn(\n\
          \x20       device: *const WGPUDevice,\n\
          \x20       error_type: i32,\n\
@@ -84,6 +86,7 @@ pub(crate) fn rust_private_types(op: &DeviceEventsOp) -> String {
          }}\n\
          /// webgpu.h `{cb}` callback and info.\n\
          type {cb} = Option<\n\
+         \x20   // SAFETY: the callback signature matches the pinned webgpu.h declaration.\n\
          \x20   unsafe extern \"C\" fn(\n\
          \x20       status: i32,\n\
          \x20       error_type: i32,\n\
@@ -149,13 +152,15 @@ pub(crate) fn rust_constants(op: &DeviceEventsOp) -> String {
 
 pub(crate) fn rust_callbacks(op: &DeviceEventsOp) -> String {
     format!(
-        "unsafe extern \"C\" fn device_lost_callback(\n\
+        "// SAFETY: the callback signature matches the pinned webgpu.h declaration.\n\
+         unsafe extern \"C\" fn device_lost_callback(\n\
          \x20   _device: *const WGPUDevice,\n\
          \x20   reason: i32,\n\
          \x20   message: WGPUStringView,\n\
          \x20   userdata1: *mut c_void,\n\
          \x20   _userdata2: *mut c_void,\n\
          ) {{\n\
+         \x20   // SAFETY: callback pointers and views remain valid for this callback.\n\
          \x20   runtime::callback_guard(|| unsafe {{\n\
          \x20       runtime::record_device_lost(\n\
          \x20           userdata1 as usize,\n\
@@ -165,6 +170,7 @@ pub(crate) fn rust_callbacks(op: &DeviceEventsOp) -> String {
          \x20   }});\n\
          }}\n\
          \n\
+         // SAFETY: the callback signature matches the pinned webgpu.h declaration.\n\
          unsafe extern \"C\" fn uncaptured_error_callback(\n\
          \x20   _device: *const WGPUDevice,\n\
          \x20   error_type: i32,\n\
@@ -172,6 +178,7 @@ pub(crate) fn rust_callbacks(op: &DeviceEventsOp) -> String {
          \x20   userdata1: *mut c_void,\n\
          \x20   _userdata2: *mut c_void,\n\
          ) {{\n\
+         \x20   // SAFETY: callback pointers and views remain valid for this callback.\n\
          \x20   runtime::callback_guard(|| unsafe {{\n\
          \x20       runtime::enqueue_uncaptured_error(\n\
          \x20           userdata1 as usize,\n\
@@ -181,6 +188,7 @@ pub(crate) fn rust_callbacks(op: &DeviceEventsOp) -> String {
          \x20   }});\n\
          }}\n\
          \n\
+         // SAFETY: the callback signature matches the pinned webgpu.h declaration.\n\
          unsafe extern \"C\" fn {callback}(\n\
          \x20   status: i32,\n\
          \x20   error_type: i32,\n\
@@ -188,6 +196,7 @@ pub(crate) fn rust_callbacks(op: &DeviceEventsOp) -> String {
          \x20   userdata1: *mut c_void,\n\
          \x20   _userdata2: *mut c_void,\n\
          ) {{\n\
+         \x20   // SAFETY: callback pointers and views remain valid for this callback.\n\
          \x20   runtime::callback_guard(|| unsafe {{\n\
          \x20       runtime::complete_record_from_callback(\n\
          \x20           userdata1,\n\
@@ -245,6 +254,7 @@ pub(crate) fn rust_exports(op: &DeviceEventsOp, anchor: &str, mode_const: &str) 
          \x20   ) else {{\n\
          \x20       return false;\n\
          \x20   }};\n\
+         \x20   // SAFETY: out is non-null and writable for one record.\n\
          \x20   unsafe {{\n\
          \x20       out.write(SubscriptTypegpuErrorRecord {{\n\
          \x20           r#type: record.value,\n\
@@ -273,6 +283,7 @@ pub(crate) fn rust_exports(op: &DeviceEventsOp, anchor: &str, mode_const: &str) 
          \x20   let Some(record) = runtime::next_uncaptured_error(device as usize) else {{\n\
          \x20       return false;\n\
          \x20   }};\n\
+         \x20   // SAFETY: out is non-null and writable for one record.\n\
          \x20   unsafe {{\n\
          \x20       out.write(SubscriptTypegpuErrorRecord {{\n\
          \x20           r#type: record.value,\n\
@@ -294,6 +305,7 @@ pub(crate) fn rust_exports(op: &DeviceEventsOp, anchor: &str, mode_const: &str) 
          \x20   let Some(record) = runtime::device_lost_info(device as usize) else {{\n\
          \x20       return false;\n\
          \x20   }};\n\
+         \x20   // SAFETY: out is non-null and writable for one record.\n\
          \x20   unsafe {{\n\
          \x20       out.write(SubscriptTypegpuLostRecord {{\n\
          \x20           reason: record.value,\n\

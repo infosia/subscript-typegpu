@@ -23,10 +23,23 @@ while IFS= read -r file; do
         continue
     fi
 
-    if grep -nE '/(Users|home|Documents|workspace|Projects|repos)/|~/|\.\./\.\.|\.\./(subscript|subscript-gpu|yawgpu|gpuweb|webgpu-native-cts|webgpu-headers|TypeGPU)|(^|[^[:alnum:]])[A-Za-z]:[\\/]|(^|[^[:alnum:]_])(sgpu|SGPU|stgpu|STGPU)([^[:alnum:]_]|$)|(^|[^[:alnum:]_])tgpu([^[:alnum:]_]|$)' "$file"; then
+    if grep -nE '/(Users|home|Documents|workspace|Projects|repos)/|~/|\.\./\.\.|\.\./(subscript|subscript-gpu|yawgpu|gpuweb|webgpu-native-cts|webgpu-headers|TypeGPU)|(^|[^[:alnum:]])[A-Za-z]:[\\/]' "$file"; then
         echo "hygiene: forbidden text in $file" >&2
         failed=1
     fi
+
+    case "$file" in
+        crates/*|lib/*|tools/*|programs/*|README*)
+            if grep -niE 'handoff|review round|proof of concept|as requested|the owner|slice [0-9]' "$file"; then
+                echo "hygiene: review residue in $file" >&2
+                failed=1
+            fi
+            if grep -niE '(^|[^a-z])(sgpu|stgpu|tgpu)' "$file"; then
+                echo "hygiene: banned prefix in $file" >&2
+                failed=1
+            fi
+            ;;
+    esac
 done <"$file_list"
 
 if find crates -name build.rs -type f -print | grep .; then

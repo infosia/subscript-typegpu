@@ -111,7 +111,8 @@ fn render_webgpu_table(declarations: &str) -> String {
         String::from("pub(crate) struct WebgpuTable {\n    _library: libloading::Library,\n");
     for signature in &signatures {
         out.push_str(&format!(
-            "    {}: unsafe extern \"C\" fn({}){},\n",
+            "    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.\n\
+                 {}: unsafe extern \"C\" fn({}){},\n",
             signature.name, signature.param_types, signature.result
         ));
     }

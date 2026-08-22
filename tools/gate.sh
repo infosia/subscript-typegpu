@@ -40,6 +40,7 @@ trap cleanup EXIT HUP INT TERM
 
 gate_run=0
 last_test_log=
+require_backend=0
 
 run_gate() {
     gate_run=$((gate_run + 1))
@@ -55,8 +56,17 @@ run_gate() {
     fi
 
     tools/hygiene.sh
+    pending_count=$(grep -c '^pending:' "$last_test_log" || true)
     grep '^pending:' "$last_test_log" || true
-    echo "gate: green"
+    if [ "$pending_count" -gt 0 ]; then
+        if [ "$require_backend" -eq 1 ]; then
+            echo "gate: red, pending $pending_count"
+            return 1
+        fi
+        echo "gate: green, pending $pending_count"
+    else
+        echo "gate: green"
+    fi
 }
 
 elapsed() {
@@ -129,21 +139,26 @@ case "$#" in
     1)
         if [ "$1" = "--measure" ]; then
             echo "CAUTION: tools/gate.sh --measure runs cargo clean. Re-run with --measure --yes." >&2
+        elif [ "$1" = "--require-backend" ]; then
+            require_backend=1
+            run_gate
+            exit 0
         else
-            echo "usage: tools/gate.sh [--measure --yes]" >&2
+            echo "usage: tools/gate.sh [--require-backend | --measure --yes]" >&2
         fi
         exit 2
         ;;
     2)
         if [ "$1" = "--measure" ] && [ "$2" = "--yes" ]; then
+            require_backend=1
             measure
         else
-            echo "usage: tools/gate.sh [--measure --yes]" >&2
+            echo "usage: tools/gate.sh [--require-backend | --measure --yes]" >&2
             exit 2
         fi
         ;;
     *)
-        echo "usage: tools/gate.sh [--measure --yes]" >&2
+        echo "usage: tools/gate.sh [--require-backend | --measure --yes]" >&2
         exit 2
         ;;
 esac

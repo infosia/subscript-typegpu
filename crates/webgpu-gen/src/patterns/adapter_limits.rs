@@ -274,9 +274,13 @@ pub(crate) fn rust_info_export(op: &AdapterInfoOp) -> String {
          \x20   let strings = runtime::store_adapter_info_strings(\n\
          \x20       {receiver} as usize,\n\
          \x20       [\n\
+         \x20           // SAFETY: backend string views remain valid until free-members runs.\n\
          \x20           unsafe {{ copy_string_view(info.vendor) }},\n\
+         \x20           // SAFETY: backend string views remain valid until free-members runs.\n\
          \x20           unsafe {{ copy_string_view(info.architecture) }},\n\
+         \x20           // SAFETY: backend string views remain valid until free-members runs.\n\
          \x20           unsafe {{ copy_string_view(info.device) }},\n\
+         \x20           // SAFETY: backend string views remain valid until free-members runs.\n\
          \x20           unsafe {{ copy_string_view(info.description) }},\n\
          \x20       ],\n\
          \x20   );\n\

@@ -88,6 +88,7 @@ pub(crate) fn rust_callback_typedef(op: &AsyncOp) -> String {
     format!(
         "/// webgpu.h `{cb}` callback and userdata.\n\
          type {cb} = Option<\n\
+         \x20   // SAFETY: the callback signature matches the pinned webgpu.h declaration.\n\
          \x20   unsafe extern \"C\" fn(\n\
          \x20       status: i32,\n\
          {handle}\
@@ -164,13 +165,15 @@ pub(crate) fn rust_callback_fn(op: &AsyncOp, device_events: bool) -> String {
         String::new()
     };
     format!(
-        "unsafe extern \"C\" fn {rust_fn}(\n\
+        "// SAFETY: the callback signature matches the pinned webgpu.h declaration.\n\
+         unsafe extern \"C\" fn {rust_fn}(\n\
          \x20   status: i32,\n\
          {handle_param}\
          \x20   message: WGPUStringView,\n\
          \x20   userdata1: *mut c_void,\n\
          \x20   {userdata2}: *mut c_void,\n\
          ) {{\n\
+         \x20   // SAFETY: callback pointers and views remain valid for this callback.\n\
          \x20   runtime::callback_guard(|| unsafe {{\n\
          \x20       let message = copy_string_view(message);\n\
          {event_action}\
@@ -451,6 +454,7 @@ pub(crate) fn rust_release_helpers(ops: &[&AsyncOp]) -> String {
                 };
                 format!(
                     "        {kind} => {{\n\
+                     \x20           // SAFETY: the owned handle matches this slot kind and is released once.\n\
                      \x20           unsafe {{ wgpu{pascal}Release(handle.value as {ty}) }};\n\
                      {cleanup}\
                      \x20           runtime::note_owned_handle_release();\n\

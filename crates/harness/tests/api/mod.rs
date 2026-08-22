@@ -106,7 +106,10 @@ fn facade_library_has_the_generated_symbols_and_header_directory() {
     assert!(rendered.contains("c_sources: []"));
     assert_eq!(
         subscript_typegpu_harness::native_symbols_generated::facade_symbols().len(),
-        163
+        super::FACADE_EXPORT_COUNT
     );
-    assert_eq!(rendered.matches("(\"subscript_typegpu_").count(), 163);
+    assert_eq!(
+        rendered.matches("(\"subscript_typegpu_").count(),
+        super::FACADE_EXPORT_COUNT
+    );
 }

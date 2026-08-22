@@ -1,5 +1,5 @@
-//! Pin canaries. Re-pin with `specs/tracking/p0-seed.md` “Pins” and
-//! plan §5 “The substrate generator”.
+//! Pin canaries. Re-pin with `specs/subscript-typegpu-project-plan.md`
+//! section 5, "The substrate generator".
 
 use std::path::{Path, PathBuf};
 

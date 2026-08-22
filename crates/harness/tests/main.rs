@@ -4,6 +4,10 @@ use std::path::PathBuf;
 mod api;
 mod differential;
 
+// Re-pin with specs/subscript-typegpu-project-plan.md section 5,
+// "The substrate generator".
+const FACADE_EXPORT_COUNT: usize = 163;
+
 fn repository_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .ancestors()

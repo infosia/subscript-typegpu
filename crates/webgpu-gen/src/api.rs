@@ -1051,7 +1051,7 @@ fn validate_host_owned_device_policy(
         return Err(ApiPolicyError::Invalid {
             entry: GPU_DEVICE_CONSTRUCTOR.to_owned(),
             message: format!(
-                "device ownership handoff requires pattern `{HOST_OWNED_WRAPPER_PATTERN}`, found `{}`",
+                "device ownership transfer requires pattern `{HOST_OWNED_WRAPPER_PATTERN}`, found `{}`",
                 row.pattern
             ),
         });

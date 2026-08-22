@@ -1,6 +1,5 @@
-//! F20 count-first `u8` parameter-pair pattern. The generated facade
-//! reorders the public pair into the backend function's size-last
-//! order; raw pointers never cross subscript-typegpu.h.
+//! F20 count-first `u8` pairs keep count and pointer in generated ABI order.
+//! Raw pointers never cross subscript-typegpu.h.
 
 use crate::naming;
 use crate::patterns::rust_signature;

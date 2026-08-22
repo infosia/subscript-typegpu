@@ -36,7 +36,7 @@ pattern = "sync"
 [[map]]
 method = "instance.request_adapter"
 pattern = "future-poll"
-reason = "async op; F6 future-poll triple over the F7/F8 slot machinery"
+reason = "async op. F6 future-poll triple over the F7/F8 slot machinery"
 
 [[map]]
 method = "adapter.get_limits"
@@ -54,7 +54,7 @@ pattern = "feature-probe"
 [[map]]
 method = "adapter.request_device"
 pattern = "future-poll"
-reason = "async op; F6 future-poll triple over the F7/F8 slot machinery"
+reason = "async op. F6 future-poll triple over the F7/F8 slot machinery"
 
 [[map]]
 method = "device.get_queue"
@@ -103,7 +103,7 @@ reason = "B2/F12 chain-free descriptor with nested Extent3D and enum-element vie
 [[map]]
 method = "device.create_sampler"
 pattern = "descriptor"
-reason = "B2/F12 chain-free descriptor; yml optionality is preserved"
+reason = "B2/F12 chain-free descriptor. Yml optionality is preserved"
 
 [[map]]
 method = "device.create_bind_group_layout"
@@ -207,7 +207,7 @@ reason = "S1-S3 add the only script-inexpressible typed element as a sibling ove
 [[typed_pairs]]
 source = "buffer.read_mapped_range"
 element = "float"
-reason = "S1-S3 add the float fill sibling over the byte view of the float run; mapped writes stay deferred"
+reason = "S1-S3 add the float fill sibling over the byte view of the float run. Mapped writes stay deferred"
 
 [[map]]
 method = "buffer.set_label"
@@ -587,7 +587,7 @@ reason = "F4 single-owner model excludes AddRef exports"
 
 [[exclude]]
 construct = "instance.wait_any"
-reason = "non-portable; ProcessEvents is the one pump, so wgpuInstanceWaitAny is excluded"
+reason = "non-portable. ProcessEvents is the one pump, so wgpuInstanceWaitAny is excluded"
 
 [[exclude]]
 construct = "device.get_lost_future"
@@ -625,7 +625,7 @@ reason = "feature enumeration needs the parked mutable-pair and enum-parameter-p
 
 [[exclude]]
 construct = "instance.has_WGSL_language_feature"
-reason = "no consumer; probe pattern exists — map on evidence"
+reason = "no consumer. Probe pattern exists — map on evidence"
 
 [[exclude]]
 construct = "adapter.get_features"
@@ -643,7 +643,7 @@ reason = "compilation-info output records are deferred from the facade area work
 
 [[constants]]
 source = "bitflag.buffer_usage"
-reason = "usage bits cross as bare u64 scalars (F16); suite programs pass them as literals"
+reason = "usage bits cross as bare u64 scalars (F16). Suite programs pass them as literals"
 
 [[constants]]
 source = "bitflag.map_mode"
@@ -977,7 +977,7 @@ synthetic_enum = "GPUErrorType"
 synthetic_boundary_enum = "SubscriptTypegpuErrorType"
 synthetic_enum_mappings = ["validation=SUBSCRIPT_TYPEGPU_ERROR_TYPE_VALIDATION", "out-of-memory=SUBSCRIPT_TYPEGPU_ERROR_TYPE_OUT_OF_MEMORY", "internal=SUBSCRIPT_TYPEGPU_ERROR_TYPE_INTERNAL", "unknown=SUBSCRIPT_TYPEGPU_ERROR_TYPE_UNKNOWN"]
 synthetic_enum_exclusions = ["SUBSCRIPT_TYPEGPU_ERROR_TYPE_NO_ERROR"]
-reason = "F11 materializes the facade-owned type and message fill as an immutable API result; GPUErrorType is a project-defined discriminator rather than a pinned-IDL enum, GPUError gains a public constructor the IDL does not declare, and NoError becomes null rather than a GPUError"
+reason = "F11 materializes the facade-owned type and message fill as an immutable API result. GPUErrorType is a project-defined discriminator rather than a pinned-IDL enum, GPUError gains a public constructor the IDL does not declare, and NoError becomes null rather than a GPUError"
 
 [[api.result_records]]
 interface = "GPUDeviceLostInfo"
@@ -989,14 +989,14 @@ reason = "F11 materializes the facade-owned reason and message fill as an immuta
 interface = "GPUSupportedLimits"
 boundary = "SubscriptTypegpuLimits"
 nullable = false
-reason = "the pinned IDL exposes 36 readonly limit attributes while the facade fill carries 32; this API returns those 32 as an immutable result class with a public constructor, preserves all three u64 fields, and excludes the four stage-specific storage-limit attributes the facade does not carry"
+reason = "the pinned IDL exposes 36 readonly limit attributes while the facade fill carries 32. This API returns those 32 as an immutable result class with a public constructor, preserves all three u64 fields, and excludes the four stage-specific storage-limit attributes the facade does not carry"
 
 [[api.result_records]]
 interface = "GPUAdapterInfo"
 boundary = "SubscriptTypegpuAdapterInfo"
 nullable = false
 boundary_field_exclusions = ["backendType", "adapterType", "vendorID", "deviceID"]
-reason = "the pinned IDL exposes seven readonly adapter-info attributes while the facade fill carries only the four facade-public strings; this API returns those strings as an immutable result class with a public constructor, and does not invent public IDL surface for the facade-only backend type, adapter type, vendor ID, or device ID"
+reason = "the pinned IDL exposes seven readonly adapter-info attributes while the facade fill carries only the four facade-public strings. This API returns those strings as an immutable result class with a public constructor, and does not invent public IDL surface for the facade-only backend type, adapter type, vendor ID, or device ID"
 
 [[api.flattened_interfaces]]
 interface = "GPUValidationError"
@@ -1016,7 +1016,7 @@ reason = "the public GPUError type field preserves internal identity, but JavaSc
 [[api.namespace_mappings]]
 namespace = "GPUColorWrite"
 boundary = "SubscriptTypegpuColorWriteMask"
-reason = "the IDL namespace omits the facade's Mask suffix; this explicit join preserves the pinned SubscriptTypegpuColorWriteMask alias name"
+reason = "the IDL namespace omits the facade's Mask suffix. This explicit join preserves the pinned SubscriptTypegpuColorWriteMask alias name"
 
 [[api.dictionary_mappings]]
 dictionary = "GPUExtent3DDict"
@@ -1037,7 +1037,7 @@ dictionary = "GPUColorDict"
 api = "GPUColor"
 idl_type = "GPUColor"
 boundary = "SubscriptTypegpuColor"
-reason = "GPUColor is a dictionary-or-sequence union; this API keeps the dictionary branch, so JavaScript's [r, g, b, a] sequence spelling is unavailable"
+reason = "GPUColor is a dictionary-or-sequence union. This API keeps the dictionary branch, so JavaScript's [r, g, b, a] sequence spelling is unavailable"
 
 [[api.dictionary_mappings]]
 dictionary = "GPUComputePassTimestampWrites"
@@ -1324,7 +1324,7 @@ reason = "the readable/writable JavaScript label becomes a write-only label(valu
 member = "GPUComputePipeline.getBindGroupLayout"
 pattern = "operation"
 boundary_arguments = ["index=groupIndex"]
-reason = "the facade names the WebIDL index parameter groupIndex; the generated API keeps the IDL name and joins it explicitly"
+reason = "the facade names the WebIDL index parameter groupIndex. The generated API keeps the IDL name and joins it explicitly"
 
 [[api.deviations]]
 member = "GPUComputePipeline.label"
@@ -1335,7 +1335,7 @@ reason = "the readable/writable JavaScript label becomes a write-only label(valu
 member = "GPURenderPipeline.getBindGroupLayout"
 pattern = "operation"
 boundary_arguments = ["index=groupIndex"]
-reason = "the facade names the WebIDL index parameter groupIndex; the generated API keeps the IDL name and joins it explicitly"
+reason = "the facade names the WebIDL index parameter groupIndex. The generated API keeps the IDL name and joins it explicitly"
 
 [[api.deviations]]
 member = "GPURenderPipeline.label"
@@ -1352,7 +1352,7 @@ pattern = "dictionary-field"
 
 [[api.exclude]]
 member = "GPUShaderModuleDescriptor.compilationHints"
-reason = "the facade's WGSL chain flattening has no compilation-hint field; JavaScript users lose performance hints, not shader semantics"
+reason = "the facade's WGSL chain flattening has no compilation-hint field. JavaScript users lose performance hints, not shader semantics"
 
 [[api.generate]]
 member = "GPUProgrammableStage.module"
@@ -1362,7 +1362,7 @@ pattern = "dictionary-field"
 member = "GPUProgrammableStage.entryPoint"
 pattern = "dictionary-required"
 required_field = true
-reason = "JavaScript may omit entryPoint when exactly one matching shader entry can be inferred, while this API requires the entry-point name explicitly"
+reason = "JavaScript can omit entryPoint when exactly one matching shader entry can be inferred, while this API requires the entry-point name explicitly"
 
 [[api.deviations]]
 member = "GPUProgrammableStage.constants"
@@ -1370,7 +1370,7 @@ pattern = "dictionary-record-entries"
 field_default = "[]"
 record_entry_api = "GPUPipelineConstantEntry"
 record_entry_boundary = "SubscriptTypegpuConstantEntry"
-reason = "WebIDL's map literal { constants: { gain: 2.0 } } is not expressible, so JavaScript users must supply an entry array { constants: [{ key: \"gain\", value: 2.0 }] }; unlike a record, the array can contain duplicate keys, so duplicates become backend validation errors instead of an unrepresentable state"
+reason = "WebIDL's map literal { constants: { gain: 2.0 } } is not expressible, so JavaScript users must supply an entry array { constants: [{ key: \"gain\", value: 2.0 }] }. Unlike a record, the array can contain duplicate keys, so duplicates become backend validation errors instead of an unrepresentable state"
 
 [[api.generate]]
 member = "GPUComputePipelineDescriptor.label"
@@ -1380,7 +1380,7 @@ pattern = "dictionary-field"
 member = "GPUComputePipelineDescriptor.layout"
 pattern = "dictionary-nullable-handle"
 field_default = "null"
-reason = "IDL requires a layout handle or the string \"auto\"; this API makes layout optional and replaces \"auto\" with null, so omission/null selects automatic layout *(docs)* and an accidentally omitted layout produces a pipeline whose bind groups cannot be shared through an explicit GPUPipelineLayout"
+reason = "IDL requires a layout handle or the string \"auto\". This API makes layout optional and replaces \"auto\" with null, so omission/null selects automatic layout *(docs)* and an accidentally omitted layout produces a pipeline whose bind groups cannot be shared through an explicit GPUPipelineLayout"
 
 [[api.generate]]
 member = "GPUComputePipelineDescriptor.compute"
@@ -1418,7 +1418,7 @@ pattern = "dictionary-field"
 member = "GPUVertexState.entryPoint"
 pattern = "dictionary-required"
 required_field = true
-reason = "JavaScript may omit entryPoint when exactly one matching shader entry can be inferred, while this API requires the entry-point name explicitly"
+reason = "JavaScript can omit entryPoint when exactly one matching shader entry can be inferred, while this API requires the entry-point name explicitly"
 
 [[api.deviations]]
 member = "GPUVertexState.constants"
@@ -1426,7 +1426,7 @@ pattern = "dictionary-record-entries"
 field_default = "[]"
 record_entry_api = "GPUPipelineConstantEntry"
 record_entry_boundary = "SubscriptTypegpuConstantEntry"
-reason = "WebIDL's pipeline-constant map is not expressible, so JavaScript users must supply key/value entry objects in an array; unlike a record, the array can contain duplicate keys, so duplicates become backend validation errors instead of an unrepresentable state"
+reason = "WebIDL's pipeline-constant map is not expressible, so JavaScript users must supply key/value entry objects in an array. Unlike a record, the array can contain duplicate keys, so duplicates become backend validation errors instead of an unrepresentable state"
 
 [[api.deviations]]
 member = "GPUVertexState.buffers"
@@ -1477,7 +1477,7 @@ pattern = "dictionary-field"
 member = "GPUDepthStencilState.depthWriteEnabled"
 pattern = "dictionary-required-optional-bool"
 required_field = true
-reason = "JavaScript distinguishes an absent depthWriteEnabled from false, but Q33 has no absence-capable boolean member; callers must state true or false and the facade receives that explicit optional-bool value"
+reason = "JavaScript distinguishes an absent depthWriteEnabled from false, but Q33 has no absence-capable boolean member. Callers must state true or false and the facade receives that explicit optional-bool value"
 
 [[api.generate]]
 member = "GPUDepthStencilState.depthCompare"
@@ -1551,7 +1551,7 @@ pattern = "dictionary-field"
 member = "GPUColorTargetState.blend"
 pattern = "dictionary-nullable-descriptor"
 field_default = "null"
-reason = "JavaScript expresses an absent blend member by omission; this API also accepts explicit null, and omission or null both disable blending"
+reason = "JavaScript expresses an absent blend member by omission. This API also accepts explicit null, and omission or null both disable blending"
 
 [[api.generate]]
 member = "GPUColorTargetState.writeMask"
@@ -1565,7 +1565,7 @@ pattern = "dictionary-field"
 member = "GPUFragmentState.entryPoint"
 pattern = "dictionary-required"
 required_field = true
-reason = "JavaScript may omit entryPoint when exactly one matching shader entry can be inferred, while this API requires the entry-point name explicitly"
+reason = "JavaScript can omit entryPoint when exactly one matching shader entry can be inferred, while this API requires the entry-point name explicitly"
 
 [[api.deviations]]
 member = "GPUFragmentState.constants"
@@ -1573,7 +1573,7 @@ pattern = "dictionary-record-entries"
 field_default = "[]"
 record_entry_api = "GPUPipelineConstantEntry"
 record_entry_boundary = "SubscriptTypegpuConstantEntry"
-reason = "WebIDL's pipeline-constant map is not expressible, so JavaScript users must supply key/value entry objects in an array; unlike a record, the array can contain duplicate keys, so duplicates become backend validation errors instead of an unrepresentable state"
+reason = "WebIDL's pipeline-constant map is not expressible, so JavaScript users must supply key/value entry objects in an array. Unlike a record, the array can contain duplicate keys, so duplicates become backend validation errors instead of an unrepresentable state"
 
 [[api.deviations]]
 member = "GPUFragmentState.targets"
@@ -1588,7 +1588,7 @@ pattern = "dictionary-field"
 member = "GPURenderPipelineDescriptor.layout"
 pattern = "dictionary-nullable-handle"
 field_default = "null"
-reason = "IDL requires a layout handle or the string \"auto\"; this API makes layout optional and replaces \"auto\" with null, so omission/null selects automatic layout *(docs)* and an accidentally omitted layout produces a pipeline whose bind groups cannot be shared through an explicit GPUPipelineLayout"
+reason = "IDL requires a layout handle or the string \"auto\". This API makes layout optional and replaces \"auto\" with null, so omission/null selects automatic layout *(docs)* and an accidentally omitted layout produces a pipeline whose bind groups cannot be shared through an explicit GPUPipelineLayout"
 
 [[api.generate]]
 member = "GPURenderPipelineDescriptor.vertex"
@@ -1602,7 +1602,7 @@ pattern = "dictionary-field"
 member = "GPURenderPipelineDescriptor.depthStencil"
 pattern = "dictionary-nullable-descriptor"
 field_default = "null"
-reason = "JavaScript omits depthStencil to disable depth/stencil state; this API also accepts explicit null, and omission or null both pass a null facade pointer"
+reason = "JavaScript omits depthStencil to disable depth/stencil state. This API also accepts explicit null, and omission or null both pass a null facade pointer"
 
 [[api.generate]]
 member = "GPURenderPipelineDescriptor.multisample"
@@ -1612,7 +1612,7 @@ pattern = "dictionary-field"
 member = "GPURenderPipelineDescriptor.fragment"
 pattern = "dictionary-nullable-descriptor"
 field_default = "null"
-reason = "JavaScript omits fragment for a no-color-output pipeline; this API also accepts explicit null, and omission or null both pass a null facade pointer"
+reason = "JavaScript omits fragment for a no-color-output pipeline. This API also accepts explicit null, and omission or null both pass a null facade pointer"
 
 [[api.generate]]
 member = "GPUVertexFormat.uint8"
@@ -1994,7 +1994,7 @@ member = "GPUAdapter.requestDevice"
 pattern = "async-request"
 begin_function = "subscript_typegpu_adapter_request_device_with_descriptor"
 nullable_return = true
-reason = "GPUDeviceDescriptor is lowered through the facade's WithDescriptor route and requiredFeatures entries are passed without filtering, so an unsupported feature fails the request rather than being dropped; JavaScript rejects requestDevice with a DOMException on failure, while this API resolves null without an error reason or message"
+reason = "GPUDeviceDescriptor is lowered through the facade's WithDescriptor route and requiredFeatures entries are passed without filtering, so an unsupported feature fails the request rather than being dropped. JavaScript rejects requestDevice with a DOMException on failure, while this API resolves null without an error reason or message"
 
 [[api.generate]]
 member = "GPUQueueDescriptor.label"
@@ -2014,7 +2014,7 @@ pattern = "dictionary-required-limits"
 required_limits_api = "GPURequiredLimits"
 required_limits_source = "GPUSupportedLimits"
 required_limits_u32_unspecified = 4294967295
-reason = "WebIDL accepts an open record<DOMString, GPUSize64>, while this API uses a fixed-key GPURequiredLimits descriptor for the 32 fields exposed by the facade (29 u32 and 3 u64), so arbitrary keys, the four compatibility-only limits, and values above u32 for narrowed fields are unavailable; public zero is reserved for omission and cannot request a real zero-valued limit, lowering u32 omission to WGPU_LIMIT_U32_UNDEFINED and leaving the three u64 fields for the facade's F13 zero-to-undefined rule"
+reason = "WebIDL accepts an open record<DOMString, GPUSize64>, while this API uses a fixed-key GPURequiredLimits descriptor for the 32 fields exposed by the facade (29 u32 and 3 u64), so arbitrary keys, the four compatibility-only limits, and values above u32 for narrowed fields are unavailable. Public zero is reserved for omission and cannot request a real zero-valued limit, lowering u32 omission to WGPU_LIMIT_U32_UNDEFINED and leaving the three u64 fields for the facade's F13 zero-to-undefined rule"
 
 [[api.generate]]
 member = "GPUDeviceDescriptor.defaultQueue"
@@ -2023,7 +2023,7 @@ pattern = "dictionary-field"
 [[api.deviations]]
 member = "GPUDevice.@constructor"
 pattern = "host-owned-wrapper"
-reason = "JavaScript exposes no GPUDevice constructor; static methods are unavailable, so this API keeps a public owning constructor that accepts private raw-handle fields, acquires and caches one queue reference through subscript_typegpu_device_get_queue, and is paired with hostOwnedGPUDevice, whose GPUHostOwnedDevice wraps a host-owned device, exposes the same creation methods but neither dispose nor destroy, and returns a new owned queue wrapper from each queue call"
+reason = "JavaScript exposes no GPUDevice constructor. Static methods are unavailable, so this API keeps a public owning constructor that accepts private raw-handle fields, acquires and caches one queue reference through subscript_typegpu_device_get_queue, and is paired with hostOwnedGPUDevice, whose GPUHostOwnedDevice wraps a host-owned device, exposes the same creation methods but neither dispose nor destroy, and returns a new owned queue wrapper from each queue call"
 
 [[api.deviations]]
 member = "GPUDevice.queue"
@@ -2054,12 +2054,12 @@ reason = "the facade accepts explicit offset and size values and exposes mapping
 [[api.deviations]]
 member = "GPUBuffer.getMappedRange"
 pattern = "mapped-range"
-reason = "ArrayBuffer and raw pointers are unavailable, so readMappedRange(offset, size) and writeMappedRange(offset, data) require explicit ranges; failed reads return an empty u8[] indistinguishable from zero-size success"
+reason = "ArrayBuffer and raw pointers are unavailable, so readMappedRange(offset, size) and writeMappedRange(offset, data) require explicit ranges. Failed reads return an empty u8[] indistinguishable from zero-size success"
 
 [[api.deviations]]
 member = "GPUBuffer.readMappedRangeF32"
 pattern = "typed-read-f32"
-reason = "the IDL spells this element type as Float32Array inside BufferSource, and subscript has no typed-array view; offset counts bytes and count counts elements"
+reason = "the IDL spells this element type as Float32Array inside BufferSource, and subscript has no typed-array view. Offset counts bytes and count counts elements"
 
 [[api.deviations]]
 member = "GPUQueue.writeBuffer"
@@ -2071,7 +2071,7 @@ reason = "the facade accepts a complete byte array and drops IDL's dataOffset an
 [[api.deviations]]
 member = "GPUQueue.writeBufferF32"
 pattern = "typed-write-f32"
-reason = "the IDL spells this element type as Float32Array inside BufferSource, and subscript has no typed-array view; bufferOffset counts bytes and data length counts elements"
+reason = "the IDL spells this element type as Float32Array inside BufferSource, and subscript has no typed-array view. BufferOffset counts bytes and data length counts elements"
 
 [[api.deviations]]
 member = "GPUQueue.onSubmittedWorkDone"
@@ -2090,32 +2090,32 @@ reason = "the facade exposes neither an instance WGSL-language-feature probe nor
 [[api.deviations]]
 member = "GPUAdapter.features"
 pattern = "feature-probe"
-reason = "the IDL GPUSupportedFeatures setlike attribute becomes hasFeature(name); without a set type or facade enumeration, callers lose the stable set object, iteration, size, and features.has(name) spelling"
+reason = "the IDL GPUSupportedFeatures setlike attribute becomes hasFeature(name). Without a set type or facade enumeration, callers lose the stable set object, iteration, size, and features.has(name) spelling"
 
 [[api.deviations]]
 member = "GPUAdapter.limits"
 pattern = "result-record-fill"
-reason = "the readonly SameObject limits attribute becomes limits(), which returns a fresh GPUSupportedLimits record; a failed i32 facade fill returns null rather than a success-looking zero record"
+reason = "the readonly SameObject limits attribute becomes limits(), which returns a fresh GPUSupportedLimits record. A failed i32 facade fill returns null rather than a success-looking zero record"
 
 [[api.deviations]]
 member = "GPUAdapter.info"
 pattern = "result-record-fill"
-reason = "the readonly SameObject info attribute becomes info(), which returns a fresh GPUAdapterInfo record; a failed boolean facade fill returns null rather than a success-looking empty record"
+reason = "the readonly SameObject info attribute becomes info(), which returns a fresh GPUAdapterInfo record. A failed boolean facade fill returns null rather than a success-looking empty record"
 
 [[api.deviations]]
 member = "GPUDevice.features"
 pattern = "feature-probe"
-reason = "the IDL GPUSupportedFeatures setlike attribute becomes hasFeature(name); without a set type or facade enumeration, callers lose the stable set object, iteration, size, and features.has(name) spelling"
+reason = "the IDL GPUSupportedFeatures setlike attribute becomes hasFeature(name). Without a set type or facade enumeration, callers lose the stable set object, iteration, size, and features.has(name) spelling"
 
 [[api.deviations]]
 member = "GPUDevice.limits"
 pattern = "result-record-fill"
-reason = "the readonly SameObject limits attribute becomes limits(), which returns a fresh GPUSupportedLimits record; a failed i32 facade fill returns null rather than a success-looking zero record"
+reason = "the readonly SameObject limits attribute becomes limits(), which returns a fresh GPUSupportedLimits record. A failed i32 facade fill returns null rather than a success-looking zero record"
 
 [[api.deviations]]
 member = "GPUDevice.adapterInfo"
 pattern = "result-record-fill"
-reason = "the readonly SameObject adapterInfo attribute becomes adapterInfo(), which returns a fresh GPUAdapterInfo record; a failed boolean facade fill returns null rather than a success-looking empty record"
+reason = "the readonly SameObject adapterInfo attribute becomes adapterInfo(), which returns a fresh GPUAdapterInfo record. A failed boolean facade fill returns null rather than a success-looking empty record"
 
 [[api.generate]]
 member = "GPUDevice.destroy"
@@ -2162,20 +2162,20 @@ member = "GPUDevice.createComputePipelineAsync"
 pattern = "async-request"
 nullable_return = true
 begin_function = "subscript_typegpu_device_create_compute_pipeline_async_begin"
-reason = "JavaScript rejects with a GPUPipelineError carrying reason and message, while this API resolves null and carries neither directly; callers must use a separate device error scope to obtain the backend error type and message"
+reason = "JavaScript rejects with a GPUPipelineError carrying reason and message, while this API resolves null and carries neither directly. Callers must use a separate device error scope to obtain the backend error type and message"
 
 [[api.deviations]]
 member = "GPUDevice.createRenderPipelineAsync"
 pattern = "async-request"
 nullable_return = true
 begin_function = "subscript_typegpu_device_create_render_pipeline_async_begin"
-reason = "JavaScript rejects with a GPUPipelineError carrying reason and message, while this API resolves null and carries neither directly; callers must use a separate device error scope to obtain the backend error type and message"
+reason = "JavaScript rejects with a GPUPipelineError carrying reason and message, while this API resolves null and carries neither directly. Callers must use a separate device error scope to obtain the backend error type and message"
 
 [[api.deviations]]
 member = "GPUDevice.createCommandEncoder"
 pattern = "operation"
 default_variant = "createCommandEncoderDefault"
-reason = "JavaScript omits the empty descriptor on createCommandEncoder(); this API keeps a typed createCommandEncoder(descriptor) and provides createCommandEncoderDefault() for omission"
+reason = "JavaScript omits the empty descriptor on createCommandEncoder(). This API keeps a typed createCommandEncoder(descriptor) and provides createCommandEncoderDefault() for omission"
 
 [[api.generate]]
 member = "GPUDevice.createRenderBundleEncoder"
@@ -2188,7 +2188,7 @@ pattern = "operation"
 [[api.deviations]]
 member = "GPUDevice.lost"
 pattern = "device-lost-poll"
-reason = "JavaScript exposes a once-resolving device.lost promise attribute that can be awaited at setup; without promise attributes this API provides non-consuming deviceLostInfo(), so callers must poll at chosen points and may read the same record repeatedly; each call pumps the instance event loop and can complete unrelated futures"
+reason = "JavaScript exposes a once-resolving device.lost promise attribute that can be awaited at setup. Without promise attributes this API provides non-consuming deviceLostInfo(), so callers must poll at chosen points and can read the same record repeatedly. Each call pumps the instance event loop and can complete unrelated futures"
 
 [[api.generate]]
 member = "GPUDevice.pushErrorScope"
@@ -2197,12 +2197,12 @@ pattern = "operation"
 [[api.deviations]]
 member = "GPUDevice.popErrorScope"
 pattern = "error-scope-pop"
-reason = "JavaScript rejects a failed pop and resolves a GPUError subclass or null; this API polls the F6 delivery separately, then converts a captured fill to flattened GPUError, so delivery-status failure, fill-take failure, and a successful NoError fill all resolve null and carry no rejection detail"
+reason = "JavaScript rejects a failed pop and resolves a GPUError subclass or null. This API polls the F6 delivery separately, then converts a captured fill to flattened GPUError, so delivery-status failure, fill-take failure, and a successful NoError fill all resolve null and carry no rejection detail"
 
 [[api.deviations]]
 member = "GPUDevice.onuncapturederror"
 pattern = "uncaptured-error-drain"
-reason = "JavaScript handler registration becomes consuming nextUncapturedError() over the F11 FIFO; callers lose EventTarget delivery and preventDefault, errors are observed only when the program drains, and unlike deviceLostInfo() the drain does not pump the instance event loop"
+reason = "JavaScript handler registration becomes consuming nextUncapturedError() over the F11 FIFO. Callers lose EventTarget delivery and preventDefault, errors are observed only when the program drains, and unlike deviceLostInfo() the drain does not pump the instance event loop"
 
 [[api.deviations]]
 member = "GPUDevice.label"
@@ -2218,7 +2218,7 @@ reason = "the readable/writable JavaScript label becomes a write-only label(valu
 member = "GPUQueue.submit"
 pattern = "operation"
 boundary_arguments = ["commandBuffers=commands"]
-reason = "the public method keeps IDL's commandBuffers name while explicitly joining the facade's R11-collapsed commands handle array; the array shape is unchanged"
+reason = "the public method keeps IDL's commandBuffers name while explicitly joining the facade's R11-collapsed commands handle array. The array shape is unchanged"
 
 [[api.deviations]]
 member = "GPUQueue.writeTexture"
@@ -3086,25 +3086,25 @@ pattern = "dictionary-field"
 member = "GPUBindGroupLayoutEntry.buffer"
 pattern = "dictionary-optional-descriptor"
 absent_boundary_values = ["SubscriptTypegpuBufferBindingType.SUBSCRIPT_TYPEGPU_BUFFER_BINDING_TYPE_BINDING_NOT_USED", "false", "0"]
-reason = "the optional JavaScript buffer layout becomes GPUBufferBindingLayout | null; null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error"
+reason = "the optional JavaScript buffer layout becomes GPUBufferBindingLayout | null. Null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error"
 
 [[api.deviations]]
 member = "GPUBindGroupLayoutEntry.sampler"
 pattern = "dictionary-optional-descriptor"
 absent_boundary_values = ["SubscriptTypegpuSamplerBindingType.SUBSCRIPT_TYPEGPU_SAMPLER_BINDING_TYPE_BINDING_NOT_USED"]
-reason = "the optional JavaScript sampler layout becomes GPUSamplerBindingLayout | null; null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error"
+reason = "the optional JavaScript sampler layout becomes GPUSamplerBindingLayout | null. Null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error"
 
 [[api.deviations]]
 member = "GPUBindGroupLayoutEntry.texture"
 pattern = "dictionary-optional-descriptor"
 absent_boundary_values = ["SubscriptTypegpuTextureSampleType.SUBSCRIPT_TYPEGPU_TEXTURE_SAMPLE_TYPE_BINDING_NOT_USED", "SubscriptTypegpuTextureViewDimension.SUBSCRIPT_TYPEGPU_TEXTURE_VIEW_DIMENSION_UNDEFINED", "false"]
-reason = "the optional JavaScript texture layout becomes GPUTextureBindingLayout | null; null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error"
+reason = "the optional JavaScript texture layout becomes GPUTextureBindingLayout | null. Null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error"
 
 [[api.deviations]]
 member = "GPUBindGroupLayoutEntry.storageTexture"
 pattern = "dictionary-optional-descriptor"
 absent_boundary_values = ["SubscriptTypegpuStorageTextureAccess.SUBSCRIPT_TYPEGPU_STORAGE_TEXTURE_ACCESS_BINDING_NOT_USED", "SubscriptTypegpuTextureFormat.SUBSCRIPT_TYPEGPU_TEXTURE_FORMAT_UNDEFINED", "SubscriptTypegpuTextureViewDimension.SUBSCRIPT_TYPEGPU_TEXTURE_VIEW_DIMENSION_UNDEFINED"]
-reason = "the optional JavaScript storage-texture layout becomes GPUStorageTextureBindingLayout | null; null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error"
+reason = "the optional JavaScript storage-texture layout becomes GPUStorageTextureBindingLayout | null. Null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error"
 
 [[api.exclude]]
 member = "GPUBindGroupLayoutEntry.externalTexture"
@@ -3125,7 +3125,7 @@ pattern = "dictionary-field"
 [[api.deviations]]
 member = "GPUBindGroupEntry.resource"
 pattern = "binding-resource"
-reason = "the JavaScript API's one resource union becomes nullable buffer, sampler, and textureView members plus buffer offset and size; GPUTexture shorthand and GPUExternalTexture are unavailable, and setting none or more than one handle is a backend validation error rather than a type error"
+reason = "the JavaScript API's one resource union becomes nullable buffer, sampler, and textureView members plus buffer offset and size. GPUTexture shorthand and GPUExternalTexture are unavailable, and setting none or more than one handle is a backend validation error rather than a type error"
 
 [[api.generate]]
 member = "GPUBindGroupDescriptor.label"
@@ -3151,7 +3151,7 @@ pattern = "dictionary-field"
 member = "GPUBufferBinding.size"
 pattern = "dictionary-default"
 field_default = "0"
-reason = "WebIDL omission means the rest of the buffer; the public default 0 lowers through the facade's 0-to-WGPU_WHOLE_SIZE rule, and zero is never a valid binding size, so no valid JavaScript size is conflated and this is not an R16 case"
+reason = "WebIDL omission means the rest of the buffer. The public default 0 lowers through the facade's 0-to-WGPU_WHOLE_SIZE rule, and zero is never a valid binding size, so no valid JavaScript size is conflated and this is not an R16 case"
 
 [[api.generate]]
 member = "GPUPipelineLayoutDescriptor.label"
@@ -3321,13 +3321,13 @@ pattern = "dictionary-field"
 member = "GPUComputePassTimestampWrites.beginningOfPassWriteIndex"
 pattern = "dictionary-default"
 field_default = "4294967295"
-reason = "IDL omission is represented by the pinned WGPU_QUERY_SET_INDEX_UNDEFINED u32 sentinel; the public default preserves omission without exposing an additional value"
+reason = "IDL omission is represented by the pinned WGPU_QUERY_SET_INDEX_UNDEFINED u32 sentinel. The public default preserves omission without exposing an additional value"
 
 [[api.deviations]]
 member = "GPUComputePassTimestampWrites.endOfPassWriteIndex"
 pattern = "dictionary-default"
 field_default = "4294967295"
-reason = "IDL omission is represented by the pinned WGPU_QUERY_SET_INDEX_UNDEFINED u32 sentinel; the public default preserves omission without exposing an additional value"
+reason = "IDL omission is represented by the pinned WGPU_QUERY_SET_INDEX_UNDEFINED u32 sentinel. The public default preserves omission without exposing an additional value"
 
 [[api.generate]]
 member = "GPURenderPassTimestampWrites.querySet"
@@ -3337,13 +3337,13 @@ pattern = "dictionary-field"
 member = "GPURenderPassTimestampWrites.beginningOfPassWriteIndex"
 pattern = "dictionary-default"
 field_default = "4294967295"
-reason = "IDL omission is represented by the pinned WGPU_QUERY_SET_INDEX_UNDEFINED u32 sentinel; the shared pass-timestamp descriptor preserves omission"
+reason = "IDL omission is represented by the pinned WGPU_QUERY_SET_INDEX_UNDEFINED u32 sentinel. The shared pass-timestamp descriptor preserves omission"
 
 [[api.deviations]]
 member = "GPURenderPassTimestampWrites.endOfPassWriteIndex"
 pattern = "dictionary-default"
 field_default = "4294967295"
-reason = "IDL omission is represented by the pinned WGPU_QUERY_SET_INDEX_UNDEFINED u32 sentinel; the shared pass-timestamp descriptor preserves omission"
+reason = "IDL omission is represented by the pinned WGPU_QUERY_SET_INDEX_UNDEFINED u32 sentinel. The shared pass-timestamp descriptor preserves omission"
 
 [[api.generate]]
 member = "GPUComputePassDescriptor.label"
@@ -3353,7 +3353,7 @@ pattern = "dictionary-field"
 member = "GPUComputePassDescriptor.timestampWrites"
 pattern = "dictionary-nullable-descriptor"
 field_default = "null"
-reason = "IDL omission disables pass timestamp writes; this API also accepts explicit null, and omission or null both pass a null facade pointer"
+reason = "IDL omission disables pass timestamp writes. This API also accepts explicit null, and omission or null both pass a null facade pointer"
 
 [[api.generate]]
 member = "GPUColorDict.r"
@@ -3374,7 +3374,7 @@ pattern = "dictionary-field"
 [[api.deviations]]
 member = "GPURenderPassColorAttachment.view"
 pattern = "dictionary-required-handle"
-reason = "IDL accepts a GPUTexture or GPUTextureView, while the facade accepts only a texture-view handle; callers lose the GPUTexture shorthand and must provide a GPUTextureView, which remains required"
+reason = "IDL accepts a GPUTexture or GPUTextureView, while the facade accepts only a texture-view handle. Callers lose the GPUTexture shorthand and must provide a GPUTextureView, which remains required"
 
 [[api.deviations]]
 member = "GPURenderPassColorAttachment.depthSlice"
@@ -3386,13 +3386,13 @@ reason = "IDL omission is represented by the pinned WGPU_DEPTH_SLICE_UNDEFINED u
 member = "GPURenderPassColorAttachment.resolveTarget"
 pattern = "dictionary-nullable-handle"
 field_default = "null"
-reason = "IDL accepts a GPUTexture or GPUTextureView when present, while the facade accepts only a texture-view handle; callers lose the GPUTexture shorthand, and omission or null disables resolve"
+reason = "IDL accepts a GPUTexture or GPUTextureView when present, while the facade accepts only a texture-view handle. Callers lose the GPUTexture shorthand, and omission or null disables resolve"
 
 [[api.deviations]]
 member = "GPURenderPassColorAttachment.clearValue"
 pattern = "dictionary-union-descriptor"
 field_default = "{ r: 0, g: 0, b: 0, a: 0 }"
-reason = "GPUColor is a dictionary-or-sequence union; callers must use { r, g, b, a } and lose the [r, g, b, a] sequence spelling, while omission keeps the IDL zero-color default"
+reason = "GPUColor is a dictionary-or-sequence union. Callers must use { r, g, b, a } and lose the [r, g, b, a] sequence spelling, while omission keeps the IDL zero-color default"
 
 [[api.generate]]
 member = "GPURenderPassColorAttachment.loadOp"
@@ -3405,7 +3405,7 @@ pattern = "dictionary-field"
 [[api.deviations]]
 member = "GPURenderPassDepthStencilAttachment.view"
 pattern = "dictionary-required-handle"
-reason = "IDL accepts a GPUTexture or GPUTextureView, while the facade accepts only a texture-view handle; callers lose the GPUTexture shorthand and must provide a GPUTextureView"
+reason = "IDL accepts a GPUTexture or GPUTextureView, while the facade accepts only a texture-view handle. Callers lose the GPUTexture shorthand and must provide a GPUTextureView"
 
 [[api.deviations]]
 member = "GPURenderPassDepthStencilAttachment.depthClearValue"
@@ -3454,19 +3454,19 @@ reason = "IDL permits null holes for unused color attachments, while the facade 
 member = "GPURenderPassDescriptor.depthStencilAttachment"
 pattern = "dictionary-nullable-descriptor"
 field_default = "null"
-reason = "IDL omission disables the depth/stencil attachment; this API also accepts explicit null, and omission or null both pass a null facade pointer"
+reason = "IDL omission disables the depth/stencil attachment. This API also accepts explicit null, and omission or null both pass a null facade pointer"
 
 [[api.deviations]]
 member = "GPURenderPassDescriptor.occlusionQuerySet"
 pattern = "dictionary-optional-handle"
 field_default = "null"
-reason = "IDL omission disables occlusion queries; this API also accepts explicit null, and omission or null both pass a null query-set handle"
+reason = "IDL omission disables occlusion queries. This API also accepts explicit null, and omission or null both pass a null query-set handle"
 
 [[api.deviations]]
 member = "GPURenderPassDescriptor.timestampWrites"
 pattern = "dictionary-nullable-descriptor"
 field_default = "null"
-reason = "IDL omission disables render-pass timestamp writes; this API also accepts explicit null, and omission or null both pass a null facade pointer"
+reason = "IDL omission disables render-pass timestamp writes. This API also accepts explicit null, and omission or null both pass a null facade pointer"
 
 [[api.exclude]]
 member = "GPURenderPassDescriptor.maxDrawCount"
@@ -3500,7 +3500,7 @@ pattern = "dictionary-field"
 member = "GPUCommandEncoder.copyBufferToBuffer"
 pattern = "operation"
 overload_arguments = ["source", "sourceOffset", "destination", "destinationOffset", "size"]
-reason = "this API keeps the explicit-offset overload and drops JavaScript's source/destination convenience overload; size is required because the facade does not expose the whole-size sentinel"
+reason = "this API keeps the explicit-offset overload and drops JavaScript's source/destination convenience overload. Size is required because the facade does not expose the whole-size sentinel"
 
 [[api.generate]]
 member = "GPUCommandEncoder.beginRenderPass"
@@ -3510,7 +3510,7 @@ pattern = "operation"
 member = "GPUCommandEncoder.beginComputePass"
 pattern = "operation"
 default_variant = "beginComputePassDefault"
-reason = "JavaScript omits the empty compute-pass descriptor; this API keeps a typed beginComputePass(descriptor) and provides beginComputePassDefault() for omission"
+reason = "JavaScript omits the empty compute-pass descriptor. This API keeps a typed beginComputePass(descriptor) and provides beginComputePassDefault() for omission"
 
 [[api.generate]]
 member = "GPUCommandEncoder.copyBufferToTexture"
@@ -3528,7 +3528,7 @@ pattern = "operation"
 member = "GPUCommandEncoder.clearBuffer"
 pattern = "operation"
 required_arguments = ["offset"]
-reason = "JavaScript may omit offset and size to clear the rest of the buffer; the facade exposes no whole-size sentinel, so this API requires both an explicit offset and an explicit size"
+reason = "JavaScript can omit offset and size to clear the rest of the buffer. The facade exposes no whole-size sentinel, so this API requires both an explicit offset and an explicit size"
 
 [[api.generate]]
 member = "GPUCommandEncoder.resolveQuerySet"
@@ -3538,7 +3538,7 @@ pattern = "operation"
 member = "GPUCommandEncoder.finish"
 pattern = "operation"
 default_variant = "finishDefault"
-reason = "JavaScript omits the empty command-buffer descriptor; this API keeps finish(descriptor) and provides finishDefault() for omission"
+reason = "JavaScript omits the empty command-buffer descriptor. This API keeps finish(descriptor) and provides finishDefault() for omission"
 
 [[api.generate]]
 member = "GPUCommandEncoder.pushDebugGroup"
@@ -3590,7 +3590,7 @@ member = "GPUComputePassEncoder.setBindGroup"
 pattern = "operation"
 overload_arguments = ["index", "bindGroup", "dynamicOffsets"]
 boundary_arguments = ["index=groupIndex", "bindGroup=group"]
-reason = "this API keeps setBindGroup(index, bindGroup, dynamicOffsets = []) and drops the Uint32Array subrange overload with dynamicOffsetsDataStart/dynamicOffsetsDataLength; callers lose zero-copy subrange selection"
+reason = "this API keeps setBindGroup(index, bindGroup, dynamicOffsets = []) and drops the Uint32Array subrange overload with dynamicOffsetsDataStart/dynamicOffsetsDataLength. Callers lose zero-copy subrange selection"
 
 [[api.exclude]]
 member = "GPUComputePassEncoder.setImmediates"
@@ -3650,7 +3650,7 @@ member = "GPURenderPassEncoder.setBindGroup"
 pattern = "operation"
 overload_arguments = ["index", "bindGroup", "dynamicOffsets"]
 boundary_arguments = ["index=groupIndex", "bindGroup=group"]
-reason = "this API keeps setBindGroup(index, bindGroup, dynamicOffsets = []) and drops the Uint32Array subrange overload with dynamicOffsetsDataStart/dynamicOffsetsDataLength; callers lose zero-copy subrange selection"
+reason = "this API keeps setBindGroup(index, bindGroup, dynamicOffsets = []) and drops the Uint32Array subrange overload with dynamicOffsetsDataStart/dynamicOffsetsDataLength. Callers lose zero-copy subrange selection"
 
 [[api.exclude]]
 member = "GPURenderPassEncoder.setImmediates"
@@ -3665,13 +3665,13 @@ member = "GPURenderPassEncoder.setIndexBuffer"
 pattern = "operation"
 required_arguments = ["offset"]
 boundary_arguments = ["indexFormat=format"]
-reason = "JavaScript may omit offset and size to bind the rest of the index buffer; the facade exposes no whole-size sentinel, so this API requires both, while retaining the IDL indexFormat name"
+reason = "JavaScript can omit offset and size to bind the rest of the index buffer. The facade exposes no whole-size sentinel, so this API requires both, while retaining the IDL indexFormat name"
 
 [[api.deviations]]
 member = "GPURenderPassEncoder.setVertexBuffer"
 pattern = "operation"
 required_arguments = ["offset"]
-reason = "JavaScript may omit offset and size to bind the rest of the vertex buffer; the facade exposes no whole-size sentinel, so this API requires both; a null buffer still unbinds the slot"
+reason = "JavaScript can omit offset and size to bind the rest of the vertex buffer. The facade exposes no whole-size sentinel, so this API requires both. A null buffer still unbinds the slot"
 
 [[api.generate]]
 member = "GPURenderPassEncoder.draw"
@@ -3703,7 +3703,7 @@ reason = "the readable/writable JavaScript label becomes a write-only label(valu
 member = "GPURenderBundleEncoder.finish"
 pattern = "operation"
 default_variant = "finishDefault"
-reason = "JavaScript omits the empty render-bundle descriptor; this API keeps finish(descriptor) and provides finishDefault() for omission"
+reason = "JavaScript omits the empty render-bundle descriptor. This API keeps finish(descriptor) and provides finishDefault() for omission"
 
 [[api.generate]]
 member = "GPURenderBundleEncoder.pushDebugGroup"
@@ -3722,7 +3722,7 @@ member = "GPURenderBundleEncoder.setBindGroup"
 pattern = "operation"
 overload_arguments = ["index", "bindGroup", "dynamicOffsets"]
 boundary_arguments = ["index=groupIndex", "bindGroup=group"]
-reason = "this API keeps setBindGroup(index, bindGroup, dynamicOffsets = []) and drops the Uint32Array subrange overload with dynamicOffsetsDataStart/dynamicOffsetsDataLength; callers lose zero-copy subrange selection"
+reason = "this API keeps setBindGroup(index, bindGroup, dynamicOffsets = []) and drops the Uint32Array subrange overload with dynamicOffsetsDataStart/dynamicOffsetsDataLength. Callers lose zero-copy subrange selection"
 
 [[api.exclude]]
 member = "GPURenderBundleEncoder.setImmediates"
@@ -3737,13 +3737,13 @@ member = "GPURenderBundleEncoder.setIndexBuffer"
 pattern = "operation"
 required_arguments = ["offset"]
 boundary_arguments = ["indexFormat=format"]
-reason = "JavaScript may omit offset and size to bind the rest of the index buffer; the facade exposes no whole-size sentinel, so this API requires both, while retaining the IDL indexFormat name"
+reason = "JavaScript can omit offset and size to bind the rest of the index buffer. The facade exposes no whole-size sentinel, so this API requires both, while retaining the IDL indexFormat name"
 
 [[api.deviations]]
 member = "GPURenderBundleEncoder.setVertexBuffer"
 pattern = "operation"
 required_arguments = ["offset"]
-reason = "JavaScript may omit offset and size to bind the rest of the vertex buffer; the facade exposes no whole-size sentinel, so this API requires both; a null buffer still unbinds the slot"
+reason = "JavaScript can omit offset and size to bind the rest of the vertex buffer. The facade exposes no whole-size sentinel, so this API requires both. A null buffer still unbinds the slot"
 
 [[api.generate]]
 member = "GPURenderBundleEncoder.draw"
@@ -3793,7 +3793,7 @@ reason = "the readable/writable JavaScript label becomes a write-only label(valu
 [[api.deviations]]
 member = "GPUError.message"
 pattern = "result-record-field"
-reason = "GPUValidationError, GPUOutOfMemoryError, and GPUInternalError are flattened into GPUError(type, message); callers retain a string type but lose subclass constructors and err instanceof GPUValidationError-style checks"
+reason = "GPUValidationError, GPUOutOfMemoryError, and GPUInternalError are flattened into GPUError(type, message). Callers retain a string type but lose subclass constructors and err instanceof GPUValidationError-style checks"
 
 [[api.generate]]
 member = "GPUDeviceLostInfo.reason"
@@ -3965,11 +3965,11 @@ pattern = "result-record-field"
 
 [[api.exclude]]
 member = "GPUAdapterInfo.subgroupMinSize"
-reason = "the plain WGPUAdapterInfo subgroup minimum is deliberately private to the facade; exposing it requires a facade-surface change"
+reason = "the plain WGPUAdapterInfo subgroup minimum is deliberately private to the facade. Exposing it requires a facade-surface change"
 
 [[api.exclude]]
 member = "GPUAdapterInfo.subgroupMaxSize"
-reason = "the plain WGPUAdapterInfo subgroup maximum is deliberately private to the facade; exposing it requires a facade-surface change"
+reason = "the plain WGPUAdapterInfo subgroup maximum is deliberately private to the facade. Exposing it requires a facade-surface change"
 
 [[api.exclude]]
 member = "GPUAdapterInfo.isFallbackAdapter"

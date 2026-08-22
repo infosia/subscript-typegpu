@@ -389,6 +389,7 @@ pub(crate) fn note_owned_handle_release() {
 }
 
 /// Removes the released instance's slots. Pending userdata boxes can
+/// outlive their slots until the callbacks arrive.
 /// Callbacks cannot observe the removed slots after instance release.
 /// The function returns completed owned handles for release.
 pub(crate) fn release_all_slots(instance: usize) -> Vec<OwnedHandle> {
