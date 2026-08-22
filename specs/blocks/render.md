@@ -65,7 +65,7 @@ does not say otherwise. Schemas are `schema.md`.
 - **RN8 — The fragment output.** A `Vec4f` return is `@location(0)
   vec4<f32>`. A `@CStruct` class return with `Vec4f` fields is one
   `@location(n)` per field in declaration order, for multiple
-  targets (P3 declares one target; the rule allows more).
+  targets. P3 declares one target. The rule allows more.
 
 ## Emission
 
