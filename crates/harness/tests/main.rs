@@ -8,6 +8,7 @@ mod library;
 mod live;
 mod rejections;
 mod runtime;
+mod traps;
 mod wgsl_goldens;
 
 // Re-pin with specs/subscript-typegpu-project-plan.md section 5,

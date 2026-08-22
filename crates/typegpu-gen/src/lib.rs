@@ -9,7 +9,7 @@ mod schema;
 
 use std::collections::BTreeSet;
 
-use subscript_compiler::{Diagnostic, Pos, RuleCode, SourceFile};
+use subscript_compiler::{CheckOptions, Diagnostic, Pos, RuleCode, SourceFile};
 
 use crate::layout::{Layout, TypeTree};
 
@@ -43,9 +43,8 @@ pub struct Generated {
 
 #[derive(Debug)]
 struct SupportImport {
-    program_index: usize,
-    module_name: String,
     names: BTreeSet<String>,
+    pos: Pos,
 }
 
 fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
@@ -67,114 +66,48 @@ fn is_library_file(name: &str) -> bool {
     )
 }
 
-/// This import-statement scanner is a typed-HIR discovery deviation with R35 as its kill date.
-fn scan_support_import(source: &str, target: &str) -> Result<BTreeSet<String>, String> {
-    for statement in source.split_inclusive(';') {
-        let mut statement = statement.trim_start();
-        loop {
-            if let Some(comment) = statement.strip_prefix("//") {
-                statement = comment
-                    .split_once('\n')
-                    .map_or("", |(_, remainder)| remainder)
-                    .trim_start();
-                continue;
-            }
-            if let Some(comment) = statement.strip_prefix("/*") {
-                statement = comment
-                    .split_once("*/")
-                    .map_or("", |(_, remainder)| remainder)
-                    .trim_start();
-                continue;
-            }
-            break;
-        }
-        if !statement.starts_with("import") {
-            continue;
-        }
-        let double_quoted = format!("\"{target}\"");
-        let single_quoted = format!("'{target}'");
-        if !statement.contains(&double_quoted) && !statement.contains(&single_quoted) {
-            continue;
-        }
-        let open = statement
-            .find('{')
-            .ok_or_else(|| format!("support import `{target}` has no named imports"))?;
-        let close = statement[open + 1..]
-            .find('}')
-            .map(|index| open + 1 + index)
-            .ok_or_else(|| format!("support import `{target}` has no closing brace"))?;
-        let mut names = BTreeSet::new();
-        for item in statement[open + 1..close].split(',') {
-            let Some(name) = item.split_whitespace().next() else {
-                continue;
-            };
-            if !name.is_empty() {
-                names.insert(name.to_owned());
-            }
-        }
-        return Ok(names);
-    }
-    Err(format!("cannot read confirmed support import `{target}`"))
-}
-
-fn support_import(files: &[SourceFile]) -> Result<Option<SupportImport>, Vec<Diagnostic>> {
-    let mut found = Vec::new();
-    for (program_index, file) in files.iter().enumerate() {
+fn discovery_options(files: &[SourceFile]) -> Result<CheckOptions, Vec<Diagnostic>> {
+    let mut modules = Vec::new();
+    for file in files {
         if file.dts || is_library_file(&file.name) || file.name.ends_with(".typegpu.ts") {
             continue;
         }
         let Some(stem) = file.name.strip_suffix(".ts") else {
             continue;
         };
-        let module_name = format!("./{stem}.typegpu");
-        let specifiers = subscript_compiler::parse_import_specifiers(file)?;
-        if !specifiers.iter().any(|specifier| specifier == &module_name) {
-            continue;
-        }
-        let names = scan_support_import(&file.source, &module_name)
-            .map_err(|message| vec![diagnostic("SC1", message, Pos::new(&file.name, 1, 1))])?;
-        found.push(SupportImport {
-            program_index,
-            module_name,
-            names,
-        });
+        modules.push((file.name.as_str(), format!("./{stem}.typegpu")));
     }
-    match found.len() {
-        0 => Ok(None),
-        1 => Ok(found.pop()),
-        _ => Err(vec![diagnostic(
+    if modules.len() > 1 {
+        return Err(vec![diagnostic(
             "SC1",
-            "one generator run found more than one support-module import",
-            Pos::new(&files[found[1].program_index].name, 1, 1),
-        )]),
+            "one generator run received more than one program file",
+            Pos::new(modules[1].0, 1, 1),
+        )]);
     }
+    let mut options = CheckOptions::default();
+    options.poison_missing_modules = modules.into_iter().map(|(_, module)| module).collect();
+    Ok(options)
 }
 
-fn stub_file(support: &SupportImport) -> SourceFile {
-    let mut source = String::new();
-    let pipeline_support = support.names.iter().any(|name| name.contains("_LAYOUT"));
-    if pipeline_support {
-        source.push_str("import { BindGroupLayoutSpec } from \"./typegpu\";\n");
+fn support_import(
+    module: &subscript_compiler::hir::Module,
+) -> Result<Option<SupportImport>, Vec<Diagnostic>> {
+    match module.poisoned_imports.as_slice() {
+        [] => Ok(None),
+        [support] => Ok(Some(SupportImport {
+            names: support
+                .names
+                .iter()
+                .map(|(imported, _)| imported.clone())
+                .collect(),
+            pos: support.pos.clone(),
+        })),
+        supports => Err(vec![diagnostic(
+            "SC1",
+            "one generator run found more than one support-module import",
+            supports[1].pos.clone(),
+        )]),
     }
-    for name in &support.names {
-        let ty = if name.ends_with("_WGSL") || name.ends_with("_ENTRY") {
-            "string"
-        } else if name.contains("_LAYOUT") {
-            "BindGroupLayoutSpec"
-        } else {
-            "u32"
-        };
-        source.push_str(&format!("export const {name}: {ty} = "));
-        source.push_str(match ty {
-            "string" => "\"\";\n",
-            "BindGroupLayoutSpec" => "{ entries: [] };\n",
-            _ => "0;\n",
-        });
-    }
-    SourceFile::new(
-        format!("{}.ts", support.module_name.trim_start_matches("./")),
-        source,
-    )
 }
 
 fn schema_name(export: &str) -> Option<&str> {
@@ -197,44 +130,6 @@ fn intended_schemas(support: Option<&SupportImport>) -> BTreeSet<String> {
         .filter(|name| name.starts_with(|ch: char| ch.is_ascii_uppercase()))
         .map(str::to_owned)
         .collect()
-}
-
-fn imported_field<'a>(support: &'a SupportImport, schema: &str) -> &'a str {
-    let prefix = format!("{schema}_OFFSET_");
-    support
-        .names
-        .iter()
-        .find_map(|name| name.strip_prefix(&prefix))
-        .unwrap_or("<unknown>")
-}
-
-fn translate_illegal_fields(
-    files: &[SourceFile],
-    support: Option<&SupportImport>,
-    intended: &BTreeSet<String>,
-    diagnostics: &[Diagnostic],
-) -> Option<Vec<Diagnostic>> {
-    let support = support?;
-    if intended.is_empty() || diagnostics.iter().any(|item| item.code != RuleCode::S100) {
-        return None;
-    }
-    let mut translated = Vec::new();
-    for item in diagnostics {
-        for name in intended {
-            let field = imported_field(support, name);
-            if field == "<unknown>"
-                || !source_line(files, &item.pos).is_some_and(|line| line.contains(field))
-            {
-                continue;
-            }
-            translated.push(diagnostic(
-                "SC3",
-                format!("schema `{name}` field `{field}` has an illegal schema type"),
-                item.pos.clone(),
-            ));
-        }
-    }
-    (!translated.is_empty()).then_some(translated)
 }
 
 fn source_line<'a>(files: &'a [SourceFile], pos: &Pos) -> Option<&'a str> {
@@ -272,6 +167,20 @@ fn translate_kernel_checker_diagnostics(
     diagnostics
         .into_iter()
         .map(|item| {
+            if item.code == RuleCode::S100
+                && item.message.contains("outside the value-class whitelist")
+            {
+                let field = source_line(files, &item.pos)
+                    .and_then(|line| line.split_once(':'))
+                    .and_then(|(declaration, _)| declaration.split_whitespace().last())
+                    .unwrap_or("<unknown>");
+                let ty = item.message.split('`').nth(1).unwrap_or("<unknown>");
+                return diagnostic(
+                    "SC3",
+                    format!("field `{field}` has illegal schema type `{ty}`"),
+                    item.pos,
+                );
+            }
             if item.code == RuleCode::S013 {
                 return diagnostic("K9", "await is outside K9", item.pos);
             }
@@ -344,23 +253,15 @@ fn generated_export_names(
 ///
 /// Returns compiler or schema diagnostics with source positions.
 pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
-    let support = support_import(files)?;
-    let mut intended = intended_schemas(support.as_ref());
-    let mut checked_files = files.to_vec();
-    if let Some(support) = &support {
-        checked_files.push(stub_file(support));
-    }
-    let module = match subscript_compiler::check_program(&checked_files) {
+    let options = discovery_options(files)?;
+    let module = match subscript_compiler::check_program_with(files, &options) {
         Ok(module) => module,
         Err(diagnostics) => {
-            return Err(
-                translate_illegal_fields(files, support.as_ref(), &intended, &diagnostics)
-                    .unwrap_or_else(|| {
-                        translate_kernel_checker_diagnostics(&checked_files, diagnostics)
-                    }),
-            )
+            return Err(translate_kernel_checker_diagnostics(files, diagnostics));
         }
     };
+    let support = support_import(&module)?;
+    let mut intended = intended_schemas(support.as_ref());
     let pipeline_definitions = pipeline::discover(&module)?;
     intended.extend(pipeline::schema_names(&module, &pipeline_definitions));
     for pipeline in &pipeline_definitions {
@@ -376,14 +277,13 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
             .filter(|name| !exports.contains(*name))
             .collect::<Vec<_>>();
         if !missing.is_empty() {
-            let file = &files[support.program_index];
             return Err(missing
                 .into_iter()
                 .map(|name| {
                     diagnostic(
                         "SC1",
-                        format!("imported `{name}` is not a generated schema fact"),
-                        Pos::new(&file.name, 1, 1),
+                        format!("imported `{name}` is not a schema or pipeline fact"),
+                        support.pos.clone(),
                     )
                 })
                 .collect());
@@ -459,24 +359,4 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         layouts,
         pipelines,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn discovery_stub_exports_only_imported_names() {
-        let files = vec![SourceFile::new(
-            "demo.ts",
-            "// program header\nimport {\n  A_SIZE,\n  A_WGSL,\n} from\n  \"./demo.typegpu\";\n",
-        )];
-        let support = support_import(&files)
-            .expect("parse support import")
-            .expect("support import");
-        assert_eq!(
-            stub_file(&support).source,
-            "export const A_SIZE: u32 = 0;\nexport const A_WGSL: string = \"\";\n"
-        );
-    }
 }

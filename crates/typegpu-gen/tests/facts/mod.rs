@@ -55,3 +55,44 @@ class Host {
     assert!(message.contains("not a schema"), "{message}");
     assert!(message.contains("(author)"), "{message}");
 }
+
+#[test]
+fn imported_names_without_generated_facts_report_schema_rules() {
+    let cases = [
+        (
+            r#"
+import { Missing_SIZE } from "./missing.typegpu";
+"#,
+            "missing.ts",
+            "SC1",
+        ),
+        (
+            r#"
+import { Bad_SIZE } from "./illegal.typegpu";
+
+@CStruct
+class Bad {
+  value: string;
+}
+"#,
+            "illegal.ts",
+            "SC3",
+        ),
+    ];
+    for (source, file, rule) in cases {
+        let diagnostics = subscript_typegpu_gen::generate(&[SourceFile::new(file, source)])
+            .expect_err("an imported name without a generated fact must fail");
+        let messages = diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.message.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            messages.contains(rule),
+            "{file} expected {rule}:\n{messages}"
+        );
+        if rule == "SC1" {
+            assert!(messages.contains("not a schema"), "{file}:\n{messages}");
+        }
+    }
+}

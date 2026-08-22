@@ -45,14 +45,20 @@ scanners are gone and the import-statement stub carries its R35
 kill date, hygiene clean. Measurement: 45 s / 0.2 s / 13 s / 10 s /
 6 (`build-time.md`).
 
-## Slice 2 — `Buffer<T>` write and read
+## Slice 2 — the discovery check, `Buffer<T>`, the byte path
 
-Blocked on subscript request R34 (the bytes of a value class). See
-plan §9 RC-14. R35 (the discovery check) is RC-15.
+R34 and R35 landed at subscript `bb9dadc` (2026-08-22). Delivered:
+the discovery check through `check_program_with` (the stub and the
+import scan are gone), `Buffer<T>` per BF1–BF5, `b05-buffer` (a
+`FixedArray<Particle, 4>` through `bytesOf`, a Noop copy, `fromBytes`,
+`roundtrip:match`, 128 bytes printed by value), `x01`–`x03` on the
+byte path, three BF8 trap fixtures. Planner verification: gate green
+with the backend, 193 tests in six executables, `b05` equal on both
+tiers. Measurement: 45 s / 0.2 s / 28 s / 25 s / 6.
 
 ## Exit criteria
 
-Criterion 6 (`Buffer<T>` through R34) is slice 2.
+
 
 | # | Criterion | Evidence |
 |---|---|---|
@@ -60,4 +66,5 @@ Criterion 6 (`Buffer<T>` through R34) is slice 2.
 | 2 | `b01-layout` lays out every library class and matches its golden on both tiers | Slice 1 close, `--require-backend` green |
 | 3 | naga's offsets equal the engine's for every emitted struct | Slice 1: spans, member offsets, every array stride, the uniform wrap, `SHADER_FLOAT16` when `enable f16;` |
 | 4 | The C numbers match (LY16 Rev 1) | Slice 1: `c_layout` module, `value_class_layouts` and the compiled probe, red recorded |
-| 5 | No schema in the corpus holds a padding field | Slice 1: none in `b01-layout` |
+| 5 | No schema in the corpus holds a padding field | Slices 1 and 2: none |
+| 6 | `Buffer<T>` writes a `FixedArray<T, N>` and reads it back through R34 | Slice 2: `b05-buffer` on both tiers |

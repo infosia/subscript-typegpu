@@ -10,8 +10,133 @@ import {
   GPUCommandEncoder,
   GPUComputePipeline,
   GPUDevice,
+  GPUQueue,
   GPUShaderStage,
 } from "./webgpu";
+
+export class Buffer<T> {
+  private buffer: GPUBuffer;
+  private elementSize: u32;
+  private count: u32;
+
+  constructor(buffer: GPUBuffer, elementSize: u32, count: u32) {
+    this.buffer = buffer;
+    this.elementSize = elementSize;
+    this.count = count;
+  }
+
+  write(queue: GPUQueue, elementIndex: u32, bytes: u8[]): void {
+    const byteLength: u32 = bytes.length as u32;
+    const remainder: u32 = byteLength % this.elementSize;
+    if (remainder !== 0) {
+      print(
+        `BF8 Buffer.write byteLength=${byteLength} elementSize=${this.elementSize} remainder=${remainder}`,
+      );
+      unreachable();
+    }
+    const elementCount: u32 = byteLength / this.elementSize;
+    if (elementIndex > this.count || elementCount > this.count - elementIndex) {
+      print(
+        `BF8 Buffer.write elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`,
+      );
+      unreachable();
+    }
+    queue.writeBuffer(
+      this.buffer,
+      (elementIndex as u64) * (this.elementSize as u64),
+      bytes,
+    );
+  }
+
+  writeOne(queue: GPUQueue, elementIndex: u32, bytes: u8[]): void {
+    const byteLength: u32 = bytes.length as u32;
+    if (byteLength !== this.elementSize) {
+      print(
+        `BF8 Buffer.writeOne elementIndex=${elementIndex} byteLength=${byteLength} elementSize=${this.elementSize}`,
+      );
+      unreachable();
+    }
+    if (elementIndex >= this.count) {
+      print(`BF8 Buffer.writeOne elementIndex=${elementIndex} elementCount=1 count=${this.count}`);
+      unreachable();
+    }
+    queue.writeBuffer(
+      this.buffer,
+      (elementIndex as u64) * (this.elementSize as u64),
+      bytes,
+    );
+  }
+
+  read(readback: Buffer<T>, elementIndex: u32, elementCount: u32): u8[] {
+    if (elementIndex > readback.count || elementCount > readback.count - elementIndex) {
+      print(
+        `BF8 Buffer.read elementIndex=${elementIndex} elementCount=${elementCount} count=${readback.count}`,
+      );
+      unreachable();
+    }
+    return readback.buffer.readMappedRange(
+      (elementIndex as u64) * (readback.elementSize as u64),
+      (elementCount as u64) * (readback.elementSize as u64),
+    );
+  }
+
+  copyTo(
+    encoder: GPUCommandEncoder,
+    target: Buffer<T>,
+    elementIndex: u32,
+    elementCount: u32,
+  ): void {
+    if (elementIndex > this.count || elementCount > this.count - elementIndex) {
+      print(
+        `BF8 Buffer.copyTo elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`,
+      );
+      unreachable();
+    }
+    if (elementCount > target.count) {
+      print(
+        `BF8 Buffer.copyTo targetCount=${target.count} elementCount=${elementCount} elementSize=${this.elementSize}`,
+      );
+      unreachable();
+    }
+    encoder.copyBufferToBuffer(
+      this.buffer,
+      (elementIndex as u64) * (this.elementSize as u64),
+      target.buffer,
+      0,
+      (elementCount as u64) * (this.elementSize as u64),
+    );
+  }
+
+  handle(): GPUBuffer {
+    return this.buffer;
+  }
+
+  dispose(): void {
+    this.buffer.dispose();
+  }
+
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
+}
+
+export function createBuffer<T>(
+  device: GPUDevice,
+  elementSize: u32,
+  count: u32,
+  usage: u64,
+  label: string,
+): Buffer<T> {
+  return new Buffer<T>(
+    device.createBuffer({
+      size: (elementSize as u64) * (count as u64),
+      usage,
+      label,
+    }),
+    elementSize,
+    count,
+  );
+}
 
 export class ComputeInvocation {
   globalId!: Vec3u;

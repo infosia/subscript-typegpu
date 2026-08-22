@@ -1,9 +1,11 @@
 // program: x01-live-vecadd
 // purpose: compute vector addition on a real adapter and compare every result
-// exercises: PI12, T4, T15, storage bindings, readback
+// exercises: BF7, PI12, T4, T15, storage bindings, readback
 // questions: none
 
 import {
+  Buffer,
+  createBuffer,
   createComputePipeline,
   createBindGroup,
   ComputeInvocation,
@@ -20,7 +22,7 @@ import {
   GPUMapMode,
 } from "./webgpu";
 import {
-  Item_SIZE,
+  Item_STRIDE,
   vecAdd_ENTRY,
   vecAdd_LAYOUT0,
   vecAdd_WGSL,
@@ -57,25 +59,25 @@ export const vecAdd: ComputePipelineSpec = computePipeline<VecAddLayout>(vecAddK
   workgroupSize: [64, 1, 1],
 });
 
-function appendU32(bytes: u8[], value: u32): void {
-  bytes.push((value & 255) as u8);
-  bytes.push(((value >> 8) & 255) as u8);
-  bytes.push(((value >> 16) & 255) as u8);
-  bytes.push(((value >> 24) & 255) as u8);
-}
-
-function appendF32(bytes: u8[], value: f32): void {
-  appendU32(bytes, Math.f32ToBits(value as f64));
-}
-
-function readF32(bytes: u8[], offset: u32): f32 {
-  const index: i32 = offset as i32;
-  const bits: u32 =
-    (bytes[index] as u32) |
-    ((bytes[index + 1] as u32) << 8) |
-    ((bytes[index + 2] as u32) << 16) |
-    ((bytes[index + 3] as u32) << 24);
-  return Math.f32FromBits(bits) as f32;
+function itemArray(): FixedArray<Item, 64> {
+  return [
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+    new Item(0.0), new Item(0.0), new Item(0.0), new Item(0.0),
+  ];
 }
 
 export async function main(): Promise<void> {
@@ -98,42 +100,50 @@ export async function main(): Promise<void> {
     using adapter = adapterResult;
     using device = deviceResult;
     const count: u32 = 64;
-    const size: u64 = (Item_SIZE * count) as u64;
-    const aBytes: u8[] = [];
-    const bBytes: u8[] = [];
-    const expected: f32[] = [];
-    let i: u32 = 0;
-    while (i < count) {
-      const a: f32 = (i as f32) * 0.5;
-      const b: f32 = ((count - i) as f32) * 0.25;
-      appendF32(aBytes, a);
-      appendF32(bBytes, b);
-      expected.push(a + b);
-      i = i + 1;
+    const itemBytes: u64 = (Item_STRIDE as u64) * (count as u64);
+    const aValues: FixedArray<Item, 64> = itemArray();
+    const bValues: FixedArray<Item, 64> = itemArray();
+    const expected: FixedArray<Item, 64> = itemArray();
+    let index: i32 = 0;
+    while (index < 64) {
+      const aValue: f32 = (index as f32) * 0.5;
+      const bValue: f32 = ((count - (index as u32)) as f32) * 0.25;
+      aValues[index] = new Item(aValue);
+      bValues[index] = new Item(bValue);
+      expected[index] = new Item(aValue + bValue);
+      index = index + 1;
     }
-    using a = device.createBuffer({
-      label: "x01-a",
-      size,
-      usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
-    });
-    using b = device.createBuffer({
-      label: "x01-b",
-      size,
-      usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
-    });
-    using out = device.createBuffer({
-      label: "x01-out",
-      size,
-      usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_SRC,
-    });
-    using readback = device.createBuffer({
-      label: "x01-readback",
-      size,
-      usage: GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
-    });
+    using a: Buffer<Item> = createBuffer<Item>(
+      device,
+      Item_STRIDE,
+      count,
+      GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
+      "x01-a",
+    );
+    using b: Buffer<Item> = createBuffer<Item>(
+      device,
+      Item_STRIDE,
+      count,
+      GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
+      "x01-b",
+    );
+    using out: Buffer<Item> = createBuffer<Item>(
+      device,
+      Item_STRIDE,
+      count,
+      GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_SRC,
+      "x01-out",
+    );
+    using readback: Buffer<Item> = createBuffer<Item>(
+      device,
+      Item_STRIDE,
+      count,
+      GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
+      "x01-readback",
+    );
     const queue = device.queue();
-    queue.writeBuffer(a, 0, aBytes);
-    queue.writeBuffer(b, 0, bBytes);
+    a.write(queue, 0, Context.bytesOf<FixedArray<Item, 64>>(aValues));
+    b.write(queue, 0, Context.bytesOf<FixedArray<Item, 64>>(bValues));
     print("inputs:written");
     using pipeline = createComputePipeline(
       device,
@@ -143,30 +153,37 @@ export async function main(): Promise<void> {
       [vecAdd_WORKGROUP_X, vecAdd_WORKGROUP_Y, vecAdd_WORKGROUP_Z],
     );
     using nativeLayout = pipeline.bindGroupLayout(0);
-    using bindGroup = createBindGroup(device, nativeLayout, vecAdd_LAYOUT0, [a, b, out]);
+    using bindGroup = createBindGroup(
+      device,
+      nativeLayout,
+      vecAdd_LAYOUT0,
+      [a.handle(), b.handle(), out.handle()],
+    );
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
-    encoder.copyBufferToBuffer(out, 0, readback, 0, size);
+    out.copyTo(encoder, readback, 0, count);
     using command = encoder.finishDefault();
     queue.submit([command]);
     print("dispatch:submitted");
-    const mapped: boolean = await readback.mapAsync(GPUMapMode.READ, 0, size);
+    const mapped: boolean = await readback.handle().mapAsync(GPUMapMode.READ, 0, itemBytes);
     if (!mapped) {
       print("FAIL map");
       return;
     }
-    const result: u8[] = readback.readMappedRange(0, size);
+    const result: FixedArray<Item, 64> = Context.fromBytes<FixedArray<Item, 64>>(
+      out.read(readback, 0, count),
+      0,
+    );
     print("readback:mapped");
-    i = 0;
-    while (i < count) {
-      const got: f32 = readF32(result, i * Item_SIZE);
-      if (Math.f32ToBits(got as f64) !== Math.f32ToBits(expected[i as i32] as f64)) {
-        print(`FAIL ${i} expected=${expected[i as i32]} got=${got}`);
+    index = 0;
+    while (index < 64) {
+      if (result[index].value !== expected[index].value) {
+        print(`FAIL ${index} expected=${expected[index].value} got=${result[index].value}`);
         return;
       }
-      i = i + 1;
+      index = index + 1;
     }
-    readback.unmap();
+    readback.handle().unmap();
   }
   gpu.dispose();
   print("PASS");

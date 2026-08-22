@@ -1,9 +1,11 @@
 // program: x03-live-particles
 // purpose: integrate particles for four GPU steps and compare all components
-// exercises: PI12, T4, T15, vector schema, helper function, repeated dispatch
+// exercises: BF7, PI12, T4, T15, vector schema, helper function, repeated dispatch
 // questions: none
 
 import {
+  Buffer,
+  createBuffer,
   createComputePipeline,
   createBindGroup,
   ComputeInvocation,
@@ -21,8 +23,8 @@ import {
   GPUMapMode,
 } from "./webgpu";
 import {
-  Particle_SIZE,
-  SimParams_SIZE,
+  Particle_STRIDE,
+  SimParams_STRIDE,
   particles_ENTRY,
   particles_LAYOUT0,
   particles_WGSL,
@@ -79,40 +81,27 @@ export const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(pa
   workgroupSize: [64, 1, 1],
 });
 
-function appendU32(bytes: u8[], value: u32): void {
-  bytes.push((value & 255) as u8);
-  bytes.push(((value >> 8) & 255) as u8);
-  bytes.push(((value >> 16) & 255) as u8);
-  bytes.push(((value >> 24) & 255) as u8);
+function particleArray(): FixedArray<Particle, 64> {
+  const zero = new Particle(new Vec3f(0.0, 0.0, 0.0), new Vec3f(0.0, 0.0, 0.0));
+  return [
+    zero, zero, zero, zero, zero, zero, zero, zero,
+    zero, zero, zero, zero, zero, zero, zero, zero,
+    zero, zero, zero, zero, zero, zero, zero, zero,
+    zero, zero, zero, zero, zero, zero, zero, zero,
+    zero, zero, zero, zero, zero, zero, zero, zero,
+    zero, zero, zero, zero, zero, zero, zero, zero,
+    zero, zero, zero, zero, zero, zero, zero, zero,
+    zero, zero, zero, zero, zero, zero, zero, zero,
+  ];
 }
 
-function appendF32(bytes: u8[], value: f32): void {
-  appendU32(bytes, Math.f32ToBits(value as f64));
-}
-
-function appendParticle(bytes: u8[], particle: Particle): void {
-  appendF32(bytes, particle.pos.x);
-  appendF32(bytes, particle.pos.y);
-  appendF32(bytes, particle.pos.z);
-  appendF32(bytes, 0.0);
-  appendF32(bytes, particle.vel.x);
-  appendF32(bytes, particle.vel.y);
-  appendF32(bytes, particle.vel.z);
-  appendF32(bytes, 0.0);
-}
-
-function readF32(bytes: u8[], offset: u32): f32 {
-  const index: i32 = offset as i32;
-  const bits: u32 =
-    (bytes[index] as u32) |
-    ((bytes[index + 1] as u32) << 8) |
-    ((bytes[index + 2] as u32) << 16) |
-    ((bytes[index + 3] as u32) << 24);
-  return Math.f32FromBits(bits) as f32;
-}
-
-function equalF32(left: f32, right: f32): boolean {
-  return Math.f32ToBits(left as f64) === Math.f32ToBits(right as f64);
+function equalParticle(left: Particle, right: Particle): boolean {
+  return left.pos.x === right.pos.x
+    && left.pos.y === right.pos.y
+    && left.pos.z === right.pos.z
+    && left.vel.x === right.vel.x
+    && left.vel.y === right.vel.y
+    && left.vel.z === right.vel.z;
 }
 
 export async function main(): Promise<void> {
@@ -137,49 +126,56 @@ export async function main(): Promise<void> {
     const count: u32 = 64;
     const dt: f32 = 0.25;
     const steps: u32 = 4;
-    const paramsBytes: u8[] = [];
-    appendF32(paramsBytes, dt);
-    appendU32(paramsBytes, count);
-    const particleBytes: u8[] = [];
-    const expected: Particle[] = [];
-    let i: u32 = 0;
-    while (i < count) {
+    const size: u64 = (Particle_STRIDE as u64) * (count as u64);
+    const particleValues: FixedArray<Particle, 64> = particleArray();
+    const expected: FixedArray<Particle, 64> = particleArray();
+    let index: i32 = 0;
+    while (index < 64) {
       const particle = new Particle(
-        new Vec3f(i as f32, (i as f32) * 0.5, (i as f32) * -0.25),
+        new Vec3f(index as f32, (index as f32) * 0.5, (index as f32) * -0.25),
         new Vec3f(0.5, -0.25, 0.125),
       );
-      expected.push(particle);
-      appendParticle(particleBytes, particle);
-      i = i + 1;
+      particleValues[index] = particle;
+      expected[index] = particle;
+      index = index + 1;
     }
     let step: u32 = 0;
     while (step < steps) {
-      i = 0;
-      while (i < count) {
-        expected[i as i32] = integrate(expected[i as i32], dt);
-        i = i + 1;
+      index = 0;
+      while (index < 64) {
+        expected[index] = integrate(expected[index], dt);
+        index = index + 1;
       }
       step = step + 1;
     }
-    const size: u64 = (Particle_SIZE * count) as u64;
-    using params = device.createBuffer({
-      label: "x03-params",
-      size: SimParams_SIZE as u64,
-      usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
-    });
-    using particlesBuffer = device.createBuffer({
-      label: "x03-particles",
-      size,
-      usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
-    });
-    using readback = device.createBuffer({
-      label: "x03-readback",
-      size,
-      usage: GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
-    });
+    using params: Buffer<SimParams> = createBuffer<SimParams>(
+      device,
+      SimParams_STRIDE,
+      1,
+      GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
+      "x03-params",
+    );
+    using particlesBuffer: Buffer<Particle> = createBuffer<Particle>(
+      device,
+      Particle_STRIDE,
+      count,
+      GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
+      "x03-particles",
+    );
+    using readback: Buffer<Particle> = createBuffer<Particle>(
+      device,
+      Particle_STRIDE,
+      count,
+      GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
+      "x03-readback",
+    );
     const queue = device.queue();
-    queue.writeBuffer(params, 0, paramsBytes);
-    queue.writeBuffer(particlesBuffer, 0, particleBytes);
+    params.writeOne(queue, 0, Context.bytesOf<SimParams>(new SimParams(dt, count)));
+    particlesBuffer.write(
+      queue,
+      0,
+      Context.bytesOf<FixedArray<Particle, 64>>(particleValues),
+    );
     print("inputs:written");
     using pipeline = createComputePipeline(
       device,
@@ -193,7 +189,7 @@ export async function main(): Promise<void> {
       device,
       nativeLayout,
       particles_LAYOUT0,
-      [params, particlesBuffer],
+      [params.handle(), particlesBuffer.handle()],
     );
     using encoder = device.createCommandEncoderDefault();
     step = 0;
@@ -201,54 +197,29 @@ export async function main(): Promise<void> {
       pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
       step = step + 1;
     }
-    encoder.copyBufferToBuffer(particlesBuffer, 0, readback, 0, size);
+    particlesBuffer.copyTo(encoder, readback, 0, count);
     using command = encoder.finishDefault();
     queue.submit([command]);
     print("dispatch:steps=4");
-    const mapped: boolean = await readback.mapAsync(GPUMapMode.READ, 0, size);
+    const mapped: boolean = await readback.handle().mapAsync(GPUMapMode.READ, 0, size);
     if (!mapped) {
       print("FAIL map");
       return;
     }
-    const result: u8[] = readback.readMappedRange(0, size);
+    const result: FixedArray<Particle, 64> = Context.fromBytes<FixedArray<Particle, 64>>(
+      particlesBuffer.read(readback, 0, count),
+      0,
+    );
     print("readback:mapped");
-    i = 0;
-    while (i < count) {
-      const base: u32 = i * Particle_SIZE;
-      const expectedParticle: Particle = expected[i as i32];
-      const got0: f32 = readF32(result, base);
-      const got1: f32 = readF32(result, base + 4);
-      const got2: f32 = readF32(result, base + 8);
-      const got3: f32 = readF32(result, base + 16);
-      const got4: f32 = readF32(result, base + 20);
-      const got5: f32 = readF32(result, base + 24);
-      if (!equalF32(got0, expectedParticle.pos.x)) {
-        print(`FAIL ${i * 6} expected=${expectedParticle.pos.x} got=${got0}`);
+    index = 0;
+    while (index < 64) {
+      if (!equalParticle(result[index], expected[index])) {
+        print(`FAIL ${index}`);
         return;
       }
-      if (!equalF32(got1, expectedParticle.pos.y)) {
-        print(`FAIL ${i * 6 + 1} expected=${expectedParticle.pos.y} got=${got1}`);
-        return;
-      }
-      if (!equalF32(got2, expectedParticle.pos.z)) {
-        print(`FAIL ${i * 6 + 2} expected=${expectedParticle.pos.z} got=${got2}`);
-        return;
-      }
-      if (!equalF32(got3, expectedParticle.vel.x)) {
-        print(`FAIL ${i * 6 + 3} expected=${expectedParticle.vel.x} got=${got3}`);
-        return;
-      }
-      if (!equalF32(got4, expectedParticle.vel.y)) {
-        print(`FAIL ${i * 6 + 4} expected=${expectedParticle.vel.y} got=${got4}`);
-        return;
-      }
-      if (!equalF32(got5, expectedParticle.vel.z)) {
-        print(`FAIL ${i * 6 + 5} expected=${expectedParticle.vel.z} got=${got5}`);
-        return;
-      }
-      i = i + 1;
+      index = index + 1;
     }
-    readback.unmap();
+    readback.handle().unmap();
   }
   gpu.dispose();
   print("PASS");
