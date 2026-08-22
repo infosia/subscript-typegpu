@@ -384,5 +384,6 @@ the finding and the upstream citation, never the local path.
 Avoid `dangerouslyDisableSandbox: true` whenever possible. Network ops
 (`git push`/`pull`, `cargo` fetches, submodule fetches) are invoked by
 the user via the `!` prompt, not run by Claude with the sandbox
-disabled. Do not run device programs from a sandboxed agent shell.
-Zero adapters there reads exactly like a backend defect.
+disabled. The one exception is `tools/live.sh`: Claude runs it with
+the sandbox disabled, because a sandboxed shell sees zero adapters
+and that reads exactly like a backend defect.

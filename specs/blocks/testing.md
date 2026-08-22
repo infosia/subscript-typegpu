@@ -105,10 +105,13 @@ principles" govern this block.
   in a forked child) and on the ship tier through the harness
   binary, and asserts that the last output line is `PASS`. Results
   go to `specs/tracking/` with the date and the commit. Phase exits
-  need them. Test runs do not. The owner runs the script. An agent
-  shell never runs it (T16).
-- **T16 — No sandboxed device runs.** Device programs never run from
-  a sandboxed agent shell.
+  need them. Test runs do not. The planner runs the script outside
+  the sandbox (T16).
+- **T16 — No sandboxed device runs.** Rev 1, 2026-08-22. Device
+  programs run outside any process sandbox. The planner runs
+  `tools/live.sh` itself with the sandbox disabled for that one
+  command. A zero-adapter result from inside a sandbox is not
+  evidence of anything. The coding agent never runs the live lane.
 
 ## Toolchain
 
