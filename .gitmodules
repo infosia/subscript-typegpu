@@ -1,0 +1,6 @@
+[submodule "third_party/webgpu-headers"]
+	path = third_party/webgpu-headers
+	url = https://github.com/webgpu-native/webgpu-headers
+[submodule "third_party/gpuweb"]
+	path = third_party/gpuweb
+	url = https://github.com/gpuweb/gpuweb
