@@ -60,8 +60,11 @@ ignored `live` module exist. Live run by the owner (2026-08-22, Metal, yawgpu
 `target/release/libyawgpu.dylib`, pin `bb9dadc`, the working tree
 between `786aae7` and the P1 slice 2 landing):
 `live::every_x_program_passes_on_a_real_adapter ... ok`, 9.71
-seconds, `x01`–`x03` `PASS` on both tiers. A second run on the
-committed slice 2 tree is the phase-close citation.
+seconds, `x01`–`x03` `PASS` on both tiers. Phase-close run by
+the planner outside the sandbox (2026-08-22, Metal, the same
+library, committed tree `b7e2533`, `x01`–`x03` on the R34 byte
+path): `live::every_x_program_passes_on_a_real_adapter ... ok`,
+6.70 seconds.
 Measurement: 44 s / 0.2 s / 25 s / 22 s / 6.
 
 Noted for a later round: the generated Rust of the backend request
@@ -73,7 +76,7 @@ it).
 | # | Criterion | Evidence |
 |---|---|---|
 | 1 | `b02-vecadd`, `b03-saxpy-uniform`, `b04-particles` gate-green on both tiers with WGSL goldens | Slice 2 close: all three equal, goldens naga-valid |
-| 2 | `x01`–`x03` print `PASS` on a real adapter | First run 2026-08-22 on Metal: ok, 9.71 s. The phase-close run is pending |
+| 2 | `x01`–`x03` print `PASS` on a real adapter | Metal, `b7e2533`: ok, 6.70 s (and an earlier run at 9.71 s) |
 | 3 | Every rejection rule has a red fixture | Slice 1: 30 fixtures, one rule id each |
 | 4 | Every generator diagnostic names its rule id and its owner | Slice 1: asserted per fixture |
 | 5 | Build-time budgets hold | 44 s / 0.2 s / 25 s / 22 s / 6 at the slice 2 close |
