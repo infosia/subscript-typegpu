@@ -12,8 +12,8 @@ dead and RC-2 is closed. Delivered: the wrappers and runtime class,
 the kernel emitter with the K10/K11 tables, the harness
 `wgsl_goldens` module, `b02-vecadd` with its `.expected` and
 `.vecAdd.wgsl` goldens, 21 rejection fixtures. Planner verification:
-gate green, 179 tests, the emitted module is 19 lines, naga-valid,
-and equal on both tiers.
+gate green, 179 tests, the harness executable 9.57 seconds, the
+emitted module is 19 lines, naga-valid, and equal on both tiers.
 
 Slice review (a fresh reviewer, 2026-08-22): CRITICAL 1, MAJOR 16,
 MINOR 21. C1: the discovery stub hard-coded two generated names from
@@ -21,7 +21,7 @@ MINOR 21. C1: the discovery stub hard-coded two generated names from
 generated function. Resolution: PI8 Rev 1 — the support module
 exports constants only, the stub types a name by its suffix, bind
 groups are positional through the library (PI9). M1: a K15
-structural check that could not fail (K15 Rev 1 moved validation to
+structural check with no failing input (K15 Rev 1 moved validation to
 the harness, the check is deleted). M2–M4: three identifier policies
 and a 31-entry keyword list (K14 Rev: one mangler over naga's
 lists). M5/M6: f16 vectors unspelled, schemas used only as locals
@@ -40,7 +40,7 @@ goldens through a scratch directory, because the first version left
 support modules in `programs/`. Planner verification at the slice
 close: `tools/gate.sh --require-backend` green, 188 tests in six
 executables (facade 3, typegpu-gen unit 7 and integration 15,
-harness 15, webgpu-gen 1 and 147), `b02-vecadd` equal on both tiers
+harness 15 in 9.81 seconds, webgpu-gen 1 and 147), `b02-vecadd` equal on both tiers
 with its `.vecAdd.wgsl` golden, 30 rejection fixtures each red with
 one rule id and its owner, the keyword list equal to naga's, no
 support module under `programs/`. Measurement: 44 s / 0.2 s / 40 s
@@ -50,8 +50,8 @@ support module under `programs/`. Measurement: 44 s / 0.2 s / 40 s
 
 Delivered 2026-08-22. Planner verification: `tools/gate.sh
 --require-backend` green, 191 tests in six executables (facade 4,
-typegpu-gen 7 and 15, harness 15 plus the ignored live test,
-webgpu-gen 3 and 147). `b03-saxpy-uniform` (a `Uniform` binding)
+typegpu-gen 7 and 15, harness 15 in 16.00 seconds plus the ignored
+live test, webgpu-gen 3 and 147). `b03-saxpy-uniform` (a `Uniform` binding)
 and `b04-particles` (a `Vec3f` schema and a helper) equal on both
 tiers with their `.wgsl` goldens. The facade reads
 `SUBSCRIPT_TYPEGPU_BACKEND` and builds the yawgpu backend-select
@@ -70,6 +70,29 @@ Measurement: 44 s / 0.2 s / 25 s / 22 s / 6.
 Noted for a later round: the generated Rust of the backend request
 carries no indentation (a template defect, `#[rustfmt::skip]` hides
 it).
+
+## Phase review (2026-08-22)
+
+A fresh reviewer ran the gate (green, 26.5 s, 192 tests) and found
+CRITICAL 3, MAJOR 9, MINOR 17. The CRITICALs are emitter defects
+naga cannot see: a K10 method lowered to an operator is not
+parenthesized as an operand, `Math.fround` substitutes its
+argument's text bare, and the `?:` lowering of a loop condition
+lands before the loop. The MAJORs: PI8 still described the typed
+factory (a failed edit), PI2's type-argument check did not exist,
+seven author diagnostics had no fixture, `build-time.md` had lost
+its rows, a nested `?:` ran its inner branch unconditionally, the
+uniform minimum binding size question (M6, a specification reading
+with no Dawn run), the PI13 async and non-void cases relabelled
+checker diagnostics through text matching, the differential test
+had no non-empty assertion, and the gate citations quoted no wall
+time. Spec resolutions in this commit: PI8 Rev 1 written as
+intended, PI13 Rev 1 and K17 leave the checker-rejected cases to
+the checker, K9 and K14 state where a lowering lands and how
+precedence is judged, plan §5 matches LY11, T6 names the library
+and binary equality. M6 is recorded as a Dawn measurement item for
+P6: LY11 stays as measured in the proof of concept until a Dawn run
+says otherwise. The code findings go to the coding agent.
 
 ## Exit criteria
 

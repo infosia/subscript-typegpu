@@ -37,8 +37,11 @@ principles" govern this block.
   identity test: run the generator binary against a scratch copy of
   the repository root, compare each output to the committed file.
   The test runs the same binary `tools/regen.sh` runs, never a
-  re-implementation of it. The failure message names
-  `tools/regen.sh`.
+  re-implementation of it. For the TypeGPU generator's `.wgsl`
+  goldens the harness compares the library API's text, and one test
+  proves the binary's text equal to the library's for every
+  program, with the same library file order in both. The failure
+  message names `tools/regen.sh`.
 - **T7 — Demonstrated red.** A guard or policy rule counts only
   after a recorded red run against a fixture that violates it.
 - **T8 — The symbol table matches the exports.** A harness test

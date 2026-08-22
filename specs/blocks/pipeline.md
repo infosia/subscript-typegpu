@@ -58,17 +58,17 @@ this block. Kernels are `kernel.md`. The runtime classes live in
 
 ## Generated artifacts
 
-- **PI8 — The support module.** For each declaration `<name>` the
-  generator emits: `<name>_WGSL: string`, `<name>_ENTRY: string`,
-  three `u32` constants `<name>_WORKGROUP_X`, `_Y`, `_Z`, and, per
-  layout class
-  `L` of the declaration, `<name>_LAYOUT<g>: BindGroupLayoutSpec`
-  (a library `@Descriptor` with an entries array of `{ binding,
-  visibility, kind, minBindingSize }`) plus a typed factory
-  `create<Name>BindGroup<g>(device, layout, resources:
-  <L>Resources): GPUBindGroup` where `<L>Resources` is a generated
-  `@Descriptor` with one `GPUBuffer` field per binding, named as
-  the layout field. Schema constants per SC11 continue.
+- **PI8 — The support module exports constants only.** Rev 1,
+  2026-08-22. For each declaration `<name>` the generator emits
+  `<name>_WGSL: string`, `<name>_ENTRY: string`, three `u32`
+  constants `<name>_WORKGROUP_X`, `_Y`, `_Z`, and, per layout class
+  of the declaration, `<name>_LAYOUT<g>: BindGroupLayoutSpec` (a
+  library `@Descriptor` with an entries array of `{ binding,
+  visibility, kind, minBindingSize }`, every size from the layout
+  engine, a type the engine cannot size is a diagnostic). Schema
+  constants per SC11 continue. No generated type and no generated
+  function exists. A typed per-field resources record is a P6
+  ergonomics item.
 - **PI9 — The runtime class.** `lib/typegpu.ts` exports
   `createComputePipeline(device, wgsl, entry, layouts:
   BindGroupLayoutSpec[], workgroup: FixedArray<u32, 3>):
@@ -80,7 +80,7 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   layout: GPUBindGroupLayout, spec: BindGroupLayoutSpec, buffers:
   GPUBuffer[]): GPUBindGroup` (positional, binding order equals
   declaration order, a count mismatch traps with both counts). It
-  builds on `lib/webgpu.ts` only.
+  builds on `lib/webgpu.ts` and `lib/typegpu-types.ts` only.
 - **PI10 — The WGSL golden.** Per K16. The harness module
   `wgsl_goldens` compares every `<stem>.<name>.wgsl` and validates
   it with naga.
@@ -103,8 +103,13 @@ this block. Kernels are `kernel.md`. The runtime classes live in
 ## Rejections
 
 - **PI13 — Each rejection is a named diagnostic with a red fixture.**
-  The P2 set: a layout field that is not a wrapper, a wrapper `T`
-  outside PI5, a non-literal workgroup size, a kernel that is
-  `async`, a kernel with a non-`void` return, a declaration inside a
-  function, a layout class used as a local, a uniform schema that
-  violates LY11.
+  Rev 1, 2026-08-22. The generator's set: a layout field that is not
+  a wrapper, a wrapper `T` outside PI5, a non-literal workgroup size,
+  a declaration inside a function, a layout class used as a local, a
+  uniform schema that violates LY11, a declaration type argument
+  that differs from the kernel's parameter type (PI2). Two cases
+  never reach the generator: an `async` kernel and a kernel with a
+  non-`void` return fail subscript's checker first, because the
+  declaration's function type does not match. Their fixtures assert
+  the checker's diagnostic. The generator never relabels a checker
+  diagnostic and never reads the program text.

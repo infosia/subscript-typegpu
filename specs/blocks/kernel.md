@@ -57,8 +57,10 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 - **K9 — The expression set.** Literals, locals, parameters, field
   access, `FixedArray` index, binding access (PI6), unary `-`, `!`,
   `~`, binary `+ - * / %`, comparisons, `&&`, `||`, `&`, `|`, the
-  conditional `?:` (lowered to `if`/`else` over a `var`, so both
-  sides keep short-circuit evaluation), `as` casts among `f32`,
+  conditional `?:` (lowered to `if`/`else` over a `var` placed
+  where the expression is evaluated — inside the loop for a loop
+  condition, inside the chosen branch for a nested conditional — so
+  both sides keep short-circuit evaluation), `as` casts among `f32`,
   `i32`, `u32`, calls to
   helpers, calls to library methods (K10), `new` of a library
   vector or matrix, `new` of a schema class with all fields set by
@@ -101,7 +103,12 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   names, field names, bindings, locals, helpers, the entry, and the
   `_ENTRY` constant. The list of reserved words and builtins is
   committed in `mapping.rs`, and a test compares it with naga's
-  lists. Parentheses appear only where precedence needs them.
+  lists. A mangled name that collides with an author identifier gets
+  a further `_`. Parentheses appear where precedence needs them,
+  and the need is judged on the emitted WGSL operator, not on the
+  subscript expression kind: a K10 method that lowers to an
+  operator, a `Math.fround` that lowers to its argument, and a
+  lowered `?:` are operands like any other.
   Whitespace is fixed: two-space indentation, one statement per
   line, no trailing space. A struct declaration carries no trailing
   semicolon.
@@ -129,8 +136,12 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   K12, K7, K4), never this rule. A fixture header names that rule and
   the fixture reaches that rule's check and no earlier one. The P2
   set: a `string` local, a `T[]` parameter, a
-  reference-class local, a lambda, `await`, a recursive helper, a
-  helper that takes a layout class, a `Math` member outside K11, a
-  cast to `f64`, a template string, an `f16` field read, a method
-  outside K10, a statement outside K7. Each names its rule id and
-  the author as the owner.
+  reference-class local, a lambda, a recursive helper, a helper that
+  takes a layout class, a `Math` member outside K11, a cast to `f64`,
+  a template string, an `f16` field read, a method outside K10, a
+  statement outside K7, a kernel signature outside K1, a literal
+  outside K6, a builtin outside PI4, a binding access outside PI6.
+  Each names its rule id and the author as the owner. `await` in a
+  kernel fails subscript's checker before the generator runs (an
+  `async` function is not a function value), and its fixture asserts
+  the checker's diagnostic.

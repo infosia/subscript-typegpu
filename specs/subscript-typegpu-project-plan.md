@@ -272,9 +272,10 @@ process before the JIT. The CLI (`subscript-typegpu-gen gen
 program.ts --lib lib/ -o dir/`) writes the same artifacts for
 ship-tier users.
 
-Layout engine: a pure module over a schema type tree. Two modes,
-WGSL default and uniform. A C-layout function for the same tree,
-with the R33 override. A diagnostic where they differ (D4).
+Layout engine: a pure module over a schema type tree. One layout,
+the WGSL default, plus the uniform check of LY11 (which changes no
+number and reports a violation). A C-layout function for the same
+tree, with the R33 override. A diagnostic where they differ (D4).
 
 Kernel emitter: type-directed, from `hir::Expr.ty`. From P4 on the
 emitter carries TypeGPU's origin model — where a value lives
