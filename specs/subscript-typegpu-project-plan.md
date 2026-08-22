@@ -371,10 +371,10 @@ emission, golden vectors from TypeGPU, naga cross-check, the layout
 identity diagnostic, `Buffer<T>` with `write` from `FixedArray<T, N>`
 and `read` into it.
 
-The phase starts on the subscript re-pin that carries R33. The layout
-engine computes C layout with the override from the start, so the
-generator is ready before the pin moves. The phase's first program
-proves identity for every vector and matrix class.
+R33 is at the pin from P0 slice 2 on. The layout engine computes C
+layout with the override. The phase's first program proves identity
+for every vector and matrix class, because subscript's own corpus
+entry pins values and not alignment numbers.
 
 Exit: (1) every committed golden vector passes. (2) `b02-layout`
 prints layout constants that match its golden on both tiers. (3)
@@ -450,7 +450,7 @@ The lane is a gate module, not a new executable.
 
 | Id | Risk | Mitigation / trigger |
 |---|---|---|
-| RC-1 | `@CStruct` has no alignment control, so a schema with a `vec3f` member cannot reach layout identity (C offset 12, WGSL offset 16) | **Decided 2026-08-22.** Escalated as subscript request R33: `@CStruct({ align: N })`, class-level, `N` in `{2, 4, 8, 16}`. P1 waits for the re-pin. No fallback is planned |
+| RC-1 | ~~`@CStruct` has no alignment control~~ **Closed 2026-08-22.** R33 landed in subscript at `ba6aa2e` (compiler.md §62): `@CStruct({ align: N })`, `N` in `{2, 4, 8, 16}`, both tiers, `offsetof` proof for `Vec3f` 16/16, `Mixed` 32/16, `Mat3x3f` 48/16, `Vec2f` 8/8, measured on clang and MSVC | P0 slice 2 re-pins subscript to `ba6aa2e`. P1's layout gate is the end-to-end check, because `a141` pins values, not alignment numbers |
 | RC-2 | `computePipeline(fn, desc)` needs a function value of a named function and a descriptor literal in one expression. The checker can reject the combination | P0 probes the expression before P2's contract. Fallback: two statements, a `@Descriptor` const and a call |
 | RC-3 | A generic runtime class (`Buffer<T>`) needs per-`T` size and layout facts with no inference | The generator emits one `Layout` const per schema and the class takes it as a constructor argument |
 | RC-4 | `hir` is `#[non_exhaustive]`. A subscript re-pin adds a construct the emitter does not know | Wildcard arms emit a named diagnostic. The re-pin procedure runs the full gate |
@@ -471,8 +471,8 @@ evidence, the date, and the corrected claim.
 
 ## 11. Open questions for the owner
 
-1. ~~**Alignment control in `@CStruct`** (RC-1).~~ Decided
-   2026-08-22: subscript gains `@CStruct({ align: N })` (R33).
+1. ~~**Alignment control in `@CStruct`** (RC-1).~~ Landed
+   2026-08-22 as R33 at subscript `ba6aa2e`.
 2. **The kernel marker** (RC-2). The plan uses a pipeline declaration
    as the marker. A `'use gpu'` directive is valid TypeScript and
    TypeGPU's own spelling, but subscript's treatment of a string
