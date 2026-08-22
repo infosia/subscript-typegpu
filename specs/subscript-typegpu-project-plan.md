@@ -459,12 +459,15 @@ gate. (6) Budgets hold.
 ### P7 — the CPU lane (~5%, optional, owner decides at P6 close)
 
 Because the library has real bodies (D7), a kernel can run on the
-dev-tier JIT with a `FixedArray` in place of each binding. The
-harness runs each `b` kernel on the CPU and compares the result with
-the live lane's recorded output.
+dev-tier JIT with its wrappers holding host data. Contract draft:
+`specs/blocks/cpu-lane.md` (CL1–CL4): `simulateCompute` loops the
+invocations on the host, barrier kernels are out until a phased
+revision, the live programs take the kernel body as their oracle.
 
-Exit: one kernel's CPU result equals its live result byte for byte.
-The lane is a gate module, not a new executable.
+Exit: `x01`–`x04` and `x09` use `simulateCompute` as their oracle
+and print `PASS` on Metal. One `b` program's host golden is
+committed and compared on both tiers. `CL2` has a fixture. Budgets
+hold. The lane is a gate module, not a new executable.
 
 ## 9. Risk register
 
