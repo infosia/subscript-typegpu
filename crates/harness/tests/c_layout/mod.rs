@@ -55,6 +55,7 @@ fn programs() -> Vec<PathBuf> {
             "b04-particles.ts",
             "b05-buffer.ts",
             "b06-render.ts",
+            "b07-draw-variants.ts",
         ],
         "C layout program set changed"
     );
