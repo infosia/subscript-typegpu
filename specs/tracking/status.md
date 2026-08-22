@@ -13,7 +13,7 @@ Updated 2026-08-23 at `4c2eff8`.
 | P6 ergonomics and diagnostics | COMPLETE | `4c2eff8`, 2026-08-23 |
 | P7 the CPU lane | in progress | opened 2026-08-23 by the owner's decision |
 
-Numbers at `4c2eff8`: 221 tests in six executables, 22 programs
+Numbers at `4c2eff8`: 223 tests in six executables, 28 programs
 (`a01`–`a05`, `b01`–`b11`, `x01`–`x12`), 157 facade exports all
 reached, the live lane green on yawgpu Metal and on Dawn, the gate
 84 s after a generator change and 78 s after a program change

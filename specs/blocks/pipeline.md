@@ -92,7 +92,8 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   the pipeline through the generated constants, creates buffers
   sized from schema constants, creates bind groups through the
   typed factory or the positional call, encodes a dispatch, submits,
-  and prints markers,
+  runs `simulateCompute` when the pipeline is host-runnable and
+  prints its `host:` line (CL4), and prints markers,
   constants by name, and the WGSL line count. Noop executes no
   shader, so a `b` program never prints a result buffer.
 - **PI12 — Live programs compute.** An `x` program writes input

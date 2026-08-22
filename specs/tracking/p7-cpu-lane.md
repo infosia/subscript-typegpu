@@ -26,11 +26,27 @@ planner's omission, corrected at `f590e81`'s successor) and made the
 scanners read `cpu-lane.md` headings instead; the close round
 returns the scanners to the table.
 
+## Phase review (2026-08-23)
+
+A fresh reviewer ran the gate (green) and found CRITICAL 0, MAJOR 6,
+MINOR 14. MAJOR: a written private variable was host-runnable while
+the host holds one shared instance; the barrier and atomic branches
+of the analysis had no program that could fail them; the CL2 fixture
+passed a literal `false` instead of the generator's constant; the
+`hostRunnable` argument was unenforceable; `b11`'s host run bound a
+nearest sampler beside a linear GPU sampler; the scanners carried a
+duplicate rule list. Resolutions in the specs: CL2 Rev 1 (written
+private variables, the harness pairing check over the HIR), CL4 Rev
+1 (host-runnability from `Generated`), CL5, CL6, `simulateComputeThreads`
+in CL1, PI4, PI8, and PI11 cross-references. The code findings go to
+the coding agent.
+
 ## Exit criteria
 
 | # | Criterion | Evidence |
 |---|---|---|
 | 1 | `x01`–`x04` and `x09` use `simulateCompute` as their oracle and print `PASS` on Metal | Metal and Dawn at `1da3db8` |
 | 2 | One `b` program's host golden is committed and compared on both tiers | `b02-vecadd` `host:out=5,7,9`, and every host-runnable `b` pipeline |
-| 3 | `CL2` has a fixture | Slice 1 |
-| 4 | Budgets hold | 46 s / 0.2 s / 84 s / 81 s / 6 |
+| 3 | `CL2` has a fixture that reaches the trap through the generator's constant | — |
+| 4 | CL6's five emitter tests exist. The lane is a gate module | — |
+| 5 | Budgets hold | 46 s / 0.2 s / 84 s / 81 s / 6 |
