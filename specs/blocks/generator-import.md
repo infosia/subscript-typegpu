@@ -43,7 +43,7 @@ checkout.
 Each item is one commit. Each commit's message names the item and
 quotes its gate result.
 
-- **I4 (G1) — Names.** `naming.rs` derives `subscript_typegpu_` +
+- **I4 — Names.** `naming.rs` derives `subscript_typegpu_` +
   snake_case for exports (`subscript_typegpu_device_create_buffer`),
   `SubscriptTypegpu` + Pascal for types
   (`SubscriptTypegpuBufferDescriptor`), and
@@ -52,9 +52,10 @@ quotes its gate result.
   `subscript-typegpu.h`. The mirror is
   `subscript-typegpu.generated.d.ts`. The bindgen pragma comments keep
   their spelling, because `subscript bind` reads them. Gate: a grep
-  for `sgpu` and `SGPU` over every regenerated output and every file
-  under `crates/webgpu-gen/` finds nothing.
-- **I5 (G2) — The function table.** `emit_rust.rs` emits, in place of
+  for the old four-letter prefix, in both cases, over every
+  regenerated output and every file under `crates/webgpu-gen/` finds
+  nothing. `tools/hygiene.sh` carries the pattern.
+- **I5 — The function table.** `emit_rust.rs` emits, in place of
   the `extern "C"` block, one `struct WebgpuTable` with one
   `unsafe extern "C" fn` pointer field per webgpu.h function the plan
   uses, one `fn load(path: &std::path::Path) -> Result<WebgpuTable,
@@ -66,18 +67,20 @@ quotes its gate result.
   `adapter_limits.rs`) are verified present in the table by a test.
   `runtime.rs` owns `table()`: a `OnceLock<WebgpuTable>` filled by
   `subscript_typegpu_create_instance` from
-  `SUBSCRIPT_TYPEGPU_BACKEND_LIB` (facade.md F1 through F4). Gate:
+  `SUBSCRIPT_TYPEGPU_BACKEND_LIB` (facade.md L1 through L4). Gate:
   `cargo tree -p subscript-typegpu-facade` lists `libloading` and
   nothing else. The facade crate has no `[features]` and no
   `build.rs`.
-- **I6 (G3) — The symbol table from the plan.** `native_symbols.rs`
+- **I6 — The symbol table from the plan.** `native_symbols.rs`
   takes the plan's export list and emits
   `crates/harness/src/native_symbols.generated.rs`. It does not parse
   Rust source. `syn` leaves `Cargo.toml`. `facade_native_symbols()`
   and the `include_str!` of a sibling directory leave. Gate: `syn` is
-  absent from `Cargo.lock`. A harness test compares the table's names
-  with the facade's exports (testing.md T8).
-- **I7 (G4) — The driver.** `main.rs` takes one argument, the
+  not a direct dependency of any workspace crate (`cargo tree -e
+  normal --depth 1`). A transitive `syn` through `serde_derive` is
+  accepted. A harness test compares the table's names with the
+  facade's exports (testing.md T8).
+- **I7 — The driver.** `main.rs` takes one argument, the
   repository root, and reads `third_party/webgpu-headers/webgpu.yml`,
   `crates/webgpu-gen/policy.toml`, and the two gpuweb `.bs` files. It
   writes exactly: `crates/facade/subscript-typegpu.h`,
@@ -87,20 +90,28 @@ quotes its gate result.
   `crates/harness/src/native_symbols.generated.rs`. `tools/regen.sh`
   runs it. Gate: the regen test regenerates into a scratch directory
   and compares bytes with every committed output (testing.md T6).
-- **I8 (G5) — One test executable.** `tests/main.rs` declares one
+- **I8 — One test executable.** `tests/main.rs` declares one
   `mod` per former file. The pin canaries (the IDL block count, the
   namespace-constant table, the weedle2 definition count, the API
-  accounting tuple, the absence-enum list) move into `tests/pins.rs`
-  with a comment that names the re-pin procedure. Gate: `cargo test
+  accounting tuple, the absence-enum list) move into
+  `tests/pins/mod.rs` with a comment that names the re-pin
+  procedure. Former test files live under `tests/cases/`. Gate: `cargo test
   -p subscript-typegpu-webgpu-gen` builds one executable. The test
   count before and after is recorded in the tracking entry and is
   equal.
-- **I9 (G6) — Prose.** Every comment and doc string that names the
+- **I9 — Prose.** Every comment and doc string that names the
   proof of concept, its crates, its directories, or its phases is
   rewritten to this repository's names, or cites the upstream URL.
-  The module docs follow CLAUDE.md's writing rules. Gate:
-  `tools/hygiene.sh` is clean.
-- **I10 (G7) — The two-pass question.** The coding agent measures
+  A rule id cited anywhere in the crate, the policy file, or a
+  generated output resolves in this repository's `specs/blocks/`:
+  F-, S-, A-, B-, C-, PL-, E-, G-, H-rules in
+  `facade-generator.md`, J-rules in `api-layer.md`, T-rules in
+  `testing.md`, Q- and R-ids as subscript's. A phase or plan
+  reference of the proof of concept becomes prose. The module docs
+  follow CLAUDE.md's writing rules. Gate: `tools/hygiene.sh` is
+  clean, and a test lists every cited id and checks it against the
+  id table in `specs/blocks/rule-ids.txt`.
+- **I10 — The two-pass question.** The coding agent measures
   whether `api.cenum_aliases` can be computed from `policy.toml` and
   `webgpu.yml` without the base mirror. If it can, the driver
   generates the facade once, `generate_with_cenum_aliases` leaves,

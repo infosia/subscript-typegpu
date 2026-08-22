@@ -226,13 +226,13 @@ What changes at import, each with its gate:
 
 | Id | Change | Where | Gate |
 |---|---|---|---|
-| G1 | C prefix `sgpu` → `subscript_typegpu_` (snake_case, from the yml names), type prefix `SGPU` → `SubscriptTypegpu`, header `subscript-typegpu.h`, mirror file name | `naming.rs`, `emit_header.rs` preamble | Regenerated outputs carry no `sgpu` token. A hygiene grep |
-| G2 | The `extern "C"` block becomes generated shims over a function table that `runtime.rs` fills from `SUBSCRIPT_TYPEGPU_BACKEND_LIB` with `libloading` on `subscript_typegpu_create_instance`. Call sites do not change | `emit_rust.rs` and the 17 `rust_*_extern` renderers. The three hard-coded names (`wgpu{Pascal}Release` ×2, `wgpuAdapterInfoFreeMembers`) | `cargo tree -p subscript-typegpu-facade` lists `libloading` alone. `a01` runs with the variable set. The variable absent gives one stderr line that names the variable, then a null instance |
-| G3 | The symbol table is emitted from the plan's export list, not by parsing `generated.rs`. `syn` and the `include_str!` of a sibling crate leave | `native_symbols.rs` | `syn` absent from `Cargo.lock`. The harness table equals the facade's export set, checked by a test that links both |
-| G4 | The driver takes the repository root as an argument and writes the five outputs of this repository | `bin/` | `tools/regen.sh` regenerates. The regen test is byte-identical |
-| G5 | Tests merge into `tests/main.rs`, one module per former file. The hard-coded pin canaries move into one `pins` module next to the pin table | `tests/` | One executable. The test count before and after is recorded |
-| G6 | Every in-crate mention of the proof of concept's names is rewritten to this repository's names or to the upstream URL | comments, docs | Hygiene grep |
-| G7 | Measured, then decided: if the CEnum alias list is computable from policy and yml alone, the two-pass facade generation collapses to one pass and `generate_with_cenum_aliases` leaves | `lib.rs`, `api.rs` | A before-and-after byte comparison of every output. If the outputs differ, the two-pass stays and the reason is recorded |
+| I4 | The proof of concept's four-letter C prefix becomes `subscript_typegpu_` (snake_case, from the yml names), its type prefix becomes `SubscriptTypegpu`, the header becomes `subscript-typegpu.h`, the mirror file name follows | `naming.rs`, `emit_header.rs` preamble | Regenerated outputs carry no old prefix token. A hygiene grep |
+| I5 | The `extern "C"` block becomes generated shims over a function table that `runtime.rs` fills from `SUBSCRIPT_TYPEGPU_BACKEND_LIB` with `libloading` on `subscript_typegpu_create_instance`. Call sites do not change | `emit_rust.rs` and the 17 `rust_*_extern` renderers. The three hard-coded names (`wgpu{Pascal}Release` ×2, `wgpuAdapterInfoFreeMembers`) | `cargo tree -p subscript-typegpu-facade` lists `libloading` alone. `a01` runs with the variable set. The variable absent gives one stderr line that names the variable, then a null instance |
+| I6 | The symbol table is emitted from the plan's export list, not by parsing `generated.rs`. `syn` and the `include_str!` of a sibling crate leave | `native_symbols.rs` | `syn` is not a direct dependency of any workspace crate (`cargo tree -e normal --depth 1`). The harness table equals the facade's export set, checked by a test that links both |
+| I7 | The driver takes the repository root as an argument and writes the five outputs of this repository | `bin/` | `tools/regen.sh` regenerates. The regen test is byte-identical |
+| I8 | Tests merge into `tests/main.rs`, one module per former file. The hard-coded pin canaries move into one `pins` module next to the pin table | `tests/` | One executable. The test count before and after is recorded |
+| I9 | Every in-crate mention of the proof of concept's names is rewritten to this repository's names or to the upstream URL | comments, docs | Hygiene grep |
+| I10 | Measured, then decided: if the CEnum alias list is computable from policy and yml alone, the two-pass facade generation collapses to one pass and `generate_with_cenum_aliases` leaves | `lib.rs`, `api.rs` | A before-and-after byte comparison of every output. If the outputs differ, the two-pass stays and the reason is recorded |
 
 The policy file keeps its two-way validation (unknown, dead,
 duplicate, unpoliced, invalid all abort). The subset it names at P0 is
@@ -341,7 +341,7 @@ does not work around.
 ### P0 — seed and generator import (~15%)
 
 Slice 1, the import. Workspace, pins, profile, `tools/`, the two
-submodules, the substrate generator with reshape items G1 through G7,
+submodules, the substrate generator with reshape items I4 through I10,
 the facade crate with `runtime.rs` and the loader, the five
 regenerated outputs committed, the generator's test executable green.
 
@@ -357,11 +357,12 @@ every committed generated file, demonstrated red then green. (3)
 `specs/tracking/build-time.md` records the five measurements of §7.
 Each is inside budget, or the budget is revised with the cause
 stated. (4) `cargo tree -p subscript-typegpu-facade` lists
-`libloading` alone. `syn` is absent from `Cargo.lock`. (5) The
+`libloading` alone. `syn` is not a direct dependency of any
+workspace crate. (5) The
 workspace has no `[features]` table and no `build.rs`, proven by a
-hygiene check. (6) G1 through G6 are green by their gates. G7 is
+hygiene check. (6) I4 through I9 are green by their gates. I10 is
 measured and decided. (7) The generator's test count before and
-after G5 is recorded and equal.
+after I8 is recorded and equal.
 
 ### P1 — schemas and layout (~20%)
 
@@ -461,8 +462,8 @@ The lane is a gate module, not a new executable.
 | RC-9 | Methods with real bodies let an author call a GPU-only intrinsic on the host | GPU-only intrinsics have a body that traps with a named message. The generator lowers the call |
 | RC-10 | The live lane cannot run in a sandboxed agent shell | `tools/live.sh` is owner-run. `CLAUDE.md` forbids sandboxed device runs |
 | RC-11 | The mirror regen test needs libclang at run time (`subscript-bindgen` loads it) | Loud `pending` when absent. The owner's machine has it through Xcode |
-| RC-12 | The imported generator's hard-coded pin canaries (IDL block count, policy accounting tuple) need a manual edit at every re-pin | They move into one `pins` module (G5). The re-pin procedure lists them |
-| RC-13 | A reshape item (G2, G7) costs more than the module it touches | D11's kill evidence. The module is rewritten, the rest stays imported |
+| RC-12 | The imported generator's hard-coded pin canaries (IDL block count, policy accounting tuple) need a manual edit at every re-pin | They move into one `pins` module (I8). The re-pin procedure lists them |
+| RC-13 | A reshape item (I5, I10) costs more than the module it touches | D11's kill evidence. The module is rewritten, the rest stays imported |
 
 ## 10. Corrections
 

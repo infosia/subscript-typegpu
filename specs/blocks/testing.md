@@ -27,8 +27,11 @@ principles" govern this block.
   `SUBSCRIPT_TYPEGPU_BACKEND_LIB` names, in its Noop mode. Both raw
   byte outputs must equal the golden exactly.
 - **T6 — Regeneration.** Every committed generated file has a byte-
-  identity test: regenerate into a scratch directory, compare to the
-  committed file. The failure message names `tools/regen.sh`.
+  identity test: run the generator binary against a scratch copy of
+  the repository root, compare each output to the committed file.
+  The test runs the same binary `tools/regen.sh` runs, never a
+  re-implementation of it. The failure message names
+  `tools/regen.sh`.
 - **T7 — Demonstrated red.** A guard or policy rule counts only
   after a recorded red run against a fixture that violates it.
 - **T8 — The symbol table matches the exports.** A harness test
@@ -39,11 +42,14 @@ principles" govern this block.
   only integration-test file of a crate. A new test is a `mod`. A
   hygiene check counts `tests/*.rs` files and fails above one.
 - **T10 — Loud pending.** If a prerequisite is absent (the backend
-  library, libclang, a TypeGPU checkout), the test prints one
-  `pending: <what> — <fix>` line and passes. The gate prints the
-  pending lines at the end.
+  library, libclang, a TypeGPU checkout), the tests that need it
+  print one `pending: <what> — <fix>` line in total and pass. Tests
+  that do not need the prerequisite still run. The gate runs
+  `cargo test` with `-- --nocapture` so the line reaches the log,
+  and prints the pending lines at the end.
 - **T11 — No features, no build scripts.** A hygiene check fails on
-  any `[features]` table or `build.rs` in the workspace.
+  any `[features]` table or `build.rs` under `crates/` or in the
+  root manifest. Submodules and `target/` are outside the check.
 
 ## Build time
 
@@ -64,9 +70,10 @@ principles" govern this block.
 
 - **T14 — The gate.** `tools/gate.sh` runs, in order: `cargo fmt
   --all -- --check`, `cargo clippy --workspace -- -D warnings`,
-  `cargo test --workspace`, `tools/hygiene.sh`. It sets
-  `CARGO_BUILD_JOBS=4` unless the environment sets it. It fails on the
-  first failure and prints the pending lines at the end.
+  `cargo test --workspace -- --nocapture`, `tools/hygiene.sh`. It
+  sets `CARGO_BUILD_JOBS=4` unless the environment sets it. It fails
+  on the first failure and prints the pending lines at the end. An
+  unknown argument is an error, not a silent default.
 - **T15 — Live is not the gate.** `tools/live.sh` runs `x` programs
   on a real adapter through `ReloadSession` and ship AOT, never the
   forking JIT runner. Results go to `specs/tracking/` with the date

@@ -27,7 +27,7 @@ Not started.
 | 1 | `a01` byte-identical on both tiers and the golden | — |
 | 2 | Regeneration gate red then green | — |
 | 3 | Five build-time measurements recorded | `build-time.md` |
-| 4 | Facade deps: `libloading` alone. `syn` absent | — |
+| 4 | Facade deps: `libloading` alone. `syn` not a direct dependency | — |
 | 5 | No `[features]`, no `build.rs` | — |
 | 6 | I4–I9 green by their gates. I10 measured | — |
 | 7 | Test count before and after I8 equal | — |
