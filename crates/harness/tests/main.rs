@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod api;
 mod c_layout;
+mod coverage;
 mod differential;
 mod library;
 mod live;

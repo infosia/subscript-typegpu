@@ -2,6 +2,7 @@
 // purpose: prove that Buffer.write traps before crossing the element range
 // exercises: BF8
 // questions: none
+// expected-rule: BF8
 
 import { Buffer, createBuffer } from "./typegpu";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";

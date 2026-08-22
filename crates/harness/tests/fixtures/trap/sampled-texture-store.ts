@@ -2,6 +2,7 @@
 // purpose: prove the host body of a generator-rejected sampled-texture store traps
 // exercises: TX3
 // questions: none
+// expected-rule: TX3
 
 import { Texture2d } from "./typegpu";
 import { Vec2i, Vec4f } from "./typegpu-types";

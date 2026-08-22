@@ -2,6 +2,7 @@
 // purpose: prove a storageTexture layout entry without a format traps
 // exercises: TX5
 // questions: none
+// expected-rule: TX5
 
 import { BindGroupLayoutSpec, COMPUTE_VISIBILITY, createComputePipeline } from "./typegpu";
 import { gpu, GPUAdapter, GPUDevice } from "./webgpu";

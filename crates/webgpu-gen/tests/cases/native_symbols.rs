@@ -54,11 +54,23 @@ fn symbol_source_has_the_required_table_shape() {
         .contains("pub fn facade_symbols() -> Vec<(String, *const u8)>"));
     assert!(generated
         .native_symbols
+        .contains("pub fn facade_counting_symbols() -> Vec<(String, *const u8)>"));
+    assert!(generated
+        .native_symbols
+        .contains("pub fn facade_export_names() -> &'static [&'static str]"));
+    assert!(generated
+        .native_symbols
         .contains("use subscript_typegpu_facade as facade;"));
-    for name in generated.export_names {
+    for (index, name) in generated.export_names.into_iter().enumerate() {
         assert!(generated.native_symbols.contains(&format!(
             "(\"{name}\".to_owned(), facade::{name} as *const u8)"
         )));
+        assert!(generated.native_symbols.contains(&format!(
+            "(\"{name}\".to_owned(), coverage_{index} as *const u8)"
+        )));
+        assert!(generated
+            .native_symbols
+            .contains(&format!("super::coverage_hit({index});")));
     }
 }
 

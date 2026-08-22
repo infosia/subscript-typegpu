@@ -1,4 +1,5 @@
 // expected-rule: S100
+// covers-rule: PI2
 // expected-owner: checker
 // expected-message: type mismatch: the argument expects `(Declared, ComputeInvocation) => void`, got `(KernelLayout, ComputeInvocation) => void`
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";

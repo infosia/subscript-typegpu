@@ -5,13 +5,11 @@
 
 import {
   createComputePipeline,
-  createBindGroup,
   ComputeInvocation,
   computePipeline,
   ComputePipelineSpec,
   MutStorage,
   Storage,
-  bufferResource,
 } from "./typegpu";
 import {
   gpu,
@@ -21,6 +19,9 @@ import {
 } from "./webgpu";
 import {
   Item_SIZE,
+  VecAddLayoutResources,
+  createVecAddLayoutResources,
+  createVecAddBindGroup0,
   vecAdd_ENTRY,
   vecAdd_LAYOUT0,
   vecAdd_WGSL,
@@ -99,8 +100,8 @@ export async function main(): Promise<void> {
       [vecAdd_LAYOUT0],
       [vecAdd_WORKGROUP_X, vecAdd_WORKGROUP_Y, vecAdd_WORKGROUP_Z],
     );
-    using nativeLayout = pipeline.bindGroupLayout(0);
-    using bindGroup = createBindGroup(device, nativeLayout, vecAdd_LAYOUT0, [bufferResource(a), bufferResource(b), bufferResource(out)]);
+    const resources: VecAddLayoutResources = createVecAddLayoutResources(a, b, out);
+    using bindGroup = createVecAddBindGroup0(device, pipeline, resources);
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();

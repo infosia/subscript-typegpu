@@ -43,6 +43,10 @@ fn runtime_traps_are_named_and_numbered() {
     let directory = repository_root().join("crates/harness/tests/fixtures/trap");
     for (name, expected) in [
         (
+            "patch-past-field.ts",
+            "EG2 Buffer.patch fieldOffset=3 byteLength=2 elementSize=4",
+        ),
+        (
             "write-past-end.ts",
             "BF8 Buffer.write elementIndex=1 elementCount=2 count=2",
         ),
@@ -57,6 +61,10 @@ fn runtime_traps_are_named_and_numbered() {
         (
             "resource-kind-mismatch.ts",
             "TX4 createBindGroup binding=3 expected=texture actual=buffer",
+        ),
+        (
+            "resource-count-mismatch.ts",
+            "PI9 createBindGroup expected 1 resources but received 0",
         ),
         (
             "resource-two-fields.ts",

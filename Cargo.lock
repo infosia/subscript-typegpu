@@ -1166,6 +1166,7 @@ dependencies = [
 name = "subscript-typegpu-harness"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "naga",
  "subscript-codegen",
  "subscript-compiler",

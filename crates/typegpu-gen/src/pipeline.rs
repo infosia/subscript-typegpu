@@ -540,9 +540,8 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
             continue;
         };
         let Some(kernel) = function(module, entry) else {
-            diagnostics.push(Diagnostic::new(
-                RuleCode::S100,
-                format!("K15: kernel `{entry}` disappeared from typed HIR (generator)"),
+            diagnostics.push(generator_diagnostic(
+                format!("kernel `{entry}` disappeared from typed HIR"),
                 global.init.pos.clone(),
             ));
             continue;
@@ -554,9 +553,8 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
                 _ => None,
             });
         if kernel.params.len() != arity + 1 {
-            diagnostics.push(Diagnostic::new(
-                RuleCode::S100,
-                format!("K15: kernel `{entry}` has an impossible parameter count (generator)"),
+            diagnostics.push(generator_diagnostic(
+                format!("kernel `{entry}` has an impossible parameter count"),
                 kernel.pos.clone(),
             ));
             continue;
@@ -598,9 +596,8 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
             .is_some_and(|name| name == "ComputeInvocation")
             && library_class(module, &kernel.params[arity].ty).is_some();
         if !invocation_ok {
-            diagnostics.push(Diagnostic::new(
-                RuleCode::S100,
-                format!("K15: kernel `{entry}` lost its ComputeInvocation parameter (generator)"),
+            diagnostics.push(generator_diagnostic(
+                format!("kernel `{entry}` lost its ComputeInvocation parameter"),
                 kernel.params[arity].pos.clone(),
             ));
             continue;

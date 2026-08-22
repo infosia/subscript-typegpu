@@ -2,6 +2,7 @@
 // purpose: prove that readBuffer traps before crossing the mapped range
 // exercises: BF8
 // questions: none
+// expected-rule: BF8
 
 import { Buffer, createBuffer, readBuffer } from "./typegpu";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";

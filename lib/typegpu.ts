@@ -20,6 +20,11 @@ import {
   GPUVertexBufferLayout,
 } from "./webgpu";
 
+function authorTrap(rule: string, method: string, values: string): void {
+  print(`${rule} ${method} ${values} (author)`);
+  unreachable();
+}
+
 export class Texture2d<T> {
   // The generator reads this zero-length marker to recover T from the typed HIR.
   private values: T[];
@@ -65,8 +70,7 @@ export class Texture2d<T> {
   }
 
   store(coords: Vec2i, value: Vec4f): void {
-    print("TX3 store is not legal on Texture2d");
-    unreachable();
+    authorTrap("TX3", "store", "is not legal on Texture2d");
   }
 }
 
@@ -130,17 +134,11 @@ export class Buffer<T> {
     const byteLength: u32 = bytes.length as u32;
     const remainder: u32 = byteLength % this.elementSize;
     if (remainder !== 0) {
-      print(
-        `BF8 Buffer.write byteLength=${byteLength} elementSize=${this.elementSize} remainder=${remainder}`,
-      );
-      unreachable();
+      authorTrap("BF8", "Buffer.write", `byteLength=${byteLength} elementSize=${this.elementSize} remainder=${remainder}`);
     }
     const elementCount: u32 = byteLength / this.elementSize;
     if (elementIndex > this.count || elementCount > this.count - elementIndex) {
-      print(
-        `BF8 Buffer.write elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`,
-      );
-      unreachable();
+      authorTrap("BF8", "Buffer.write", `elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`);
     }
     queue.writeBuffer(
       this.buffer,
@@ -152,18 +150,29 @@ export class Buffer<T> {
   writeOne(queue: GPUQueue, elementIndex: u32, bytes: u8[]): void {
     const byteLength: u32 = bytes.length as u32;
     if (byteLength !== this.elementSize) {
-      print(
-        `BF8 Buffer.writeOne elementIndex=${elementIndex} byteLength=${byteLength} elementSize=${this.elementSize}`,
-      );
-      unreachable();
+      authorTrap("BF8", "Buffer.writeOne", `elementIndex=${elementIndex} byteLength=${byteLength} elementSize=${this.elementSize}`);
     }
     if (elementIndex >= this.count) {
-      print(`BF8 Buffer.writeOne elementIndex=${elementIndex} elementCount=1 count=${this.count}`);
-      unreachable();
+      authorTrap("BF8", "Buffer.writeOne", `elementIndex=${elementIndex} elementCount=1 count=${this.count}`);
     }
     queue.writeBuffer(
       this.buffer,
       (elementIndex as u64) * (this.elementSize as u64),
+      bytes,
+    );
+  }
+
+  patch(queue: GPUQueue, elementIndex: u32, fieldOffset: u32, bytes: u8[]): void {
+    const byteLength: u32 = bytes.length as u32;
+    if (elementIndex >= this.count) {
+      authorTrap("EG2", "Buffer.patch", `elementIndex=${elementIndex} elementCount=1 count=${this.count}`);
+    }
+    if (fieldOffset > this.elementSize || byteLength > this.elementSize - fieldOffset) {
+      authorTrap("EG2", "Buffer.patch", `fieldOffset=${fieldOffset} byteLength=${byteLength} elementSize=${this.elementSize}`);
+    }
+    queue.writeBuffer(
+      this.buffer,
+      (elementIndex as u64) * (this.elementSize as u64) + (fieldOffset as u64),
       bytes,
     );
   }
@@ -175,16 +184,10 @@ export class Buffer<T> {
     elementCount: u32,
   ): void {
     if (elementIndex > this.count || elementCount > this.count - elementIndex) {
-      print(
-        `BF8 Buffer.copyTo elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`,
-      );
-      unreachable();
+      authorTrap("BF8", "Buffer.copyTo", `elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`);
     }
     if (elementCount > target.count) {
-      print(
-        `BF8 Buffer.copyTo targetCount=${target.count} elementCount=${elementCount} elementSize=${this.elementSize}`,
-      );
-      unreachable();
+      authorTrap("BF8", "Buffer.copyTo", `targetCount=${target.count} elementCount=${elementCount} elementSize=${this.elementSize}`);
     }
     encoder.copyBufferToBuffer(
       this.buffer,
@@ -214,15 +217,16 @@ export function readBuffer<T>(
   elementCount: u32,
 ): u8[] {
   if (elementIndex > readback.count || elementCount > readback.count - elementIndex) {
-    print(
-      `BF8 readBuffer elementIndex=${elementIndex} elementCount=${elementCount} count=${readback.count}`,
-    );
-    unreachable();
+    authorTrap("BF8", "readBuffer", `elementIndex=${elementIndex} elementCount=${elementCount} count=${readback.count}`);
   }
   return readback.buffer.readMappedRange(
     (elementIndex as u64) * (readback.elementSize as u64),
     (elementCount as u64) * (readback.elementSize as u64),
   );
+}
+
+export function readOne<T>(readback: Buffer<T>, elementIndex: u32): u8[] {
+  return readBuffer<T>(readback, elementIndex, 1);
 }
 
 export function createBuffer<T>(
@@ -655,8 +659,7 @@ function createNativeBindGroupLayouts(
             storageTexture: { access: "write-only", format: source.format, viewDimension: "2d" },
           });
         } else {
-          print(`TX5 storageTexture binding=${source.binding} has no format`);
-          unreachable();
+          authorTrap("TX5", "storageTexture", `binding=${source.binding} has no format`);
         }
       } else if (source.kind === "sampler" || source.kind === "comparisonSampler") {
         entries.push({
@@ -665,8 +668,7 @@ function createNativeBindGroupLayouts(
           sampler: { type: source.samplerType },
         });
       } else {
-        print(`TX5 bind group layout binding=${source.binding} has unknown kind=${source.kind}`);
-        unreachable();
+        authorTrap("TX5", "bind group layout", `binding=${source.binding} has unknown kind=${source.kind}`);
       }
       binding = binding + 1;
     }
@@ -765,8 +767,7 @@ export function createBindGroup(
   resources: BindingResource[],
 ): GPUBindGroup {
   if (spec.entries.length !== resources.length) {
-    print(`PI9 createBindGroup expected ${spec.entries.length} resources but received ${resources.length}`);
-    unreachable();
+    authorTrap("PI9", "createBindGroup", `expected ${spec.entries.length} resources but received ${resources.length}`);
   }
   const entries: GPUBindGroupEntry[] = [];
   let index: i32 = 0;
@@ -788,8 +789,7 @@ export function createBindGroup(
       fieldCount = fieldCount + 1;
     }
     if (fieldCount !== 1) {
-      print(`TX4 createBindGroup binding=${specEntry.binding} resourceFields=${fieldCount}`);
-      unreachable();
+      authorTrap("TX4", "createBindGroup", `binding=${specEntry.binding} resourceFields=${fieldCount}`);
     }
     let expected: string = "unknown";
     if (specEntry.kind === "uniform" || specEntry.kind === "read-only-storage"
@@ -797,12 +797,10 @@ export function createBindGroup(
     if (specEntry.kind === "texture" || specEntry.kind === "storageTexture") expected = "texture";
     if (specEntry.kind === "sampler" || specEntry.kind === "comparisonSampler") expected = "sampler";
     if (expected === "unknown") {
-      print(`TX5 createBindGroup binding=${specEntry.binding} has unknown kind=${specEntry.kind}`);
-      unreachable();
+      authorTrap("TX5", "createBindGroup", `binding=${specEntry.binding} has unknown kind=${specEntry.kind}`);
     }
     if (actual !== expected) {
-      print(`TX4 createBindGroup binding=${specEntry.binding} expected=${expected} actual=${actual}`);
-      unreachable();
+      authorTrap("TX4", "createBindGroup", `binding=${specEntry.binding} expected=${expected} actual=${actual}`);
     }
     entries.push({
       binding: specEntry.binding,

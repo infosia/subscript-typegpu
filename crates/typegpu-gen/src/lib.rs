@@ -112,6 +112,9 @@ fn support_import(
 }
 
 fn schema_name(export: &str) -> Option<&str> {
+    if export.ends_with("Resources") {
+        return None;
+    }
     for suffix in ["_SIZE", "_ALIGN", "_STRIDE", "_WGSL"] {
         if let Some(name) = export.strip_suffix(suffix) {
             return Some(name);
@@ -158,6 +161,12 @@ fn generated_export_names(
         ]);
         for layout in &pipeline.layouts {
             names.insert(format!("{}_LAYOUT{}", pipeline.declaration, layout.group));
+            names.insert(format!("{}Resources", layout.name));
+            names.insert(format!("create{}Resources", layout.name));
+            names.insert(emit::bind_group_factory_name(
+                &pipeline.declaration,
+                layout.group,
+            ));
         }
     }
     for pipeline in render_pipelines {
@@ -169,6 +178,12 @@ fn generated_export_names(
         ]);
         for layout in &pipeline.layouts {
             names.insert(format!("{}_LAYOUT{}", pipeline.declaration, layout.group));
+            names.insert(format!("{}Resources", layout.name));
+            names.insert(format!("create{}Resources", layout.name));
+            names.insert(emit::bind_group_factory_name(
+                &pipeline.declaration,
+                layout.group,
+            ));
         }
         for buffer in &pipeline.vertex_buffers {
             names.insert(format!(

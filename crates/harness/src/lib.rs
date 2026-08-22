@@ -7,6 +7,7 @@ pub mod native_symbols_generated;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 
 use subscript_codegen::{
@@ -140,6 +141,66 @@ fn include_directory() -> PathBuf {
     repository_root().join("crates/facade")
 }
 
+#[derive(Clone, Copy)]
+struct CoverageMemory {
+    address: usize,
+    len: usize,
+}
+
+static COVERAGE_MEMORY: OnceLock<CoverageMemory> = OnceLock::new();
+
+fn coverage_counts() -> &'static [AtomicU64] {
+    let memory = COVERAGE_MEMORY.get_or_init(|| {
+        let len = native_symbols_generated::facade_export_names().len();
+        let byte_len = len
+            .checked_mul(std::mem::size_of::<AtomicU64>())
+            .expect("facade coverage array size");
+        // SAFETY: the mapping is anonymous, process-shared, and remains live for the
+        // process lifetime. Its zeroed storage is valid for `AtomicU64`.
+        let address = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                byte_len,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_SHARED | libc::MAP_ANON,
+                -1,
+                0,
+            )
+        };
+        assert_ne!(
+            address,
+            libc::MAP_FAILED,
+            "allocate facade coverage counters"
+        );
+        CoverageMemory {
+            address: address as usize,
+            len,
+        }
+    });
+    // SAFETY: `coverage_counts` creates this process-lifetime mapping at exactly
+    // `len * size_of::<AtomicU64>()` bytes and never changes its address or length.
+    unsafe { std::slice::from_raw_parts(memory.address as *const AtomicU64, memory.len) }
+}
+
+pub(crate) fn coverage_hit(index: usize) {
+    coverage_counts()[index].fetch_add(1, Ordering::Relaxed);
+}
+
+fn coverage_reset() {
+    for counter in coverage_counts() {
+        counter.store(0, Ordering::Relaxed);
+    }
+}
+
+fn coverage_reached() -> Vec<String> {
+    native_symbols_generated::facade_export_names()
+        .iter()
+        .zip(coverage_counts())
+        .filter(|(_, counter)| counter.load(Ordering::Relaxed) != 0)
+        .map(|(name, _)| (*name).to_owned())
+        .collect()
+}
+
 fn ship_facade_library() -> Result<NativeLibrary, String> {
     let inputs = ship_link_inputs()?.into_iter().map(PathBuf::from).collect();
     // SAFETY: the generated table contains static facade exports with
@@ -199,6 +260,18 @@ pub fn facade_library() -> NativeLibrary {
     }
 }
 
+fn facade_counting_library() -> NativeLibrary {
+    // SAFETY: the generated table contains ABI-preserving wrappers for the same
+    // static facade exports declared by the committed ambient mirror.
+    unsafe {
+        NativeLibrary::new(
+            vec![include_directory()],
+            Vec::new(),
+            native_symbols_generated::facade_counting_symbols(),
+        )
+    }
+}
+
 /// Builds and returns the facade archive and its platform libraries.
 pub fn ship_link_inputs() -> Result<Vec<String>, String> {
     static INPUTS: OnceLock<Result<Vec<String>, String>> = OnceLock::new();
@@ -209,6 +282,15 @@ pub fn ship_link_inputs() -> Result<Vec<String>, String> {
 pub fn run_dev(program: &Path) -> Result<Vec<u8>, String> {
     run_jit_with_native_libraries(&program_files(program)?, &[facade_library()])
         .map_err(|error| error.to_string())
+}
+
+/// Runs one program through the development JIT and returns the facade exports reached.
+pub fn run_dev_with_coverage(program: &Path) -> Result<(Vec<u8>, Vec<String>), String> {
+    coverage_reset();
+    let bytes =
+        run_jit_with_native_libraries(&program_files(program)?, &[facade_counting_library()])
+            .map_err(|error| error.to_string())?;
+    Ok((bytes, coverage_reached()))
 }
 
 /// Runs one program through the emitted-C ship tier.

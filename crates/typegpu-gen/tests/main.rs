@@ -1,4 +1,6 @@
 mod cli;
+mod diagnostics;
+mod ergonomics;
 mod facts;
 mod identity;
 mod kernel;

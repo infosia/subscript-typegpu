@@ -1,6 +1,6 @@
 bytes=128
 particle0=1,2,3,0.5,-0.25,0.125
-particle1=4,5,6,-1,0.75,0.25
+particle1=4,5,6,3,-2,1
 particle2=-2,8,0.5,2,1,-0.5
 particle3=9,-3,7,0,0.25,1.5
 roundtrip:match

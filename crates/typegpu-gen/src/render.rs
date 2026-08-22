@@ -58,6 +58,14 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
+    Diagnostic::new(
+        RuleCode::S100,
+        format!("K15: {} (generator)", message.into()),
+        pos,
+    )
+}
+
 fn base_name(name: &str) -> &str {
     name.split('<').next().unwrap_or(name)
 }
@@ -79,29 +87,13 @@ fn library_named(module: &Module, ty: &Type, name: &str) -> bool {
     matches!(ty, Type::Class(id) if matches!(module.classes[id.0].pos.file.as_str(), "typegpu-types.ts" | "typegpu.ts") && module.classes[id.0].name == name)
 }
 
-fn value_class<'a>(
-    module: &'a Module,
-    ty: &Type,
-    rule: &str,
-    purpose: &str,
-    pos: &Pos,
-) -> Result<&'a subscript_compiler::hir::ClassDef, Diagnostic> {
-    let Type::Class(id) = ty else {
-        return Err(diagnostic(
-            rule,
-            format!("{purpose} is not a @CStruct class"),
-            pos.clone(),
-        ));
-    };
+fn value_class<'a>(module: &'a Module, ty: &Type) -> Option<&'a subscript_compiler::hir::ClassDef> {
+    let Type::Class(id) = ty else { return None };
     let class = &module.classes[id.0];
     if !class.is_value || class.pos.file == "typegpu-types.ts" {
-        return Err(diagnostic(
-            rule,
-            format!("{purpose} `{}` is not a program @CStruct class", class.name),
-            pos.clone(),
-        ));
+        return None;
     }
-    Ok(class)
+    Some(class)
 }
 
 fn vertex_format(module: &Module, ty: &Type) -> Option<&'static str> {
@@ -137,7 +129,13 @@ fn vertex_buffer(
     step_mode: &'static str,
     pos: &Pos,
 ) -> Result<VertexBuffer, Diagnostic> {
-    let class = value_class(module, ty, "RN4", "vertex input", pos)?;
+    let class = value_class(module, ty).ok_or_else(|| {
+        diagnostic(
+            "RN4",
+            "vertex input is not a program @CStruct class",
+            pos.clone(),
+        )
+    })?;
     let mut attributes = Vec::new();
     for (index, field) in class.fields.iter().enumerate() {
         let format = vertex_format(module, &field.ty).ok_or_else(|| {
@@ -166,7 +164,13 @@ fn vertex_buffer(
 }
 
 fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varying>), Diagnostic> {
-    let class = value_class(module, ty, "RN7", "varyings", pos)?;
+    let class = value_class(module, ty).ok_or_else(|| {
+        diagnostic(
+            "RN7",
+            "varyings is not a program @CStruct class",
+            pos.clone(),
+        )
+    })?;
     let position = class
         .fields
         .iter()
@@ -438,9 +442,8 @@ fn compare_signature(
     pos: &Pos,
 ) -> Result<(), Diagnostic> {
     let Type::Func(signature) = declaration_ty else {
-        return Err(Diagnostic::new(
-            RuleCode::S100,
-            format!("K15: render {role} declaration lost its function type (generator)"),
+        return Err(generator_diagnostic(
+            format!("render {role} declaration lost its function type"),
             pos.clone(),
         ));
     };
@@ -565,9 +568,8 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             pipeline::function(module, vertex_name),
             pipeline::function(module, fragment_name),
         ) else {
-            diagnostics.push(Diagnostic::new(
-                RuleCode::S100,
-                "K15: a render kernel disappeared from typed HIR (generator)",
+            diagnostics.push(generator_diagnostic(
+                "a render kernel disappeared from typed HIR",
                 global.init.pos.clone(),
             ));
             continue;
@@ -577,9 +579,8 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             continue;
         }
         let Some((vertex_declared, fragment_declared)) = signature_types(module, callee) else {
-            diagnostics.push(Diagnostic::new(
-                RuleCode::S100,
-                "K15: the render declaration disappeared from typed HIR (generator)",
+            diagnostics.push(generator_diagnostic(
+                "the render declaration disappeared from typed HIR",
                 global.init.pos.clone(),
             ));
             continue;

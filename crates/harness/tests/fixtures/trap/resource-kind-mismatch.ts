@@ -2,6 +2,7 @@
 // purpose: prove createBindGroup rejects a resource whose kind differs from the layout entry
 // exercises: TX4
 // questions: none
+// expected-rule: TX4
 
 import {
   BindGroupLayoutSpec,

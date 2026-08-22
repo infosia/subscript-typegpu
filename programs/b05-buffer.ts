@@ -3,7 +3,7 @@
 // exercises: BF1-BF6, SC1, SC11, LY16, R34
 // questions: none
 
-import { Buffer, createBuffer, readBuffer } from "./typegpu";
+import { Buffer, createBuffer, readOne } from "./typegpu";
 import { Vec3f } from "./typegpu-types";
 import {
   gpu,
@@ -12,7 +12,7 @@ import {
   GPUDevice,
   GPUMapMode,
 } from "./webgpu";
-import { Particle_STRIDE } from "./b05-buffer.typegpu";
+import { Particle_OFFSET_vel, Particle_STRIDE } from "./b05-buffer.typegpu";
 
 @CStruct
 class Particle {
@@ -74,6 +74,14 @@ export async function main(): Promise<void> {
     );
     const queue = device.queue();
     source.write(queue, 0, bytes);
+    const patchedVelocity = new Vec3f(3.0, -2.0, 1.0);
+    source.patch(
+      queue,
+      1,
+      Particle_OFFSET_vel,
+      Context.bytesOf<Vec3f>(patchedVelocity),
+    );
+    particles[1].vel = patchedVelocity;
     using encoder = device.createCommandEncoderDefault();
     source.copyTo(encoder, readback, 0, 4);
     using command = encoder.finishDefault();
@@ -87,21 +95,17 @@ export async function main(): Promise<void> {
       print("FAIL map");
       return;
     }
-    const resultBytes: u8[] = readBuffer<Particle>(readback, 0, 4);
-    const result: FixedArray<Particle, 4> =
-      Context.fromBytes<FixedArray<Particle, 4>>(resultBytes, 0);
+    print(`bytes=${bytes.length}`);
     let index: i32 = 0;
     while (index < 4) {
-      if (!equalParticle(result[index], particles[index])) {
+      const value: Particle = Context.fromBytes<Particle>(
+        readOne<Particle>(readback, index as u32),
+        0,
+      );
+      if (!equalParticle(value, particles[index])) {
         print(`FAIL particle ${index}`);
         return;
       }
-      index = index + 1;
-    }
-    print(`bytes=${bytes.length}`);
-    index = 0;
-    while (index < 4) {
-      const value: Particle = result[index];
       print(
         `particle${index}=${value.pos.x},${value.pos.y},${value.pos.z},${value.vel.x},${value.vel.y},${value.vel.z}`,
       );

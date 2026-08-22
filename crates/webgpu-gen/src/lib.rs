@@ -113,10 +113,11 @@ pub fn generate(yml_text: &str, policy_text: &str) -> Result<Generated, Error> {
             }));
         }
     }
-    let symbols = native_symbols::render(&plan);
+    let rust = emit_rust::render(&plan);
+    let symbols = native_symbols::render(&plan, &rust);
     Ok(Generated {
         header: emit_header::render(&plan, &cenum_aliases),
-        rust: emit_rust::render(&plan),
+        rust,
         native_symbols: symbols.source,
         export_names: symbols.names,
         cenum_aliases,

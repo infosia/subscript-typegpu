@@ -8,7 +8,7 @@ use std::sync::{Mutex, MutexGuard, Once, OnceLock};
 static SUITE_LOCK: Mutex<()> = Mutex::new(());
 static FIRST_OUTPUTS: OnceLock<Vec<ProgramOutput>> = OnceLock::new();
 
-fn suite_lock() -> MutexGuard<'static, ()> {
+pub(crate) fn suite_lock() -> MutexGuard<'static, ()> {
     SUITE_LOCK
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
