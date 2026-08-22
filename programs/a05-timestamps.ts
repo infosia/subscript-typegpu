@@ -70,7 +70,7 @@ export async function main(): Promise<void> {
     );
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchTimed(encoder, [], 1, 1, 1, pair);
-    pair.resolve(encoder, readback);
+    pair.resolve(encoder);
     pair.copyTo(encoder, readback);
     using command = encoder.finishDefault();
     device.queue().submit([command]);

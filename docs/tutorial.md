@@ -11,6 +11,12 @@ This tutorial follows `programs/b04-particles.ts`. The program defines host data
 class Particle {
   pos: Vec3f;
   vel: Vec3f;
+
+  constructor(pos: Vec3f, vel: Vec3f) {
+    this.pos = pos;
+    this.vel = vel;
+  }
+}
 ```
 
 `SimParams` stores the time step and the active particle count.
@@ -20,6 +26,12 @@ class Particle {
 class SimParams {
   dt: f32;
   count: u32;
+
+  constructor(dt: f32, count: u32) {
+    this.dt = dt;
+    this.count = count;
+  }
+}
 ```
 
 ## Define the resources
@@ -92,6 +104,16 @@ The generated WGSL text, entry name, layout, and workgroup constants create the 
       [particles_LAYOUT0],
       [particles_WORKGROUP_X, particles_WORKGROUP_Y, particles_WORKGROUP_Z],
     );
+```
+
+The typed factory joins each named resource to its layout binding. It returns the `bindGroup` value for the dispatch.
+
+```ts program=programs/b04-particles.ts
+    const resources: ParticleLayoutResources = createParticleLayoutResources(
+      params,
+      particlesBuffer,
+    );
+    using bindGroup = createParticlesBindGroup0(device, pipeline, resources);
 ```
 
 ## Dispatch the work

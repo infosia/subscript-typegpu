@@ -107,10 +107,17 @@ fn difference(program: &Path, tier: &str, actual: &[u8], expected: &[u8]) -> Opt
 }
 
 #[derive(Debug)]
-struct ProgramOutput {
+pub(crate) struct ProgramOutput {
     program: PathBuf,
     dev: Vec<u8>,
     ship: Vec<u8>,
+    coverage: Vec<String>,
+}
+
+impl ProgramOutput {
+    pub(crate) fn coverage(&self) -> &[String] {
+        &self.coverage
+    }
 }
 
 fn child_bytes(program: &Path, tier: &str, output: Output) -> Vec<u8> {
@@ -126,14 +133,28 @@ fn child_bytes(program: &Path, tier: &str, output: Output) -> Vec<u8> {
     output.stdout
 }
 
-fn run_dev(program: &Path) -> Vec<u8> {
+pub(crate) fn run_dev_with_coverage(program: &Path) -> (Vec<u8>, Vec<String>) {
     // The dev runner forks, so this tier runs in a child process (T5).
-    let output = Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-harness"))
+    let mut output = Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-harness"))
         .arg("dev")
         .arg(program)
+        .arg("--coverage")
         .output()
         .unwrap_or_else(|error| panic!("spawn {} dev: {error}", program.display()));
-    child_bytes(program, "dev", output)
+    let stderr = String::from_utf8(std::mem::take(&mut output.stderr))
+        .unwrap_or_else(|error| panic!("{} dev stderr is not UTF-8: {error}", program.display()));
+    let (program_stderr, report) = stderr
+        .split_once(subscript_typegpu_harness::COVERAGE_SEPARATOR)
+        .unwrap_or_else(|| panic!("{} dev lacks the coverage separator", program.display()));
+    std::io::stderr()
+        .write_all(program_stderr.as_bytes())
+        .expect("forward dev stderr");
+    let coverage = report
+        .lines()
+        .filter_map(|line| line.strip_prefix("coverage:"))
+        .map(str::to_owned)
+        .collect();
+    (child_bytes(program, "dev", output), coverage)
 }
 
 fn run_ship(program: &Path) -> Vec<u8> {
@@ -151,15 +172,19 @@ fn run_suite() -> Vec<ProgramOutput> {
     assert!(!programs.is_empty(), "differential program list is empty");
     programs
         .into_iter()
-        .map(|program| ProgramOutput {
-            dev: run_dev(&program),
-            ship: run_ship(&program),
-            program,
+        .map(|program| {
+            let (dev, coverage) = run_dev_with_coverage(&program);
+            ProgramOutput {
+                dev,
+                ship: run_ship(&program),
+                coverage,
+                program,
+            }
         })
         .collect()
 }
 
-fn first_outputs() -> &'static [ProgramOutput] {
+pub(crate) fn first_outputs() -> &'static [ProgramOutput] {
     FIRST_OUTPUTS.get_or_init(run_suite)
 }
 
@@ -204,6 +229,12 @@ fn every_program_is_deterministic_across_repeated_runs() {
             assert_eq!(
                 expected.program, actual.program,
                 "suite program order changed"
+            );
+            assert_eq!(
+                expected.coverage,
+                actual.coverage,
+                "{} dev coverage changed",
+                actual.program.display(),
             );
             [
                 difference(

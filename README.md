@@ -14,9 +14,11 @@ The generators create the facade, the ambient mirror, the WebGPU API layer, Type
 
 `SUBSCRIPT_TYPEGPU_BACKEND_LIB` must name the backend shared library for backend-required gates and device runs.
 
-`SUBSCRIPT_TYPEGPU_BACKEND` selects a yawgpu backend. The accepted yawgpu values are `noop`, `metal`, `vulkan`, and `gles`.
+`SUBSCRIPT_TYPEGPU_BACKEND` selects a yawgpu backend. The accepted values are `metal`, `vulkan`, and `gles`.
 
-`tools/live.sh` also accepts `default`. This value removes the backend request before the Dawn run.
+If `SUBSCRIPT_TYPEGPU_BACKEND` is absent, the library selects its default. The yawgpu default is Noop. The gate never sets this variable.
+
+`tools/live.sh` also accepts `default`. This value sends no selection chain to a library that ignores the yawgpu extension.
 
 `SUBSCRIPT_TYPEGPU_UPSTREAM_DIR` names a TypeGPU checkout for the optional golden-vector tool.
 

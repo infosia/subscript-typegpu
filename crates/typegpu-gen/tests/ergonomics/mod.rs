@@ -33,7 +33,6 @@ fn typed_and_positional_bind_group_paths_share_layout_and_binding_order() {
             .find(expression)
             .unwrap_or_else(|| panic!("typed factory lacks `{expression}`:\n{source}"))
             + previous;
-        assert!(offset >= previous);
         previous = offset + expression.len();
     }
     for binding in 0..3 {

@@ -107,15 +107,22 @@ fn filter_header_exports(mut header: String, excluded: &BTreeSet<String>) -> Str
     if excluded.is_empty() {
         return header;
     }
-    header = header
+    let retained = header
         .lines()
         .filter(|line| {
             !excluded
                 .iter()
                 .any(|name| line.contains(&format!(" {name}(")))
         })
-        .collect::<Vec<_>>()
-        .join("\n");
+        .collect::<Vec<_>>();
+    let mut lines: Vec<&str> = Vec::with_capacity(retained.len());
+    for line in retained {
+        if line.is_empty() && lines.last().is_some_and(|previous| previous.is_empty()) {
+            continue;
+        }
+        lines.push(line);
+    }
+    header = lines.join("\n");
     header.push('\n');
     header
 }

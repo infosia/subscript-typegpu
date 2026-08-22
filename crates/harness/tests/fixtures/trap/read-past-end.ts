@@ -1,10 +1,10 @@
 // program: read-past-end
-// purpose: prove that readBuffer traps before crossing the mapped range
+// purpose: prove that readOne traps before crossing the mapped range
 // exercises: BF8
 // questions: none
 // expected-rule: BF8
 
-import { Buffer, createBuffer, readBuffer } from "./typegpu";
+import { Buffer, createBuffer, readOne } from "./typegpu";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
 
 export async function main(): Promise<void> {
@@ -32,5 +32,5 @@ export async function main(): Promise<void> {
     GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
     "trap-readback",
   );
-  readBuffer<u32>(readback, 1, 2);
+  readOne<u32>(readback, 2);
 }

@@ -22,17 +22,16 @@ export async function main(): Promise<void> {
   {
     using adapter = adapterResult;
     using device = deviceResult;
-    const adapterFeature: boolean = adapter.hasFeature("timestamp-query");
+    adapter.hasFeature("timestamp-query");
     adapter.limits();
     adapter.info();
-    print(`adapter:capabilities=${adapterFeature}`);
 
-    const deviceFeature: boolean = device.hasFeature("timestamp-query");
+    device.hasFeature("timestamp-query");
     device.limits();
     device.adapterInfo();
     device.label("a04-device");
     device.queue().label("a04-queue");
-    print(`device:capabilities=${deviceFeature}`);
+    print("feature:checked");
 
     device.pushErrorScope("validation");
     const scoped: GPUError | null = await device.popErrorScope();

@@ -3660,12 +3660,6 @@ pub(crate) fn referenced_render_schema_names(
         .iter()
         .map(|buffer| buffer.schema.as_str())
         .chain(std::iter::once(pipeline.varyings_name.as_str()))
-        .chain(
-            pipeline
-                .fragment_output
-                .iter()
-                .map(|output| output.name.as_str()),
-        )
         .collect::<BTreeSet<_>>();
     out.retain(|name| !interface_names.contains(name.as_str()));
     Ok(out)
@@ -3729,16 +3723,6 @@ fn render_interface_structs(
         ));
     }
     out.push_str("}\n\n");
-    if let Some(output) = &pipeline.fragment_output {
-        out.push_str(&format!("struct {} {{\n", mapping::ident(&output.name)));
-        for (location, field) in output.fields.iter().enumerate() {
-            out.push_str(&format!(
-                "  @location({location}) {}: vec4<f32>,\n",
-                mapping::ident(field)
-            ));
-        }
-        out.push_str("}\n\n");
-    }
     Ok(out)
 }
 
@@ -3847,9 +3831,6 @@ pub(crate) fn emit_render(
         &[&pipeline.vertex_entry, &pipeline.fragment_entry],
     );
     module_names.insert(mapping::ident(&pipeline.varyings_name));
-    if let Some(output) = &pipeline.fragment_output {
-        module_names.insert(mapping::ident(&output.name));
-    }
     let layout_count = pipeline.layouts.len();
     let vertex_value_count = pipeline.vertex_buffers.len();
     let mut vertex_emitter = Emitter::entry(
@@ -3962,10 +3943,7 @@ pub(crate) fn emit_render(
             .map(str::to_owned),
     );
     out.push_str("@fragment\n");
-    let fragment_result = pipeline.fragment_output.as_ref().map_or_else(
-        || "@location(0) vec4<f32>".to_owned(),
-        |output| mapping::ident(&output.name),
-    );
+    let fragment_result = "@location(0) vec4<f32>";
     out.push_str(&format!(
         "fn {}({}) -> {fragment_result} {{\n",
         mapping::ident(&pipeline.fragment_entry),

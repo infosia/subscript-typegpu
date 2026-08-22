@@ -1,5 +1,4 @@
 // expected-rule: S100
-// covers-rule: RN8
 // expected-owner: checker
 // expected-message: type mismatch: the argument expects `(Varyings, FragmentInvocation) => Vec4f`, got `(Varyings, FragmentInvocation) => f32`
 import { FragmentInvocation, renderPipeline, RenderPipelineSpec, VertexInvocation } from "./typegpu";

@@ -94,6 +94,7 @@ fn timestamp_pair_has_explicit_query_resolution() {
         "GPUBufferUsage.QUERY_RESOLVE + GPUBufferUsage.COPY_SRC",
         "beginningOfPassWriteIndex: 0",
         "endOfPassWriteIndex: 1",
+        "resolve(encoder: GPUCommandEncoder): void",
         "encoder.resolveQuerySet(this.queries, 0, 2, this.resolved, 0)",
         "encoder.copyBufferToBuffer(this.resolved, 0, readback.handle(), 0, 16)",
     ] {

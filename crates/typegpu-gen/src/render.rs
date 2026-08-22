@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use subscript_compiler::hir::{Callee, Expr, ExprKind, Function, Module, Stmt};
+use subscript_compiler::hir::{Callee, Expr, ExprKind, Module, Stmt};
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 use crate::pipeline::{self, BindingKind, Layout};
@@ -31,12 +31,6 @@ pub(crate) struct Varying {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct FragmentOutput {
-    pub(crate) name: String,
-    pub(crate) fields: Vec<String>,
-}
-
-#[derive(Debug, Clone)]
 pub(crate) struct RenderPipeline {
     pub(crate) declaration: String,
     pub(crate) vertex_entry: String,
@@ -45,7 +39,6 @@ pub(crate) struct RenderPipeline {
     pub(crate) vertex_buffers: Vec<VertexBuffer>,
     pub(crate) varyings_name: String,
     pub(crate) varyings: Vec<Varying>,
-    pub(crate) fragment_output: Option<FragmentOutput>,
     pub(crate) target_format: String,
     pub(crate) pos: Pos,
 }
@@ -427,88 +420,6 @@ fn contains_render_call_stmt(module: &Module, stmt: &Stmt) -> bool {
     }
 }
 
-fn signature_types<'a>(module: &'a Module, callee: &str) -> Option<(&'a Type, &'a Type)> {
-    let declaration = pipeline::function(module, callee)?;
-    Some((
-        &declaration.params.first()?.ty,
-        &declaration.params.get(1)?.ty,
-    ))
-}
-
-fn compare_signature(
-    declaration_ty: &Type,
-    kernel: &Function,
-    role: &str,
-    pos: &Pos,
-) -> Result<(), Diagnostic> {
-    let Type::Func(signature) = declaration_ty else {
-        return Err(generator_diagnostic(
-            format!("render {role} declaration lost its function type"),
-            pos.clone(),
-        ));
-    };
-    let same = signature.params.len() == kernel.params.len()
-        && signature
-            .params
-            .iter()
-            .zip(&kernel.params)
-            .all(|(declared, actual)| declared == &actual.ty)
-        && signature.ret == kernel.ret;
-    if !same {
-        return Err(diagnostic(
-            "RN2",
-            format!("{role} kernel signature differs from the declaration type arguments"),
-            kernel.pos.clone(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_rn2(
-    module: &Module,
-    vertex: &Function,
-    fragment: &Function,
-    layout_count: usize,
-    instance_index: Option<usize>,
-) -> Result<(), Diagnostic> {
-    let vertex_values = if instance_index.is_some() { 2 } else { 1 };
-    if vertex.params.len() != layout_count + vertex_values + 1
-        || fragment.params.len() != layout_count + 2
-    {
-        return Err(diagnostic(
-            "RN2",
-            "render kernel parameter counts do not match the declaration form",
-            vertex.pos.clone(),
-        ));
-    }
-    let vertex_invocation = &vertex.params[layout_count + vertex_values];
-    let fragment_invocation = &fragment.params[layout_count + 1];
-    if !library_named(module, &vertex_invocation.ty, "VertexInvocation")
-        || !library_named(module, &fragment_invocation.ty, "FragmentInvocation")
-    {
-        return Err(diagnostic(
-            "RN2",
-            "render kernels require VertexInvocation and FragmentInvocation parameters",
-            vertex_invocation.pos.clone(),
-        ));
-    }
-    if vertex.ret != fragment.params[layout_count].ty {
-        return Err(diagnostic(
-            "RN2",
-            "the vertex return type differs from the fragment input type",
-            fragment.params[layout_count].pos.clone(),
-        ));
-    }
-    if layout_count == 1 && vertex.params[0].ty != fragment.params[0].ty {
-        return Err(diagnostic(
-            "RN2",
-            "the vertex and fragment layout parameter types differ",
-            fragment.params[0].pos.clone(),
-        ));
-    }
-    Ok(())
-}
-
 pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
     for function in &module.functions {
@@ -564,7 +475,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             ));
             continue;
         };
-        let (Some(vertex), Some(fragment)) = (
+        let (Some(vertex), Some(_fragment)) = (
             pipeline::function(module, vertex_name),
             pipeline::function(module, fragment_name),
         ) else {
@@ -574,26 +485,6 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             ));
             continue;
         };
-        if let Err(error) = validate_rn2(module, vertex, fragment, layout_count, instance_index) {
-            diagnostics.push(error);
-            continue;
-        }
-        let Some((vertex_declared, fragment_declared)) = signature_types(module, callee) else {
-            diagnostics.push(generator_diagnostic(
-                "the render declaration disappeared from typed HIR",
-                global.init.pos.clone(),
-            ));
-            continue;
-        };
-        if let Err(error) = compare_signature(vertex_declared, vertex, "vertex", &global.pos) {
-            diagnostics.push(error);
-            continue;
-        }
-        if let Err(error) = compare_signature(fragment_declared, fragment, "fragment", &global.pos)
-        {
-            diagnostics.push(error);
-            continue;
-        }
         let mut layouts = Vec::new();
         if layout_count == 1 {
             match pipeline::layout(module, &vertex.params[0].ty, 0) {
@@ -647,40 +538,6 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             ));
             continue;
         }
-        let fragment_output = if library_named(module, &fragment.ret, "Vec4f") {
-            None
-        } else if let Type::Class(id) = &fragment.ret {
-            let class = &module.classes[id.0];
-            if !class.is_value
-                || class.fields.is_empty()
-                || !class
-                    .fields
-                    .iter()
-                    .all(|field| library_named(module, &field.ty, "Vec4f"))
-            {
-                diagnostics.push(diagnostic(
-                    "RN8",
-                    "fragment kernel return is neither Vec4f nor a @CStruct of Vec4f fields",
-                    fragment.pos.clone(),
-                ));
-                continue;
-            }
-            Some(FragmentOutput {
-                name: class.name.clone(),
-                fields: class
-                    .fields
-                    .iter()
-                    .map(|field| field.name.clone())
-                    .collect(),
-            })
-        } else {
-            diagnostics.push(diagnostic(
-                "RN8",
-                "fragment kernel return is neither Vec4f nor a @CStruct of Vec4f fields",
-                fragment.pos.clone(),
-            ));
-            continue;
-        };
         let Some(options) = args.get(2) else {
             diagnostics.push(diagnostic(
                 "RN1",
@@ -713,7 +570,6 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             vertex_buffers,
             varyings_name,
             varyings,
-            fragment_output,
             target_format,
             pos: global.pos.clone(),
         };

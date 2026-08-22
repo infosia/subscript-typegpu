@@ -37,17 +37,13 @@ export async function main(): Promise<void> {
       label: "a02-upload",
       size: 256,
       usage: GPUBufferUsage.COPY_SRC + GPUBufferUsage.COPY_DST + GPUBufferUsage.MAP_WRITE,
+      mappedAtCreation: true,
     });
     upload.label("a02-upload-label");
     upload.usage();
     upload.mapState();
-    const uploadMapped: boolean = await upload.mapAsync(GPUMapMode.WRITE, 0, 256);
-    if (uploadMapped) {
-      upload.writeMappedRange(0, [1, 2, 3, 4]);
-      upload.unmap();
-    } else {
-      upload.writeMappedRange(0, [1, 2, 3, 4]);
-    }
+    upload.writeMappedRange(0, [1, 2, 3, 4]);
+    upload.unmap();
     queue.writeBufferF32(upload, 0, [1.0, 2.0, 3.0, 4.0]);
 
     using readback = device.createBuffer({

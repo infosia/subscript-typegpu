@@ -1,4 +1,3 @@
-adapter:capabilities=true
-device:capabilities=false
+feature:checked
 errors:empty
 PASS

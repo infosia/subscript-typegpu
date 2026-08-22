@@ -233,6 +233,15 @@ fn red(idl: &str, mirror: &str, policy: &str, expected: &str) {
 }
 
 #[test]
+fn synthetic_result_enum_trap_names_its_converter() {
+    let generated = subscript_typegpu_webgpu_gen::generate_api(&document(), &mirror(), &policy())
+        .expect("valid device-event fixture generates");
+    assert!(generated.source.contains(
+        "print(\"fromSubscriptTypegpuErrorRecord: unexpected result enum\");\n  unreachable();"
+    ));
+}
+
+#[test]
 fn flattened_subclasses_require_a_selected_result_target() {
     let policy = policy().replace(
         "interface = \"GPUValidationError\"\ntarget = \"GPUError\"",

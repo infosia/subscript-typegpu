@@ -5,19 +5,20 @@
 
 import {
   createComputePipeline,
-  createBindGroup,
   ComputeInvocation,
   computePipeline,
   ComputePipelineSpec,
   MutStorage,
   Uniform,
-  bufferResource,
 } from "./typegpu";
 import { Vec3f } from "./typegpu-types";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
 import {
   Particle_SIZE,
+  ParticleLayoutResources,
   SimParams_SIZE,
+  createParticleLayoutResources,
+  createParticlesBindGroup0,
   particles_ENTRY,
   particles_LAYOUT0,
   particles_WGSL,
@@ -109,13 +110,11 @@ export async function main(): Promise<void> {
       [particles_LAYOUT0],
       [particles_WORKGROUP_X, particles_WORKGROUP_Y, particles_WORKGROUP_Z],
     );
-    using nativeLayout = pipeline.bindGroupLayout(0);
-    using bindGroup = createBindGroup(
-      device,
-      nativeLayout,
-      particles_LAYOUT0,
-      [bufferResource(params), bufferResource(particlesBuffer)],
+    const resources: ParticleLayoutResources = createParticleLayoutResources(
+      params,
+      particlesBuffer,
     );
+    using bindGroup = createParticlesBindGroup0(device, pipeline, resources);
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();

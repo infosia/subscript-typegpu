@@ -36,7 +36,7 @@ while IFS= read -r file; do
     fi
 
     case "$file" in
-        crates/*|lib/*|tools/*|programs/*|README*)
+        crates/*|docs/*|lib/*|tools/*|programs/*|README*)
             if grep -niE 'handoff|review round|proof of concept|as requested|the owner|slice [0-9]' "$file"; then
                 echo "hygiene: review residue in $file" >&2
                 failed=1

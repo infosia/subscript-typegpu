@@ -293,6 +293,9 @@ pub fn run_dev_with_coverage(program: &Path) -> Result<(Vec<u8>, Vec<String>), S
     Ok((bytes, coverage_reached()))
 }
 
+/// Separates a dev program's stderr from its facade coverage report.
+pub const COVERAGE_SEPARATOR: &str = "--- subscript-typegpu coverage ---";
+
 /// Runs one program through the emitted-C ship tier.
 pub fn run_ship(program: &Path) -> Result<Vec<u8>, String> {
     run_c_aot_with_native_libraries(&program_files(program)?, &[ship_facade_library()?])

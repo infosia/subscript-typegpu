@@ -206,6 +206,7 @@ function fromSubscriptTypegpuErrorRecord(value: SubscriptTypegpuErrorRecord): GP
     case SubscriptTypegpuErrorType.SUBSCRIPT_TYPEGPU_ERROR_TYPE_NO_ERROR:
       return null;
   }
+  print("fromSubscriptTypegpuErrorRecord: unexpected result enum");
   unreachable();
 }
 

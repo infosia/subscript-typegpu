@@ -56,7 +56,7 @@ fn runtime_traps_are_named_and_numbered() {
         ),
         (
             "read-past-end.ts",
-            "BF8 readBuffer elementIndex=1 elementCount=2 count=2",
+            "BF8 readOne elementIndex=2 elementCount=1 count=2",
         ),
         (
             "resource-kind-mismatch.ts",

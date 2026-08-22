@@ -228,7 +228,13 @@ export function readBuffer<T>(
 }
 
 export function readOne<T>(readback: Buffer<T>, elementIndex: u32): u8[] {
-  return readBuffer<T>(readback, elementIndex, 1);
+  if (elementIndex >= readback.count) {
+    authorTrap("BF8", "readOne", `elementIndex=${elementIndex} elementCount=1 count=${readback.count}`);
+  }
+  return readback.buffer.readMappedRange(
+    (elementIndex as u64) * (readback.elementSize as u64),
+    readback.elementSize as u64,
+  );
 }
 
 export function createBuffer<T>(
@@ -618,11 +624,7 @@ export class TimestampPair {
     return this.queries;
   }
 
-  resolve(
-    encoder: GPUCommandEncoder,
-    buffer: Buffer<FixedArray<u64, 2>>,
-  ): void {
-    buffer.handle();
+  resolve(encoder: GPUCommandEncoder): void {
     encoder.resolveQuerySet(this.queries, 0, 2, this.resolved, 0);
   }
 

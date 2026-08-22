@@ -16,11 +16,21 @@ fn read(path: &Path) -> String {
 }
 
 fn rust_sources(directory: &Path) -> Vec<PathBuf> {
-    let mut files = std::fs::read_dir(directory)
-        .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()))
-        .map(|entry| entry.expect("read Rust source entry").path())
-        .filter(|path| path.extension().is_some_and(|extension| extension == "rs"))
-        .collect::<Vec<_>>();
+    fn collect(directory: &Path, files: &mut Vec<PathBuf>) {
+        for entry in std::fs::read_dir(directory)
+            .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()))
+        {
+            let path = entry.expect("read Rust source entry").path();
+            if path.is_dir() {
+                collect(&path, files);
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                files.push(path);
+            }
+        }
+    }
+
+    let mut files = Vec::new();
+    collect(directory, &mut files);
     files.sort();
     files
 }
@@ -47,10 +57,10 @@ fn fixture_rules(root: &Path) -> BTreeSet<String> {
             }
             let source = read(&path);
             let mut named = false;
-            for rule in source.lines().filter_map(|line| {
-                line.strip_prefix("// expected-rule: ")
-                    .or_else(|| line.strip_prefix("// covers-rule: "))
-            }) {
+            for rule in source
+                .lines()
+                .filter_map(|line| line.strip_prefix("// expected-rule: "))
+            {
                 rules.insert(rule.to_owned());
                 named = true;
             }
@@ -89,11 +99,14 @@ fn assert_site(
 
 #[test]
 fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
+    const K15_GENERATOR_SITE_EXEMPTION: &str = "K15";
+
     let root = root();
     let allowed = allowed_rules(&root);
     let fixtures = fixture_rules(&root);
     let meta = BTreeSet::from(["K17", "K24", "PI13", "RN16", "SC14", "TX8"]);
 
+    let mut generator_sites = 0usize;
     for path in rust_sources(&root.join("crates/typegpu-gen/src")) {
         let source = read(&path);
         if source.contains("fn diagnostic(") {
@@ -105,8 +118,9 @@ fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
         }
         if source.contains("fn generator_diagnostic(") {
             assert!(
-                source.contains("(generator)"),
-                "{} generator diagnostic helper lacks the generator owner",
+                source.contains("format!(\"K15: {} (generator)\"")
+                    || source.contains("format!(\n        \"K15: {} (generator)\""),
+                "{} generator diagnostic helper lacks the K15 owner",
                 path.display(),
             );
         }
@@ -134,7 +148,7 @@ fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
                 continue;
             };
             if line[..offset].ends_with("generator_") {
-                assert!(allowed.contains("K15") && !meta.contains("K15"));
+                generator_sites += 1;
                 continue;
             }
             let tail = lines[line_index..lines.len().min(line_index + 4)].join("\n");
@@ -153,6 +167,27 @@ fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
             );
             assert_site(&path, line_index + 1, rule, &allowed, &fixtures);
         }
+    }
+
+    assert!(
+        generator_sites != 0,
+        "K15 exemption matched no generator sites"
+    );
+    assert!(
+        allowed.contains(K15_GENERATOR_SITE_EXEMPTION)
+            && !meta.contains(K15_GENERATOR_SITE_EXEMPTION),
+        "K15 generator-site exemption must name a non-meta rule",
+    );
+    let naga_gate = read(&root.join("crates/harness/tests/wgsl_goldens/mod.rs"));
+    for evidence in [
+        "naga::front::wgsl::parse_str",
+        "Validator::new",
+        "K15 (generator): naga",
+    ] {
+        assert!(
+            naga_gate.contains(evidence),
+            "K15 generator-site exemption lacks harness naga evidence `{evidence}`",
+        );
     }
 
     let runtime = root.join("lib/typegpu.ts");

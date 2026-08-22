@@ -546,44 +546,12 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
             ));
             continue;
         };
-        let declared_layouts = function(module, callee)
-            .and_then(|declaration| declaration.params.first())
-            .and_then(|parameter| match &parameter.ty {
-                Type::Func(signature) => Some(&signature.params),
-                _ => None,
-            });
         if kernel.params.len() != arity + 1 {
             diagnostics.push(generator_diagnostic(
                 format!("kernel `{entry}` has an impossible parameter count"),
                 kernel.pos.clone(),
             ));
             continue;
-        }
-        if let Some(declared_layouts) = declared_layouts {
-            let mut mismatch = false;
-            for (index, (declared, actual)) in declared_layouts
-                .iter()
-                .take(arity)
-                .zip(&kernel.params[..arity])
-                .enumerate()
-            {
-                if declared != &actual.ty {
-                    diagnostics.push(diagnostic(
-                        "PI2",
-                        format!(
-                            "pipeline layout type argument {} is `{}` but kernel parameter is `{}`",
-                            index + 1,
-                            type_name(module, declared),
-                            type_name(module, &actual.ty),
-                        ),
-                        global.init.pos.clone(),
-                    ));
-                    mismatch = true;
-                }
-            }
-            if mismatch {
-                continue;
-            }
         }
         let mut layouts = Vec::new();
         for (group, param) in kernel.params[..arity].iter().enumerate() {
@@ -642,66 +610,4 @@ pub(crate) fn schema_names(module: &Module, pipelines: &[Pipeline]) -> BTreeSet<
         })
         .map(str::to_owned)
         .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
-
-    use subscript_compiler::SourceFile;
-
-    use super::*;
-
-    fn read(root: &std::path::Path, name: &str) -> String {
-        std::fs::read_to_string(root.join("lib").join(name)).expect("read test library")
-    }
-
-    #[test]
-    fn pi2_compares_declared_type_arguments_with_kernel_layouts() {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .ancestors()
-            .nth(2)
-            .expect("repository root")
-            .to_path_buf();
-        let files = vec![
-            SourceFile::ambient(
-                "subscript-typegpu.generated.d.ts",
-                read(&root, "subscript-typegpu.generated.d.ts"),
-            ),
-            SourceFile::ambient(
-                "wire-enum-aliases.generated.d.ts",
-                read(&root, "wire-enum-aliases.generated.d.ts"),
-            ),
-            SourceFile::new("webgpu.ts", read(&root, "webgpu.ts")),
-            SourceFile::new("typegpu-types.ts", read(&root, "typegpu-types.ts")),
-            SourceFile::new("typegpu.ts", read(&root, "typegpu.ts")),
-            SourceFile::new(
-                "pi2-test.ts",
-                r#"
-import { ComputeInvocation, computePipeline, ComputePipelineSpec } from "./typegpu";
-class Declared {}
-class KernelLayout {}
-function kernel(res: Declared, ctx: ComputeInvocation): void {}
-export const pipeline: ComputePipelineSpec = computePipeline<Declared>(kernel, { workgroupSize: [1, 1, 1] });
-"#,
-            ),
-        ];
-        let mut module = subscript_compiler::check_program(&files).expect("valid PI2 seed HIR");
-        let replacement = module
-            .classes
-            .iter()
-            .position(|class| class.name == "KernelLayout")
-            .expect("replacement class");
-        let kernel = module
-            .functions
-            .iter_mut()
-            .find(|function| function.name == "kernel")
-            .expect("kernel");
-        kernel.params[0].ty = Type::Class(subscript_compiler::ClassId(replacement));
-        let diagnostics = discover(&module).expect_err("PI2 mismatch must fail");
-        assert_eq!(diagnostics.len(), 1);
-        assert!(diagnostics[0].message.starts_with("PI2:"));
-        assert!(diagnostics[0].message.contains("`Declared`"));
-        assert!(diagnostics[0].message.contains("`KernelLayout`"));
-    }
 }

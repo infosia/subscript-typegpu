@@ -2,9 +2,8 @@
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-fn is_program(path: &Path) -> bool {
+fn is_live_program(path: &Path) -> bool {
     let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
         return false;
     };
@@ -13,7 +12,7 @@ fn is_program(path: &Path) -> bool {
     };
     let bytes = stem.as_bytes();
     bytes.len() >= 5
-        && matches!(bytes[0], b'a' | b'b' | b'x')
+        && bytes[0] == b'x'
         && bytes[1].is_ascii_digit()
         && bytes[2].is_ascii_digit()
         && bytes[3] == b'-'
@@ -22,11 +21,11 @@ fn is_program(path: &Path) -> bool {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-')
 }
 
-fn programs(root: &Path) -> Vec<PathBuf> {
+fn live_programs(root: &Path) -> Vec<PathBuf> {
     let mut programs = std::fs::read_dir(root.join("programs"))
         .expect("read programs directory")
         .map(|entry| entry.expect("read programs entry").path())
-        .filter(|path| is_program(path))
+        .filter(|path| is_live_program(path))
         .collect::<Vec<_>>();
     programs.sort();
     programs
@@ -54,27 +53,18 @@ fn dev_corpus_writes_sorted_facade_coverage() {
     }
     let _suite = crate::differential::suite_lock();
     let root = crate::repository_root();
-    let programs = programs(&root);
-    assert!(!programs.is_empty(), "coverage program list is empty");
-    let mut reached = BTreeSet::new();
-    for program in programs {
-        let output = Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-harness"))
-            .arg("dev")
-            .arg(&program)
-            .arg("--coverage")
-            .output()
-            .unwrap_or_else(|error| panic!("run {} for coverage: {error}", program.display()));
-        assert!(
-            output.status.success(),
-            "coverage run failed for {}:\n{}",
-            program.display(),
-            String::from_utf8_lossy(&output.stderr),
-        );
-        for line in String::from_utf8_lossy(&output.stdout).lines() {
-            if let Some(name) = line.strip_prefix("coverage:") {
-                reached.insert(name.to_owned());
-            }
-        }
+    let mut reached = crate::differential::first_outputs()
+        .iter()
+        .flat_map(|output| output.coverage().iter().cloned())
+        .collect::<BTreeSet<_>>();
+    let live_programs = live_programs(&root);
+    assert!(
+        !live_programs.is_empty(),
+        "live coverage program list is empty"
+    );
+    for program in live_programs {
+        let (_, coverage) = crate::differential::run_dev_with_coverage(&program);
+        reached.extend(coverage);
     }
     let all = subscript_typegpu_harness::native_symbols_generated::facade_export_names()
         .iter()

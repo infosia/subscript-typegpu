@@ -17,13 +17,11 @@ fn run() -> Result<Vec<u8>, String> {
     }
     match tier.to_str() {
         Some("dev") if coverage => {
-            let (mut bytes, names) =
+            let (bytes, names) =
                 subscript_typegpu_harness::run_dev_with_coverage(Path::new(&program))?;
-            if !bytes.is_empty() && !bytes.ends_with(b"\n") {
-                bytes.push(b'\n');
-            }
+            eprintln!("{}", subscript_typegpu_harness::COVERAGE_SEPARATOR);
             for name in names {
-                bytes.extend_from_slice(format!("coverage:{name}\n").as_bytes());
+                eprintln!("coverage:{name}");
             }
             Ok(bytes)
         }

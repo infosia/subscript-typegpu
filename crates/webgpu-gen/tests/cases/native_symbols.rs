@@ -81,6 +81,10 @@ fn full_plan_export_names_are_unique() {
         &repo_file("crates/webgpu-gen/policy.toml"),
     )
     .expect("pinned facade generates");
+    assert!(
+        !generated.header.contains("\n\n\n"),
+        "export exclusions left a blank declaration gap",
+    );
     let mut names = generated.export_names;
     let before = names.len();
     names.sort();

@@ -5438,7 +5438,10 @@ fn render_result_record(out: &mut String, record: &ResultRecordPlan) -> Result<(
                 enum_plan.mirror_name, exclusion
             ));
         }
-        out.push_str("  }\n  unreachable();\n");
+        out.push_str(&format!(
+            "  }}\n  print(\"from{}: unexpected result enum\");\n  unreachable();\n",
+            record.boundary_name,
+        ));
     } else {
         out.push_str(&format!("  return new {}(\n", record.name));
         for field in &record.fields {
