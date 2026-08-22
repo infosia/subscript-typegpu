@@ -25,7 +25,11 @@ principles" govern this block.
 - **T5 — Differential.** Every `a` and `b` program runs on both
   tiers, dev JIT and ship C AOT, on the backend that
   `SUBSCRIPT_TYPEGPU_BACKEND_LIB` names, in its Noop mode. Both raw
-  byte outputs must equal the golden exactly.
+  byte outputs must equal the golden exactly. Each tier runs in a
+  child process of the test, because the dev runner forks and the
+  ship runner sets environment variables. A program file is one that
+  matches `[ab][0-9][0-9]-[a-z0-9-]+.ts`. A set variable that names a
+  missing file is a failure, not a pending.
 - **T6 — Regeneration.** Every committed generated file has a byte-
   identity test: run the generator binary against a scratch copy of
   the repository root, compare each output to the committed file.
@@ -53,15 +57,20 @@ principles" govern this block.
 
 ## Build time
 
-- **T12 — The five measurements.** `tools/gate.sh --measure` records,
-  on the reference machine with `CARGO_BUILD_JOBS=4`: the cold build
-  (`cargo build --workspace --tests` after `cargo clean`), the warm
-  no-op (`cargo test --workspace --no-run`), the warm full gate after
-  a one-line change in `crates/typegpu-gen/src/lib.rs` (P0: in
-  `crates/webgpu-gen/src/lib.rs`), the warm full gate after a
-  program-only change, and the test-executable count. The numbers go
-  to `specs/tracking/build-time.md` with the date, the commit, and
-  the command.
+- **T12 — The five measurements.** `tools/gate.sh --measure --yes`
+  records, on the reference machine with `CARGO_BUILD_JOBS=4`, in
+  this order: (1) the cold build — `cargo clean`, an assertion that
+  `target/` is empty, then `cargo build --workspace --tests` plus the
+  ship-tier release build of the facade and the subscript runtime
+  into `target/ship-build`, timed together; (2) the warm no-op
+  (`cargo test --workspace --no-run`); then one untimed full gate;
+  (3) the full gate after a one-line change in
+  `crates/typegpu-gen/src/lib.rs` (P0: in
+  `crates/webgpu-gen/src/lib.rs`), then the line is removed and one
+  untimed full gate runs; (4) the full gate after a one-line change
+  in a program; (5) the test-executable count, which is an error when
+  it cannot be read. The numbers go to `specs/tracking/build-time.md`
+  with the date, the commit, and the command.
 - **T13 — A budget is a gate.** Plan §7 holds the budgets. A phase
   close quotes the five numbers. A number above budget is a red
   finding of the phase review.
@@ -69,8 +78,10 @@ principles" govern this block.
 ## Lanes
 
 - **T14 — The gate.** `tools/gate.sh` runs, in order: `cargo fmt
-  --all -- --check`, `cargo clippy --workspace -- -D warnings`,
-  `cargo test --workspace -- --nocapture`, `tools/hygiene.sh`. It
+  --all -- --check`, `cargo clippy --workspace --offline -- -D
+  warnings`, `cargo test --workspace --offline -- --nocapture`,
+  `tools/hygiene.sh`. Every cargo command carries `--offline` in the
+  same position, after the subcommand. It
   sets `CARGO_BUILD_JOBS=4` unless the environment sets it. It fails
   on the first failure and prints the pending lines at the end. An
   unknown argument is an error, not a silent default.

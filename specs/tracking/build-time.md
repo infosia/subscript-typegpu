@@ -5,4 +5,11 @@ Reference machine: Apple M2, 16 GB. `CARGO_BUILD_JOBS=4`. Procedure:
 
 | Date | Commit | Cold build | Warm no-op | Gate after codegen change | Gate after program change | Test executables |
 |---|---|---|---|---|---|---|
-| — | — | — | — | — | — | — |
+| 2026-08-22 | slice 2 tree on `11dc4de` | 34 s | 0.2 s | 39 s | 10 s | 4 |
+
+Run by the planner with `tools/gate.sh --measure --yes`, backend set.
+The coding agent's run on the same tree gave 27 s / 0.2 s / 36 s /
+10 s / 4. The cold build is genuine: `cargo clean` removed `target/`,
+no user-wide build cache exists, and the rebuilt `target/` is 1.5 GB.
+Every number is inside the plan §7 budget (480 s / 5 s / 240 s /
+120 s / 4).
