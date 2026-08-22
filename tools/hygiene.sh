@@ -10,7 +10,7 @@ trap 'rm -f "$file_list"' EXIT HUP INT TERM
 git ls-files --cached --others --exclude-standard >"$file_list"
 while IFS= read -r file; do
     case "$file" in
-        tools/hygiene.sh|HANDOFF*.md|third_party/*|target/*)
+        tools/hygiene.sh|HANDOFF.md|REPORT.md|third_party/*|target/*)
             continue
             ;;
     esac
