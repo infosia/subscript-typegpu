@@ -1,6 +1,7 @@
 # P6 — ergonomics and diagnostics
 
-Status: **in progress**. Opened 2026-08-23. Plan §8 P6. Contract:
+Status: **COMPLETE 2026-08-23.** Opened 2026-08-23. Closed at
+`4c2eff8`. Plan §8 P6. Contract:
 `specs/blocks/ergonomics.md` (EG1–EG9).
 
 ## Slice 1 — typed resources, buffer patches, the coverage list, the sweep
@@ -57,7 +58,20 @@ child processes per program-change gate — and proposed counting
 coverage during the differential's own dev runs, which removes 16
 runs and makes the counted run the gated run. Resolutions in the
 specs: F22, PI8 Rev 2, PI11, BF3 wording, EG4 Rev 1, EG7 wording.
-The code findings go to the coding agent.
+The code findings landed at `4c2eff8`: the README names the three
+accepted values and the absent default, the unreachable checks and
+`covers-rule` are gone, coverage is counted in the differential's
+own dev runs (the gate fell from 96.09 s to 80.04 s on the coding
+agent's machine), `resolve` takes no buffer, `a04` prints markers,
+the docs test checks contiguous ordered quotes, hygiene scans
+`docs/`, the header has no gaps, the API layer's traps name their
+converter. Planner verification at the close: `tools/gate.sh
+--require-backend` green, 221 tests in six executables (facade 3,
+typegpu-gen 6 and 38, harness 22 in 70.62 seconds plus the ignored
+live test, webgpu-gen 3 and 149). Live runs outside the sandbox at
+`4c2eff8`: Metal (yawgpu) ok, 26.19 seconds; Dawn ok, 23.86
+seconds; `x01`–`x12` `PASS` on both. Measurement: 45 s / 0.2 s /
+84 s / 78 s / 6.
 
 ## Exit criteria
 
@@ -68,4 +82,4 @@ The code findings go to the coding agent.
 | 3 | EG5's Dawn run is recorded with its decision | Dawn at `e07b434`: ok, 25.23 s, LY11 stands |
 | 4 | EG7's sweep finds no diagnostic without a rule id, an owner, and a fixture | Slice 1, green |
 | 5 | `README.md` and the tutorial exist with their quote gate | Slice 2 |
-| 6 | Budgets hold | 45 s / 0.2 s / 97 s / 94 s / 6 |
+| 6 | Budgets hold | 45 s / 0.2 s / 84 s / 78 s / 6 at the close |
