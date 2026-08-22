@@ -1,6 +1,7 @@
 # P4 — kernel depth
 
-Status: **in progress**. Opened 2026-08-23. Plan §8 P4. Contract:
+Status: **COMPLETE 2026-08-23.** Opened 2026-08-23. Closed at
+`ea25b01`. Plan §8 P4. Contract:
 `specs/blocks/kernel.md` Rev 2 (K18–K24).
 
 ## Slice 1 — statements, constants, variables, atomics, barriers
@@ -62,14 +63,23 @@ and admits uniform-buffer reads and `length()`; K18 admits
 `continue` and `default` grouping; K19 folds with checked
 arithmetic; K21 rejects atomics in uniform and read-only storage;
 K14 names the constants' position; plan §10 C1. The code findings
-go to the coding agent.
+landed at `ea25b01`: the counterexample is a K22 diagnostic, the
+`for` step and the loop-exit taint exist, `default` groups, the K7
+fixture is back, K19 folds with checked arithmetic, atomics behind
+`Uniform` and `Storage` are rejected, `x08` runs 1000 values so 24
+lanes take the conditional load's false branch. Planner
+verification at the close: gate green, 211 tests in six executables
+(facade 4, typegpu-gen 7 and 32, harness 18 in 38.37 seconds plus
+the ignored live test, webgpu-gen 3 and 147). Live run outside the
+sandbox at `ea25b01` (Metal): ok, 18.47 seconds, `x01`–`x09`
+`PASS`. Measurement: 44 s / 0.2 s / 49 s / 46 s / 6.
 
 ## Exit criteria
 
 | # | Criterion | Evidence |
 |---|---|---|
 | 1 | `b09-kernel-depth` and `b10-workgroup` gate-green with WGSL goldens | Slice 1 and round 2, `--require-backend` green |
-| 2 | `x08-live-reduction` `PASS` | Metal at `9670180`, after the K22 Rev 1 fix |
-| 3 | `x09-live-switch` `PASS` | Metal at `010e846` and `9670180` |
-| 4 | Every K24 rejection has a red fixture, a non-uniform barrier is a generator diagnostic | Eleven fixtures, one diagnostic each |
-| 5 | Budgets hold | 44 s / 0.2 s / 48 s / 47 s / 6 |
+| 2 | `x08-live-reduction` `PASS` | Metal at `9670180` and `ea25b01` (1000 values, the false branch taken) |
+| 3 | `x09-live-switch` `PASS` | Metal at `010e846`, `9670180`, `ea25b01` |
+| 4 | Every K24 rejection has a red fixture, a non-uniform barrier is a generator diagnostic (§10 C1) | The close corpus, one diagnostic each, the reviewer's counterexample rejected |
+| 5 | Budgets hold | 44 s / 0.2 s / 49 s / 46 s / 6 at the close |
