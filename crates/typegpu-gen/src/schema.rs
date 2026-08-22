@@ -58,7 +58,7 @@ fn class_alignment(class: &ClassDef) -> Option<u32> {
     class.alignment_override.as_ref().map(|value| value.value)
 }
 
-fn library_tree(module: &Module, class: &ClassDef) -> Option<TypeTree> {
+pub(crate) fn library_tree(module: &Module, class: &ClassDef) -> Option<TypeTree> {
     if class.pos.file != "typegpu-types.ts" {
         return None;
     }
@@ -244,10 +244,16 @@ fn uniform_schema_names(module: &Module) -> BTreeSet<String> {
     module
         .classes
         .iter()
-        .filter(|class| !class.is_value && class.name.starts_with("Uniform<"))
-        .filter_map(|class| class.fields.first())
-        .filter_map(|field| match field.ty {
+        .filter(|class| {
+            class.pos.file == "typegpu.ts" && !class.is_value && class.name.starts_with("Uniform<")
+        })
+        .filter_map(|class| class.fields.iter().find(|field| field.name == "values"))
+        .filter_map(|field| match &field.ty {
             Type::Class(id) => Some(module.classes[id.0].name.clone()),
+            Type::Array(element) => match &**element {
+                Type::Class(id) => Some(module.classes[id.0].name.clone()),
+                _ => None,
+            },
             _ => None,
         })
         .collect()

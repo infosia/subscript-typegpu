@@ -4,6 +4,10 @@ use std::path::PathBuf;
 mod api;
 mod c_layout;
 mod differential;
+mod library;
+mod rejections;
+mod runtime;
+mod wgsl_goldens;
 
 // Re-pin with specs/subscript-typegpu-project-plan.md section 5,
 // "The substrate generator".

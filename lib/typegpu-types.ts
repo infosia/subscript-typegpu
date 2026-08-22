@@ -415,6 +415,46 @@ export function v2h(x: f16, y: f16): Vec2h { return new Vec2h(x, y); }
 export function v3h(x: f16, y: f16, z: f16): Vec3h { return new Vec3h(x, y, z); }
 export function v4h(x: f16, y: f16, z: f16, w: f16): Vec4h { return new Vec4h(x, y, z, w); }
 
+export function clamp(value: f32, low: f32, high: f32): f32 {
+  if (value < low) {
+    return low;
+  }
+  if (value > high) {
+    return high;
+  }
+  return value;
+}
+
+export function mix(left: f32, right: f32, amount: f32): f32 {
+  return left + (right - left) * amount;
+}
+
+export function step(edge: f32, value: f32): f32 {
+  if (value < edge) {
+    return 0.0;
+  }
+  return 1.0;
+}
+
+export function smoothstep(low: f32, high: f32, value: f32): f32 {
+  const amount: f32 = clamp((value - low) / (high - low), 0.0, 1.0);
+  return amount * amount * (3.0 - 2.0 * amount);
+}
+
+export function fract(value: f32): f32 {
+  return value - (Math.floor(value as f64) as f32);
+}
+
+export function sign(value: f32): f32 {
+  if (value < 0.0) {
+    return -1.0;
+  }
+  if (value > 0.0) {
+    return 1.0;
+  }
+  return 0.0;
+}
+
 export function mat2x2fIdentity(): Mat2x2f {
   return new Mat2x2f(v2f(1.0, 0.0), v2f(0.0, 1.0));
 }

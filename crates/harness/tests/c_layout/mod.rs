@@ -31,6 +31,7 @@ fn is_b_program(path: &Path) -> bool {
         && bytes[2].is_ascii_digit()
         && bytes[3] == b'-'
         && name.ends_with(".ts")
+        && !name.ends_with(".typegpu.ts")
 }
 
 fn programs() -> Vec<PathBuf> {
@@ -45,7 +46,11 @@ fn programs() -> Vec<PathBuf> {
         .iter()
         .map(|path| path.file_name().expect("program name").to_string_lossy())
         .collect::<Vec<_>>();
-    assert_eq!(names, ["b01-layout.ts"], "C layout program set changed");
+    assert_eq!(
+        names,
+        ["b01-layout.ts", "b02-vecadd.ts"],
+        "C layout program set changed"
+    );
     programs
 }
 
@@ -64,8 +69,14 @@ fn checked(program: &Path) -> (Generated, hir::Module) {
     );
     let mut files = subscript_typegpu_harness::program_files(program).expect("load program files");
     files.retain(|file| {
-        matches!(file.name.as_str(), "typegpu-types.ts" | "typegpu.ts")
-            || file.name == program_name
+        matches!(
+            file.name.as_str(),
+            "subscript-typegpu.generated.d.ts"
+                | "wire-enum-aliases.generated.d.ts"
+                | "webgpu.ts"
+                | "typegpu-types.ts"
+                | "typegpu.ts"
+        ) || file.name == program_name
             || file.name == support_name
     });
     let inputs = files
@@ -213,7 +224,10 @@ fn compile_probe(
     let mut command = compiler.command();
     add_c11_optimized_flags(&mut command, compiler.style());
     command
+        .arg("-I")
+        .arg(repository_root().join("crates/facade"))
         .arg(&source_path)
+        .args(subscript_typegpu_harness::ship_link_inputs().expect("facade link inputs"))
         .arg(subscript_typegpu_harness::ensure_runtime_staticlib().expect("runtime archive"))
         .args(runtime_system_libraries(compiler.style()));
     add_executable_output(&mut command, &executable, compiler.style());

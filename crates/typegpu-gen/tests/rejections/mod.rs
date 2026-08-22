@@ -10,35 +10,52 @@ fn every_rejection_fixture_reports_its_rule() {
         .map(|entry| entry.expect("read fixture entry").path())
         .collect::<Vec<_>>();
     fixtures.sort();
-    assert_eq!(fixtures.len(), 10, "schema rejection fixture count");
+    assert_eq!(fixtures.len(), 30, "rejection fixture count");
     for fixture in fixtures {
         let stem = fixture
             .file_stem()
             .and_then(|stem| stem.to_str())
             .expect("fixture stem");
-        let expected = stem
-            .split_once('-')
-            .map_or(stem, |(rule, _)| rule)
-            .to_ascii_uppercase();
         let source = support::read(&fixture);
-        let diagnostics = subscript_typegpu_gen::generate(&[SourceFile::new(
+        let expected = source
+            .lines()
+            .next()
+            .and_then(|line| line.strip_prefix("// expected-rule: "))
+            .map(str::to_owned)
+            .unwrap_or_else(|| {
+                stem.split_once('-')
+                    .map_or(stem, |(rule, _)| rule)
+                    .to_ascii_uppercase()
+            });
+        let mut files = support::b01_files();
+        files.pop();
+        files.push(SourceFile::new(
             fixture.file_name().expect("fixture name").to_string_lossy(),
             source,
-        )])
-        .expect_err("rejection fixture generated");
-        let rendered = diagnostics
+        ));
+        let diagnostics = match subscript_typegpu_gen::generate(&files) {
+            Err(diagnostics) => diagnostics,
+            Ok(_) => panic!("rejection fixture generated: {}", fixture.display()),
+        };
+        let matching = diagnostics
             .iter()
-            .map(|diagnostic| diagnostic.message.as_str())
-            .collect::<Vec<_>>()
-            .join("\n");
+            .find(|diagnostic| diagnostic.message.starts_with(&format!("{expected}:")));
         assert!(
-            rendered.contains(&expected),
-            "{} expected {expected}:\n{rendered}",
-            fixture.display()
+            matching.is_some(),
+            "{} expected {expected}:\n{}",
+            fixture.display(),
+            diagnostics
+                .iter()
+                .map(|item| item.message.as_str())
+                .collect::<Vec<_>>()
+                .join("\n")
         );
         assert!(
-            rendered.contains("(author)"),
-            "{} lacks the diagnostic owner:\n{rendered}",
+            matching
+                .expect("matching diagnostic")
+                .message
+                .contains("(author)"),
+            "{} matching diagnostic lacks its owner",
             fixture.display()
         );
     }

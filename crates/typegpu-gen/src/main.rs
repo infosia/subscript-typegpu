@@ -62,7 +62,13 @@ fn run() -> Result<(), String> {
         .ok_or_else(|| format!("program has no UTF-8 stem: {}", program.display()))?;
     let destination = output.join(format!("{stem}.typegpu.ts"));
     std::fs::write(&destination, generated.support_module)
-        .map_err(|error| format!("write {}: {error}", destination.display()))
+        .map_err(|error| format!("write {}: {error}", destination.display()))?;
+    for (pipeline, source) in generated.pipelines {
+        let destination = output.join(format!("{stem}.{pipeline}.wgsl"));
+        std::fs::write(&destination, source)
+            .map_err(|error| format!("write {}: {error}", destination.display()))?;
+    }
+    Ok(())
 }
 
 fn main() -> ExitCode {

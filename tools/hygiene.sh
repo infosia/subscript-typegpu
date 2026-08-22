@@ -23,6 +23,13 @@ while IFS= read -r file; do
         continue
     fi
 
+    case "$file" in
+        programs/*.typegpu.ts)
+            echo "hygiene: generated support module exists: $file" >&2
+            failed=1
+            ;;
+    esac
+
     if grep -nE '/(Users|home|Documents|workspace|Projects|repos)/|~/|\.\./\.\.|\.\./(subscript|subscript-gpu|yawgpu|gpuweb|webgpu-native-cts|webgpu-headers|TypeGPU)|(^|[^[:alnum:]])[A-Za-z]:[\\/]' "$file"; then
         echo "hygiene: forbidden text in $file" >&2
         failed=1

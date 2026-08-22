@@ -1,0 +1,8 @@
+pipeline:created
+Item_SIZE=4
+vecAdd_WORKGROUP_X=64
+vecAdd_WORKGROUP_Y=1
+vecAdd_WORKGROUP_Z=1
+vecAdd_WGSL_LINES=19
+dispatch:submitted
+PASS

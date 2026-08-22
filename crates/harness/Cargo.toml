@@ -18,3 +18,6 @@ subscript-typegpu-facade = { path = "../facade" }
 subscript-typegpu-gen = { path = "../typegpu-gen" }
 subscript-compiler.workspace = true
 subscript-codegen.workspace = true
+
+[dev-dependencies]
+naga = { version = "29", features = ["wgsl-in"] }

@@ -1,7 +1,10 @@
 //! Typed schema layout and WGSL support generation.
 
 mod emit;
+mod kernel;
 pub mod layout;
+mod mapping;
+mod pipeline;
 mod schema;
 
 use std::collections::BTreeSet;
@@ -34,6 +37,8 @@ pub struct Generated {
     pub wgsl_module: String,
     /// Schema trees and their C and WGSL layouts.
     pub layouts: Vec<GeneratedLayout>,
+    /// Pipeline declaration names and their complete WGSL modules.
+    pub pipelines: Vec<(String, String)>,
 }
 
 #[derive(Debug)]
@@ -147,14 +152,24 @@ fn support_import(files: &[SourceFile]) -> Result<Option<SupportImport>, Vec<Dia
 
 fn stub_file(support: &SupportImport) -> SourceFile {
     let mut source = String::new();
+    let pipeline_support = support.names.iter().any(|name| name.contains("_LAYOUT"));
+    if pipeline_support {
+        source.push_str("import { BindGroupLayoutSpec } from \"./typegpu\";\n");
+    }
     for name in &support.names {
-        let ty = if name.ends_with("_WGSL") {
+        let ty = if name.ends_with("_WGSL") || name.ends_with("_ENTRY") {
             "string"
+        } else if name.contains("_LAYOUT") {
+            "BindGroupLayoutSpec"
         } else {
             "u32"
         };
         source.push_str(&format!("export const {name}: {ty} = "));
-        source.push_str(if ty == "string" { "\"\";\n" } else { "0;\n" });
+        source.push_str(match ty {
+            "string" => "\"\";\n",
+            "BindGroupLayoutSpec" => "{ entries: [] };\n",
+            _ => "0;\n",
+        });
     }
     SourceFile::new(
         format!("{}.ts", support.module_name.trim_start_matches("./")),
@@ -179,6 +194,7 @@ fn intended_schemas(support: Option<&SupportImport>) -> BTreeSet<String> {
         .into_iter()
         .flat_map(|support| &support.names)
         .filter_map(|name| schema_name(name))
+        .filter(|name| name.starts_with(|ch: char| ch.is_ascii_uppercase()))
         .map(str::to_owned)
         .collect()
 }
@@ -192,43 +208,111 @@ fn imported_field<'a>(support: &'a SupportImport, schema: &str) -> &'a str {
         .unwrap_or("<unknown>")
 }
 
-fn illegal_type(message: &str) -> &str {
-    message
-        .split('`')
-        .nth(1)
-        .filter(|value| !value.is_empty())
-        .unwrap_or("<unknown>")
-}
-
 fn translate_illegal_fields(
+    files: &[SourceFile],
     support: Option<&SupportImport>,
     intended: &BTreeSet<String>,
     diagnostics: &[Diagnostic],
 ) -> Option<Vec<Diagnostic>> {
     let support = support?;
-    if intended.is_empty()
-        || diagnostics
-            .iter()
-            .any(|item| !item.message.contains("outside the value-class whitelist"))
-    {
+    if intended.is_empty() || diagnostics.iter().any(|item| item.code != RuleCode::S100) {
         return None;
     }
     let mut translated = Vec::new();
     for item in diagnostics {
-        let ty = illegal_type(&item.message);
         for name in intended {
             let field = imported_field(support, name);
+            if field == "<unknown>"
+                || !source_line(files, &item.pos).is_some_and(|line| line.contains(field))
+            {
+                continue;
+            }
             translated.push(diagnostic(
                 "SC3",
-                format!("schema `{name}` field `{field}` has illegal schema type `{ty}`"),
+                format!("schema `{name}` field `{field}` has an illegal schema type"),
                 item.pos.clone(),
             ));
         }
     }
-    Some(translated)
+    (!translated.is_empty()).then_some(translated)
 }
 
-fn generated_export_names(schemas: &[schema::Schema]) -> BTreeSet<String> {
+fn source_line<'a>(files: &'a [SourceFile], pos: &Pos) -> Option<&'a str> {
+    files
+        .iter()
+        .find(|file| file.name == pos.file)?
+        .source
+        .lines()
+        .nth(pos.line.checked_sub(1)? as usize)
+}
+
+fn identifier_at(line: &str, col: u32) -> Option<&str> {
+    let start = col.checked_sub(1)? as usize;
+    let rest = line.get(start..)?;
+    let len = rest
+        .char_indices()
+        .take_while(|(_, ch)| ch.is_ascii_alphanumeric() || *ch == '_')
+        .last()
+        .map_or(0, |(index, ch)| index + ch.len_utf8());
+    (len > 0).then(|| &rest[..len])
+}
+
+fn function_header<'a>(source: &'a str, name: &str) -> Option<&'a str> {
+    let marker = format!("function {name}(");
+    let start = source.find(&marker)?;
+    let rest = &source[start..];
+    let end = rest.find('{')?;
+    Some(&rest[..end])
+}
+
+fn translate_kernel_checker_diagnostics(
+    files: &[SourceFile],
+    diagnostics: Vec<Diagnostic>,
+) -> Vec<Diagnostic> {
+    diagnostics
+        .into_iter()
+        .map(|item| {
+            if item.code == RuleCode::S013 {
+                return diagnostic("K9", "await is outside K9", item.pos);
+            }
+            let Some(line) = source_line(files, &item.pos) else {
+                return item;
+            };
+            if item.code != RuleCode::S100 || !line.contains("computePipeline") {
+                return item;
+            }
+            let Some(name) = identifier_at(line, item.pos.col) else {
+                return item;
+            };
+            let Some(source) = files
+                .iter()
+                .find(|file| file.name == item.pos.file)
+                .map(|file| file.source.as_str())
+            else {
+                return item;
+            };
+            let Some(header) = function_header(source, name) else {
+                return item;
+            };
+            if source.contains(&format!("async function {name}(")) {
+                diagnostic(
+                    "PI13",
+                    "an async function cannot be a pipeline kernel",
+                    item.pos,
+                )
+            } else if !header.trim_end().ends_with(": void") {
+                diagnostic("PI13", "a pipeline kernel has a non-void return", item.pos)
+            } else {
+                item
+            }
+        })
+        .collect()
+}
+
+fn generated_export_names(
+    schemas: &[schema::Schema],
+    pipelines: &[pipeline::Pipeline],
+) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     for schema in schemas {
         names.extend([
@@ -238,6 +322,18 @@ fn generated_export_names(schemas: &[schema::Schema]) -> BTreeSet<String> {
             format!("{}_WGSL", schema.name),
         ]);
         emit::layout_export_names(&schema.name, &schema.tree, &mut names);
+    }
+    for pipeline in pipelines {
+        names.extend([
+            format!("{}_WGSL", pipeline.declaration),
+            format!("{}_ENTRY", pipeline.declaration),
+            format!("{}_WORKGROUP_X", pipeline.declaration),
+            format!("{}_WORKGROUP_Y", pipeline.declaration),
+            format!("{}_WORKGROUP_Z", pipeline.declaration),
+        ]);
+        for layout in &pipeline.layouts {
+            names.insert(format!("{}_LAYOUT{}", pipeline.declaration, layout.group));
+        }
     }
     names
 }
@@ -249,7 +345,7 @@ fn generated_export_names(schemas: &[schema::Schema]) -> BTreeSet<String> {
 /// Returns compiler or schema diagnostics with source positions.
 pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     let support = support_import(files)?;
-    let intended = intended_schemas(support.as_ref());
+    let mut intended = intended_schemas(support.as_ref());
     let mut checked_files = files.to_vec();
     if let Some(support) = &support {
         checked_files.push(stub_file(support));
@@ -258,14 +354,22 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         Ok(module) => module,
         Err(diagnostics) => {
             return Err(
-                translate_illegal_fields(support.as_ref(), &intended, &diagnostics)
-                    .unwrap_or(diagnostics),
+                translate_illegal_fields(files, support.as_ref(), &intended, &diagnostics)
+                    .unwrap_or_else(|| {
+                        translate_kernel_checker_diagnostics(&checked_files, diagnostics)
+                    }),
             )
         }
     };
+    let pipeline_definitions = pipeline::discover(&module)?;
+    intended.extend(pipeline::schema_names(&module, &pipeline_definitions));
+    for pipeline in &pipeline_definitions {
+        intended
+            .extend(kernel::referenced_schema_names(&module, pipeline).map_err(|item| vec![item])?);
+    }
     let schemas = schema::discover(&module, &intended)?;
     if let Some(support) = &support {
-        let exports = generated_export_names(&schemas);
+        let exports = generated_export_names(&schemas, &pipeline_definitions);
         let missing = support
             .names
             .iter()
@@ -290,7 +394,55 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         .map(|schema| (schema.name.clone(), emit::wgsl_struct(schema)))
         .collect::<Vec<_>>();
     let wgsl_module = emit::wgsl_module(&schemas, &wgsl_structs);
-    let support_module = emit::support_module(&schemas, &wgsl_structs);
+    let pipelines = pipeline_definitions
+        .iter()
+        .map(|pipeline| {
+            fn append_tree(tree: &TypeTree, names: &mut Vec<String>, seen: &mut BTreeSet<String>) {
+                let TypeTree::Struct(structure) = tree else {
+                    return;
+                };
+                if seen.insert(structure.name.clone()) {
+                    names.push(structure.name.clone());
+                }
+                for member in &structure.members {
+                    append_tree(&member.ty, names, seen);
+                }
+            }
+            let references = kernel::referenced_schema_names(&module, pipeline)?;
+            let mut names = Vec::new();
+            let mut seen = BTreeSet::new();
+            for name in references {
+                if let Some(schema) = schemas.iter().find(|schema| schema.name == name) {
+                    append_tree(&schema.tree, &mut names, &mut seen);
+                }
+            }
+            let selected_structs = names
+                .iter()
+                .filter_map(|name| {
+                    wgsl_structs
+                        .iter()
+                        .find(|(schema, _)| schema == name)
+                        .cloned()
+                })
+                .collect::<Vec<_>>();
+            let uses_f16 = names.iter().any(|name| {
+                schemas
+                    .iter()
+                    .find(|schema| &schema.name == name)
+                    .is_some_and(|schema| emit::uses_f16(&schema.tree))
+            });
+            let text = kernel::emit(&module, pipeline, &selected_structs, uses_f16)?;
+            Ok((pipeline.declaration.clone(), text))
+        })
+        .collect::<Result<Vec<_>, Diagnostic>>()
+        .map_err(|diagnostic| vec![diagnostic])?;
+    let support_module = emit::support_module(
+        &module,
+        &schemas,
+        &wgsl_structs,
+        &pipeline_definitions,
+        &pipelines,
+    );
     let layouts = schemas
         .iter()
         .map(|schema| GeneratedLayout {
@@ -305,6 +457,7 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         wgsl_structs,
         wgsl_module,
         layouts,
+        pipelines,
     })
 }
 

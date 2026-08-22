@@ -1,3 +1,4 @@
+// expected-rule: SC9
 import { Mixed_OFFSET_p } from "./sc9-layout.typegpu";
 
 @CStruct({ align: 16 })

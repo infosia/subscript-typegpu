@@ -1,3 +1,4 @@
+// expected-rule: SC3
 import { BadNullable_OFFSET_value } from "./sc3-nullable.typegpu";
 
 class Item {}

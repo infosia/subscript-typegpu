@@ -35,12 +35,23 @@ no emitter tests. M15: a stub `kernel` field. M16: no regeneration
 path for the `.wgsl` golden. Round 2 handoff issued with every
 finding.
 
+Round 2 closed every item. Round 3 moved the regeneration of `.wgsl`
+goldens through a scratch directory, because the first version left
+support modules in `programs/`. Planner verification at the slice
+close: `tools/gate.sh --require-backend` green, 188 tests in six
+executables (facade 3, typegpu-gen unit 7 and integration 15,
+harness 15, webgpu-gen 1 and 147), `b02-vecadd` equal on both tiers
+with its `.vecAdd.wgsl` golden, 30 rejection fixtures each red with
+one rule id and its owner, the keyword list equal to naga's, no
+support module under `programs/`. Measurement: 44 s / 0.2 s / 40 s
+/ 25 s / 6.
+
 ## Exit criteria
 
 | # | Criterion | Evidence |
 |---|---|---|
 | 1 | `b02-vecadd`, `b03-saxpy-uniform`, `b04-particles` gate-green on both tiers with WGSL goldens | — |
 | 2 | `x01`–`x03` print `PASS` on a real adapter | — |
-| 3 | Every rejection rule has a red fixture | — |
-| 4 | Every generator diagnostic names its rule id and its owner | — |
+| 3 | Every rejection rule has a red fixture | Slice 1: 30 fixtures, one rule id each |
+| 4 | Every generator diagnostic names its rule id and its owner | Slice 1: asserted per fixture |
 | 5 | Build-time budgets hold | — |
