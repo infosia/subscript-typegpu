@@ -15,5 +15,6 @@ test = false
 
 [dependencies]
 subscript-typegpu-facade = { path = "../facade" }
+subscript-typegpu-gen = { path = "../typegpu-gen" }
 subscript-compiler.workspace = true
 subscript-codegen.workspace = true

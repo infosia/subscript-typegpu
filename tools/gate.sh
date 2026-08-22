@@ -25,7 +25,7 @@ program_backup=
 
 restore_measure_files() {
     if [ -n "$codegen_backup" ] && [ -f "$codegen_backup" ]; then
-        cp "$codegen_backup" crates/webgpu-gen/src/lib.rs
+        cp "$codegen_backup" crates/typegpu-gen/src/lib.rs
     fi
     if [ -n "$program_backup" ] && [ -f "$program_backup" ]; then
         cp "$program_backup" programs/a01-smoke.ts
@@ -103,13 +103,13 @@ measure() {
 
     run_gate
 
-    codegen_backup="$gate_tmp/webgpu-gen-lib.rs"
-    cp crates/webgpu-gen/src/lib.rs "$codegen_backup"
-    printf '\n// T12 measurement probe.\n' >> crates/webgpu-gen/src/lib.rs
+    codegen_backup="$gate_tmp/typegpu-gen-lib.rs"
+    cp crates/typegpu-gen/src/lib.rs "$codegen_backup"
+    printf '\n// T12 measurement probe.\n' >> crates/typegpu-gen/src/lib.rs
     started=$(date +%s)
     run_gate
     codegen_gate=$(elapsed "$started")
-    cp "$codegen_backup" crates/webgpu-gen/src/lib.rs
+    cp "$codegen_backup" crates/typegpu-gen/src/lib.rs
     codegen_backup=
 
     run_gate

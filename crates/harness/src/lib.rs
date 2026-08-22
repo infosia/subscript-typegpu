@@ -153,7 +153,7 @@ fn ship_facade_library() -> Result<NativeLibrary, String> {
     })
 }
 
-/// Loads both ambient mirrors, the API module, and one program module.
+/// Loads the mirrors, libraries, program, and optional schema support.
 pub fn program_files(program: &Path) -> Result<Vec<SourceFile>, String> {
     let stem = program
         .file_stem()
@@ -161,7 +161,7 @@ pub fn program_files(program: &Path) -> Result<Vec<SourceFile>, String> {
         .ok_or_else(|| format!("program has no UTF-8 stem: {}", program.display()))?;
     let program_source = std::fs::read_to_string(program)
         .map_err(|error| format!("read {}: {error}", program.display()))?;
-    Ok(vec![
+    let mut files = vec![
         SourceFile::ambient(
             "subscript-typegpu.generated.d.ts",
             read("lib/subscript-typegpu.generated.d.ts")?,
@@ -171,8 +171,19 @@ pub fn program_files(program: &Path) -> Result<Vec<SourceFile>, String> {
             read("lib/wire-enum-aliases.generated.d.ts")?,
         ),
         SourceFile::new("webgpu.ts", read("lib/webgpu.ts")?),
+        SourceFile::new("typegpu-types.ts", read("lib/typegpu-types.ts")?),
+        SourceFile::new("typegpu.ts", read("lib/typegpu.ts")?),
         SourceFile::new(format!("{stem}.ts"), program_source),
-    ])
+    ];
+    if stem.starts_with('b') || stem.starts_with('x') {
+        let generated = subscript_typegpu_gen::generate(&files)
+            .map_err(|diagnostics| subscript_compiler::render_diagnostics(&files, &diagnostics))?;
+        files.push(SourceFile::new(
+            format!("{stem}.typegpu.ts"),
+            generated.support_module,
+        ));
+    }
+    Ok(files)
 }
 
 /// Returns the facade symbols and include directory for the dev tier.

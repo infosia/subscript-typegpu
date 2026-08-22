@@ -1,0 +1,21 @@
+Params size=8 align=4 dt=0 count=4
+Particle size=32 align=16 pos=0 vel=16 stride=32
+Mixed size=32 align=16 a=0 p=16
+Grid size=144 align=16 cells=0 extent=128 cellStride=32
+MatrixHolder size=48 align=16 value=0
+Half size=4 align=4 v=0
+FloatVectors size=112 align=16 v2=0 v3=16 v4=32 triples=48 tripleStride=16
+SignedVectors size=48 align=16 v2=0 v3=16 v4=32
+UnsignedVectors size=48 align=16 v2=0 v3=16 v4=32
+HalfMatrices size=160 align=16 h2=0 h3=8 h4=16 m2=24 m3=48 m4=96
+WGSL Params=5
+WGSL Particle=5
+WGSL Mixed=5
+WGSL Grid=5
+WGSL MatrixHolder=4
+WGSL Half=4
+WGSL FloatVectors=7
+WGSL SignedVectors=6
+WGSL UnsignedVectors=6
+WGSL HalfMatrices=9
+PASS

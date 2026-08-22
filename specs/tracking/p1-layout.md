@@ -33,6 +33,18 @@ file. SC6 tabulates the method set per kind. LY15 places `enable
 f16;` once. Plan §8 P1 exit criteria grew to six. Round 2 handoff
 issued with every finding.
 
+Round 2 (2026-08-22) closed every item. Planner verification at the
+slice close: `tools/gate.sh --require-backend` green, 176 tests in
+six executables (facade 3, typegpu-gen unit 5 and integration 10,
+harness 10, webgpu-gen 1 and 147), `b01-layout` lays out all
+fifteen library classes and equals the golden on both tiers, the
+harness's `c_layout` module proves every schema against
+`value_class_layouts` and a compiled `offsetof` probe (red recorded
+with an unrounded vector size: C 96 against WGSL 112), the class
+scanners are gone and the import-statement stub carries its R35
+kill date, hygiene clean. Measurement: 45 s / 0.2 s / 13 s / 10 s /
+6 (`build-time.md`).
+
 ## Slice 2 — `Buffer<T>` write and read
 
 Blocked on subscript request R34 (the bytes of a value class). See
@@ -40,10 +52,12 @@ plan §9 RC-14. R35 (the discovery check) is RC-15.
 
 ## Exit criteria
 
+Criterion 6 (`Buffer<T>` through R34) is slice 2.
+
 | # | Criterion | Evidence |
 |---|---|---|
-| 1 | Every committed golden vector passes | — |
-| 2 | `b01-layout` prints layout constants that match its golden on both tiers | — |
-| 3 | naga's offsets equal the engine's for every emitted struct | — |
-| 4 | The ship tier's `offsetof` numbers match (LY16) | — |
-| 5 | No schema in the corpus holds a padding field | — |
+| 1 | Every committed golden vector passes | Slice 1: 4 scalars, 12 vectors, 3 matrices, 3 shapes from TypeGPU 0.12.0, counts asserted |
+| 2 | `b01-layout` lays out every library class and matches its golden on both tiers | Slice 1 close, `--require-backend` green |
+| 3 | naga's offsets equal the engine's for every emitted struct | Slice 1: spans, member offsets, every array stride, the uniform wrap, `SHADER_FLOAT16` when `enable f16;` |
+| 4 | The C numbers match (LY16 Rev 1) | Slice 1: `c_layout` module, `value_class_layouts` and the compiled probe, red recorded |
+| 5 | No schema in the corpus holds a padding field | Slice 1: none in `b01-layout` |

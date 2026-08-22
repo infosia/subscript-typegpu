@@ -25,13 +25,69 @@ fn program_files_have_the_required_order_names_and_modes() {
             "subscript-typegpu.generated.d.ts",
             "wire-enum-aliases.generated.d.ts",
             "webgpu.ts",
+            "typegpu-types.ts",
+            "typegpu.ts",
             "a01-smoke.ts",
         ]
     );
     assert_eq!(
         files.iter().map(|file| file.dts).collect::<Vec<_>>(),
-        vec![true, true, false, false]
+        vec![true, true, false, false, false, false]
     );
+}
+
+#[test]
+fn typegpu_program_files_end_with_generated_support() {
+    let program = repository_root().join("programs/b01-layout.ts");
+    let files = subscript_typegpu_harness::program_files(&program).expect("load TypeGPU files");
+    let names = files
+        .iter()
+        .map(|file| file.name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        names,
+        vec![
+            "subscript-typegpu.generated.d.ts",
+            "wire-enum-aliases.generated.d.ts",
+            "webgpu.ts",
+            "typegpu-types.ts",
+            "typegpu.ts",
+            "b01-layout.ts",
+            "b01-layout.typegpu.ts",
+        ]
+    );
+    assert!(
+        files
+            .last()
+            .is_some_and(|file| file.source.contains("Particle_STRIDE")),
+        "generated support lacks Particle_STRIDE"
+    );
+}
+
+#[test]
+fn live_typegpu_programs_receive_generated_support() {
+    let directory = std::env::temp_dir().join(format!(
+        "subscript-typegpu-x-program-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&directory).expect("create live-program directory");
+    let program = directory.join("x99-layout.ts");
+    std::fs::write(
+        &program,
+        "import { Demo_SIZE } from \"./x99-layout.typegpu\";\n\n@CStruct\nclass Demo {\n  value: u32;\n}\n",
+    )
+    .expect("write live program");
+    let files =
+        subscript_typegpu_harness::program_files(&program).expect("load live TypeGPU files");
+    assert_eq!(
+        files.last().map(|file| file.name.as_str()),
+        Some("x99-layout.typegpu.ts")
+    );
+    assert!(files
+        .last()
+        .is_some_and(|file| file.source.contains("Demo_SIZE")));
+    std::fs::remove_file(&program).expect("remove live program");
+    std::fs::remove_dir(&directory).expect("remove live-program directory");
 }
 
 #[test]

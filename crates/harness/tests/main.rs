@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 mod api;
+mod c_layout;
 mod differential;
 
 // Re-pin with specs/subscript-typegpu-project-plan.md section 5,
