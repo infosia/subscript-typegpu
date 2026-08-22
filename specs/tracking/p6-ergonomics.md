@@ -5,7 +5,19 @@ Status: **in progress**. Opened 2026-08-23. Plan §8 P6. Contract:
 
 ## Slice 1 — typed resources, buffer patches, the coverage list, the sweep
 
-Handoff issued 2026-08-23. Result: pending.
+Delivered 2026-08-23, committed at `bd8c0b1`. Typed `LResources`
+records and `create<Name>BindGroup<g>` factories per layout class
+(`b02-vecadd` uses them), `Buffer<T>.patch` and `readOne<T>`
+(`b05-buffer`), counting thunks on all 163 facade exports with a
+`--coverage` mode and `specs/tracking/coverage.md` (64 reached, 99
+unreached — labels, render bundles, debug markers, query sets,
+indirect draws, error scopes, limits and features, texture getters,
+async pipeline creation, and the descriptor-less
+`adapter_request_device` the API layer never calls), the diagnostic
+and trap sweep (every site cites a rule id, an owner, and has a
+fixture). Planner verification: gate green. Measurement: 44 s / 1 s
+/ 78 s / 75 s / 6 — the coverage test runs every program's dev tier
+a second time, which the gate budgets absorb (240 s / 120 s).
 
 ## Slice 2 — the coverage close, the Dawn run, timestamps, README and tutorial
 
