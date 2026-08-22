@@ -14,7 +14,8 @@ Command for every row: `tools/gate.sh --measure --yes` with
 round 1 script, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate
 paid for the first `target/ship-build`). Row 2: the coding agent,
-with the T12 Rev 1 order.
+with the T12 Rev 1 order. Row 3: the planner, at the P0 close,
+`--require-backend` implied.
 The coding agent's run on the same tree gave 27 s / 0.2 s / 36 s /
 10 s / 4. The cold build is genuine: `cargo clean` removed `target/`,
 no user-wide build cache exists, and the rebuilt `target/` is 1.5 GB.

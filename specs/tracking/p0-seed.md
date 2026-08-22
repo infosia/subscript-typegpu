@@ -1,6 +1,7 @@
 # P0 — seed and generator import
 
-Status: **in progress**. Opened 2026-08-22. Plan §8 P0. Contracts:
+Status: **COMPLETE 2026-08-22.** Opened 2026-08-22. Closed at
+`5f6840b`. Plan §8 P0. Contracts:
 `specs/blocks/generator-import.md`, `facade.md`, `testing.md`.
 
 ## Pins
@@ -118,16 +119,26 @@ integration executable plus at most one unit executable per crate.
 The plan's output count is six, its probe path is
 `crates/typegpu-gen/src/lib.rs`, and I1 names the renamed tests.
 
-Code resolutions: handed off as the phase-close round.
+Code resolutions landed at `5f6840b` in two rounds. The second
+round corrected one of the first: the prefix scan had matched the
+`sGPU` inside `isGPURequiredLimitsEmpty`, and the coding agent had
+renamed the helper instead of the pattern. The pattern now requires
+a non-letter before the token, and the name is back.
+
+Close: `tools/gate.sh --require-backend` green at `5f6840b`, 157
+tests in four executables (facade 3, harness 6, generator unit 1,
+generator integration 147), the differential test 3.45 seconds,
+hygiene clean. Measurement row 3 in `build-time.md`. No open
+CRITICAL or MAJOR.
 
 ## Exit criteria
 
 | # | Criterion | Evidence |
 |---|---|---|
-| 1 | `a01` byte-identical on both tiers and the golden | Slice 2 close: dev, ship, golden equal. A one-byte golden change fails both tiers with the offset and both lines |
+| 1 | `a01` byte-identical on both tiers and the golden | `--require-backend` green at `5f6840b`, differential 3.45 s. A one-byte golden change fails both tiers with the offset and both lines |
 | 2 | Regeneration gate red then green | Slice 1: a one-byte change to `lib/webgpu.ts` fails T6 naming `tools/regen.sh`, green after regen |
-| 3 | Five build-time measurements recorded | `build-time.md`: two rows, both inside budget |
+| 3 | Five build-time measurements recorded | `build-time.md`: three rows, all inside budget. Close: 42 s / 0.2 s / 9 s / 6 s / 4 |
 | 4 | Facade deps: `libloading` alone. `syn` not a direct dependency | Measured at the slice 1 close: `libloading` → `cfg-if` only, `cargo tree -e normal --depth 1` lists no `syn` |
 | 5 | No `[features]`, no `build.rs` | `tools/hygiene.sh` checks both, clean at the slice 1 close |
-| 6 | I4–I9 green by their gates. I10 measured | I10: the 28 aliases derive from `[api].enums`. One pass. Six outputs byte-identical before and after |
+| 6 | I4–I9 green by their gates. I10 measured | I4 and I9 gates rewritten at the phase close (hygiene prefix and residue scans, rule-id scan widened, L10 test). I10: the 28 aliases derive from `[api].enums`. One pass. Six outputs byte-identical before and after |
 | 7 | Test count before and after I8 equal | 143 → 143 at the merge. 146 after the round 2 and 3 additions |
