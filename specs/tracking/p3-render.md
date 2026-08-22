@@ -13,7 +13,15 @@ with its `.tri.wgsl` golden (20 lines: the vertex input struct with
 locations, the varyings with `@builtin(position)`, `@vertex` and
 `@fragment` entries). `x05-live-triangle` checks all 4096 pixel
 centers against the host rasterizer and found none on an edge. Six
-RN16 fixtures. Measurement: 45 s / 0.2 s / 33 s / 32 s / 6.
+RN16 fixtures. Measurement: 45 s / 0.2 s / 33 s / 32 s / 6. Live
+run by the planner outside the sandbox at `3184883` (Metal):
+`live::every_x_program_passes_on_a_real_adapter ... ok`, 10.70
+seconds, `x01`–`x05` `PASS`, so every pixel of the rendered
+triangle equals the host rasterizer's.
+
+## Slice 2 — draw variants
+
+Handoff issued 2026-08-23. Result: pending.
 
 ## Exit criteria
 
