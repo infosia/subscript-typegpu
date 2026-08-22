@@ -84,8 +84,18 @@ letter with this block, so the pipelines area uses `PL`.
 - **F18 — The policy file is the record.** `policy.toml` names subset
   membership per area, every exclusion, every rename, every
   extension-field exposure, and every sentinel variant. Each row
-  carries a reason. An unknown, dead, duplicate, or unpoliced row
-  fails generation.
+  carries a reason. An unknown, dead, duplicate, unpoliced, or
+  invalid row fails generation.
+
+## 7a. The mirror's banner
+
+- **F21 — The mirror is bindgen's output, byte for byte.** The
+  banner of `lib/subscript-typegpu.generated.d.ts` is written by
+  `subscript bind`. Its citations (`compiler.md §12.2`,
+  `collisions.md §2`, "core principle 6") resolve in the subscript
+  repository, not here. This is a recorded deviation from "Artifacts
+  stand alone": the facade never edits a generated file. A change to
+  the banner is a subscript change request.
 
 ## 8. Typed data
 

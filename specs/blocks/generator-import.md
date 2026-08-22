@@ -20,8 +20,10 @@ checkout.
   `src/emit_rust.rs`, `src/patterns/` (17 files), `src/idl.rs`,
   `src/api_model.rs`, `src/api.rs`, `src/native_symbols.rs`,
   `src/lib.rs`, `policy.toml`, `tests/fixtures/`, `tests/support/`,
-  and these test files: `api_e5_red`, `api_e6_red`, `api_e7_red`,
-  `api_e8_red`, `api_host_ownership_red`, `api_join_red`,
+  and these test files (four renamed per `api-layer.md` §4):
+  `api_encoders_red`, `api_device_events_red`,
+  `api_capability_queries_red`, `api_device_descriptor_red`,
+  `api_host_ownership_red`, `api_join_red`,
   `api_policy_red`, `api_r19_red`, `area2_patterns` through
   `area7_patterns`, `fixtures`, `instance_descriptor_red`,
   `native_symbols`, `policy_red`, `regen`, `typed_pair_red`. The
@@ -83,7 +85,7 @@ quotes its gate result.
 - **I7 — The driver.** `main.rs` takes one argument, the
   repository root, and reads `third_party/webgpu-headers/webgpu.yml`,
   `crates/webgpu-gen/policy.toml`, and the two gpuweb `.bs` files. It
-  writes exactly: `crates/facade/subscript-typegpu.h`,
+  writes exactly these six: `crates/facade/subscript-typegpu.h`,
   `crates/facade/src/generated.rs`,
   `lib/subscript-typegpu.generated.d.ts`,
   `lib/wire-enum-aliases.generated.d.ts`, `lib/webgpu.ts`,
@@ -96,9 +98,9 @@ quotes its gate result.
   accounting tuple, the absence-enum list) move into
   `tests/pins/mod.rs` with a comment that names the re-pin
   procedure. Former test files live under `tests/cases/`. Gate: `cargo test
-  -p subscript-typegpu-webgpu-gen` builds one executable. The test
-  count before and after is recorded in the tracking entry and is
-  equal.
+  -p subscript-typegpu-webgpu-gen` builds one integration executable
+  and one unit executable, and the binary builds none. The test count
+  before and after is recorded in the tracking entry and is equal.
 - **I9 — Prose.** Every comment and doc string that names the
   proof of concept, its crates, its directories, or its phases is
   rewritten to this repository's names, or cites the upstream URL.
@@ -125,7 +127,12 @@ quotes its gate result.
   concept's subset minus the surface family. Every later area adds
   rows in its own phase. The two-way validation keeps its five error
   classes (unknown, dead, duplicate, unpoliced, invalid).
-- **I12 — No silent widening.** A policy row exists because a program
-  in `programs/` exercises it, or because the proof of concept's
-  suite exercised it and the row is marked `carried = true` until a
-  program here exercises it. P6 closes every `carried` row.
+- **I12 — No silent widening.** Rev 1, 2026-08-22. The policy
+  enters with every row the proof of concept's suite exercised. No
+  row carries a marker, because a per-row marker needs a per-row
+  judgement that no program here can make yet. Coverage is measured
+  instead: from P2 on, the harness binary counts the facade exports
+  each program's dev run calls, and a test lists the exports no
+  program reaches. P6 closes the list — each unreached export gains
+  a program or an exclusion row with a reason. Until P2 the list is
+  unmeasured, and `specs/tracking/p0-seed.md` records that.

@@ -40,8 +40,11 @@ collide.
   `0` pending, `1` success, a negative backend status on failure,
   and `-100` for an unknown id. `subscript_typegpu_future_drop`
   releases a slot. A typed `*_take` export transfers the result once.
-- **L7 — AllowProcessEvents only.** Every callback info the facade
-  registers uses `WGPUCallbackMode_AllowProcessEvents`. A generated
+- **L7 — AllowProcessEvents only.** Every future callback info the
+  facade registers uses `WGPUCallbackMode_AllowProcessEvents`. The
+  uncaptured-error callback info has no mode field in the pinned
+  header. It only records into the device's queue (facade-generator.md
+  G3). A generated
   callback runs inside `runtime::callback_guard`, copies every string
   out, records the outcome in the slot, and returns. It never calls a
   webgpu.h function and never unwinds. An unwind inside the guard

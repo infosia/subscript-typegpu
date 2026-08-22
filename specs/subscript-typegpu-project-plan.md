@@ -43,7 +43,7 @@ restated here as rules. The code is not copied.
 
 ## 3. Design decisions
 
-Each decision names the evidence that would kill it. A killed decision
+Each decision names its kill evidence. A killed decision
 is revised in §10, never patched silently.
 
 - **D1 — Compile time replaces run time.** Schemas, kernels, and
@@ -206,7 +206,8 @@ third_party/gpuweb         git submodule, pinned (the IDL)
 External inputs: `SUBSCRIPT_TYPEGPU_BACKEND_LIB` names the backend
 shared library. `SUBSCRIPT_TYPEGPU_UPSTREAM_DIR` names a TypeGPU
 checkout for `tools/gen-layout-vectors.mjs`, which the owner runs.
-Nothing else. Four test executables exist: one per crate.
+Nothing else. Each crate builds at most two test executables: one
+integration, one unit. Binaries build none.
 
 ### The substrate generator (imported)
 
@@ -229,7 +230,7 @@ What changes at import, each with its gate:
 | I4 | The proof of concept's four-letter C prefix becomes `subscript_typegpu_` (snake_case, from the yml names), its type prefix becomes `SubscriptTypegpu`, the header becomes `subscript-typegpu.h`, the mirror file name follows | `naming.rs`, `emit_header.rs` preamble | Regenerated outputs carry no old prefix token. A hygiene grep |
 | I5 | The `extern "C"` block becomes generated shims over a function table that `runtime.rs` fills from `SUBSCRIPT_TYPEGPU_BACKEND_LIB` with `libloading` on `subscript_typegpu_create_instance`. Call sites do not change | `emit_rust.rs` and the 17 `rust_*_extern` renderers. The three hard-coded names (`wgpu{Pascal}Release` ×2, `wgpuAdapterInfoFreeMembers`) | `cargo tree -p subscript-typegpu-facade` lists `libloading` alone. `a01` runs with the variable set. The variable absent gives one stderr line that names the variable, then a null instance |
 | I6 | The symbol table is emitted from the plan's export list, not by parsing `generated.rs`. `syn` and the `include_str!` of a sibling crate leave | `native_symbols.rs` | `syn` is not a direct dependency of any workspace crate (`cargo tree -e normal --depth 1`). The harness table equals the facade's export set, checked by a test that links both |
-| I7 | The driver takes the repository root as an argument and writes the five outputs of this repository | `bin/` | `tools/regen.sh` regenerates. The regen test is byte-identical |
+| I7 | The driver takes the repository root as an argument and writes the six outputs of this repository | `bin/` | `tools/regen.sh` regenerates. The regen test is byte-identical |
 | I8 | Tests merge into `tests/main.rs`, one module per former file. The hard-coded pin canaries move into one `pins` module next to the pin table | `tests/` | One executable. The test count before and after is recorded |
 | I9 | Every in-crate mention of the proof of concept's names is rewritten to this repository's names or to the upstream URL | comments, docs | Hygiene grep |
 | I10 | Measured, then decided: if the CEnum alias list is computable from policy and yml alone, the two-pass facade generation collapses to one pass and `generate_with_cenum_aliases` leaves | `lib.rs`, `api.rs` | A before-and-after byte comparison of every output. If the outputs differ, the two-pass stays and the reason is recorded |
@@ -325,9 +326,9 @@ cargo cache, `CARGO_BUILD_JOBS=4`. Recorded in
 |---|---|
 | Cold `cargo build --workspace --tests` | 8 minutes |
 | Warm no-op `cargo test --workspace --no-run` | 5 seconds |
-| Warm full gate (`tools/gate.sh`) after a one-line change in `crates/codegen` | 4 minutes |
+| Warm full gate (`tools/gate.sh`) after a one-line change in `crates/typegpu-gen/src/lib.rs` | 4 minutes |
 | Warm full gate after a program-only change | 2 minutes |
-| Number of test executables | 4 |
+| Number of test executables | 2 per crate at most: one integration, one unit. 4 at the P0 close, 6 from P1 |
 
 A budget is a gate. If a phase needs more, the phase spec states the
 new number and the cause before the work starts.
@@ -342,7 +343,7 @@ does not work around.
 
 Slice 1, the import. Workspace, pins, profile, `tools/`, the two
 submodules, the substrate generator with reshape items I4 through I10,
-the facade crate with `runtime.rs` and the loader, the five
+the facade crate with `runtime.rs` and the loader, the six
 regenerated outputs committed, the generator's test executable green.
 
 Slice 2, the first program. `lib/webgpu.ts` as regenerated, the

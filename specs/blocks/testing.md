@@ -42,9 +42,11 @@ principles" govern this block.
   builds the list of `#[no_mangle]` exports the facade links and
   compares it with `native_symbols.generated.rs`. A name in one and
   not the other fails with the name.
-- **T9 — One executable per crate.** `crates/*/tests/main.rs` is the
-  only integration-test file of a crate. A new test is a `mod`. A
-  hygiene check counts `tests/*.rs` files and fails above one.
+- **T9 — One integration executable per crate.** `crates/*/tests/main.rs`
+  is the only integration-test file of a crate. A new test is a
+  `mod`. A hygiene check counts `tests/*.rs` files and fails above
+  one. A library crate builds at most one unit-test executable. A
+  binary builds none (`test = false`).
 - **T10 — Loud pending.** If a prerequisite is absent (the backend
   library, libclang, a TypeGPU checkout), the tests that need it
   print one `pending: <what> — <fix>` line in total and pass. Tests
@@ -59,18 +61,19 @@ principles" govern this block.
 
 - **T12 — The five measurements.** `tools/gate.sh --measure --yes`
   records, on the reference machine with `CARGO_BUILD_JOBS=4`, in
-  this order: (1) the cold build — `cargo clean`, an assertion that
+  this order. (1) The cold build: `cargo clean`, an assertion that
   `target/` is empty, then `cargo build --workspace --tests` plus the
   ship-tier release build of the facade and the subscript runtime
-  into `target/ship-build`, timed together; (2) the warm no-op
-  (`cargo test --workspace --no-run`); then one untimed full gate;
-  (3) the full gate after a one-line change in
+  into `target/ship-build`, timed together. (2) The warm no-op
+  (`cargo test --workspace --no-run`). Then one untimed full gate.
+  (3) The full gate after a one-line change in
   `crates/typegpu-gen/src/lib.rs` (P0: in
-  `crates/webgpu-gen/src/lib.rs`), then the line is removed and one
-  untimed full gate runs; (4) the full gate after a one-line change
-  in a program; (5) the test-executable count, which is an error when
+  `crates/webgpu-gen/src/lib.rs`). Then the line is removed and one
+  untimed full gate runs. (4) The full gate after a one-line change
+  in a program. (5) The test-executable count, which is an error when
   it cannot be read. The numbers go to `specs/tracking/build-time.md`
-  with the date, the commit, and the command.
+  with the date, the commit, and the command. A measurement row names
+  the commit whose tree was measured.
 - **T13 — A budget is a gate.** Plan §7 holds the budgets. A phase
   close quotes the five numbers. A number above budget is a red
   finding of the phase review.
@@ -83,8 +86,13 @@ principles" govern this block.
   `tools/hygiene.sh`. Every cargo command carries `--offline` in the
   same position, after the subcommand. It
   sets `CARGO_BUILD_JOBS=4` unless the environment sets it. It fails
-  on the first failure and prints the pending lines at the end. An
-  unknown argument is an error, not a silent default.
+  on the first failure and prints the pending lines at the end. The
+  final line is `gate: green` when no test pended and
+  `gate: green, pending <n>` otherwise. `tools/gate.sh
+  --require-backend` fails when any pending line appears. A slice or
+  phase close cites a `--require-backend` run and quotes the
+  differential test's wall time. An unknown argument is an error, not
+  a silent default.
 - **T15 — Live is not the gate.** `tools/live.sh` runs `x` programs
   on a real adapter through `ReloadSession` and ship AOT, never the
   forking JIT runner. Results go to `specs/tracking/` with the date

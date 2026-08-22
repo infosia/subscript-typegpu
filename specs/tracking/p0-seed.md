@@ -95,6 +95,31 @@ integration 146), the golden holds markers and host comparisons
 only, `set_var` exists only in the harness binary's single-threaded
 start, hygiene clean.
 
+## Phase review (2026-08-22)
+
+A fresh reviewer ran the gate (green, 156 tests, four executables)
+and found CRITICAL 0, MAJOR 7, MINOR 13. The MAJORs: I12 neither
+implemented nor deferred. Handoff residue in one module doc. The
+I4 hygiene regex could not match an identifier form of the banned
+prefix. 24 `unsafe` blocks in the generated facade without a
+`// SAFETY:` comment (L10). The mirror's banner cites subscript's
+specs. The slice-close citation could not distinguish a run with the
+backend from one without. Invariant 3 and L7 stated an absolute the
+pinned header's uncaptured-error callback cannot satisfy.
+
+Resolutions in the specs: I12 Rev 1 defers coverage to a measured
+list from P2 (the harness counts facade exports each dev run calls)
+and P6 closes it. F21 records the mirror banner as a deviation: the
+file is bindgen's output byte for byte, and a banner change is a
+subscript change request. Invariant 3 and L7 name the
+uncaptured-error exception. T14 gains `--require-backend` and the
+`gate: green, pending <n>` line. T9 and build-time rule 3 count one
+integration executable plus at most one unit executable per crate.
+The plan's output count is six, its probe path is
+`crates/typegpu-gen/src/lib.rs`, and I1 names the renamed tests.
+
+Code resolutions: handed off as the phase-close round.
+
 ## Exit criteria
 
 | # | Criterion | Evidence |
