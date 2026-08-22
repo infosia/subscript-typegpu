@@ -96,11 +96,16 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   A name that collides with a WGSL keyword or builtin gets a `_`
   suffix. Whitespace is fixed: two-space indentation, one statement
   per line, no trailing space.
-- **K15 — Every emitted module validates.** `naga` parses and
-  validates the module before the generator returns (LY15). A
-  failure is a generator diagnostic that quotes naga's cause chain
-  and names the generator as the owner, because the author's program
-  passed the checker.
+- **K15 — Every emitted module validates.** Rev 1, 2026-08-22.
+  `naga` is a dev-dependency (CLAUDE.md "Build time" rule 4), so the
+  generator does not run it. The generator runs its own structural
+  checks before it returns: every referenced name is declared, every
+  binding has a unique group and binding pair, and every statement
+  and expression is in the K7 and K9 sets. The harness validates
+  every emitted module with `naga` on every test run (LY15, PI10).
+  A naga failure there is a generator defect: the test names the
+  generator as the owner and quotes naga's cause chain, because the
+  author's program passed the checker and the generator's checks.
 - **K16 — The WGSL golden.** For program `<stem>.ts` and pipeline
   declaration `<name>`, the module text is committed as
   `programs/<stem>.<name>.wgsl`. The harness compares the
