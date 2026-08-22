@@ -9,6 +9,8 @@ use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 use crate::mapping::{self, MethodEmission};
 use crate::pipeline::{BindingKind, Pipeline};
+use crate::render::RenderPipeline;
+use crate::schema::Schema;
 
 type Prelude = Vec<(usize, String)>;
 
@@ -215,16 +217,31 @@ struct Emitter<'a> {
     layout_params: BTreeMap<String, usize>,
     layout_names: BTreeSet<String>,
     invocation_param: String,
+    invocation_kind: InvocationKind,
     bindings: BTreeMap<(usize, String), BindingRef>,
     used_builtins: BTreeSet<String>,
     conditional_index: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InvocationKind {
+    None,
+    Compute,
+    Vertex,
+    Fragment,
+}
+
 impl<'a> Emitter<'a> {
-    fn new(module: &'a Module, pipeline: &'a Pipeline, kernel: &Function) -> Self {
+    fn entry(
+        module: &'a Module,
+        layouts: &'a [crate::pipeline::Layout],
+        kernel: &Function,
+        invocation_index: usize,
+        invocation_kind: InvocationKind,
+    ) -> Self {
         let mut layout_params = BTreeMap::new();
         let mut bindings = BTreeMap::new();
-        for (group, layout) in pipeline.layouts.iter().enumerate() {
+        for (group, layout) in layouts.iter().enumerate() {
             layout_params.insert(kernel.params[group].name.clone(), group);
             for binding in &layout.bindings {
                 bindings.insert(
@@ -239,12 +256,9 @@ impl<'a> Emitter<'a> {
         Self {
             module,
             layout_params,
-            layout_names: pipeline
-                .layouts
-                .iter()
-                .map(|layout| layout.name.clone())
-                .collect(),
-            invocation_param: kernel.params[pipeline.layouts.len()].name.clone(),
+            layout_names: layouts.iter().map(|layout| layout.name.clone()).collect(),
+            invocation_param: kernel.params[invocation_index].name.clone(),
+            invocation_kind,
             bindings,
             used_builtins: BTreeSet::new(),
             conditional_index: 0,
@@ -257,6 +271,7 @@ impl<'a> Emitter<'a> {
             layout_params: BTreeMap::new(),
             layout_names: BTreeSet::new(),
             invocation_param: String::new(),
+            invocation_kind: InvocationKind::None,
             bindings: BTreeMap::new(),
             used_builtins: BTreeSet::new(),
             conditional_index: 0,
@@ -446,15 +461,19 @@ impl<'a> Emitter<'a> {
                     return Ok(Snippet::atom(binding.name));
                 }
                 if matches!(&obj.kind, ExprKind::Local(name) if name == &self.invocation_param) {
-                    let builtin = match name.as_str() {
-                        "globalId" => "globalId",
-                        "localId" => "localId",
-                        "workgroupId" => "workgroupId",
-                        "numWorkgroups" => "numWorkgroups",
-                        "localIndex" => "localIndex",
+                    let builtin = match (self.invocation_kind, name.as_str()) {
+                        (InvocationKind::Compute, "globalId") => "globalId",
+                        (InvocationKind::Compute, "localId") => "localId",
+                        (InvocationKind::Compute, "workgroupId") => "workgroupId",
+                        (InvocationKind::Compute, "numWorkgroups") => "numWorkgroups",
+                        (InvocationKind::Compute, "localIndex") => "localIndex",
+                        (InvocationKind::Vertex, "vertexIndex") => "vertexIndex",
+                        (InvocationKind::Vertex, "instanceIndex") => "instanceIndex",
+                        (InvocationKind::Fragment, "position") => "fragmentPosition",
+                        (InvocationKind::Fragment, "frontFacing") => "frontFacing",
                         _ => {
                             return Err(generator_diagnostic(
-                                format!("unknown ComputeInvocation field `{name}`"),
+                                format!("unknown invocation field `{name}`"),
                                 expr.pos.clone(),
                             ))
                         }
@@ -1383,6 +1402,10 @@ fn builtin_parameter(name: &str) -> &'static str {
         "workgroupId" => "@builtin(workgroup_id) workgroupId: vec3<u32>",
         "numWorkgroups" => "@builtin(num_workgroups) numWorkgroups: vec3<u32>",
         "localIndex" => "@builtin(local_invocation_index) localIndex: u32",
+        "vertexIndex" => "@builtin(vertex_index) vertexIndex: u32",
+        "instanceIndex" => "@builtin(instance_index) instanceIndex: u32",
+        "fragmentPosition" => "@builtin(position) fragmentPosition: vec4<f32>",
+        "frontFacing" => "@builtin(front_facing) frontFacing: bool",
         _ => "",
     }
 }
@@ -1396,7 +1419,13 @@ pub(crate) fn emit(
     let kernel = function(module, &pipeline.entry)
         .ok_or_else(|| generator_diagnostic("kernel disappeared from HIR", pipeline.pos.clone()))?;
     let helpers = dependencies(module, kernel)?;
-    let mut emitter = Emitter::new(module, pipeline, kernel);
+    let mut emitter = Emitter::entry(
+        module,
+        &pipeline.layouts,
+        kernel,
+        pipeline.layouts.len(),
+        InvocationKind::Compute,
+    );
     let mut helper_text = String::new();
     for name in helpers {
         let helper = function(module, &name).ok_or_else(|| {
@@ -1510,6 +1539,333 @@ pub(crate) fn emit(
         parameters.join(", ")
     ));
     out.push_str(&entry_body);
+    out.push_str("}\n");
+    Ok(out)
+}
+
+pub(crate) fn referenced_render_schema_names(
+    module: &Module,
+    pipeline: &RenderPipeline,
+) -> Result<Vec<String>, Diagnostic> {
+    let mut seen = BTreeSet::new();
+    let mut out = Vec::new();
+    for layout in &pipeline.layouts {
+        for binding in &layout.bindings {
+            collect_schema_type(module, &binding.item_ty, &mut seen, &mut out);
+        }
+    }
+    for entry in [&pipeline.vertex_entry, &pipeline.fragment_entry] {
+        let kernel = function(module, entry).ok_or_else(|| {
+            generator_diagnostic(
+                "a render kernel disappeared from typed HIR",
+                pipeline.pos.clone(),
+            )
+        })?;
+        for name in dependencies(module, kernel)? {
+            let helper = function(module, &name).ok_or_else(|| {
+                generator_diagnostic(
+                    "a render helper disappeared from typed HIR",
+                    pipeline.pos.clone(),
+                )
+            })?;
+            for param in &helper.params {
+                collect_schema_type(module, &param.ty, &mut seen, &mut out);
+            }
+            collect_schema_type(module, &helper.ret, &mut seen, &mut out);
+            for stmt in &helper.body {
+                collect_schema_stmt(module, stmt, &mut seen, &mut out);
+            }
+        }
+        for stmt in &kernel.body {
+            collect_schema_stmt(module, stmt, &mut seen, &mut out);
+        }
+    }
+    let interface_names = pipeline
+        .vertex_buffers
+        .iter()
+        .map(|buffer| buffer.schema.as_str())
+        .chain(std::iter::once(pipeline.varyings_name.as_str()))
+        .chain(
+            pipeline
+                .fragment_output
+                .iter()
+                .map(|output| output.name.as_str()),
+        )
+        .collect::<BTreeSet<_>>();
+    out.retain(|name| !interface_names.contains(name.as_str()));
+    Ok(out)
+}
+
+fn render_interface_structs(
+    module: &Module,
+    pipeline: &RenderPipeline,
+) -> Result<String, Diagnostic> {
+    let mut out = String::new();
+    for buffer in &pipeline.vertex_buffers {
+        let class = module
+            .classes
+            .iter()
+            .find(|class| class.name == buffer.schema && class.pos.file == pipeline.pos.file)
+            .or_else(|| {
+                module
+                    .classes
+                    .iter()
+                    .find(|class| class.name == buffer.schema)
+            })
+            .ok_or_else(|| {
+                generator_diagnostic(
+                    format!(
+                        "vertex schema `{}` disappeared from typed HIR",
+                        buffer.schema
+                    ),
+                    pipeline.pos.clone(),
+                )
+            })?;
+        out.push_str(&format!("struct {} {{\n", mapping::ident(&buffer.schema)));
+        for (field, attribute) in class.fields.iter().zip(&buffer.attributes) {
+            out.push_str(&format!(
+                "  @location({}) {}: {},\n",
+                attribute.location,
+                mapping::ident(&field.name),
+                wgsl_type(module, &field.ty, &field.pos)?
+            ));
+        }
+        out.push_str("}\n\n");
+    }
+    out.push_str(&format!(
+        "struct {} {{\n",
+        mapping::ident(&pipeline.varyings_name)
+    ));
+    for varying in &pipeline.varyings {
+        let attribute = if varying.builtin_position {
+            "@builtin(position)".to_owned()
+        } else if varying.flat {
+            format!(
+                "@location({}) @interpolate(flat)",
+                varying.location.unwrap_or(0)
+            )
+        } else {
+            format!("@location({})", varying.location.unwrap_or(0))
+        };
+        out.push_str(&format!(
+            "  {attribute} {}: {},\n",
+            mapping::ident(&varying.name),
+            wgsl_type(module, &varying.ty, &pipeline.pos)?
+        ));
+    }
+    out.push_str("}\n\n");
+    if let Some(output) = &pipeline.fragment_output {
+        out.push_str(&format!("struct {} {{\n", mapping::ident(&output.name)));
+        for (location, field) in output.fields.iter().enumerate() {
+            out.push_str(&format!(
+                "  @location({location}) {}: vec4<f32>,\n",
+                mapping::ident(field)
+            ));
+        }
+        out.push_str("}\n\n");
+    }
+    Ok(out)
+}
+
+fn render_helpers(
+    module: &Module,
+    pipeline: &RenderPipeline,
+    kernels: [&Function; 2],
+) -> Result<String, Diagnostic> {
+    let mut names = Vec::new();
+    let mut seen = BTreeSet::new();
+    for kernel in kernels {
+        for name in dependencies(module, kernel)? {
+            if seen.insert(name.clone()) {
+                names.push(name);
+            }
+        }
+    }
+    let mut out = String::new();
+    for name in names {
+        let helper = function(module, &name).ok_or_else(|| {
+            generator_diagnostic(
+                format!("helper `{name}` disappeared from typed HIR"),
+                pipeline.pos.clone(),
+            )
+        })?;
+        if helper.is_async || helper.is_generator {
+            return Err(diagnostic(
+                "K2",
+                format!("helper `{name}` is async or a generator"),
+                helper.pos.clone(),
+            ));
+        }
+        for param in &helper.params {
+            let takes_layout = class_name(module, &param.ty)
+                .is_some_and(|name| pipeline.layouts.iter().any(|layout| layout.name == name));
+            if takes_layout
+                || matches!(
+                    class_name(module, &param.ty),
+                    Some("VertexInvocation" | "FragmentInvocation")
+                )
+            {
+                return Err(diagnostic(
+                    "K2",
+                    format!("helper `{name}` takes a layout class or invocation class"),
+                    param.pos.clone(),
+                ));
+            }
+            let _ = wgsl_type(module, &param.ty, &param.pos)?;
+        }
+        let params = helper
+            .params
+            .iter()
+            .map(|param| {
+                Ok(format!(
+                    "{}: {}",
+                    mapping::ident(&param.name),
+                    wgsl_type(module, &param.ty, &param.pos)?
+                ))
+            })
+            .collect::<Result<Vec<_>, Diagnostic>>()?;
+        let result = if helper.ret == Type::Void {
+            String::new()
+        } else {
+            format!(" -> {}", wgsl_type(module, &helper.ret, &helper.pos)?)
+        };
+        out.push_str(&format!(
+            "fn {}({}){result} {{\n",
+            mapping::ident(name.split('<').next().unwrap_or(&name)),
+            params.join(", ")
+        ));
+        let mut emitter = Emitter::helper(module);
+        emitter.statements(&helper.body, 1, &mut out)?;
+        out.push_str("}\n\n");
+    }
+    Ok(out)
+}
+
+pub(crate) fn emit_render(
+    module: &Module,
+    pipeline: &RenderPipeline,
+    structs: &[(String, String)],
+    schemas: &[Schema],
+) -> Result<String, Diagnostic> {
+    crate::render::reject_vertex_storage_writes(module, pipeline)?;
+    let vertex = function(module, &pipeline.vertex_entry).ok_or_else(|| {
+        generator_diagnostic("vertex kernel disappeared from HIR", pipeline.pos.clone())
+    })?;
+    let fragment = function(module, &pipeline.fragment_entry).ok_or_else(|| {
+        generator_diagnostic("fragment kernel disappeared from HIR", pipeline.pos.clone())
+    })?;
+    let layout_count = pipeline.layouts.len();
+    let vertex_value_count = pipeline.vertex_buffers.len();
+    let mut vertex_emitter = Emitter::entry(
+        module,
+        &pipeline.layouts,
+        vertex,
+        layout_count + vertex_value_count,
+        InvocationKind::Vertex,
+    );
+    let mut fragment_emitter = Emitter::entry(
+        module,
+        &pipeline.layouts,
+        fragment,
+        layout_count + 1,
+        InvocationKind::Fragment,
+    );
+    let mut vertex_body = String::new();
+    vertex_emitter.statements(&vertex.body, 1, &mut vertex_body)?;
+    let mut fragment_body = String::new();
+    fragment_emitter.statements(&fragment.body, 1, &mut fragment_body)?;
+
+    let uses_f16 = schemas
+        .iter()
+        .any(|schema| crate::emit::uses_f16(&schema.tree))
+        || pipeline
+            .vertex_buffers
+            .iter()
+            .flat_map(|buffer| &buffer.attributes)
+            .any(|attribute| attribute.format.starts_with("float16"));
+    let mut out = String::new();
+    if uses_f16 {
+        out.push_str("enable f16;\n\n");
+    }
+    for (_, structure) in structs {
+        out.push_str(structure);
+        out.push('\n');
+    }
+    out.push_str(&render_interface_structs(module, pipeline)?);
+    for layout in &pipeline.layouts {
+        for binding in &layout.bindings {
+            let item = wgsl_type(module, &binding.item_ty, &binding.pos)?;
+            let declaration_ty = if binding.kind == BindingKind::Uniform {
+                item
+            } else {
+                format!("array<{item}>")
+            };
+            out.push_str(&format!(
+                "@group({}) @binding({}) var<{}> {}: {};\n",
+                layout.group,
+                binding.index,
+                binding.kind.wgsl(),
+                mapping::ident(&binding.name),
+                declaration_ty
+            ));
+        }
+    }
+    if !pipeline.layouts.is_empty() {
+        out.push('\n');
+    }
+    out.push_str(&render_helpers(module, pipeline, [vertex, fragment])?);
+
+    let mut vertex_parameters = vertex.params[layout_count..layout_count + vertex_value_count]
+        .iter()
+        .map(|param| {
+            Ok(format!(
+                "{}: {}",
+                mapping::ident(&param.name),
+                wgsl_type(module, &param.ty, &param.pos)?
+            ))
+        })
+        .collect::<Result<Vec<_>, Diagnostic>>()?;
+    vertex_parameters.extend(
+        ["vertexIndex", "instanceIndex"]
+            .into_iter()
+            .filter(|name| vertex_emitter.used_builtins.contains(*name))
+            .map(builtin_parameter)
+            .map(str::to_owned),
+    );
+    out.push_str("@vertex\n");
+    out.push_str(&format!(
+        "fn {}({}) -> {} {{\n",
+        mapping::ident(&pipeline.vertex_entry),
+        vertex_parameters.join(", "),
+        mapping::ident(&pipeline.varyings_name)
+    ));
+    out.push_str(&vertex_body);
+    out.push_str("}\n\n");
+
+    let input = &fragment.params[layout_count];
+    let mut fragment_parameters = vec![format!(
+        "{}: {}",
+        mapping::ident(&input.name),
+        wgsl_type(module, &input.ty, &input.pos)?
+    )];
+    fragment_parameters.extend(
+        ["fragmentPosition", "frontFacing"]
+            .into_iter()
+            .filter(|name| fragment_emitter.used_builtins.contains(*name))
+            .map(builtin_parameter)
+            .map(str::to_owned),
+    );
+    out.push_str("@fragment\n");
+    let fragment_result = pipeline.fragment_output.as_ref().map_or_else(
+        || "@location(0) vec4<f32>".to_owned(),
+        |output| mapping::ident(&output.name),
+    );
+    out.push_str(&format!(
+        "fn {}({}) -> {fragment_result} {{\n",
+        mapping::ident(&pipeline.fragment_entry),
+        fragment_parameters.join(", ")
+    ));
+    out.push_str(&fragment_body);
     out.push_str("}\n");
     Ok(out)
 }

@@ -5,6 +5,7 @@ mod kernel;
 pub mod layout;
 mod mapping;
 mod pipeline;
+mod render;
 mod schema;
 
 use std::collections::BTreeSet;
@@ -135,6 +136,7 @@ fn intended_schemas(support: Option<&SupportImport>) -> BTreeSet<String> {
 fn generated_export_names(
     schemas: &[schema::Schema],
     pipelines: &[pipeline::Pipeline],
+    render_pipelines: &[render::RenderPipeline],
 ) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     for schema in schemas {
@@ -158,6 +160,23 @@ fn generated_export_names(
             names.insert(format!("{}_LAYOUT{}", pipeline.declaration, layout.group));
         }
     }
+    for pipeline in render_pipelines {
+        names.extend([
+            format!("{}_WGSL", pipeline.declaration),
+            format!("{}_VERTEX_ENTRY", pipeline.declaration),
+            format!("{}_FRAGMENT_ENTRY", pipeline.declaration),
+            format!("{}_TARGET_FORMAT", pipeline.declaration),
+        ]);
+        for layout in &pipeline.layouts {
+            names.insert(format!("{}_LAYOUT{}", pipeline.declaration, layout.group));
+        }
+        for buffer in &pipeline.vertex_buffers {
+            names.insert(format!(
+                "{}_VERTEX_LAYOUT{}",
+                pipeline.declaration, buffer.slot
+            ));
+        }
+    }
     names
 }
 
@@ -172,14 +191,21 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     let support = support_import(&module)?;
     let mut intended = intended_schemas(support.as_ref());
     let pipeline_definitions = pipeline::discover(&module)?;
+    let render_definitions = render::discover(&module)?;
     intended.extend(pipeline::schema_names(&module, &pipeline_definitions));
+    intended.extend(render::schema_names(&render_definitions));
     for pipeline in &pipeline_definitions {
         intended
             .extend(kernel::referenced_schema_names(&module, pipeline).map_err(|item| vec![item])?);
     }
+    for pipeline in &render_definitions {
+        intended.extend(
+            kernel::referenced_render_schema_names(&module, pipeline).map_err(|item| vec![item])?,
+        );
+    }
     let schemas = schema::discover(&module, &intended, support.as_ref().map(|item| &item.pos))?;
     if let Some(support) = &support {
-        let exports = generated_export_names(&schemas, &pipeline_definitions);
+        let exports = generated_export_names(&schemas, &pipeline_definitions, &render_definitions);
         let missing = support
             .names
             .iter()
@@ -203,7 +229,7 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         .map(|schema| (schema.name.clone(), emit::wgsl_struct(schema)))
         .collect::<Vec<_>>();
     let wgsl_module = emit::wgsl_module(&schemas, &wgsl_structs);
-    let pipelines = pipeline_definitions
+    let mut pipelines = pipeline_definitions
         .iter()
         .map(|pipeline| {
             fn append_tree(tree: &TypeTree, names: &mut Vec<String>, seen: &mut BTreeSet<String>) {
@@ -245,12 +271,33 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         })
         .collect::<Result<Vec<_>, Diagnostic>>()
         .map_err(|diagnostic| vec![diagnostic])?;
+    let render_texts = render_definitions
+        .iter()
+        .map(|pipeline| {
+            let references = kernel::referenced_render_schema_names(&module, pipeline)?;
+            let selected_structs = references
+                .iter()
+                .filter_map(|name| {
+                    wgsl_structs
+                        .iter()
+                        .find(|(schema, _)| schema == name)
+                        .cloned()
+                })
+                .collect::<Vec<_>>();
+            let text = kernel::emit_render(&module, pipeline, &selected_structs, &schemas)?;
+            Ok((pipeline.declaration.clone(), text))
+        })
+        .collect::<Result<Vec<_>, Diagnostic>>()
+        .map_err(|diagnostic| vec![diagnostic])?;
+    pipelines.extend(render_texts.iter().cloned());
     let support_module = emit::support_module(
         &module,
         &schemas,
         &wgsl_structs,
         &pipeline_definitions,
         &pipelines,
+        &render_definitions,
+        &render_texts,
     )
     .map_err(|diagnostic| vec![diagnostic])?;
     let layouts = schemas

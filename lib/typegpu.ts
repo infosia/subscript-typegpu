@@ -1,6 +1,6 @@
 /** Runtime bindings shared by generated TypeGPU support modules and programs. */
 
-import { Vec3u } from "./typegpu-types";
+import { Vec3u, Vec4f } from "./typegpu-types";
 import {
   GPUBindGroup,
   GPUBindGroupEntry,
@@ -11,7 +11,11 @@ import {
   GPUComputePipeline,
   GPUDevice,
   GPUQueue,
+  GPURenderPassEncoder,
+  GPURenderPipeline,
   GPUShaderStage,
+  GPUVertexAttribute,
+  GPUVertexBufferLayout,
 } from "./webgpu";
 
 export class Buffer<T> {
@@ -150,6 +154,16 @@ export class ComputeInvocation {
   localIndex!: u32;
 }
 
+export class VertexInvocation {
+  vertexIndex!: u32;
+  instanceIndex!: u32;
+}
+
+export class FragmentInvocation {
+  position!: Vec4f;
+  frontFacing!: boolean;
+}
+
 export class Uniform<T> {
   private values: T[];
 
@@ -234,6 +248,67 @@ export function computePipeline4<L0, L1, L2, L3>(
 }
 
 @Descriptor
+export class RenderPipelineSpec {
+  format!: GPUTextureFormat;
+  topology?: GPUPrimitiveTopology = "triangle-list";
+  cullMode?: GPUCullMode = "none";
+  frontFace?: GPUFrontFace = "ccw";
+}
+
+@Descriptor
+export class VertexAttributeSpec {
+  format!: GPUVertexFormat;
+  offset!: u64;
+  shaderLocation!: u32;
+}
+
+@Descriptor
+export class VertexBufferLayoutSpec {
+  arrayStride!: u64;
+  stepMode?: GPUVertexStepMode = "vertex";
+  attributes!: VertexAttributeSpec[];
+}
+
+export function renderPipeline<V, O>(
+  vertex: (value: V, ctx: VertexInvocation) => O,
+  fragment: (input: O, ctx: FragmentInvocation) => Vec4f,
+  spec: RenderPipelineSpec,
+): RenderPipelineSpec {
+  return {
+    format: spec.format,
+    topology: spec.topology,
+    cullMode: spec.cullMode,
+    frontFace: spec.frontFace,
+  };
+}
+
+export function renderPipelineL<L, V, O>(
+  vertex: (res: L, value: V, ctx: VertexInvocation) => O,
+  fragment: (res: L, input: O, ctx: FragmentInvocation) => Vec4f,
+  spec: RenderPipelineSpec,
+): RenderPipelineSpec {
+  return {
+    format: spec.format,
+    topology: spec.topology,
+    cullMode: spec.cullMode,
+    frontFace: spec.frontFace,
+  };
+}
+
+export function renderPipelineInstanced<V, I, O>(
+  vertex: (value: V, instance: I, ctx: VertexInvocation) => O,
+  fragment: (input: O, ctx: FragmentInvocation) => Vec4f,
+  spec: RenderPipelineSpec,
+): RenderPipelineSpec {
+  return {
+    format: spec.format,
+    topology: spec.topology,
+    cullMode: spec.cullMode,
+    frontFace: spec.frontFace,
+  };
+}
+
+@Descriptor
 export class BindGroupLayoutEntrySpec {
   binding!: u32;
   visibility!: u64;
@@ -302,6 +377,44 @@ export class ComputePipeline {
   }
 }
 
+export class RenderPipeline {
+  private pipeline: GPURenderPipeline;
+
+  constructor(pipeline: GPURenderPipeline) {
+    this.pipeline = pipeline;
+  }
+
+  bindGroupLayout(group: u32): GPUBindGroupLayout {
+    return this.pipeline.getBindGroupLayout(group);
+  }
+
+  bind(
+    pass: GPURenderPassEncoder,
+    groups: GPUBindGroup[],
+    vertexBuffers: GPUBuffer[],
+  ): void {
+    pass.setPipeline(this.pipeline);
+    let group: i32 = 0;
+    while (group < groups.length) {
+      pass.setBindGroup(group as u32, groups[group]);
+      group = group + 1;
+    }
+    let slot: i32 = 0;
+    while (slot < vertexBuffers.length) {
+      pass.setVertexBuffer(slot as u32, vertexBuffers[slot], 0, vertexBuffers[slot].size());
+      slot = slot + 1;
+    }
+  }
+
+  dispose(): void {
+    this.pipeline.dispose();
+  }
+
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
+}
+
 export function createComputePipeline(
   device: GPUDevice,
   wgsl: string,
@@ -354,7 +467,94 @@ export function createComputePipeline(
   return new ComputePipeline(pipeline, workgroup);
 }
 
+export function createRenderPipeline(
+  device: GPUDevice,
+  wgsl: string,
+  vertexEntry: string,
+  fragmentEntry: string,
+  layouts: BindGroupLayoutSpec[],
+  vertexLayouts: VertexBufferLayoutSpec[],
+  spec: RenderPipelineSpec,
+): RenderPipeline {
+  const nativeLayouts: GPUBindGroupLayout[] = [];
+  let group: i32 = 0;
+  while (group < layouts.length) {
+    const entries: GPUBindGroupLayoutEntry[] = [];
+    let binding: i32 = 0;
+    while (binding < layouts[group].entries.length) {
+      const source: BindGroupLayoutEntrySpec = layouts[group].entries[binding];
+      if (source.kind === "uniform") {
+        entries.push({
+          binding: source.binding,
+          visibility: source.visibility,
+          buffer: { type: "uniform", minBindingSize: source.minBindingSize },
+        });
+      } else if (source.kind === "read-only-storage") {
+        entries.push({
+          binding: source.binding,
+          visibility: source.visibility,
+          buffer: { type: "read-only-storage", minBindingSize: source.minBindingSize },
+        });
+      } else {
+        entries.push({
+          binding: source.binding,
+          visibility: source.visibility,
+          buffer: { type: "storage", minBindingSize: source.minBindingSize },
+        });
+      }
+      binding = binding + 1;
+    }
+    nativeLayouts.push(device.createBindGroupLayout({ entries }));
+    group = group + 1;
+  }
+  const nativeVertexLayouts: GPUVertexBufferLayout[] = [];
+  let slot: i32 = 0;
+  while (slot < vertexLayouts.length) {
+    const attributes: GPUVertexAttribute[] = [];
+    let attribute: i32 = 0;
+    while (attribute < vertexLayouts[slot].attributes.length) {
+      const source: VertexAttributeSpec = vertexLayouts[slot].attributes[attribute];
+      attributes.push({
+        format: source.format,
+        offset: source.offset,
+        shaderLocation: source.shaderLocation,
+      });
+      attribute = attribute + 1;
+    }
+    nativeVertexLayouts.push({
+      arrayStride: vertexLayouts[slot].arrayStride,
+      stepMode: vertexLayouts[slot].stepMode,
+      attributes,
+    });
+    slot = slot + 1;
+  }
+  using shader = device.createShaderModule({ code: wgsl });
+  using layout = device.createPipelineLayout({ bindGroupLayouts: nativeLayouts });
+  const pipeline = device.createRenderPipeline({
+    layout,
+    vertex: { module: shader, entryPoint: vertexEntry, buffers: nativeVertexLayouts },
+    primitive: {
+      topology: spec.topology,
+      cullMode: spec.cullMode,
+      frontFace: spec.frontFace,
+    },
+    fragment: {
+      module: shader,
+      entryPoint: fragmentEntry,
+      targets: [{ format: spec.format }],
+    },
+  });
+  group = 0;
+  while (group < nativeLayouts.length) {
+    nativeLayouts[group].dispose();
+    group = group + 1;
+  }
+  return new RenderPipeline(pipeline);
+}
+
 export const COMPUTE_VISIBILITY: u64 = GPUShaderStage.COMPUTE;
+export const VERTEX_VISIBILITY: u64 = GPUShaderStage.VERTEX;
+export const FRAGMENT_VISIBILITY: u64 = GPUShaderStage.FRAGMENT;
 
 export function createBindGroup(
   device: GPUDevice,

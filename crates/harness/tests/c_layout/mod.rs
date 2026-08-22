@@ -54,6 +54,7 @@ fn programs() -> Vec<PathBuf> {
             "b03-saxpy-uniform.ts",
             "b04-particles.ts",
             "b05-buffer.ts",
+            "b06-render.ts",
         ],
         "C layout program set changed"
     );

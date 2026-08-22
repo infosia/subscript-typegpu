@@ -63,12 +63,12 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
-fn class_name<'a>(module: &'a Module, ty: &Type) -> Option<&'a str> {
+pub(crate) fn class_name<'a>(module: &'a Module, ty: &Type) -> Option<&'a str> {
     let Type::Class(id) = ty else { return None };
     module.classes.get(id.0).map(|class| class.name.as_str())
 }
 
-fn type_name(module: &Module, ty: &Type) -> String {
+pub(crate) fn type_name(module: &Module, ty: &Type) -> String {
     subscript_compiler::types::display_type(
         ty,
         &|id| module.classes[id.0].name.clone(),
@@ -77,7 +77,7 @@ fn type_name(module: &Module, ty: &Type) -> String {
     )
 }
 
-fn library_class<'a>(
+pub(crate) fn library_class<'a>(
     module: &'a Module,
     ty: &Type,
 ) -> Option<&'a subscript_compiler::hir::ClassDef> {
@@ -116,7 +116,7 @@ fn allowed_binding_item(module: &Module, ty: &Type) -> bool {
     }
 }
 
-fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, Diagnostic> {
+pub(crate) fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, Diagnostic> {
     let Type::Class(id) = ty else {
         return Err(diagnostic(
             "PI3",
@@ -255,7 +255,7 @@ fn workgroup(module: &Module, expr: &Expr) -> Result<[u32; 3], Diagnostic> {
     Ok([x, y, z])
 }
 
-fn function<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
+pub(crate) fn function<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
     module
         .functions
         .iter()

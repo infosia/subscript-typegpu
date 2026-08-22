@@ -52,4 +52,65 @@ fn dispatch_threads_rounds_all_three_axes() {
             "dispatchThreads lacks workgroup axis {axis}"
         );
     }
+    for statement in [
+        "pass.setPipeline(this.pipeline);",
+        "pass.setBindGroup(group as u32, groups[group]);",
+        "pass.setVertexBuffer(slot as u32, vertexBuffers[slot], 0, vertexBuffers[slot].size());",
+    ] {
+        assert!(
+            source.contains(statement),
+            "RenderPipeline.bind lacks `{statement}`"
+        );
+    }
+}
+
+#[test]
+fn render_declaration_helpers_execute_their_real_host_bodies() {
+    let directory = std::env::temp_dir().join(format!(
+        "subscript-typegpu-render-runtime-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&directory).expect("create render runtime test directory");
+    let program = directory.join("render-runtime-host.ts");
+    std::fs::write(
+        &program,
+        r#"
+import { FragmentInvocation, renderPipeline, renderPipelineInstanced, renderPipelineL, RenderPipelineSpec, VertexInvocation } from "./typegpu";
+import { Vec2f, Vec4f } from "./typegpu-types";
+@CStruct class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
+@CStruct class Instance { offset: Vec2f; constructor(offset: Vec2f) { this.offset = offset; } }
+@CStruct class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
+class Layout {}
+function vert(value: Vertex, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(0.0, 0.0, 0.0, 1.0)); }
+function vertL(res: Layout, value: Vertex, ctx: VertexInvocation): Varyings { return vert(value, ctx); }
+function vertI(value: Vertex, instance: Instance, ctx: VertexInvocation): Varyings { return vert(value, ctx); }
+function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { return input.position; }
+function fragL(res: Layout, input: Varyings, ctx: FragmentInvocation): Vec4f { return input.position; }
+export function main(): void {
+  const plain: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
+  const layout: RenderPipelineSpec = renderPipelineL<Layout, Vertex, Varyings>(vertL, fragL, { format: "bgra8unorm", topology: "line-list" });
+  const instanced: RenderPipelineSpec = renderPipelineInstanced<Vertex, Instance, Varyings>(vertI, frag, { format: "rgba16float", cullMode: "back", frontFace: "cw" });
+  print(`${plain.format},${plain.topology},${plain.cullMode},${plain.frontFace}`);
+  print(`${layout.format},${layout.topology}`);
+  print(`${instanced.format},${instanced.cullMode},${instanced.frontFace}`);
+}
+"#,
+    )
+    .expect("write render runtime test program");
+    let result = std::process::Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-harness"))
+        .arg("dev")
+        .arg(&program)
+        .output()
+        .expect("spawn render runtime test program");
+    assert!(
+        result.status.success(),
+        "render runtime test program: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    std::fs::remove_file(&program).expect("remove render runtime test program");
+    std::fs::remove_dir(&directory).expect("remove render runtime test directory");
+    assert_eq!(
+        result.stdout,
+        b"rgba8unorm,triangle-list,none,ccw\nbgra8unorm,line-list\nrgba16float,back,cw\n"
+    );
 }

@@ -4,5 +4,6 @@ mod identity;
 mod kernel;
 mod library;
 mod naga_offsets;
+mod render;
 mod support;
 mod vectors;
