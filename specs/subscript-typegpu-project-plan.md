@@ -464,8 +464,8 @@ The lane is a gate module, not a new executable.
 | RC-11 | The mirror regen test needs libclang at run time (`subscript-bindgen` loads it) | Loud `pending` when absent. The owner's machine has it through Xcode |
 | RC-12 | The imported generator's hard-coded pin canaries (IDL block count, policy accounting tuple) need a manual edit at every re-pin | They move into one `pins` module (I8). The re-pin procedure lists them |
 | RC-13 | A reshape item (I5, I10) costs more than the module it touches | D11's kill evidence. The module is rewritten, the rest stays imported |
-| RC-15 | The program imports its support module before it exists, so the generator's first `check_program` fails on the import | Escalate as subscript request R35: a check mode that poisons the names of one unresolved import with `Type::Error` and returns the HIR. Interim: a stub module built from `parse_import_specifiers` (SC1a), a recorded deviation from D2 |
-| RC-14 | No subscript construct yields the bytes of a value class or a `FixedArray` of one, and `subscript bind` maps no parameter that takes one by address. R33 gives layout identity, but the upload path still needs an encoder without a bytes view | Escalate as subscript request R34: `Context.bytesOf<T>(value: T): u8[]` and `Context.fromBytes<T>(bytes: u8[], offset: u32): T`, `T` a value class or a `FixedArray` of one, one `memcpy` each, both tiers. P1 slice 2 (`Buffer<T>` write and read) waits for it. Fallback: a generated per-schema encoder over `Math.f32ToBits`, the proof of concept's path, which the owner decides |
+| RC-15 | ~~The program imports its support module before it exists~~ **Closed 2026-08-22.** R35 landed at subscript `bb9dadc`: `check_program_with` poisons one missing module and records the imported names | SC1a Rev 1. The stub and the import scan leave |
+| RC-14 | ~~No subscript construct yields the bytes of a value class~~ **Closed 2026-08-22.** R34 landed at subscript `bb9dadc`: `Context.bytesOf`, `bytesInto`, `fromBytes`, padding zeroed on both tiers | `buffer.md` BF-rules. P1 slice 2 |
 
 ## 10. Corrections
 

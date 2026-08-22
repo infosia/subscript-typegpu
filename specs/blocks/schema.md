@@ -13,22 +13,18 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
   or, in P1, a generated constant the program imports. A value class
   the program uses on the host only is not a schema and gets no
   diagnostic.
-- **SC1a — The discovery check.** The program imports its support
-  module before the module exists. The generator therefore checks
-  the program once without the support module, reads the schemas and
-  the imported names from the HIR, generates, and lets the harness
-  check the complete set. The first check needs the checker to
-  tolerate the one unresolved import. Until subscript supplies that
-  mode (request R35), the generator confirms the support-module
-  import with `parse_import_specifiers`, reads the imported names
-  from that one `import { ... } from "./<stem>.typegpu"` statement
-  (the only text scan, limited to that statement), and supplies a
-  stub module that exports those names as `u32` constants, or
-  `string` for a `_WGSL` name. The stub is a recorded deviation from
-  D2 with R35 as its kill date. No other text scan of the program
-  exists. An imported name that no schema produces is an SC3
-  diagnostic when its class has an illegal field, and an SC1
-  diagnostic ("not a schema") otherwise.
+- **SC1a — The discovery check.** Rev 1, 2026-08-22. The program
+  imports its support module before the module exists. The generator
+  calls `subscript_compiler::check_program_with` with
+  `poison_missing_modules = ["./<stem>.typegpu"]` (R35, at subscript
+  `bb9dadc`). The discovery HIR carries the classes, the functions,
+  the globals, and one `PoisonedImport` record with the imported
+  names. The generator reads schemas, pipelines, and the imported
+  names from it, generates, and lets the harness check the complete
+  set. The generator never lowers or lays out a discovery HIR. No
+  stub and no text scan exist. An imported name that no schema or
+  pipeline produces is an SC3 diagnostic when its class has an
+  illegal field, and an SC1 diagnostic ("not a schema") otherwise.
 - **SC2 — Declaration order is layout order.** The generator never
   reorders fields. An author who wants fewer padding bytes reorders
   the source.
