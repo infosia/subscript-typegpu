@@ -344,9 +344,7 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   text inside the emitted module. When `naga` reports an error on a
   line inside a span, the harness prefixes the diagnostic with the
   shell name (`shell addBias:`) or `declarations:`. A line outside
-  every span stays a generator defect (K15). The emitted module
-  order is: declarations, schema structs, shells, bindings, module
-  variables, the kernel.
+  every span stays a generator defect (K15). The module order is K14's.
 
 ## Diagnostics
 
