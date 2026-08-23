@@ -1,6 +1,6 @@
 # Project status
 
-Updated 2026-08-23 at `4c2eff8`.
+Updated 2026-08-23 at `167d34e`.
 
 | Phase | Status | Close |
 |---|---|---|
@@ -11,13 +11,14 @@ Updated 2026-08-23 at `4c2eff8`.
 | P4 kernel depth | COMPLETE | `ea25b01`, 2026-08-23 |
 | P5 textures and samplers | COMPLETE | `3d9d988`, 2026-08-23 |
 | P6 ergonomics and diagnostics | COMPLETE | `4c2eff8`, 2026-08-23 |
-| P7 the CPU lane | in progress | opened 2026-08-23 by the owner's decision |
+| P7 the CPU lane | COMPLETE | `167d34e`, 2026-08-23 |
 
-Numbers at `4c2eff8`: 223 tests in six executables, 28 programs
+Numbers at `167d34e`: 231 tests in six executables, 28 programs
 (`a01`–`a05`, `b01`–`b11`, `x01`–`x12`), 157 facade exports all
-reached, the live lane green on yawgpu Metal and on Dawn, the gate
-84 s after a generator change and 78 s after a program change
-(budgets 240 s and 120 s), the cold build 45 s (budget 480 s).
+reached, the live lane green on yawgpu Metal and on Dawn with the
+kernel bodies as the oracle for `x01`–`x04` and `x09`, the gate 86 s
+after a generator change and 84 s after a program change (budgets
+240 s and 120 s), the cold build 45 s (budget 480 s).
 
 Subscript requests this project made and that landed: R33
 (`@CStruct({ align })`), R34 (`Context.bytesOf`, `bytesInto`,
@@ -34,5 +35,6 @@ values (P6).
 
 Open items carried in the blocks: RN8's multiple targets, TX1's
 integer sample types and formats, a phased `simulateCompute` for
-barrier kernels (CL2), a typed per-field record for render
-pipelines beyond one group (TX2).
+barrier kernels (CL2), render pipelines beyond one group (TX2).
+Every planned phase is complete. A whole-repository retrospective
+review follows.

@@ -1,6 +1,7 @@
 # P7 — the CPU lane
 
-Status: **in progress**. Opened 2026-08-23 by the owner's decision.
+Status: **COMPLETE 2026-08-23.** Opened 2026-08-23 by the owner's
+decision. Closed at `167d34e`.
 Plan §8 P7. Contract: `specs/blocks/cpu-lane.md` (CL1–CL4).
 
 ## Slice 1 — `simulateCompute`, the host-runnable constant, the oracles
@@ -38,8 +39,21 @@ nearest sampler beside a linear GPU sampler; the scanners carried a
 duplicate rule list. Resolutions in the specs: CL2 Rev 1 (written
 private variables, the harness pairing check over the HIR), CL4 Rev
 1 (host-runnability from `Generated`), CL5, CL6, `simulateComputeThreads`
-in CL1, PI4, PI8, and PI11 cross-references. The code findings go to
-the coding agent.
+in CL1, PI4, PI8, and PI11 cross-references. The code findings landed at
+`167d34e`: written private variables are not host-runnable, five
+CL6 emitter tests, the CL2 fixture traps through the generated
+constant, the harness pairs every `simulateCompute*` call with its
+pipeline's constant over the HIR (a scratch program passing `true`
+fails with the call's position), `simulateComputeThreads` takes the
+dispatch's counts, samplers carry their filter mode on the host and
+`b11` binds nearest on both sides, the rule-id table is the one
+authority. Planner verification at the close: `tools/gate.sh
+--require-backend` green, 231 tests in six executables (facade 3,
+typegpu-gen 6 and 44, harness 26 in 75.48 seconds plus the ignored
+live test, webgpu-gen 3 and 149). Live runs outside the sandbox at
+`167d34e`: Metal ok 26.64 seconds, Dawn ok 24.35 seconds,
+`x01`–`x12` `PASS` on both with the kernel bodies as the oracle.
+Measurement: 45 s / 0.2 s / 86 s / 84 s / 6.
 
 ## Exit criteria
 
@@ -47,6 +61,6 @@ the coding agent.
 |---|---|---|
 | 1 | `x01`–`x04` and `x09` use `simulateCompute` as their oracle and print `PASS` on Metal | Metal and Dawn at `1da3db8` |
 | 2 | One `b` program's host golden is committed and compared on both tiers | `b02-vecadd` `host:out=5,7,9`, and every host-runnable `b` pipeline |
-| 3 | `CL2` has a fixture that reaches the trap through the generator's constant | — |
-| 4 | CL6's five emitter tests exist. The lane is a gate module | — |
-| 5 | Budgets hold | 46 s / 0.2 s / 84 s / 81 s / 6 |
+| 3 | `CL2` has a fixture that reaches the trap through the generator's constant | `simulate-storage-barrier.ts` at the close |
+| 4 | CL6's five emitter tests exist. The lane is a gate module | The close; `crates/harness/tests/simulate/mod.rs` |
+| 5 | Budgets hold | 45 s / 0.2 s / 86 s / 84 s / 6 at the close |
