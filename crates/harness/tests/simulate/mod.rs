@@ -548,14 +548,8 @@ fn every_host_runnable_b_pipeline_prints_a_host_golden() {
             .lines()
             .filter(|line| line.starts_with("host:"))
             .count();
-        if name == "b13-vector-builtins.ts" {
-            assert_eq!(
-                actual, 5,
-                "{name} must print one host line per vector method family"
-            );
-        }
-        assert!(
-            actual >= required,
+        assert_eq!(
+            actual, required,
             "{name} prints {actual} host lines for {required} host-runnable pipelines:\n{text}",
         );
     }

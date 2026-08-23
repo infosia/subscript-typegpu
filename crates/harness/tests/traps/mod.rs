@@ -86,6 +86,16 @@ fn runtime_traps_are_named_and_numbered() {
             false,
         ),
         (
+            "owned-read-past-end.ts",
+            "BF9 Buffer.read elementIndex=1 elementCount=1 count=1",
+            false,
+        ),
+        (
+            "owned-read-one-past-end.ts",
+            "BF9 Buffer.readOne elementIndex=1 elementCount=1 count=1",
+            false,
+        ),
+        (
             "read-without-copy-src.ts",
             "BF10 Buffer.read usage=8",
             false,
@@ -93,6 +103,16 @@ fn runtime_traps_are_named_and_numbered() {
         (
             "write-without-copy-dst.ts",
             "BF10 Buffer.write usage=4",
+            false,
+        ),
+        (
+            "write-one-without-copy-dst.ts",
+            "BF10 Buffer.writeOne usage=4",
+            false,
+        ),
+        (
+            "patch-without-copy-dst.ts",
+            "BF10 Buffer.patch usage=4",
             false,
         ),
         (

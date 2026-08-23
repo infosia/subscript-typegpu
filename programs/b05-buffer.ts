@@ -51,13 +51,6 @@ export async function main(): Promise<void> {
   {
     using adapter = adapterResult;
     using device = deviceResult;
-    device.pushErrorScope("validation");
-    const validationError = await device.popErrorScope();
-    if (validationError !== null) {
-      print("pipeline:invalid");
-      print("FAIL");
-      return;
-    }
     const particles: FixedArray<Particle, 4> = [
       new Particle(new Vec3f(1.0, 2.0, 3.0), new Vec3f(0.5, -0.25, 0.125)),
       new Particle(new Vec3f(4.0, 5.0, 6.0), new Vec3f(-1.0, 0.75, 0.25)),

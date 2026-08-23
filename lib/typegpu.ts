@@ -176,6 +176,9 @@ export class Buffer<T> {
   }
 
   writeOne(queue: GPUQueue, elementIndex: u32, bytes: u8[]): void {
+    if ((this.usage & GPUBufferUsage.COPY_DST) === 0) {
+      authorTrap("BF10", "Buffer.writeOne", `usage=${this.usage}`);
+    }
     const byteLength: u32 = bytes.length as u32;
     if (byteLength !== this.elementSize) {
       authorTrap("BF8", "Buffer.writeOne", `elementIndex=${elementIndex} byteLength=${byteLength} elementSize=${this.elementSize}`);
@@ -191,6 +194,9 @@ export class Buffer<T> {
   }
 
   patch(queue: GPUQueue, elementIndex: u32, fieldOffset: u32, bytes: u8[]): void {
+    if ((this.usage & GPUBufferUsage.COPY_DST) === 0) {
+      authorTrap("BF10", "Buffer.patch", `usage=${this.usage}`);
+    }
     const byteLength: u32 = bytes.length as u32;
     if (elementIndex >= this.count) {
       authorTrap("EG2", "Buffer.patch", `elementIndex=${elementIndex} elementCount=1 count=${this.count}`);
@@ -230,6 +236,9 @@ export class Buffer<T> {
     if ((this.usage & GPUBufferUsage.COPY_SRC) === 0) {
       authorTrap("BF10", "Buffer.read", `usage=${this.usage}`);
     }
+    if (elementIndex > this.count || elementCount > this.count - elementIndex) {
+      authorTrap("BF9", "Buffer.read", `elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`);
+    }
     const staging: Buffer<T> = createBuffer<T>(
       device,
       this.elementSize,
@@ -253,6 +262,9 @@ export class Buffer<T> {
   }
 
   async readOne(device: GPUDevice, elementIndex: u32): Promise<u8[]> {
+    if (elementIndex >= this.count) {
+      authorTrap("BF9", "Buffer.readOne", `elementIndex=${elementIndex} elementCount=1 count=${this.count}`);
+    }
     return await this.read(device, elementIndex, 1);
   }
 

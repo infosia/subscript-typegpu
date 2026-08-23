@@ -248,8 +248,7 @@ fn allowed_binding_item(module: &Module, ty: &Type) -> bool {
             class.is_value
                 && (class.pos.file != "typegpu.ts")
                 && (class.pos.file != "webgpu.ts")
-                && !(class.pos.file == "typegpu-types.ts"
-                    && matches!(class.name.as_str(), "Vec2b" | "Vec3b" | "Vec4b"))
+                && !crate::schema::is_bool_vector(module, ty)
         }
         _ => false,
     }

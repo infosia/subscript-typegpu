@@ -1947,17 +1947,22 @@ impl<'a> Emitter<'a> {
                     let (args, args_prelude) = self.snippets(args)?;
                     let mut prelude = place.prelude;
                     prelude.extend(args_prelude);
-                    let text = match (name.as_str(), args.as_slice()) {
-                        ("load", []) => format!("atomicLoad(&{})", place.text),
-                        ("store", [value]) => {
-                            format!("atomicStore(&{}, {value})", place.text)
+                    let receiver = class_name(self.module, &recv.ty)
+                        .expect("atomic scalar receiver has a class name");
+                    let builtin = match mapping::method(receiver, name) {
+                        Some(MethodEmission::Atomic(builtin)) => builtin,
+                        _ => {
+                            return Err(diagnostic(
+                                "K21",
+                                format!("atomic method `{name}` is outside K21"),
+                                expr.pos.clone(),
+                            ))
                         }
-                        ("add", [value]) => format!("atomicAdd(&{}, {value})", place.text),
-                        ("sub", [value]) => format!("atomicSub(&{}, {value})", place.text),
-                        ("min", [value]) => format!("atomicMin(&{}, {value})", place.text),
-                        ("max", [value]) => format!("atomicMax(&{}, {value})", place.text),
-                        ("exchange", [value]) => {
-                            format!("atomicExchange(&{}, {value})", place.text)
+                    };
+                    let text = match args.as_slice() {
+                        [] if name == "load" => format!("{builtin}(&{})", place.text),
+                        [value] if name != "load" => {
+                            format!("{builtin}(&{}, {value})", place.text)
                         }
                         _ => {
                             return Err(diagnostic(
@@ -2140,6 +2145,14 @@ impl<'a> Emitter<'a> {
                             .collect::<Vec<_>>()
                             .join(", ");
                         (format!("{builtin}({}, {args})", recv_value.text), 10)
+                    }
+                    MethodEmission::BuiltinReceiverLast(builtin) => {
+                        let args = arg_values
+                            .iter()
+                            .map(|value| value.text.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        (format!("{builtin}({args}, {})", recv_value.text), 10)
                     }
                     MethodEmission::Unary(op) if arg_values.is_empty() => {
                         let recv = if recv_value.precedence <= 9 {

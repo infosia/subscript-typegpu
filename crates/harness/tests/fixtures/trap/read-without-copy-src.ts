@@ -1,5 +1,5 @@
 // program: read-without-copy-src
-// purpose: prove that Buffer.read requires COPY_SRC before allocating staging storage
+// purpose: prove that Buffer.read requires COPY_SRC before it creates the staging buffer
 // exercises: BF10
 // questions: none
 // expected-rule: BF10

@@ -1,5 +1,5 @@
 // program: map-failure
-// purpose: prove that Buffer.read traps after Noop rejects an unaligned staging map
+// purpose: prove that Buffer.read traps when the backend refuses the one-byte staging map
 // exercises: BF9
 // questions: none
 // expected-rule: BF9

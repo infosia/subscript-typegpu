@@ -7,7 +7,8 @@ use subscript_compiler::CheckOptions;
 use subscript_compiler::Type;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ScopeCall {
+enum ProgramCall {
+    Creation,
     Push,
     Pop,
 }
@@ -66,7 +67,36 @@ fn is_validation_filter(module: &Module, expression: &Expr) -> bool {
         == Some(*value)
 }
 
-fn visit_expr(module: &Module, expression: &Expr, program_name: &str, calls: &mut Vec<ScopeCall>) {
+fn is_library_creation(module: &Module, name: &str) -> bool {
+    matches!(name, "createComputePipeline" | "createRenderPipeline")
+        && module
+            .functions
+            .iter()
+            .any(|function| function.name == name && function.pos.file == "typegpu.ts")
+}
+
+fn is_device_creation(module: &Module, receiver: &Expr, name: &str) -> bool {
+    if !matches!(
+        name,
+        "createShaderModule"
+            | "createComputePipeline"
+            | "createComputePipelineAsync"
+            | "createRenderPipeline"
+            | "createRenderPipelineAsync"
+    ) {
+        return false;
+    }
+    matches!(&receiver.ty, Type::Class(id)
+        if module.classes[id.0].name == "GPUDevice"
+            && module.classes[id.0].pos.file == "webgpu.ts")
+}
+
+fn visit_expr(
+    module: &Module,
+    expression: &Expr,
+    program_name: &str,
+    calls: &mut Vec<ProgramCall>,
+) {
     if expression.pos.file == program_name {
         match &expression.kind {
             ExprKind::Call {
@@ -75,12 +105,24 @@ fn visit_expr(module: &Module, expression: &Expr, program_name: &str, calls: &mu
             } if name == "pushErrorScope"
                 && matches!(args.as_slice(), [filter] if is_validation_filter(module, filter)) =>
             {
-                calls.push(ScopeCall::Push);
+                calls.push(ProgramCall::Push);
             }
             ExprKind::AsyncCall {
                 callee: AsyncCallee::Method { name, .. },
                 ..
-            } if name == "popErrorScope" => calls.push(ScopeCall::Pop),
+            } if name == "popErrorScope" => calls.push(ProgramCall::Pop),
+            ExprKind::Call {
+                callee: Callee::Func(name),
+                ..
+            } if is_library_creation(module, name) => calls.push(ProgramCall::Creation),
+            ExprKind::Call {
+                callee: Callee::Method { recv, name },
+                ..
+            } if is_device_creation(module, recv, name) => calls.push(ProgramCall::Creation),
+            ExprKind::AsyncCall {
+                callee: AsyncCallee::Method { receiver, name, .. },
+                ..
+            } if is_device_creation(module, receiver, name) => calls.push(ProgramCall::Creation),
             _ => {}
         }
     }
@@ -168,7 +210,7 @@ fn visit_statements(
     module: &Module,
     statements: &[Stmt],
     program_name: &str,
-    calls: &mut Vec<ScopeCall>,
+    calls: &mut Vec<ProgramCall>,
 ) {
     for statement in statements {
         match statement {
@@ -254,15 +296,41 @@ fn scope_failure(program: &Path) -> Option<String> {
     };
     let mut calls = Vec::new();
     visit_statements(&module, &main.body, program_name, &mut calls);
-    (calls != [ScopeCall::Push, ScopeCall::Pop]).then(|| {
+    let creations = calls
+        .iter()
+        .filter(|call| **call == ProgramCall::Creation)
+        .count();
+    if creations == 0 {
+        return (!calls.is_empty()).then(|| {
+            format!(
+                "{program_name}: expected no validation scope without a creation call, found {calls:?}"
+            )
+        });
+    }
+    let valid = calls.first() == Some(&ProgramCall::Push)
+        && calls.last() == Some(&ProgramCall::Pop)
+        && calls
+            .iter()
+            .filter(|call| **call == ProgramCall::Push)
+            .count()
+            == 1
+        && calls
+            .iter()
+            .filter(|call| **call == ProgramCall::Pop)
+            .count()
+            == 1
+        && calls[1..calls.len() - 1]
+            .iter()
+            .all(|call| *call == ProgramCall::Creation);
+    (!valid).then(|| {
         format!(
-            "{program_name}: expected one pushErrorScope(\"validation\") before one popErrorScope, found {calls:?}"
+            "{program_name}: expected one validation scope around {creations} creation call(s), found {calls:?}"
         )
     })
 }
 
 #[test]
-fn every_program_wraps_pipeline_creation_in_a_validation_scope() {
+fn every_program_scopes_exactly_its_shader_and_pipeline_creation_calls() {
     let failures = programs()
         .iter()
         .filter_map(|program| scope_failure(program))

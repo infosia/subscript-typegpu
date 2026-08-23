@@ -65,5 +65,7 @@ BF10 `write` (`usage=4`).
 
 Evidence: `tools/gate.sh --require-backend` green, 235 passed, 132 s
 at load average 6.2 (the owner's subscript work shares the machine).
-`tools/live.sh` x01–x14 PASS: Metal 34.79 s, Dawn 32.15 s. The idle
-re-measurement stays open.
+`tools/live.sh` x01–x14 PASS: Metal 34.79 s, Dawn 32.15 s. Per plan §7 (owner decision
+2026-08-23), the rows under load stand as recorded and do not block
+the close. The per-module measurement found no module that doubled
+against HEAD with the diff applied.

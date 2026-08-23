@@ -336,6 +336,14 @@ cargo cache, `CARGO_BUILD_JOBS=4`. Recorded in
 A budget is a gate. If a phase needs more, the phase spec states the
 new number and the cause before the work starts.
 
+**How a budget is read (owner decision, 2026-08-23).** The budgets
+exist for iteration speed. A gate that takes a few minutes is
+acceptable. A row is red when it is about twice the previous
+comparable row and the cause is in the diff, located by a
+per-module measurement. A measurement under load is recorded with
+the load condition and does not block a phase close. A budget
+number is revised with its cause stated, never waited out.
+
 ## 8. Phases
 
 Exit criteria are pre-registered. If a criterion is unreachable

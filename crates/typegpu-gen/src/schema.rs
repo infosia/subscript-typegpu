@@ -23,6 +23,12 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+pub(crate) fn is_bool_vector(module: &Module, ty: &Type) -> bool {
+    matches!(ty, Type::Class(id)
+        if module.classes[id.0].pos.file == "typegpu-types.ts"
+            && matches!(module.classes[id.0].name.as_str(), "Vec2b" | "Vec3b" | "Vec4b"))
+}
+
 fn is_library_file(file: &str) -> bool {
     matches!(file, "webgpu.ts" | "typegpu-types.ts" | "typegpu.ts")
 }
@@ -116,22 +122,14 @@ impl Walker<'_> {
                 Box::new(self.type_tree(element, field_name, pos)?),
                 *length,
             )),
-            Type::Class(id)
-                if self.module.classes[id.0].pos.file == "typegpu-types.ts"
-                    && matches!(
-                        self.module.classes[id.0].name.as_str(),
-                        "Vec2b" | "Vec3b" | "Vec4b"
-                    ) =>
-            {
-                Err(diagnostic(
-                    "SC5",
-                    format!(
-                        "field `{field_name}` has non-host-shareable boolean vector type `{}`",
-                        self.module.classes[id.0].name
-                    ),
-                    pos.clone(),
-                ))
-            }
+            Type::Class(id) if is_bool_vector(self.module, ty) => Err(diagnostic(
+                "SC5",
+                format!(
+                    "field `{field_name}` has non-host-shareable boolean vector type `{}`",
+                    self.module.classes[id.0].name
+                ),
+                pos.clone(),
+            )),
             Type::Class(id) if self.module.classes[id.0].is_value => self.class_tree(id.0),
             other => Err(diagnostic(
                 "SC3",
@@ -298,11 +296,7 @@ fn collect_type_reachable(module: &Module, ty: &Type, reachable: &mut BTreeSet<u
         Type::Class(id)
             if module.classes[id.0].is_value
                 && library_tree(module, &module.classes[id.0]).is_none()
-                && !(module.classes[id.0].pos.file == "typegpu-types.ts"
-                    && matches!(
-                        module.classes[id.0].name.as_str(),
-                        "Vec2b" | "Vec3b" | "Vec4b"
-                    )) =>
+                && !is_bool_vector(module, ty) =>
         {
             collect_reachable(module, id.0, reachable);
         }

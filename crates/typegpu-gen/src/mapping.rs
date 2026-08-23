@@ -450,8 +450,10 @@ pub(crate) fn ident(name: &str) -> String {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MethodEmission {
+    Atomic(&'static str),
     Binary(&'static str),
     Builtin(&'static str),
+    BuiltinReceiverLast(&'static str),
     Unary(&'static str),
     Swizzle(&'static str),
 }
@@ -494,8 +496,11 @@ const FLOAT_METHODS: &[(&str, MethodEmission)] = &[
     ("clamp", MethodEmission::Builtin("clamp")),
     ("pow", MethodEmission::Builtin("pow")),
     ("mix", MethodEmission::Builtin("mix")),
-    ("step", MethodEmission::Builtin("step")),
-    ("smoothstep", MethodEmission::Builtin("smoothstep")),
+    ("step", MethodEmission::BuiltinReceiverLast("step")),
+    (
+        "smoothstep",
+        MethodEmission::BuiltinReceiverLast("smoothstep"),
+    ),
     ("distance", MethodEmission::Builtin("distance")),
     ("reflect", MethodEmission::Builtin("reflect")),
     ("refract", MethodEmission::Builtin("refract")),
@@ -520,6 +525,15 @@ const COMPARISON_METHODS: &[(&str, MethodEmission)] = &[
     ("eq", MethodEmission::Binary("==")),
     ("ne", MethodEmission::Binary("!=")),
     ("select", MethodEmission::Builtin("select")),
+];
+const ATOMIC_METHODS: &[(&str, MethodEmission)] = &[
+    ("load", MethodEmission::Atomic("atomicLoad")),
+    ("store", MethodEmission::Atomic("atomicStore")),
+    ("add", MethodEmission::Atomic("atomicAdd")),
+    ("sub", MethodEmission::Atomic("atomicSub")),
+    ("min", MethodEmission::Atomic("atomicMin")),
+    ("max", MethodEmission::Atomic("atomicMax")),
+    ("exchange", MethodEmission::Atomic("atomicExchange")),
 ];
 const VEC3_SWIZZLES: &[(&str, MethodEmission)] = &[
     ("xy", MethodEmission::Swizzle("xy")),
@@ -602,6 +616,10 @@ const METHOD_GROUPS: &[MethodGroup] = &[
             ("mulVec", MethodEmission::Binary("*")),
             ("transpose", MethodEmission::Builtin("transpose")),
         ],
+    },
+    MethodGroup {
+        receivers: &["AtomicU32", "AtomicI32"],
+        methods: ATOMIC_METHODS,
     },
 ];
 
@@ -695,7 +713,7 @@ mod tests {
     }
 
     #[test]
-    fn k10_table_matches_vector_and_matrix_hir_methods() {
+    fn k10_table_matches_vector_matrix_and_atomic_hir_methods() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .ancestors()
             .nth(2)
@@ -712,7 +730,9 @@ mod tests {
             .iter()
             .filter(|class| {
                 class.pos.file == "typegpu-types.ts"
-                    && (class.name.starts_with("Vec") || class.name.starts_with("Mat"))
+                    && (class.name.starts_with("Vec")
+                        || class.name.starts_with("Mat")
+                        || class.name.starts_with("Atomic"))
             })
             .flat_map(|class| {
                 class

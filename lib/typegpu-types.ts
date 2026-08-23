@@ -56,8 +56,8 @@ export class Vec2f {
   clamp(low: Vec2f, high: Vec2f): Vec2f { return new Vec2f(clamp(this.x, low.x, high.x), clamp(this.y, low.y, high.y)); }
   pow(other: Vec2f): Vec2f { return new Vec2f(Math.pow(this.x as f64, other.x as f64) as f32, Math.pow(this.y as f64, other.y as f64) as f32); }
   mix(other: Vec2f, amount: f32): Vec2f { return new Vec2f(mix(this.x, other.x, amount), mix(this.y, other.y, amount)); }
-  step(edge: Vec2f): Vec2f { return new Vec2f(step(this.x, edge.x), step(this.y, edge.y)); }
-  smoothstep(low: Vec2f, high: Vec2f): Vec2f { return new Vec2f(smoothstep(this.x, low.x, high.x), smoothstep(this.y, low.y, high.y)); }
+  step(edge: Vec2f): Vec2f { return new Vec2f(step(edge.x, this.x), step(edge.y, this.y)); }
+  smoothstep(low: Vec2f, high: Vec2f): Vec2f { return new Vec2f(smoothstep(low.x, high.x, this.x), smoothstep(low.y, high.y, this.y)); }
   distance(other: Vec2f): f32 { return this.sub(other).length(); }
   reflect(normal: Vec2f): Vec2f { return this.sub(normal.scale(2.0 * this.dot(normal))); }
   refract(normal: Vec2f, eta: f32): Vec2f {
@@ -144,8 +144,8 @@ export class Vec3f {
   clamp(low: Vec3f, high: Vec3f): Vec3f { return new Vec3f(clamp(this.x, low.x, high.x), clamp(this.y, low.y, high.y), clamp(this.z, low.z, high.z)); }
   pow(other: Vec3f): Vec3f { return new Vec3f(Math.pow(this.x as f64, other.x as f64) as f32, Math.pow(this.y as f64, other.y as f64) as f32, Math.pow(this.z as f64, other.z as f64) as f32); }
   mix(other: Vec3f, amount: f32): Vec3f { return new Vec3f(mix(this.x, other.x, amount), mix(this.y, other.y, amount), mix(this.z, other.z, amount)); }
-  step(edge: Vec3f): Vec3f { return new Vec3f(step(this.x, edge.x), step(this.y, edge.y), step(this.z, edge.z)); }
-  smoothstep(low: Vec3f, high: Vec3f): Vec3f { return new Vec3f(smoothstep(this.x, low.x, high.x), smoothstep(this.y, low.y, high.y), smoothstep(this.z, low.z, high.z)); }
+  step(edge: Vec3f): Vec3f { return new Vec3f(step(edge.x, this.x), step(edge.y, this.y), step(edge.z, this.z)); }
+  smoothstep(low: Vec3f, high: Vec3f): Vec3f { return new Vec3f(smoothstep(low.x, high.x, this.x), smoothstep(low.y, high.y, this.y), smoothstep(low.z, high.z, this.z)); }
   distance(other: Vec3f): f32 { return this.sub(other).length(); }
   reflect(normal: Vec3f): Vec3f { return this.sub(normal.scale(2.0 * this.dot(normal))); }
   refract(normal: Vec3f, eta: f32): Vec3f {
@@ -229,8 +229,8 @@ export class Vec4f {
   clamp(low: Vec4f, high: Vec4f): Vec4f { return new Vec4f(clamp(this.x, low.x, high.x), clamp(this.y, low.y, high.y), clamp(this.z, low.z, high.z), clamp(this.w, low.w, high.w)); }
   pow(other: Vec4f): Vec4f { return new Vec4f(Math.pow(this.x as f64, other.x as f64) as f32, Math.pow(this.y as f64, other.y as f64) as f32, Math.pow(this.z as f64, other.z as f64) as f32, Math.pow(this.w as f64, other.w as f64) as f32); }
   mix(other: Vec4f, amount: f32): Vec4f { return new Vec4f(mix(this.x, other.x, amount), mix(this.y, other.y, amount), mix(this.z, other.z, amount), mix(this.w, other.w, amount)); }
-  step(edge: Vec4f): Vec4f { return new Vec4f(step(this.x, edge.x), step(this.y, edge.y), step(this.z, edge.z), step(this.w, edge.w)); }
-  smoothstep(low: Vec4f, high: Vec4f): Vec4f { return new Vec4f(smoothstep(this.x, low.x, high.x), smoothstep(this.y, low.y, high.y), smoothstep(this.z, low.z, high.z), smoothstep(this.w, low.w, high.w)); }
+  step(edge: Vec4f): Vec4f { return new Vec4f(step(edge.x, this.x), step(edge.y, this.y), step(edge.z, this.z), step(edge.w, this.w)); }
+  smoothstep(low: Vec4f, high: Vec4f): Vec4f { return new Vec4f(smoothstep(low.x, high.x, this.x), smoothstep(low.y, high.y, this.y), smoothstep(low.z, high.z, this.z), smoothstep(low.w, high.w, this.w)); }
   distance(other: Vec4f): f32 { return this.sub(other).length(); }
   reflect(normal: Vec4f): Vec4f { return this.sub(normal.scale(2.0 * this.dot(normal))); }
   refract(normal: Vec4f, eta: f32): Vec4f {

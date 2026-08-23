@@ -1,6 +1,6 @@
 // program: b13-vector-builtins
 // purpose: execute every vector method family through one host-runnable kernel
-// exercises: CL1, CL2, K10, K25, K26, K27, K28, PI14
+// exercises: CL1, CL2, K10, K25, K26, K27, PI14
 // questions: none
 
 import {
@@ -89,6 +89,19 @@ class VectorOutput {
   factoryFloat: Vec4f;
   factorySigned: Vec4i;
   factoryUnsigned: Vec4u;
+  width2Float: Vec2f;
+  width2Signed: Vec2i;
+  width2Unsigned: Vec2u;
+  width3Float: Vec3f;
+  width3Signed: Vec3i;
+  width3Unsigned: Vec3u;
+  orderStep: Vec4f;
+  orderSmoothstep: Vec4f;
+  orderMix: Vec4f;
+  orderClamp: Vec4f;
+  orderRefract: Vec4f;
+  orderFaceForward: Vec4f;
+  orderSelect: Vec4f;
 
   constructor() {
     this.exactFloat = new Vec4f(0.0, 0.0, 0.0, 0.0);
@@ -103,6 +116,19 @@ class VectorOutput {
     this.factoryFloat = new Vec4f(0.0, 0.0, 0.0, 0.0);
     this.factorySigned = new Vec4i(0, 0, 0, 0);
     this.factoryUnsigned = new Vec4u(0, 0, 0, 0);
+    this.width2Float = new Vec2f(0.0, 0.0);
+    this.width2Signed = new Vec2i(0, 0);
+    this.width2Unsigned = new Vec2u(0, 0);
+    this.width3Float = new Vec3f(0.0, 0.0, 0.0);
+    this.width3Signed = new Vec3i(0, 0, 0);
+    this.width3Unsigned = new Vec3u(0, 0, 0);
+    this.orderStep = new Vec4f(0.0, 0.0, 0.0, 0.0);
+    this.orderSmoothstep = new Vec4f(0.0, 0.0, 0.0, 0.0);
+    this.orderMix = new Vec4f(0.0, 0.0, 0.0, 0.0);
+    this.orderClamp = new Vec4f(0.0, 0.0, 0.0, 0.0);
+    this.orderRefract = new Vec4f(0.0, 0.0, 0.0, 0.0);
+    this.orderFaceForward = new Vec4f(0.0, 0.0, 0.0, 0.0);
+    this.orderSelect = new Vec4f(0.0, 0.0, 0.0, 0.0);
   }
 }
 
@@ -110,6 +136,135 @@ class VectorLayout {
   input!: Storage<VectorInput>;
   output!: MutStorage<VectorOutput>;
 }
+
+function coverFloat2(a: Vec2f, b: Vec2f, low: Vec2f, high: Vec2f): Vec2f {
+  const lt = a.lt(b);
+  const le = a.le(b);
+  const gt = a.gt(b);
+  const ge = a.ge(b);
+  const eq = a.eq(b);
+  const ne = a.ne(b);
+  const inverted = lt.not();
+  const marker: f32 = lt.any() || le.all() || gt.any() || ge.all()
+    || eq.any() || ne.all() || inverted.any() || inverted.all() ? 1.0 : 0.0;
+  const distanceValue: f32 = a.distance(b);
+  return a.abs().add(a.floor()).add(a.ceil()).add(a.fract()).add(a.sqrt())
+    .add(a.exp()).add(a.log()).add(a.sin()).add(a.cos()).add(a.tan()).add(a.sign())
+    .add(a.min(b)).add(a.max(b)).add(a.clamp(low, high)).add(a.pow(b))
+    .add(a.mix(b, 0.25)).add(a.step(b)).add(a.smoothstep(low, high))
+    .add(new Vec2f(distanceValue, distanceValue)).add(a.reflect(b))
+    .add(a.refract(b, 0.5)).add(a.faceForward(b, low))
+    .add(a.select(b, inverted)).add(new Vec2f(marker, marker));
+}
+
+function coverFloat3(a: Vec3f, b: Vec3f, low: Vec3f, high: Vec3f): Vec3f {
+  const lt = a.lt(b);
+  const le = a.le(b);
+  const gt = a.gt(b);
+  const ge = a.ge(b);
+  const eq = a.eq(b);
+  const ne = a.ne(b);
+  const inverted = lt.not();
+  const marker: f32 = lt.any() || le.all() || gt.any() || ge.all()
+    || eq.any() || ne.all() || inverted.any() || inverted.all() ? 1.0 : 0.0;
+  const distanceValue: f32 = a.distance(b);
+  return a.abs().add(a.floor()).add(a.ceil()).add(a.fract()).add(a.sqrt())
+    .add(a.exp()).add(a.log()).add(a.sin()).add(a.cos()).add(a.tan()).add(a.sign())
+    .add(a.min(b)).add(a.max(b)).add(a.clamp(low, high)).add(a.pow(b))
+    .add(a.mix(b, 0.25)).add(a.step(b)).add(a.smoothstep(low, high))
+    .add(new Vec3f(distanceValue, distanceValue, distanceValue)).add(a.reflect(b))
+    .add(a.refract(b, 0.5)).add(a.faceForward(b, low))
+    .add(a.select(b, inverted)).add(new Vec3f(marker, marker, marker));
+}
+
+function coverSigned2(a: Vec2i, b: Vec2i): Vec2i {
+  const lt = a.lt(b);
+  const le = a.le(b);
+  const gt = a.gt(b);
+  const ge = a.ge(b);
+  const eq = a.eq(b);
+  const ne = a.ne(b);
+  const inverted = lt.not();
+  const marker: i32 = lt.any() || le.all() || gt.any() || ge.all()
+    || eq.any() || ne.all() || inverted.any() || inverted.all() ? 1 : 0;
+  return a.abs().add(a.min(b)).add(a.max(b))
+    .add(a.clamp(new Vec2i(-3, -2), new Vec2i(4, 5)))
+    .add(a.select(b, inverted)).add(new Vec2i(marker, marker));
+}
+
+function coverSigned3(a: Vec3i, b: Vec3i): Vec3i {
+  const lt = a.lt(b);
+  const le = a.le(b);
+  const gt = a.gt(b);
+  const ge = a.ge(b);
+  const eq = a.eq(b);
+  const ne = a.ne(b);
+  const inverted = lt.not();
+  const marker: i32 = lt.any() || le.all() || gt.any() || ge.all()
+    || eq.any() || ne.all() || inverted.any() || inverted.all() ? 1 : 0;
+  return a.abs().add(a.min(b)).add(a.max(b))
+    .add(a.clamp(new Vec3i(-3, -2, -1), new Vec3i(4, 5, 6)))
+    .add(a.select(b, inverted)).add(new Vec3i(marker, marker, marker));
+}
+
+function coverSigned4(a: Vec4i, b: Vec4i): Vec4i {
+  const lt = a.lt(b);
+  const le = a.le(b);
+  const gt = a.gt(b);
+  const ge = a.ge(b);
+  const eq = a.eq(b);
+  const ne = a.ne(b);
+  const inverted = lt.not();
+  const marker: i32 = lt.any() || le.all() || gt.any() || ge.all()
+    || eq.any() || ne.all() || inverted.any() || inverted.all() ? 1 : 0;
+  return a.abs().add(a.min(b)).add(a.max(b))
+    .add(a.clamp(new Vec4i(-3, -2, -1, 0), new Vec4i(4, 5, 6, 7)))
+    .add(a.select(b, inverted)).add(new Vec4i(marker, marker, marker, marker));
+}
+
+function coverUnsigned2(a: Vec2u, b: Vec2u): Vec2u {
+  const lt = a.lt(b);
+  const le = a.le(b);
+  const gt = a.gt(b);
+  const ge = a.ge(b);
+  const eq = a.eq(b);
+  const ne = a.ne(b);
+  const inverted = lt.not();
+  const marker: u32 = lt.any() || le.all() || gt.any() || ge.all()
+    || eq.any() || ne.all() || inverted.any() || inverted.all() ? 1 : 0;
+  return a.min(b).add(a.max(b)).add(a.clamp(new Vec2u(1, 2), new Vec2u(8, 9)))
+    .add(a.select(b, inverted)).add(new Vec2u(marker, marker));
+}
+
+function coverUnsigned3(a: Vec3u, b: Vec3u): Vec3u {
+  const lt = a.lt(b);
+  const le = a.le(b);
+  const gt = a.gt(b);
+  const ge = a.ge(b);
+  const eq = a.eq(b);
+  const ne = a.ne(b);
+  const inverted = lt.not();
+  const marker: u32 = lt.any() || le.all() || gt.any() || ge.all()
+    || eq.any() || ne.all() || inverted.any() || inverted.all() ? 1 : 0;
+  return a.min(b).add(a.max(b)).add(a.clamp(new Vec3u(1, 2, 3), new Vec3u(8, 9, 10)))
+    .add(a.select(b, inverted)).add(new Vec3u(marker, marker, marker));
+}
+
+function coverUnsigned4(a: Vec4u, b: Vec4u): Vec4u {
+  const lt = a.lt(b);
+  const le = a.le(b);
+  const gt = a.gt(b);
+  const ge = a.ge(b);
+  const eq = a.eq(b);
+  const ne = a.ne(b);
+  const inverted = lt.not();
+  const marker: u32 = lt.any() || le.all() || gt.any() || ge.all()
+    || eq.any() || ne.all() || inverted.any() || inverted.all() ? 1 : 0;
+  return a.min(b).add(a.max(b))
+    .add(a.clamp(new Vec4u(1, 2, 3, 4), new Vec4u(8, 9, 10, 11)))
+    .add(a.select(b, inverted)).add(new Vec4u(marker, marker, marker, marker));
+}
+
 
 function vectorKernel(res: VectorLayout, ctx: ComputeInvocation): void {
   const input: VectorInput = res.input.get(0);
@@ -142,17 +297,8 @@ function vectorKernel(res: VectorLayout, ctx: ComputeInvocation): void {
     .add(a.refract(b, 0.5))
     .add(a.faceForward(b, low));
 
-  const signedMask = input.signedA.lt(input.signedB).not();
-  output.signedValue = input.signedA.abs()
-    .add(input.signedA.min(input.signedB))
-    .add(input.signedA.max(input.signedB))
-    .add(input.signedA.clamp(new Vec4i(-3, -2, -1, 0), new Vec4i(4, 5, 6, 7)))
-    .add(input.signedA.select(input.signedB, signedMask));
-  const unsignedMask = input.unsignedA.ge(input.unsignedB);
-  output.unsignedValue = input.unsignedA.min(input.unsignedB)
-    .add(input.unsignedA.max(input.unsignedB))
-    .add(input.unsignedA.clamp(new Vec4u(1, 2, 3, 4), new Vec4u(8, 9, 10, 11)))
-    .add(input.unsignedA.select(input.unsignedB, unsignedMask));
+  output.signedValue = coverSigned4(input.signedA, input.signedB);
+  output.unsignedValue = coverUnsigned4(input.unsignedA, input.unsignedB);
 
   const lt = a.lt(b);
   const le = a.le(b);
@@ -168,6 +314,49 @@ function vectorKernel(res: VectorLayout, ctx: ComputeInvocation): void {
     eq.any() || ne.all() || inverted.any() || inverted.all() ? 1 : 0,
   );
   output.selectedValue = a.select(b, inverted);
+
+  output.width2Float = coverFloat2(
+    new Vec2f(a.x, a.y),
+    new Vec2f(b.x, b.y),
+    new Vec2f(low.x, low.y),
+    new Vec2f(high.x, high.y),
+  );
+  output.width3Float = coverFloat3(
+    new Vec3f(a.x, a.y, a.z),
+    new Vec3f(b.x, b.y, b.z),
+    new Vec3f(low.x, low.y, low.z),
+    new Vec3f(high.x, high.y, high.z),
+  );
+  output.width2Signed = coverSigned2(
+    new Vec2i(input.signedA.x, input.signedA.y),
+    new Vec2i(input.signedB.x, input.signedB.y),
+  );
+  output.width3Signed = coverSigned3(
+    new Vec3i(input.signedA.x, input.signedA.y, input.signedA.z),
+    new Vec3i(input.signedB.x, input.signedB.y, input.signedB.z),
+  );
+  output.width2Unsigned = coverUnsigned2(
+    new Vec2u(input.unsignedA.x, input.unsignedA.y),
+    new Vec2u(input.unsignedB.x, input.unsignedB.y),
+  );
+  output.width3Unsigned = coverUnsigned3(
+    new Vec3u(input.unsignedA.x, input.unsignedA.y, input.unsignedA.z),
+    new Vec3u(input.unsignedB.x, input.unsignedB.y, input.unsignedB.z),
+  );
+
+  output.orderStep = new Vec4f(-1.0, 0.25, 0.75, 2.0).step(new Vec4f(0.0, 0.5, 1.0, 3.0));
+  output.orderSmoothstep = new Vec4f(0.25, 0.5, 0.75, 1.0)
+    .smoothstep(new Vec4f(0.0, 0.0, 0.0, 0.0), new Vec4f(1.0, 1.0, 1.0, 1.0));
+  output.orderMix = new Vec4f(1.0, 2.0, 3.0, 4.0).mix(new Vec4f(5.0, 6.0, 7.0, 8.0), 0.25);
+  output.orderClamp = new Vec4f(-2.0, 0.5, 2.0, 8.0)
+    .clamp(new Vec4f(0.0, 1.0, 2.0, 3.0), new Vec4f(1.0, 2.0, 3.0, 4.0));
+  output.orderRefract = new Vec4f(1.0, 0.0, 0.0, 0.0)
+    .refract(new Vec4f(0.0, 1.0, 0.0, 0.0), 0.5);
+  output.orderFaceForward = new Vec4f(1.0, 2.0, 3.0, 4.0)
+    .faceForward(new Vec4f(1.0, 0.0, 0.0, 0.0), new Vec4f(-1.0, 0.0, 0.0, 0.0));
+  const orderSelectBase = new Vec4f(1.0, 7.0, 3.0, 9.0);
+  const orderSelectOther = new Vec4f(0.0, 8.0, 2.0, 10.0);
+  output.orderSelect = orderSelectBase.select(orderSelectOther, orderSelectBase.lt(orderSelectOther));
 
   const f3 = new Vec3f(a.x, a.y, a.z);
   output.swizzleFloat = new Vec4f(
@@ -260,11 +449,7 @@ export async function main(): Promise<void> {
     hostLayout.output = new MutStorage<VectorOutput>([new VectorOutput()]);
     simulateCompute<VectorLayout>(vectorKernel, hostLayout, vectorBuiltins, [1, 1, 1], vectorBuiltins_HOST_RUNNABLE);
     const host = hostLayout.output.get(0);
-    print(`host:k25-float=${host.exactFloat.x},${host.exactFloat.y},${host.exactFloat.z},${host.exactFloat.w};${host.transFloat.x},${host.transFloat.y},${host.transFloat.z},${host.transFloat.w}`);
-    print(`host:k25-integer=${host.signedValue.x},${host.signedValue.y},${host.signedValue.z},${host.signedValue.w};${host.unsignedValue.x},${host.unsignedValue.y},${host.unsignedValue.z},${host.unsignedValue.w}`);
-    print(`host:k26=${host.comparisonBits.x},${host.comparisonBits.y},${host.comparisonBits.z},${host.comparisonBits.w};${host.selectedValue.x},${host.selectedValue.y},${host.selectedValue.z},${host.selectedValue.w}`);
-    print(`host:k27-swizzles=${host.swizzleFloat.x},${host.swizzleFloat.y},${host.swizzleFloat.z},${host.swizzleFloat.w};${host.swizzleSigned.x},${host.swizzleSigned.y},${host.swizzleSigned.z},${host.swizzleSigned.w};${host.swizzleUnsigned.x},${host.swizzleUnsigned.y},${host.swizzleUnsigned.z},${host.swizzleUnsigned.w}`);
-    print(`host:k27-factories=${host.factoryFloat.x},${host.factoryFloat.y},${host.factoryFloat.z},${host.factoryFloat.w};${host.factorySigned.x},${host.factorySigned.y},${host.factorySigned.z},${host.factorySigned.w};${host.factoryUnsigned.x},${host.factoryUnsigned.y},${host.factoryUnsigned.z},${host.factoryUnsigned.w}`);
+    print(`host:k25-float=${host.exactFloat.x},${host.exactFloat.y},${host.exactFloat.z},${host.exactFloat.w},${host.transFloat.x},${host.transFloat.y},${host.transFloat.z},${host.transFloat.w};k25-integer=${host.signedValue.x},${host.signedValue.y},${host.signedValue.z},${host.signedValue.w},${host.unsignedValue.x},${host.unsignedValue.y},${host.unsignedValue.z},${host.unsignedValue.w};k26=${host.comparisonBits.x},${host.comparisonBits.y},${host.comparisonBits.z},${host.comparisonBits.w},${host.selectedValue.x},${host.selectedValue.y},${host.selectedValue.z},${host.selectedValue.w};k27-swizzles=${host.swizzleFloat.x},${host.swizzleFloat.y},${host.swizzleFloat.z},${host.swizzleFloat.w},${host.swizzleSigned.x},${host.swizzleSigned.y},${host.swizzleSigned.z},${host.swizzleSigned.w},${host.swizzleUnsigned.x},${host.swizzleUnsigned.y},${host.swizzleUnsigned.z},${host.swizzleUnsigned.w};k27-factories=${host.factoryFloat.x},${host.factoryFloat.y},${host.factoryFloat.z},${host.factoryFloat.w},${host.factorySigned.x},${host.factorySigned.y},${host.factorySigned.z},${host.factorySigned.w},${host.factoryUnsigned.x},${host.factoryUnsigned.y},${host.factoryUnsigned.z},${host.factoryUnsigned.w};width2=${host.width2Float.x},${host.width2Float.y},${host.width2Signed.x},${host.width2Signed.y},${host.width2Unsigned.x},${host.width2Unsigned.y};width3=${host.width3Float.x},${host.width3Float.y},${host.width3Float.z},${host.width3Signed.x},${host.width3Signed.y},${host.width3Signed.z},${host.width3Unsigned.x},${host.width3Unsigned.y},${host.width3Unsigned.z};step=${host.orderStep.x},${host.orderStep.y},${host.orderStep.z},${host.orderStep.w};smoothstep=${host.orderSmoothstep.x},${host.orderSmoothstep.y},${host.orderSmoothstep.z},${host.orderSmoothstep.w};mix=${host.orderMix.x},${host.orderMix.y},${host.orderMix.z},${host.orderMix.w};clamp=${host.orderClamp.x},${host.orderClamp.y},${host.orderClamp.z},${host.orderClamp.w};refract=${host.orderRefract.x},${host.orderRefract.y},${host.orderRefract.z},${host.orderRefract.w};faceForward=${host.orderFaceForward.x},${host.orderFaceForward.y},${host.orderFaceForward.z},${host.orderFaceForward.w};select=${host.orderSelect.x},${host.orderSelect.y},${host.orderSelect.z},${host.orderSelect.w}`);
     print(`vectorBuiltins_WGSL_LINES=${vectorBuiltins_WGSL.split("\n").length}`);
   }
   gpu.dispose();

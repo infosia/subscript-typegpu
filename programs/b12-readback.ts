@@ -1,6 +1,6 @@
 // program: b12-readback
-// purpose: round-trip typed values through a buffer-owned staging allocation
-// exercises: BF9-BF11, PI14, SC1
+// purpose: round-trip typed values through a buffer-owned staging buffer
+// exercises: BF9-BF11, SC1
 // questions: none
 
 import { Buffer, createBuffer } from "./typegpu";
@@ -43,13 +43,6 @@ export async function main(): Promise<void> {
   {
     using adapter = adapterResult;
     using device = deviceResult;
-    device.pushErrorScope("validation");
-    const validationError = await device.popErrorScope();
-    if (validationError !== null) {
-      print("pipeline:invalid");
-      print("FAIL");
-      return;
-    }
     const particles: FixedArray<Particle, 4> = [
       new Particle(0.5, new Vec3f(1.0, 2.0, 3.0)),
       new Particle(1.5, new Vec3f(4.0, 5.0, 6.0)),
