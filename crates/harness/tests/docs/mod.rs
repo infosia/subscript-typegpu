@@ -80,20 +80,17 @@ fn check_program_quotes(root: &Path, document_path: &Path) {
 }
 
 #[test]
-fn documentation_program_quotes_match_the_named_programs() {
+fn readme_and_documentation_program_quotes_match_the_named_programs() {
     let root = crate::repository_root();
     let docs_dir = root.join("docs");
-    let mut documents = std::fs::read_dir(&docs_dir)
-        .unwrap_or_else(|error| panic!("read {}: {error}", docs_dir.display()))
-        .map(|entry| entry.expect("documentation directory entry").path())
-        .filter(|path| path.extension().is_some_and(|extension| extension == "md"))
-        .collect::<Vec<_>>();
-    documents.sort();
-    assert!(
-        !documents.is_empty(),
-        "{} has no Markdown files",
-        docs_dir.display()
+    let mut documents = vec![root.join("README.md")];
+    documents.extend(
+        std::fs::read_dir(&docs_dir)
+            .unwrap_or_else(|error| panic!("read {}: {error}", docs_dir.display()))
+            .map(|entry| entry.expect("documentation directory entry").path())
+            .filter(|path| path.extension().is_some_and(|extension| extension == "md")),
     );
+    documents.sort();
     for document in documents {
         check_program_quotes(&root, &document);
     }

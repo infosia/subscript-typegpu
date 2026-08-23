@@ -92,3 +92,8 @@ question (P2 review M6), and the diagnostic sweep.
   the quote test scans every `docs/*.md` file. The document quotes
   TypeGPU's `tgpu` namespace, so `tools/hygiene.sh` exempts that one
   file from the banned-prefix check. `README.md` links both documents.
+  Rev 2, 2026-08-23: `README.md` states that the library reinterprets
+  TypeGPU's concepts for subscript and is not a port, quotes
+  `b04-particles` with the same `program=` fence, and pairs each quote
+  with its TypeGPU counterpart in one or two sentences. The quote test
+  scans `README.md` with `docs/*.md`.

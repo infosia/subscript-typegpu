@@ -41,6 +41,7 @@ EG7
 EG8
 EG9
 EG9 Rev 1
+EG9 Rev 2
 F10
 F11
 F11 Rev 1
