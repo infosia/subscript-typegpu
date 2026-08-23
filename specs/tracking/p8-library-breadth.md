@@ -108,6 +108,9 @@ Metal (yawgpu) 35.55 s, Dawn 32.88 s. `.wgsl` goldens for `b13` and
 
 ## Close
 
+The workspace re-pins subscript to `f99d4cb` (tracking commits after
+`1438b76`, no code change), as the R36 response asks.
+
 P8 slice 1 COMPLETE 2026-08-23. Open for a later slice: derivatives,
 pack/unpack, `Vec*i.abs` at the `i32` minimum (K25 states the
 domain).
