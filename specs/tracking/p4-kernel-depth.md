@@ -29,14 +29,22 @@ verbatim through a hand-written pipeline fails (w4); the same
 module without its early `return` passes (w5, w7) and with the
 `return` fails regardless of the loop (w6). Cause: `if (global >=
 1024u) { return; }` before `workgroupBarrier()` is a uniformity
-violation. naga did not report it, yawgpu's Tint compiled it, and
-Metal read the workgroup memory as zero. Resolution: K22 Rev 1
+violation. naga did not report it. Resolution: K22 Rev 1
 moves uniform placement into the generator (a taint rule over
 builtins, bindings, and helper results, and no `return` before a
 barrier), K24 gains three rejections, and `x08` loads under a
-condition and barriers unconditionally. Observation for the
-backend's owner: Dawn rejects this module at pipeline creation
-(docs), yawgpu accepted it.
+condition and barriers unconditionally.
+
+Corrected 2026-08-23 (plan §10 C4): the same probe with a
+`validation` error scope around `createShaderModule` and
+`createComputePipeline` shows that yawgpu (Metal) and Dawn both
+reject the module — "'workgroupBarrier' must only be called from
+uniform control flow" at the shader module, then "shader module
+must not be an error module" / "Invalid ShaderModule" at the
+pipeline. The zeros were read from an invalid pipeline. No backend
+defect exists, and no observation goes to yawgpu's owner. The gap
+was the program: no error scope, so a rejection looked like a
+numeric result. PI14 closes it.
 
 Round 2 landed at `9670180`: the taint rule, the conditional load in
 `x08`, three K24 fixtures. Live run by the planner outside the

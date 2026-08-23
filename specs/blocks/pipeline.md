@@ -107,6 +107,21 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   host computation (`simulateCompute` where CL3 applies), and prints
   `PASS`.
 
+## Backend rejections
+
+- **PI14 — A backend rejection is a visible failure.** Rev 0,
+  2026-08-23. Every program pushes a `validation` error scope before
+  its first `createShaderModule` and pops it after its last pipeline
+  creation. A popped error ends the program: an `x` program prints
+  `FAIL validation` and the error's first line, a `b` or `a`
+  program prints `pipeline:invalid` and then `FAIL` (T2: the
+  message text never enters a golden). The runtime helpers
+  `createComputePipeline` and `createRenderPipeline` document that
+  they run inside the caller's scope. A harness test asserts that
+  every program contains the push and the pop (a source check of the
+  program set through the HIR: one `pushErrorScope` before one
+  `popErrorScope`).
+
 ## Rejections
 
 - **PI13 — Each rejection is a named diagnostic with a red fixture.**

@@ -25,8 +25,10 @@ Subscript requests this project made and that landed: R33
 `fromBytes`), R35 (`check_program_with`, the discovery check). The
 pin is `bb9dadc`.
 
-Defects the live lane found that no validator reported: the
-barrier after a non-uniform early return (P4, K22 Rev 1 and Rev 3).
+Defects the live lane found that naga did not report: the barrier
+after a non-uniform early return (P4, K22 Rev 1 and Rev 3) — both
+backends rejected it at shader-module creation, and PI14 now makes
+such a rejection visible.
 Defects the phase reviews found that the gate could not see: the
 operator precedence after a method lowering, the `?:` lowering in a
 loop condition (P2), the duplicated `@builtin(position)` (P3), the

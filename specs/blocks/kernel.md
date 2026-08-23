@@ -187,8 +187,11 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   bodies, legal only as a statement in the kernel body, never in a
   helper. The generator enforces uniform placement itself, because
   `naga` did not reject a barrier after a non-uniform early return
-  and yawgpu's Tint did not either, while Metal then read every
-  workgroup value as zero (measured 2026-08-23, `x08`). The rule: a
+  (measured 2026-08-23, `x08`). Both backends reject such a module
+  at shader-module creation — Tint: "'workgroupBarrier' must only be
+  called from uniform control flow" — and a program without an
+  error scope then reads zeros from an invalid pipeline (corrected
+  2026-08-23, plan §10 C4). The rule: a
   barrier statement is legal at the kernel body's top level, or
   inside `while`, `for`, and `if` statements whose conditions are
   uniform. A uniform expression reads only literals, module
