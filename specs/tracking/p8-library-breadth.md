@@ -154,3 +154,19 @@ Evidence: `tools/gate.sh --require-backend` green, 238 passed, 142 s
 at load average 2.6 (slice 1 close: 114 s, 235 tests; the increment
 is four `b` programs on both tiers). `tools/live.sh` x01–x18 PASS:
 Metal (yawgpu) 47.12 s, Dawn 43.65 s.
+
+## Slice 2 phase review (2026-08-23)
+
+Fresh no-context review (Opus) of `6a204bf..3f5bbc3`: 1 CRITICAL,
+7 MAJOR, 15 MINOR. CRITICAL: the injected guard `if` is non-uniform
+control flow, so a barrier inside a guarded kernel is the K22 case
+with nothing to reject it. MAJOR: `dispatchTimed` skipped the guard
+write; two guarded dispatches into one encoder read the last count;
+`b16` wrote a 6-byte index buffer through the raw queue; the
+`map-failure` fixture lost its table row; the shell-name collision
+had no fixture; the typed factory's guard append ran in no program;
+two module orders with K14 unrevised. Resolutions: PI15 Rev 1
+(barrier and multi-layout rejections, `dispatchTimed` writes, one
+guarded dispatch per encoder with a trap), PI18 Rev 1, K14 Rev 5
+(one order, goldens regenerated), K31 wording. Code fixes in one
+Codex round.
