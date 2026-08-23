@@ -357,9 +357,22 @@ builtin.
 Differences:
 
 - `Vec2f`, `Vec3f`, and `Vec4f` have `add`, `sub`, `mul`, `scale`,
-  `dot`, `length`, and `normalize`. `Vec3f` has `cross`. The integer
-  vectors have `add`, `sub`, `mul`, `scale`, and `dot`. The `f16`
-  vectors declare no arithmetic.
+  `dot`, `length`, `normalize`, and the componentwise builtins
+  `abs`, `floor`, `ceil`, `fract`, `sqrt`, `exp`, `log`, `sin`,
+  `cos`, `tan`, `sign`, `min`, `max`, `clamp`, `pow`, `mix`, `step`,
+  `smoothstep`, `distance`, `reflect`, `refract`, and `faceForward`.
+  `Vec3f` has `cross`. The integer vectors have `add`, `sub`, `mul`,
+  `scale`, `dot`, `min`, `max`, and `clamp`, and the signed ones
+  `abs`. The `f16` vectors declare no arithmetic.
+- Comparisons are methods: `lt`, `le`, `gt`, `ge`, `eq`, and `ne`
+  return a `Vec2b`, `Vec3b`, or `Vec4b` with `any`, `all`, and
+  `not`. `select(other, mask)` picks per component. TypeGPU writes
+  `std.lt(a, b)` and `std.select`.
+- Swizzles are methods, because subscript has no user-defined
+  accessors: `v.xy()`, `v.xyz()`, and the other in-order subsets.
+  TypeGPU writes `v.xy`. Mixed constructors are free functions:
+  `v4fFrom3(v, w)`, `v3fFrom2(v, z)`, `v3fSplat(s)`, and the same
+  shapes for the integer families. TypeGPU writes `d.vec4f(v, w)`.
 - There is no operator on vectors. subscript has no operator
   overloading, and the library does not add a build step for it.
 - `scale(s)` multiplies by a scalar. `mul(v)` multiplies component by
@@ -676,7 +689,8 @@ These TypeGPU features have no equivalent.
 - `root.createGuardedComputePipeline` and default workgroup sizes.
 - `buffer.read()` with an automatic staging buffer, `buffer.clear`,
   `buffer.copyFrom`, `common.writeSoA`.
-- Operators on vectors, `std` as a namespace, `tsover`.
+- Operators on vectors, `std` as a namespace, `tsover`, swizzles as
+  properties, and the derivative builtins `dpdx`, `dpdy`, `fwidth`.
 - Integer and depth textures, texture dimensions other than 2D, sampler
   filters other than `nearest` on the host.
 - Render pipelines with multiple color targets, depth-stencil, or
