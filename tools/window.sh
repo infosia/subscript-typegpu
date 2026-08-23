@@ -13,9 +13,9 @@ shift
 
 backend=${SUBSCRIPT_TYPEGPU_BACKEND:-}
 case "$backend" in
-  default|metal|vulkan) ;;
+  default|metal|vulkan|gles|d3d11|d3d12) ;;
   *)
-    echo "window: set SUBSCRIPT_TYPEGPU_BACKEND to default, metal, or vulkan" >&2
+    echo "window: set SUBSCRIPT_TYPEGPU_BACKEND to default, metal, vulkan, gles, d3d11, or d3d12" >&2
     exit 1
     ;;
 esac

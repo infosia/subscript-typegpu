@@ -160,6 +160,7 @@ fn convert_part_descriptor(source: SubscriptTypegpuPartDescriptor) -> WGPUPartDe
 
 pub(crate) struct WebgpuTable {
     pub(crate) library: libloading::Library,
+    pub(crate) is_yawgpu: bool,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuMakeHub: unsafe extern "C" fn(*const WGPUHubDescriptor)-> WGPUHub,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
@@ -197,6 +198,12 @@ impl WebgpuTable {
         let library = unsafe { libloading::Library::new(path) };
         let library = library
             .map_err(|error| format!("load {}: {error}", path.display()))?;
+        // SAFETY: the marker is probed but never called.
+        let is_yawgpu = unsafe {
+            library
+                .get::<*const ()>(b"yawgpuDeviceCreateExternalTexture\0")
+                .is_ok()
+        };
         fn symbol<T: Copy>(
             library: &libloading::Library,
             path: &std::path::Path,
@@ -221,6 +228,7 @@ impl WebgpuTable {
             wgpuPartRelease: symbol(&library, path, b"wgpuPartRelease\0")?,
             wgpuGizmoRelease: symbol(&library, path, b"wgpuGizmoRelease\0")?,
             library,
+            is_yawgpu,
         })
     }
 }

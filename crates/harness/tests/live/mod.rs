@@ -95,7 +95,7 @@ fn live_tool_removes_the_default_backend_request() {
     let path = repository_root().join("tools/live.sh");
     let source = std::fs::read_to_string(&path)
         .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-    assert!(source.contains("default|metal|vulkan"));
+    assert!(source.contains("default|metal|vulkan|gles|d3d11|d3d12"));
     assert!(source
         .contains("if [ \"$backend\" = \"default\" ]; then\n  unset SUBSCRIPT_TYPEGPU_BACKEND"));
     assert!(source.contains("[ \"$backend\" = \"metal\" ]"));

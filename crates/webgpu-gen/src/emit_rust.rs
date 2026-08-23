@@ -109,7 +109,7 @@ fn function_signatures(declarations: &str) -> Vec<FunctionSignature> {
 fn render_webgpu_table(declarations: &str) -> String {
     let signatures = function_signatures(declarations);
     let mut out = String::from(
-        "pub(crate) struct WebgpuTable {\n    pub(crate) library: libloading::Library,\n",
+        "pub(crate) struct WebgpuTable {\n    pub(crate) library: libloading::Library,\n    pub(crate) is_yawgpu: bool,\n",
     );
     for signature in &signatures {
         out.push_str(&format!(
@@ -119,13 +119,23 @@ fn render_webgpu_table(declarations: &str) -> String {
         ));
     }
     out.push_str("}\n\nimpl WebgpuTable {\n    pub(crate) fn load(path: &std::path::Path) -> Result<Self, String> {\n        #[cfg(windows)]\n        // SAFETY: The library stays owned by the returned table.\n        // The Windows flag searches the backend directory for dependent libraries.\n        let library = unsafe {\n            libloading::os::windows::Library::load_with_flags(\n                path,\n                libloading::os::windows::LOAD_WITH_ALTERED_SEARCH_PATH,\n            )\n        }\n        .map(libloading::Library::from);\n        #[cfg(not(windows))]\n        // SAFETY: The library stays owned by the returned table.\n        let library = unsafe { libloading::Library::new(path) };\n        let library = library\n            .map_err(|error| format!(\"load {}: {error}\", path.display()))?;\n        fn symbol<T: Copy>(\n            library: &libloading::Library,\n            path: &std::path::Path,\n            name: &'static [u8],\n        ) -> Result<T, String> {\n            // SAFETY: each call uses the pinned webgpu.h signature for this symbol.\n            unsafe { library.get::<T>(name) }\n                .map(|value| *value)\n                .map_err(|error| {\n                    let name = std::str::from_utf8(&name[..name.len() - 1]).unwrap_or(\"<invalid>\");\n                    format!(\"missing symbol {name} in {}: {error}\", path.display())\n                })\n        }\n        Ok(Self {\n");
+    out = out.replace(
+        "        fn symbol<T: Copy>(",
+        "        // SAFETY: the marker is probed but never called.\n\
+         \x20       let is_yawgpu = unsafe {\n\
+         \x20           library\n\
+         \x20               .get::<*const ()>(b\"yawgpuDeviceCreateExternalTexture\\0\")\n\
+         \x20               .is_ok()\n\
+         \x20       };\n\
+         \x20       fn symbol<T: Copy>(",
+    );
     for signature in &signatures {
         out.push_str(&format!(
             "            {0}: symbol(&library, path, b\"{0}\\0\")?,\n",
             signature.name
         ));
     }
-    out.push_str("            library,\n        })\n    }\n}\n\n");
+    out.push_str("            library,\n            is_yawgpu,\n        })\n    }\n}\n\n");
     for signature in &signatures {
         out.push_str(&format!(
             "unsafe fn {name}({params}){result} {{\n    let Some(table) = crate::runtime::table() else {{\n        eprintln!(\"subscript-typegpu: cannot call {name}: set SUBSCRIPT_TYPEGPU_BACKEND_LIB\");\n        std::process::abort();\n    }};\n    // SAFETY: the table stores the pinned signature for this symbol.\n    unsafe {{ (table.{name})({args}) }}\n}}\n\n",
@@ -157,6 +167,8 @@ mod tests {
         assert!(table.contains("wgpuWithCallback: unsafe extern \"C\" fn"));
         assert!(table.contains("wgpuDocumented: unsafe extern \"C\" fn"));
         assert!(table.contains("(table.wgpuWithCallback)(callback, userdata)"));
+        assert!(table.contains("pub(crate) is_yawgpu: bool"));
+        assert!(table.contains("yawgpuDeviceCreateExternalTexture"));
     }
 }
 
@@ -245,6 +257,14 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
     if let Some(instance_descriptor) = instance_descriptor {
         pointer_only.retain(|name| name != instance_descriptor);
     }
+    let request_adapter_options = async_ops
+        .iter()
+        .find(|op| op.wgpu_fn == "wgpuInstanceRequestAdapter")
+        .and_then(|op| op.dropped_arg.as_ref())
+        .map(|(_, options)| options.as_str());
+    if let Some(request_adapter_options) = request_adapter_options {
+        pointer_only.retain(|name| name != request_adapter_options);
+    }
     out.push_str(&handles::rust_wgpu_opaque_block(
         &all_objects,
         needs_opaque_chain,
@@ -256,6 +276,12 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
     if let Some(instance_descriptor) = instance_descriptor {
         out.push('\n');
         out.push_str(&sync::rust_instance_backend_types(instance_descriptor));
+    }
+    if let Some(request_adapter_options) = request_adapter_options {
+        out.push('\n');
+        out.push_str(&future_poll::rust_request_adapter_options(
+            request_adapter_options,
+        ));
     }
 
     for op in &shader_ops {

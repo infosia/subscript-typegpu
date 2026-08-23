@@ -13,6 +13,21 @@ pub(crate) const COMPLETED_COMMENT: &str = "/*\n * 0 = pending, 1 = success, neg
 
 pub(crate) const TAKE_COMMENT: &str = "/*\n * NULL until the future completed successfully; ownership transfers\n * once — a second take returns NULL.\n */";
 
+/// Private webgpu.h request-adapter options with INIT-compatible fields.
+pub(crate) fn rust_request_adapter_options(options: &str) -> String {
+    format!(
+        "#[repr(C)]\n\
+         struct {options} {{\n\
+         \x20   next_in_chain: *mut WGPUChainedStruct,\n\
+         \x20   feature_level: i32,\n\
+         \x20   power_preference: i32,\n\
+         \x20   force_fallback_adapter: u32,\n\
+         \x20   backend_type: i32,\n\
+         \x20   compatible_surface: *mut c_void,\n\
+         }}\n"
+    )
+}
+
 pub(crate) fn c_request_decl(op: &AsyncOp, anchor: &str) -> String {
     let anchor_param = format!(
         "{} {}",
@@ -238,6 +253,7 @@ pub(crate) fn rust_request_export(
         .map(|(name, _)| naming::camel(name))
         .unwrap_or_else(|| "descriptor".to_string());
     let request_device = device_events && op.wgpu_fn == "wgpuAdapterRequestDevice";
+    let request_adapter = op.wgpu_fn == "wgpuInstanceRequestAdapter";
     let export_name = if op.device_descriptor {
         format!("{}_with_descriptor", op.subscript_typegpu_fn)
     } else {
@@ -327,8 +343,34 @@ pub(crate) fn rust_request_export(
     } else {
         "std::ptr::null_mut()"
     };
+    let adapter_setup = if request_adapter {
+        concat!(
+            "    let requested_backend = std::env::var_os(\"SUBSCRIPT_TYPEGPU_BACKEND\");\n",
+            "    let backend_type = match requested_backend.as_deref().and_then(std::ffi::OsStr::to_str) {\n",
+            "        None if requested_backend.is_none() => None,\n",
+            "        Some(\"metal\") => Some(WGPUBackendType_Metal),\n",
+            "        Some(\"vulkan\") => Some(WGPUBackendType_Vulkan),\n",
+            "        Some(\"gles\") => Some(WGPUBackendType_OpenGLES),\n",
+            "        Some(\"d3d11\") => Some(WGPUBackendType_D3D11),\n",
+            "        Some(\"d3d12\") => Some(WGPUBackendType_D3D12),\n",
+            "        _ => return 0,\n",
+            "    };\n",
+            "    let options = backend_type.map(|backend_type| WGPURequestAdapterOptions {\n",
+            "        next_in_chain: std::ptr::null_mut(),\n",
+            "        feature_level: 0,\n",
+            "        power_preference: 0,\n",
+            "        force_fallback_adapter: 0,\n",
+            "        backend_type,\n",
+            "        compatible_surface: std::ptr::null_mut(),\n",
+            "    });\n",
+            "    let options = options.as_ref().map_or(std::ptr::null(), |value| value);\n",
+        )
+    } else {
+        ""
+    };
     let call_args = match (&op.dropped_arg, request_device) {
         (Some(_), true) => format!("{recv}.cast(), &descriptor, info"),
+        (Some(_), false) if request_adapter => format!("{recv}.cast(), options, info"),
         (Some(_), false) => format!("{recv}.cast(), std::ptr::null(), info"),
         (None, _) => format!("{recv}.cast(), info"),
     };
@@ -344,6 +386,7 @@ pub(crate) fn rust_request_export(
          \x20   if {recv}.is_null() {{\n\
          \x20       return 0;\n\
          \x20   }}\n\
+         {adapter_setup}\
          \x20   let (id, userdata1) = runtime::new_pending_slot({instance} as usize, {kind});\n\
          {event_setup}\
          \x20   let info = {info} {{\n\

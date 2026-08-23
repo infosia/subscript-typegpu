@@ -59,8 +59,6 @@ opaque!(
     WGPURenderBundleEncoderImpl,
     WGPURenderBundleImpl,
     WGPUQuerySetImpl,
-    // Pointer-only in this subset (always null / never built):
-    WGPURequestAdapterOptions,
 );
 
 type WGPUInstance = *mut WGPUInstanceImpl;
@@ -112,6 +110,16 @@ const YAWGPU_INSTANCE_BACKEND_NOOP: u32 = 0;
 const YAWGPU_INSTANCE_BACKEND_METAL: u32 = 1;
 const YAWGPU_INSTANCE_BACKEND_VULKAN: u32 = 2;
 const YAWGPU_INSTANCE_BACKEND_GLES: u32 = 3;
+
+#[repr(C)]
+struct WGPURequestAdapterOptions {
+    next_in_chain: *mut WGPUChainedStruct,
+    feature_level: i32,
+    power_preference: i32,
+    force_fallback_adapter: u32,
+    backend_type: i32,
+    compatible_surface: *mut c_void,
+}
 
 /// webgpu.h `WGPUChainedStruct`; concrete for WGSL source construction.
 #[repr(C)]
@@ -3620,6 +3628,7 @@ fn convert_render_bundle_descriptor(source: SubscriptTypegpuRenderBundleDescript
 
 pub(crate) struct WebgpuTable {
     pub(crate) library: libloading::Library,
+    pub(crate) is_yawgpu: bool,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuCreateInstance: unsafe extern "C" fn(*const WGPUInstanceDescriptor)-> WGPUInstance,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
@@ -3933,6 +3942,12 @@ impl WebgpuTable {
         let library = unsafe { libloading::Library::new(path) };
         let library = library
             .map_err(|error| format!("load {}: {error}", path.display()))?;
+        // SAFETY: the marker is probed but never called.
+        let is_yawgpu = unsafe {
+            library
+                .get::<*const ()>(b"yawgpuDeviceCreateExternalTexture\0")
+                .is_ok()
+        };
         fn symbol<T: Copy>(
             library: &libloading::Library,
             path: &std::path::Path,
@@ -4095,6 +4110,7 @@ impl WebgpuTable {
             wgpuDeviceRelease: symbol(&library, path, b"wgpuDeviceRelease\0")?,
             wgpuAdapterRelease: symbol(&library, path, b"wgpuAdapterRelease\0")?,
             library,
+            is_yawgpu,
         })
     }
 }
@@ -6669,22 +6685,33 @@ pub extern "C" fn subscript_typegpu_create_instance() -> SubscriptTypegpuInstanc
     let requested_backend = std::env::var_os("SUBSCRIPT_TYPEGPU_BACKEND");
     let backend = match requested_backend.as_deref().and_then(std::ffi::OsStr::to_str) {
         None if requested_backend.is_none() => None,
-        Some("metal") => Some(("metal", YAWGPU_INSTANCE_BACKEND_METAL)),
-        Some("vulkan") => Some(("vulkan", YAWGPU_INSTANCE_BACKEND_VULKAN)),
-        Some("gles") => Some(("gles", YAWGPU_INSTANCE_BACKEND_GLES)),
+        Some("metal") => Some(("metal", Some(YAWGPU_INSTANCE_BACKEND_METAL))),
+        Some("vulkan") => Some(("vulkan", Some(YAWGPU_INSTANCE_BACKEND_VULKAN))),
+        Some("gles") => Some(("gles", Some(YAWGPU_INSTANCE_BACKEND_GLES))),
+        Some("d3d11") => Some(("d3d11", None)),
+        Some("d3d12") => Some(("d3d12", None)),
         _ => {
             let value = requested_backend.as_deref().map_or_else(
                 || "<non-UTF-8>".into(),
                 |value| value.to_string_lossy(),
             );
-            eprintln!("subscript-typegpu: unknown SUBSCRIPT_TYPEGPU_BACKEND value `{value}`; expected metal, vulkan, or gles");
+            eprintln!("subscript-typegpu: unknown SUBSCRIPT_TYPEGPU_BACKEND value `{value}`; expected metal, vulkan, gles, d3d11, or d3d12");
             return std::ptr::null_mut();
         }
     };
     if !runtime::initialize_table() {
         return std::ptr::null_mut();
     }
-    let mut select = backend.map(|(_, backend)| YawgpuInstanceBackendSelect {
+    let is_yawgpu = runtime::table().is_some_and(|table| table.is_yawgpu);
+    if is_yawgpu {
+        if let Some((request, None)) = backend {
+            eprintln!("subscript-typegpu: backend `{request}` is not a yawgpu backend");
+            return std::ptr::null_mut();
+        }
+    }
+    let mut select = backend.and_then(|(_, backend)| {
+        is_yawgpu.then_some(backend).flatten()
+    }).map(|backend| YawgpuInstanceBackendSelect {
         chain: YawgpuChainedStruct {
             next: std::ptr::null_mut(),
             s_type: YAWGPU_STYPE_INSTANCE_BACKEND_SELECT,
@@ -6745,6 +6772,25 @@ pub extern "C" fn subscript_typegpu_instance_request_adapter(
     if instance.is_null() {
         return 0;
     }
+    let requested_backend = std::env::var_os("SUBSCRIPT_TYPEGPU_BACKEND");
+    let backend_type = match requested_backend.as_deref().and_then(std::ffi::OsStr::to_str) {
+        None if requested_backend.is_none() => None,
+        Some("metal") => Some(WGPUBackendType_Metal),
+        Some("vulkan") => Some(WGPUBackendType_Vulkan),
+        Some("gles") => Some(WGPUBackendType_OpenGLES),
+        Some("d3d11") => Some(WGPUBackendType_D3D11),
+        Some("d3d12") => Some(WGPUBackendType_D3D12),
+        _ => return 0,
+    };
+    let options = backend_type.map(|backend_type| WGPURequestAdapterOptions {
+        next_in_chain: std::ptr::null_mut(),
+        feature_level: 0,
+        power_preference: 0,
+        force_fallback_adapter: 0,
+        backend_type,
+        compatible_surface: std::ptr::null_mut(),
+    });
+    let options = options.as_ref().map_or(std::ptr::null(), |value| value);
     let (id, userdata1) = runtime::new_pending_slot(instance as usize, SLOT_KIND_REQUEST_ADAPTER);
     let info = WGPURequestAdapterCallbackInfo {
         next_in_chain: std::ptr::null_mut(),
@@ -6755,7 +6801,7 @@ pub extern "C" fn subscript_typegpu_instance_request_adapter(
     };
     // SAFETY: non-null receiver; NULL options is allowed and
     // callback userdata remains live until completion or release.
-    let _ = unsafe { wgpuInstanceRequestAdapter(instance.cast(), std::ptr::null(), info) };
+    let _ = unsafe { wgpuInstanceRequestAdapter(instance.cast(), options, info) };
     id
 }
 

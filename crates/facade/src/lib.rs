@@ -37,7 +37,7 @@ mod tests {
             );
             assert_eq!(
                 String::from_utf8_lossy(&output.stderr).trim(),
-                "subscript-typegpu: unknown SUBSCRIPT_TYPEGPU_BACKEND value `unknown-test-backend`; expected metal, vulkan, or gles"
+                "subscript-typegpu: unknown SUBSCRIPT_TYPEGPU_BACKEND value `unknown-test-backend`; expected metal, vulkan, gles, d3d11, or d3d12"
             );
             return;
         }

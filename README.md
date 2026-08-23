@@ -191,11 +191,13 @@ Most names do not.
 
 `SUBSCRIPT_TYPEGPU_BACKEND_LIB` must name the backend shared library for backend-required gates and device runs.
 
-`SUBSCRIPT_TYPEGPU_BACKEND` selects a yawgpu backend. The accepted values are `metal`, `vulkan`, and `gles`.
+`SUBSCRIPT_TYPEGPU_BACKEND` selects the adapter backend. The accepted values are `metal`, `vulkan`, `gles`, `d3d11`, and `d3d12`.
 
 If `SUBSCRIPT_TYPEGPU_BACKEND` is absent, the library selects its default. The yawgpu default is Noop. The gate never sets this variable.
 
-`tools/live.sh` also accepts `default`. This value sends no selection chain to a library that ignores the yawgpu extension.
+`tools/live.sh` and `tools/window.sh` also accept `default`. This value sends no backend request.
+
+On Windows, place `vulkan-1.dll` and `d3dcompiler_47.dll` beside `webgpu_dawn.dll`. Dawn loads them from the library directory, not from `System32`. A missing library fails with `DynamicLib.Open: ... Windows Error: 87`.
 
 `SUBSCRIPT_TYPEGPU_UPSTREAM_DIR` names a TypeGPU checkout for the optional golden-vector tool.
 
