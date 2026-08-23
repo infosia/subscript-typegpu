@@ -1,6 +1,6 @@
 // program: x14-live-vector-builtins
-// purpose: compare the GPU vector surface with simulateCompute through the BF3 readback path
-// exercises: BF3, CL1, CL2, K10, K25, K26, K27, PI14
+// purpose: compare the GPU vector surface with simulateCompute through an owned staging buffer
+// exercises: BF9, BF11, CL1, CL2, K10, K25, K26, K27, PI14
 // questions: none
 // tolerance: sqrt, exp, log, sin, cos, tan, pow, mix, smoothstep, distance, reflect, refract, and faceForward use 2^-16 relative tolerance
 
@@ -14,7 +14,6 @@ import {
   createBuffer,
   createComputePipeline,
   MutStorage,
-  readBuffer,
   simulateComputeThreads,
   Storage,
 } from "./typegpu";
@@ -47,7 +46,7 @@ import {
   v4uFrom3,
   v4uSplat,
 } from "./typegpu-types";
-import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice, GPUMapMode } from "./webgpu";
+import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
 import {
   VectorInput_STRIDE,
   VectorOutput_STRIDE,
@@ -251,7 +250,6 @@ export async function main(): Promise<void> {
     using device = deviceResult;
     using input: Buffer<VectorInput> = createBuffer<VectorInput>(device, VectorInput_STRIDE, 1, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST, "x14-input");
     using output: Buffer<VectorOutput> = createBuffer<VectorOutput>(device, VectorOutput_STRIDE, 1, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC, "x14-output");
-    using readback: Buffer<VectorOutput> = createBuffer<VectorOutput>(device, VectorOutput_STRIDE, 1, GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST, "x14-readback");
     const source = inputValue();
     input.writeOne(device.queue(), 0, Context.bytesOf<VectorInput>(source));
     output.writeOne(device.queue(), 0, Context.bytesOf<VectorOutput>(new VectorOutput()));
@@ -269,15 +267,10 @@ export async function main(): Promise<void> {
     using bindGroup = createBindGroup(device, nativeLayout, vectorBuiltins_LAYOUT0, [bufferResource(input.handle()), bufferResource(output.handle())]);
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], 1, 1, 1);
-    output.copyTo(encoder, readback, 0, 1);
     using command = encoder.finishDefault();
     device.queue().submit([command]);
-    if (!await readback.handle().mapAsync(GPUMapMode.READ, 0, VectorOutput_STRIDE as u64)) {
-      print("FAIL map");
-      return;
-    }
-    const gpuOutput: VectorOutput = Context.fromBytes<VectorOutput>(readBuffer<VectorOutput>(readback, 0, 1), 0);
-    readback.handle().unmap();
+    const gpuBytes: u8[] = await output.read(device, 0, 1);
+    const gpuOutput: VectorOutput = Context.fromBytes<VectorOutput>(gpuBytes, 0);
     const hostLayout = new VectorLayout();
     hostLayout.input = new Storage<VectorInput>([source]);
     hostLayout.output = new MutStorage<VectorOutput>([new VectorOutput()]);

@@ -81,6 +81,21 @@ fn runtime_traps_are_named_and_numbered() {
             false,
         ),
         (
+            "map-failure.ts",
+            "BF9 Buffer.read elementIndex=0 elementCount=1 count=1",
+            false,
+        ),
+        (
+            "read-without-copy-src.ts",
+            "BF10 Buffer.read usage=8",
+            false,
+        ),
+        (
+            "write-without-copy-dst.ts",
+            "BF10 Buffer.write usage=4",
+            false,
+        ),
+        (
             "resource-kind-mismatch.ts",
             "TX4 createBindGroup binding=3 expected=texture actual=buffer",
             false,

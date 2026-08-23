@@ -18,6 +18,7 @@ import {
   GPUSamplerDescriptor,
   GPUShaderStage,
   GPUBufferUsage,
+  GPUMapMode,
   GPUTextureView,
   GPUVertexAttribute,
   GPUVertexBufferLayout,
@@ -145,14 +146,19 @@ export class Buffer<T> {
   buffer: GPUBuffer;
   elementSize: u32;
   count: u32;
+  usage: u64;
 
-  constructor(buffer: GPUBuffer, elementSize: u32, count: u32) {
+  constructor(buffer: GPUBuffer, elementSize: u32, count: u32, usage: u64) {
     this.buffer = buffer;
     this.elementSize = elementSize;
     this.count = count;
+    this.usage = usage;
   }
 
   write(queue: GPUQueue, elementIndex: u32, bytes: u8[]): void {
+    if ((this.usage & GPUBufferUsage.COPY_DST) === 0) {
+      authorTrap("BF10", "Buffer.write", `usage=${this.usage}`);
+    }
     const byteLength: u32 = bytes.length as u32;
     const remainder: u32 = byteLength % this.elementSize;
     if (remainder !== 0) {
@@ -220,6 +226,36 @@ export class Buffer<T> {
     );
   }
 
+  async read(device: GPUDevice, elementIndex: u32, elementCount: u32): Promise<u8[]> {
+    if ((this.usage & GPUBufferUsage.COPY_SRC) === 0) {
+      authorTrap("BF10", "Buffer.read", `usage=${this.usage}`);
+    }
+    const staging: Buffer<T> = createBuffer<T>(
+      device,
+      this.elementSize,
+      elementCount,
+      GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
+      "typegpu-read-staging",
+    );
+    using encoder = device.createCommandEncoderDefault();
+    this.copyTo(encoder, staging, elementIndex, elementCount);
+    using command = encoder.finishDefault();
+    device.queue().submit([command]);
+    const byteLength: u64 = (elementCount as u64) * (this.elementSize as u64);
+    if (!await staging.handle().mapAsync(GPUMapMode.READ, 0, byteLength)) {
+      staging.dispose();
+      authorTrap("BF9", "Buffer.read", `elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`);
+    }
+    const bytes: u8[] = readBuffer<T>(staging, 0, elementCount);
+    staging.handle().unmap();
+    staging.dispose();
+    return bytes;
+  }
+
+  async readOne(device: GPUDevice, elementIndex: u32): Promise<u8[]> {
+    return await this.read(device, elementIndex, 1);
+  }
+
   handle(): GPUBuffer {
     return this.buffer;
   }
@@ -272,6 +308,7 @@ export function createBuffer<T>(
     }),
     elementSize,
     count,
+    usage,
   );
 }
 

@@ -53,3 +53,17 @@ subscript `ac9436f` (contract `4652964`, compiler.md §64) admits an
 `async` method on a generic class and a generic `async` function.
 The workspace re-pins to `ac9436f`. BF9 Rev 1: the return type is
 `Promise<u8[]>`, and a failed map traps with `BF9`. Step 1 proceeds.
+
+## Step 1 (2026-08-23)
+
+`Buffer<T>.read` and `readOne` own the staging buffer (BF9 Rev 1),
+`createBuffer<T>` stores the usage and BF10 traps, `b12-readback`
+(both tiers), `x14` reads through `read`. Scratch reds: BF9 through
+a one-byte staging map that Noop refuses (`BF9 Buffer.read
+elementIndex=0 elementCount=1 count=1`), BF10 `read` (`usage=8`),
+BF10 `write` (`usage=4`).
+
+Evidence: `tools/gate.sh --require-backend` green, 235 passed, 132 s
+at load average 6.2 (the owner's subscript work shares the machine).
+`tools/live.sh` x01–x14 PASS: Metal 34.79 s, Dawn 32.15 s. The idle
+re-measurement stays open.
