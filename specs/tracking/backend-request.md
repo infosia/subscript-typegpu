@@ -60,3 +60,15 @@ Vulkan, and Dawn D3D12, and passed on Metal. Measured bytes: `got
 `0.5` times 255 is the exact tie `127.5`, and the float-to-unorm
 rounding of a tie is implementation-defined. The rule is RN14 Rev 1.
 The fix changes the constant to `0.6` (153 on both vendors).
+
+## Reference-machine check (2026-08-24)
+
+The merge at `7eb7d79` on the reference machine (Apple M2, macOS):
+`tools/gate.sh --require-backend` green, 247 passed, 1 ignored,
+177 s. `tools/live.sh` x01–x18 PASS: Metal (yawgpu, the marker probe
+and the chain) 51.77 s, Dawn (`default`) 47.18 s.
+`tools/window.sh examples/window-triangle/main.ts --frames 60` on
+Metal: `window:frames=60`, exit 0. The 246-versus-243 count question
+in `specs/tracking/windows.md` closes as 247 on both sides of this
+merge: the tree gained three tests with the backend request, and the
+windows re-check ran before them.
