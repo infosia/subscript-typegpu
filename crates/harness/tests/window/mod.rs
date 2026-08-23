@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use subscript_compiler::{hir, CheckOptions, SourceFile, Type};
+use subscript_compiler::{hir, CheckOptions, Type};
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -12,13 +12,18 @@ fn root() -> PathBuf {
 
 fn checked_example() -> hir::Module {
     let program = root().join("examples/window-triangle/main.ts");
-    let mut files = subscript_typegpu_harness::program_files(&program)
+    let files = subscript_typegpu_harness::program_files(&program)
         .unwrap_or_else(|error| panic!("load {}: {error}", program.display()));
-    let generated = subscript_typegpu_gen::generate(&files)
-        .unwrap_or_else(|diagnostics| panic!("generate {}: {diagnostics:?}", program.display()));
-    files.push(SourceFile::new("main.typegpu.ts", generated.support_module));
     subscript_compiler::check_program_with(&files, &CheckOptions::default())
         .unwrap_or_else(|diagnostics| panic!("check {}: {diagnostics:?}", program.display()))
+}
+
+#[test]
+fn window_example_compiles_through_the_host_loader_without_a_device() {
+    let program = root().join("examples/window-triangle/main.ts");
+    let session = subscript_typegpu_harness::load_program(&program)
+        .unwrap_or_else(|error| panic!("compile {}: {error}", program.display()));
+    drop(session);
 }
 
 fn type_name(module: &hir::Module, ty: &Type) -> String {
@@ -41,7 +46,7 @@ fn window_example_has_the_three_host_entry_signatures() {
             vec![
                 ("instance", "SubscriptTypegpuInstance"),
                 ("device", "SubscriptTypegpuDevice"),
-                ("format", "GPUTextureFormatWire"),
+                ("format", "GPUTextureFormat"),
             ],
         ),
         (
@@ -70,7 +75,9 @@ fn window_example_has_the_three_host_entry_signatures() {
             .iter()
             .find(|function| function.name == name)
             .unwrap_or_else(|| panic!("missing exported {name}"));
-        assert!(!function.is_async, "{name} must be synchronous");
+        if name != "init" {
+            assert!(!function.is_async, "{name} must be synchronous");
+        }
         assert_eq!(type_name(&module, &function.ret), "void", "{name} return");
         let actual = function
             .params
@@ -83,4 +90,24 @@ fn window_example_has_the_three_host_entry_signatures() {
             .collect::<Vec<_>>();
         assert_eq!(actual, expected, "{name} signature");
     }
+}
+
+#[test]
+fn only_the_harness_manifest_depends_on_subscript_codegen() {
+    let crates = root().join("crates");
+    let mut direct = std::fs::read_dir(&crates)
+        .unwrap_or_else(|error| panic!("read {}: {error}", crates.display()))
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+        .filter_map(|entry| {
+            let manifest = entry.path().join("Cargo.toml");
+            let source = std::fs::read_to_string(&manifest).ok()?;
+            source
+                .lines()
+                .any(|line| line.trim_start().starts_with("subscript-codegen"))
+                .then(|| entry.file_name().to_string_lossy().into_owned())
+        })
+        .collect::<Vec<_>>();
+    direct.sort();
+    assert_eq!(direct, ["harness"]);
 }

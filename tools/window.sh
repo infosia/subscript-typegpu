@@ -4,11 +4,12 @@ set -eu
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$repo_root"
 
-if [ "$#" -ne 1 ]; then
-  echo "usage: tools/window.sh <program.ts>" >&2
+if [ "$#" -lt 1 ]; then
+  echo "usage: tools/window.sh <program.ts> [--frames <n>]" >&2
   exit 2
 fi
 program=$1
+shift
 
 backend=${SUBSCRIPT_TYPEGPU_BACKEND:-}
 case "$backend" in
@@ -37,4 +38,4 @@ fi
 
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}"
 cargo build --offline -p subscript-typegpu-window
-exec target/debug/subscript-typegpu-window "$program"
+exec target/debug/subscript-typegpu-window "$program" "$@"

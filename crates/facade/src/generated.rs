@@ -3619,7 +3619,7 @@ fn convert_render_bundle_descriptor(source: SubscriptTypegpuRenderBundleDescript
 }
 
 pub(crate) struct WebgpuTable {
-    pub(crate) _library: libloading::Library,
+    pub(crate) library: libloading::Library,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuCreateInstance: unsafe extern "C" fn(*const WGPUInstanceDescriptor)-> WGPUInstance,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
@@ -4094,7 +4094,7 @@ impl WebgpuTable {
             wgpuQueueRelease: symbol(&library, path, b"wgpuQueueRelease\0")?,
             wgpuDeviceRelease: symbol(&library, path, b"wgpuDeviceRelease\0")?,
             wgpuAdapterRelease: symbol(&library, path, b"wgpuAdapterRelease\0")?,
-            _library: library,
+            library,
         })
     }
 }

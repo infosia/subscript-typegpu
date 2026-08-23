@@ -159,7 +159,7 @@ fn convert_part_descriptor(source: SubscriptTypegpuPartDescriptor) -> WGPUPartDe
 }
 
 pub(crate) struct WebgpuTable {
-    pub(crate) _library: libloading::Library,
+    pub(crate) library: libloading::Library,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuMakeHub: unsafe extern "C" fn(*const WGPUHubDescriptor)-> WGPUHub,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
@@ -220,7 +220,7 @@ impl WebgpuTable {
             wgpuGizmoWritePart: symbol(&library, path, b"wgpuGizmoWritePart\0")?,
             wgpuPartRelease: symbol(&library, path, b"wgpuPartRelease\0")?,
             wgpuGizmoRelease: symbol(&library, path, b"wgpuGizmoRelease\0")?,
-            _library: library,
+            library,
         })
     }
 }

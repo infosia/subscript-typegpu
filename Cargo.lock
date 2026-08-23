@@ -2100,10 +2100,6 @@ dependencies = [
  "objc2-app-kit",
  "objc2-quartz-core",
  "raw-window-handle",
- "subscript-codegen",
- "subscript-compiler",
- "subscript-typegpu-facade",
- "subscript-typegpu-gen",
  "subscript-typegpu-harness",
  "winit",
 ]

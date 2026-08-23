@@ -1,11 +1,10 @@
 use std::ffi::c_void;
-use std::path::{Path, PathBuf};
+use std::io::Write;
+use std::path::PathBuf;
 
+use facade::surface;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use subscript_codegen::{EntryArg, ReloadSession};
-use subscript_compiler::SourceFile;
-use subscript_typegpu_facade as facade;
-use subscript_typegpu_facade::surface;
+use subscript_typegpu_harness::{native as facade, EntryArg, ProgramLoadError, ReloadSession};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, WindowEvent};
@@ -13,18 +12,15 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
 
-fn program_files(program: &Path) -> Result<Vec<SourceFile>, String> {
-    let mut files = subscript_typegpu_harness::program_files(program)?;
-    let generated = subscript_typegpu_gen::generate(&files)
-        .map_err(|diagnostics| subscript_compiler::render_diagnostics(&files, &diagnostics))?;
-    files.push(SourceFile::new("main.typegpu.ts", generated.support_module));
-    Ok(files)
+enum WindowError {
+    Compile(ProgramLoadError),
+    Host(String),
 }
 
-fn load_session(program: &Path) -> Result<ReloadSession, String> {
-    let files = program_files(program)?;
-    ReloadSession::new_with_native_libraries(&files, &[subscript_typegpu_harness::facade_library()])
-        .map_err(|error| format!("compile: {error}"))
+impl From<String> for WindowError {
+    fn from(message: String) -> Self {
+        Self::Host(message)
+    }
 }
 
 fn create_surface(
@@ -52,12 +48,12 @@ fn create_surface(
         if layer.is_null() {
             return Err("CAMetalLayer creation returned null".to_owned());
         }
-        view.setWantsLayer(true);
         // SAFETY: `layer` is a live CAMetalLayer and setLayer retains it.
         unsafe { view.setLayer(Some(&*layer)) };
+        view.setWantsLayer(true);
         let source = surface::WGPUSurfaceSourceMetalLayer {
             chain: surface::WGPUChainedStruct {
-                next: std::ptr::null(),
+                next: std::ptr::null_mut(),
                 sType: surface::WGPUSType_SurfaceSourceMetalLayer,
             },
             layer: layer.cast::<c_void>(),
@@ -89,7 +85,7 @@ fn create_surface(
         };
         let source = surface::WGPUSurfaceSourceWindowsHWND {
             chain: surface::WGPUChainedStruct {
-                next: std::ptr::null(),
+                next: std::ptr::null_mut(),
                 sType: surface::WGPUSType_SurfaceSourceWindowsHWND,
             },
             hinstance: handle
@@ -124,18 +120,51 @@ fn create_surface(
 fn await_future(
     instance: facade::SubscriptTypegpuInstance,
     future: facade::SubscriptTypegpuFutureId,
-    step: &str,
+    kind: FutureKind,
 ) -> Result<(), String> {
     loop {
         let status = facade::subscript_typegpu_future_status(instance, future);
-        if status == 1 {
-            return Ok(());
+        match status {
+            0 => facade::subscript_typegpu_instance_process_events(instance),
+            1 => return Ok(()),
+            failure => {
+                facade::subscript_typegpu_future_drop(instance, future);
+                return Err(format!(
+                    "{} failed with {} ({failure})",
+                    kind.step(),
+                    kind.status_name(failure)
+                ));
+            }
         }
-        if status < 0 {
-            facade::subscript_typegpu_future_drop(instance, future);
-            return Err(format!("{step} failed with status {status}"));
+    }
+}
+
+#[derive(Clone, Copy)]
+enum FutureKind {
+    RequestAdapter,
+    RequestDevice,
+}
+
+impl FutureKind {
+    fn step(self) -> &'static str {
+        match self {
+            Self::RequestAdapter => "adapter request",
+            Self::RequestDevice => "device request",
         }
-        facade::subscript_typegpu_instance_process_events(instance);
+    }
+
+    fn status_name(self, status: i32) -> &'static str {
+        if status == -100 {
+            return "UnknownFuture";
+        }
+        match (self, status.unsigned_abs()) {
+            (Self::RequestAdapter, 2) => "WGPURequestAdapterStatus_CallbackCancelled",
+            (Self::RequestAdapter, 3) => "WGPURequestAdapterStatus_Unavailable",
+            (Self::RequestAdapter, 4) => "WGPURequestAdapterStatus_Error",
+            (Self::RequestDevice, 2) => "WGPURequestDeviceStatus_CallbackCancelled",
+            (Self::RequestDevice, 3) => "WGPURequestDeviceStatus_Error",
+            _ => "UnknownStatus",
+        }
     }
 }
 
@@ -150,13 +179,18 @@ struct Host {
     height: u32,
     key: u32,
     frames: u64,
+    frame_limit: Option<u64>,
     initialized: bool,
     finished: bool,
     result: Result<(), String>,
 }
 
 impl Host {
-    fn new(session: ReloadSession, instance: facade::SubscriptTypegpuInstance) -> Self {
+    fn new(
+        session: ReloadSession,
+        instance: facade::SubscriptTypegpuInstance,
+        frame_limit: Option<u64>,
+    ) -> Self {
         Self {
             session,
             instance,
@@ -168,6 +202,7 @@ impl Host {
             height: 0,
             key: 0,
             frames: 0,
+            frame_limit,
             initialized: false,
             finished: false,
             result: Ok(()),
@@ -181,16 +216,17 @@ impl Host {
         let window = event_loop
             .create_window(attributes)
             .map_err(|error| format!("create window: {error}"))?;
-        let size = window.inner_size();
-        self.width = size.width.max(1);
-        self.height = size.height.max(1);
-        self.surface = create_surface(self.instance, &window)?;
+        self.window = Some(window);
+        self.surface = create_surface(
+            self.instance,
+            self.window.as_ref().expect("window stored before surface"),
+        )?;
 
         let adapter_future = facade::subscript_typegpu_instance_request_adapter(self.instance);
         if adapter_future == 0 {
             return Err("adapter request returned no future".to_owned());
         }
-        await_future(self.instance, adapter_future, "adapter request")?;
+        await_future(self.instance, adapter_future, FutureKind::RequestAdapter)?;
         let adapter = facade::subscript_typegpu_request_adapter_take(self.instance, adapter_future);
         if adapter.is_null() {
             return Err("adapter request returned null".to_owned());
@@ -205,7 +241,7 @@ impl Host {
             facade::subscript_typegpu_adapter_release(adapter);
             return Err("device request returned no future".to_owned());
         }
-        if let Err(error) = await_future(self.instance, device_future, "device request") {
+        if let Err(error) = await_future(self.instance, device_future, FutureKind::RequestDevice) {
             facade::subscript_typegpu_adapter_release(adapter);
             return Err(error);
         }
@@ -247,18 +283,15 @@ impl Host {
             return Err("surface reports no texture format".to_owned());
         }
         self.configure()?;
-        self.window = Some(window);
         self.initialized = true;
-        self.session
-            .call_export_with(
-                "init",
-                &[
-                    EntryArg::Handle(self.instance.cast::<c_void>()),
-                    EntryArg::Handle(self.device.cast::<c_void>()),
-                    EntryArg::I32(self.format as i32),
-                ],
-            )
-            .map_err(|error| format!("init: {error}"))?;
+        self.call_entry(
+            "init",
+            &[
+                EntryArg::Handle(self.instance.cast::<c_void>()),
+                EntryArg::Handle(self.device.cast::<c_void>()),
+                EntryArg::I32(self.format as i32),
+            ],
+        )?;
         self.drain_async()?;
         self.window
             .as_ref()
@@ -267,7 +300,14 @@ impl Host {
         Ok(())
     }
 
-    fn configure(&self) -> Result<(), String> {
+    fn configure(&mut self) -> Result<(), String> {
+        let size = self
+            .window
+            .as_ref()
+            .ok_or_else(|| "configure without a window".to_owned())?
+            .inner_size();
+        self.width = size.width.max(1);
+        self.height = size.height.max(1);
         let config = surface::WGPUSurfaceConfiguration {
             nextInChain: std::ptr::null_mut(),
             device: self.device,
@@ -286,15 +326,39 @@ impl Host {
         Ok(())
     }
 
+    fn write_output(&mut self) -> Result<(), String> {
+        let output = self.session.take_output();
+        let mut stdout = std::io::stdout().lock();
+        stdout
+            .write_all(&output)
+            .and_then(|()| stdout.flush())
+            .map_err(|error| format!("write script output: {error}"))
+    }
+
+    fn call_entry(&mut self, name: &str, args: &[EntryArg]) -> Result<(), String> {
+        let called = self
+            .session
+            .call_export_with(name, args)
+            .map_err(|error| format!("{name}: {error}"));
+        let output = self.write_output();
+        called?;
+        output
+    }
+
     fn drain_async(&mut self) -> Result<(), String> {
-        facade::subscript_typegpu_instance_process_events(self.instance);
-        while self.session.async_pending() != 0 {
-            self.session
-                .async_step()
-                .map_err(|error| format!("async: {error}"))?;
+        let drained: Result<(), String> = (|| {
             facade::subscript_typegpu_instance_process_events(self.instance);
-        }
-        Ok(())
+            while self.session.async_pending() != 0 {
+                self.session
+                    .async_step()
+                    .map_err(|error| format!("async: {error}"))?;
+                facade::subscript_typegpu_instance_process_events(self.instance);
+            }
+            Ok(())
+        })();
+        let output = self.write_output();
+        drained?;
+        output
     }
 
     fn frame(&mut self) -> Result<(), String> {
@@ -332,7 +396,7 @@ impl Host {
             facade::subscript_typegpu_texture_release(acquired.texture);
             return Err("surface texture view creation returned null".to_owned());
         }
-        let called = self.session.call_export_with(
+        let called = self.call_entry(
             "frame",
             &[
                 EntryArg::Handle(view.cast::<c_void>()),
@@ -344,7 +408,7 @@ impl Host {
         if let Err(error) = called {
             facade::subscript_typegpu_texture_view_release(view);
             facade::subscript_typegpu_texture_release(acquired.texture);
-            return Err(format!("frame: {error}"));
+            return Err(error);
         }
         // SAFETY: the surface has one acquired texture ready for presentation.
         let presented = unsafe { (table.wgpuSurfacePresent)(self.surface) };
@@ -356,10 +420,11 @@ impl Host {
         self.frames += 1;
         self.key = 0;
         self.drain_async()?;
-        if acquired.status == surface::WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal {
-            self.configure()?;
-        }
         Ok(())
+    }
+
+    fn reached_frame_limit(&self) -> bool {
+        self.frame_limit.is_some_and(|limit| self.frames >= limit)
     }
 
     fn finish(&mut self, event_loop: &ActiveEventLoop, result: Result<(), String>) {
@@ -368,9 +433,9 @@ impl Host {
         }
         let mut result = result;
         if self.initialized {
-            if let Err(error) = self.session.call_export_with("shutdown", &[]) {
+            if let Err(error) = self.call_entry("shutdown", &[]) {
                 if result.is_ok() {
-                    result = Err(format!("shutdown: {error}"));
+                    result = Err(error);
                 }
             }
         }
@@ -407,8 +472,10 @@ impl Host {
 impl ApplicationHandler for Host {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_none() && !self.finished {
-            if let Err(error) = self.initialize(event_loop) {
-                self.fail(event_loop, error);
+            match self.initialize(event_loop) {
+                Ok(()) if self.reached_frame_limit() => self.finish(event_loop, Ok(())),
+                Ok(()) => {}
+                Err(error) => self.fail(event_loop, error),
             }
         }
     }
@@ -425,8 +492,6 @@ impl ApplicationHandler for Host {
         match event {
             WindowEvent::CloseRequested => self.finish(event_loop, Ok(())),
             WindowEvent::Resized(size) if size.width != 0 && size.height != 0 => {
-                self.width = size.width;
-                self.height = size.height;
                 if let Err(error) = self.configure() {
                     self.fail(event_loop, error);
                 }
@@ -439,6 +504,7 @@ impl ApplicationHandler for Host {
                 };
             }
             WindowEvent::RedrawRequested => match self.frame() {
+                Ok(()) if self.reached_frame_limit() => self.finish(event_loop, Ok(())),
                 Ok(()) => {
                     if let Some(window) = &self.window {
                         window.request_redraw();
@@ -451,18 +517,40 @@ impl ApplicationHandler for Host {
     }
 }
 
-fn run() -> Result<u64, String> {
-    let program = std::env::args_os()
-        .nth(1)
+fn arguments() -> Result<(PathBuf, Option<u64>), String> {
+    let mut arguments = std::env::args_os().skip(1);
+    let program = arguments
+        .next()
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("examples/window-triangle/main.ts"));
-    let session = load_session(&program)?;
+    let mut frame_limit = None;
+    while let Some(argument) = arguments.next() {
+        if argument != "--frames" || frame_limit.is_some() {
+            return Err("usage: subscript-typegpu-window <program.ts> [--frames <n>]".to_owned());
+        }
+        let value = arguments
+            .next()
+            .ok_or_else(|| "--frames requires a count".to_owned())?;
+        frame_limit = Some(
+            value
+                .to_string_lossy()
+                .parse::<u64>()
+                .map_err(|_| "--frames requires a non-negative integer".to_owned())?,
+        );
+    }
+    Ok((program, frame_limit))
+}
+
+fn run() -> Result<u64, WindowError> {
+    let (program, frame_limit) = arguments()?;
+    let session =
+        subscript_typegpu_harness::load_program(&program).map_err(WindowError::Compile)?;
     let instance = facade::subscript_typegpu_create_instance();
     if instance.is_null() {
-        return Err("instance creation returned null".to_owned());
+        return Err("instance creation returned null".to_owned().into());
     }
     let event_loop = EventLoop::new().map_err(|error| format!("event loop: {error}"))?;
-    let mut host = Host::new(session, instance);
+    let mut host = Host::new(session, instance, frame_limit);
     event_loop
         .run_app(&mut host)
         .map_err(|error| format!("event loop: {error}"))?;
@@ -473,7 +561,14 @@ fn run() -> Result<u64, String> {
 fn main() {
     match run() {
         Ok(frames) => println!("window:frames={frames}"),
-        Err(error) => {
+        Err(WindowError::Compile(error)) => {
+            if let Some(diagnostics) = error.diagnostics() {
+                eprintln!("{diagnostics}");
+            }
+            eprintln!("window:{}", error.summary());
+            std::process::exit(1);
+        }
+        Err(WindowError::Host(error)) => {
             let first_line = error.lines().next().unwrap_or("unknown failure");
             eprintln!("window:{first_line}");
             std::process::exit(1);

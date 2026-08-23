@@ -10,10 +10,15 @@ use std::process::{Command, Output};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 
-use subscript_codegen::{
-    run_c_aot_with_native_libraries, run_jit_with_native_libraries, NativeLibrary,
-};
+use subscript_codegen::{run_c_aot_with_native_libraries, NativeLibrary, RunError};
 use subscript_compiler::SourceFile;
+
+/// Entry argument accepted by a live development session.
+pub use subscript_codegen::EntryArg;
+/// In-process development session used by the window host.
+pub use subscript_codegen::ReloadSession;
+/// Native facade types and functions used by non-script hosts.
+pub use subscript_typegpu_facade as native;
 
 fn repository_root() -> PathBuf {
     let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -22,10 +27,51 @@ fn repository_root() -> PathBuf {
     root
 }
 
-fn read(relative: &str) -> Result<String, String> {
-    let path = repository_root().join(relative);
-    std::fs::read_to_string(&path).map_err(|error| format!("read {relative}: {error}"))
+/// A failure to prepare or compile a development program.
+#[derive(Debug)]
+pub struct ProgramLoadError {
+    diagnostics: Option<String>,
+    summary: String,
 }
+
+impl ProgramLoadError {
+    fn message(message: impl Into<String>) -> Self {
+        Self {
+            diagnostics: None,
+            summary: message.into(),
+        }
+    }
+
+    fn rejected(files: &[SourceFile], diagnostics: Vec<subscript_compiler::Diagnostic>) -> Self {
+        Self {
+            summary: format!("compile: rejected with {} diagnostic(s)", diagnostics.len()),
+            diagnostics: Some(subscript_compiler::render_diagnostics(files, &diagnostics)),
+        }
+    }
+
+    /// Returns compiler diagnostics for a rejected program.
+    #[must_use]
+    pub fn diagnostics(&self) -> Option<&str> {
+        self.diagnostics.as_deref()
+    }
+
+    /// Returns the one-line failure summary.
+    #[must_use]
+    pub fn summary(&self) -> &str {
+        &self.summary
+    }
+}
+
+impl std::fmt::Display for ProgramLoadError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(diagnostics) = &self.diagnostics {
+            writeln!(formatter, "{diagnostics}")?;
+        }
+        formatter.write_str(&self.summary)
+    }
+}
+
+impl std::error::Error for ProgramLoadError {}
 
 fn cargo_command() -> Command {
     let mut command = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
@@ -225,37 +271,114 @@ fn ship_facade_library() -> Result<NativeLibrary, String> {
     })
 }
 
-/// Loads the mirrors, libraries, program, and optional schema support.
-pub fn program_files(program: &Path) -> Result<Vec<SourceFile>, String> {
-    let stem = program
-        .file_stem()
-        .and_then(OsStr::to_str)
-        .ok_or_else(|| format!("program has no UTF-8 stem: {}", program.display()))?;
-    let program_source = std::fs::read_to_string(program)
-        .map_err(|error| format!("read {}: {error}", program.display()))?;
-    let mut files = vec![
-        SourceFile::ambient(
-            "subscript-typegpu.generated.d.ts",
-            read("lib/subscript-typegpu.generated.d.ts")?,
-        ),
-        SourceFile::ambient(
-            "wire-enum-aliases.generated.d.ts",
-            read("lib/wire-enum-aliases.generated.d.ts")?,
-        ),
-        SourceFile::new("webgpu.ts", read("lib/webgpu.ts")?),
-        SourceFile::new("typegpu-types.ts", read("lib/typegpu-types.ts")?),
-        SourceFile::new("typegpu.ts", read("lib/typegpu.ts")?),
-        SourceFile::new(format!("{stem}.ts"), program_source),
+fn library_files() -> Result<Vec<SourceFile>, String> {
+    let directory = repository_root().join("lib");
+    let entries = std::fs::read_dir(&directory)
+        .map_err(|error| format!("read {}: {error}", directory.display()))?;
+    let mut paths = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file())
+        .collect::<Vec<_>>();
+    const LIBRARY_ORDER: [&str; 5] = [
+        "subscript-typegpu.generated.d.ts",
+        "wire-enum-aliases.generated.d.ts",
+        "webgpu.ts",
+        "typegpu-types.ts",
+        "typegpu.ts",
     ];
-    if stem.starts_with('b') || stem.starts_with('x') {
+    paths.sort_by_key(|path| {
+        let name = path.file_name().and_then(OsStr::to_str).unwrap_or("");
+        (
+            LIBRARY_ORDER
+                .iter()
+                .position(|candidate| *candidate == name)
+                .unwrap_or(LIBRARY_ORDER.len()),
+            name.to_owned(),
+        )
+    });
+    paths
+        .into_iter()
+        .map(|path| {
+            let name = path
+                .file_name()
+                .and_then(OsStr::to_str)
+                .ok_or_else(|| format!("library file has no UTF-8 name: {}", path.display()))?;
+            let source = std::fs::read_to_string(&path)
+                .map_err(|error| format!("read {}: {error}", path.display()))?;
+            if name.ends_with(".d.ts") {
+                Ok(SourceFile::ambient(name, source))
+            } else {
+                Ok(SourceFile::new(name, source))
+            }
+        })
+        .collect()
+}
+
+fn prepare_program(program: &Path) -> Result<Vec<SourceFile>, ProgramLoadError> {
+    let stem = program.file_stem().and_then(OsStr::to_str).ok_or_else(|| {
+        ProgramLoadError::message(format!("program has no UTF-8 stem: {}", program.display()))
+    })?;
+    let program_source = std::fs::read_to_string(program).map_err(|error| {
+        ProgramLoadError::message(format!("read {}: {error}", program.display()))
+    })?;
+    let mut files = library_files().map_err(ProgramLoadError::message)?;
+    files.push(SourceFile::new(format!("{stem}.ts"), program_source));
+    let support_module = format!("./{stem}.typegpu");
+    let mut options = subscript_compiler::CheckOptions::default();
+    options.poison_missing_modules = vec![support_module.clone()];
+    let discovery = subscript_compiler::check_program_with(&files, &options)
+        .map_err(|diagnostics| ProgramLoadError::rejected(&files, diagnostics))?;
+    if discovery
+        .poisoned_imports
+        .iter()
+        .any(|import| import.module == support_module)
+    {
         let generated = subscript_typegpu_gen::generate(&files)
-            .map_err(|diagnostics| subscript_compiler::render_diagnostics(&files, &diagnostics))?;
+            .map_err(|diagnostics| ProgramLoadError::rejected(&files, diagnostics))?;
         files.push(SourceFile::new(
             format!("{stem}.typegpu.ts"),
             generated.support_module,
         ));
     }
     Ok(files)
+}
+
+/// Loads every library, the program, and its generated support module.
+pub fn program_files(program: &Path) -> Result<Vec<SourceFile>, String> {
+    prepare_program(program).map_err(|error| error.to_string())
+}
+
+fn load_program_with_library(
+    program: &Path,
+    library: NativeLibrary,
+) -> Result<ReloadSession, ProgramLoadError> {
+    let files = prepare_program(program)?;
+    if let Err(diagnostics) = subscript_compiler::check_program(&files) {
+        return Err(ProgramLoadError::rejected(&files, diagnostics));
+    }
+    match ReloadSession::new_with_native_libraries(&files, &[library]) {
+        Ok(session) => Ok(session),
+        Err(RunError::Rejected(diagnostics)) => {
+            Err(ProgramLoadError::rejected(&files, diagnostics))
+        }
+        Err(error) => Err(ProgramLoadError::message(format!("compile: {error}"))),
+    }
+}
+
+/// Generates, checks, and compiles one program into a development session.
+pub fn load_program(program: &Path) -> Result<ReloadSession, ProgramLoadError> {
+    load_program_with_library(program, facade_library())
+}
+
+fn run_session(mut session: ReloadSession) -> Result<Vec<u8>, String> {
+    session
+        .call_export("main")
+        .map_err(|error| error.to_string())?;
+    while session.async_pending() != 0 {
+        session.async_step().map_err(|error| error.to_string())?;
+    }
+    Ok(session.take_output())
 }
 
 /// Returns the facade symbols and include directory for the dev tier.
@@ -291,16 +414,15 @@ pub fn ship_link_inputs() -> Result<Vec<String>, String> {
 
 /// Runs one program through the development JIT.
 pub fn run_dev(program: &Path) -> Result<Vec<u8>, String> {
-    run_jit_with_native_libraries(&program_files(program)?, &[facade_library()])
-        .map_err(|error| error.to_string())
+    run_session(load_program(program).map_err(|error| error.to_string())?)
 }
 
 /// Runs one program through the development JIT and returns the facade exports reached.
 pub fn run_dev_with_coverage(program: &Path) -> Result<(Vec<u8>, Vec<String>), String> {
     coverage_reset();
-    let bytes =
-        run_jit_with_native_libraries(&program_files(program)?, &[facade_counting_library()])
-            .map_err(|error| error.to_string())?;
+    let session = load_program_with_library(program, facade_counting_library())
+        .map_err(|error| error.to_string())?;
+    let bytes = run_session(session)?;
     Ok((bytes, coverage_reached()))
 }
 

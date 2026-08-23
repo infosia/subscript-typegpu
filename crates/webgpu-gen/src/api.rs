@@ -5664,16 +5664,6 @@ fn render_wire_enum_aliases(plan: &ApiPlan) -> Result<String, ApiPolicyError> {
             ));
         }
         out.push_str("}>;\n\n");
-        if enum_plan.name == "GPUTextureFormat" {
-            out.push_str("type GPUTextureFormatWire = CEnum<{\n");
-            for member in enum_plan.members.iter().chain(&enum_plan.exclusions) {
-                out.push_str(&format!(
-                    "  {:?}: {},\n",
-                    member.idl_name, member.wire_value
-                ));
-            }
-            out.push_str("}>;\n\n");
-        }
     }
     Ok(out)
 }
@@ -6240,6 +6230,7 @@ fn render_interface_class(
                 *nullable,
                 conversion,
                 seed_values,
+                host_owned,
             ),
             MethodPlan::RecordDrain {
                 name,
@@ -6438,11 +6429,14 @@ fn render_error_scope_pop_method(
     nullable: bool,
     conversion: &str,
     seed_values: &[String],
+    host_owned: bool,
 ) {
-    out.push_str(&format!(
-        "  async {name}(): Promise<{result_class}{}> {{\n",
-        if nullable { " | null" } else { "" }
-    ));
+    let result = format!("{result_class}{}", if nullable { " | null" } else { "" });
+    if host_owned {
+        out.push_str(&format!("  {name}(): {result} {{\n"));
+    } else {
+        out.push_str(&format!("  async {name}(): Promise<{result}> {{\n"));
+    }
     out.push_str(&format!(
         "    const future: SubscriptTypegpuFutureId = {begin}(this.{});\n",
         interface.raw_field
@@ -6451,7 +6445,9 @@ fn render_error_scope_pop_method(
     out.push_str("    while (status === 0) {\n");
     out.push_str("      subscript_typegpu_instance_process_events(this.instance);\n");
     out.push_str("      status = subscript_typegpu_future_status(this.instance, future);\n");
-    out.push_str("      await Context.suspend();\n");
+    if !host_owned {
+        out.push_str("      await Context.suspend();\n");
+    }
     out.push_str("    }\n");
     out.push_str(
         "    if (status !== 1) {\n      subscript_typegpu_future_drop(this.instance, future);\n      return null;\n    }\n",

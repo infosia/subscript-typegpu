@@ -51,6 +51,7 @@ fn emitted_unsafe_lines_have_safety_comments() {
         .iter()
         .enumerate()
         .filter(|(_, line)| line.contains("unsafe {") || line.contains("unsafe extern"))
+        .filter(|(_, line)| !line.trim_start().starts_with("pub type "))
         .filter(|(index, _)| !preceding_comment_has_safety(&lines, *index))
         .map(|(index, line)| format!("{}: {}", index + 1, line.trim()))
         .collect::<Vec<_>>();

@@ -64,3 +64,22 @@ poisoned imports, so it could not see it. Resolution: W8 Rev 1
 (diagnostics before the one line), W13 Rev 1 (one program loader
 shared by the host and the harness, and a gate test that compiles
 the example through it).
+
+## Close (2026-08-23)
+
+Review fixes landed: all 19 items and `--frames`. Round 2: one
+program loader in the harness crate shared by the dev lane, the
+coverage lane, the trap tests, and the window host; the W13 Rev 1
+gate test compiles the example through it (scratch red: `imported
+module './broken-typegpu' is not among the program's files`); W8
+Rev 1 prints the diagnostics before the one line.
+
+Evidence: `tools/gate.sh --require-backend` green, 246 passed, 168 s.
+`tools/window.sh examples/window-triangle/main.ts --frames 120`:
+Metal (yawgpu) `window:frames=120` exit 0, Dawn `window:frames=120`
+exit 0. The owner's interactive Dawn run (above) covers the triangle,
+space, resize, and close. `tools/live.sh` x01–x18 PASS on Metal
+(50.93 s) and Dawn after the loader change.
+
+P9 COMPLETE 2026-08-23. Open: the ship tier for the window host,
+Linux surfaces, a surface-format list on the render spec.

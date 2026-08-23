@@ -167,16 +167,27 @@ fn surface_slice_is_rust_only() {
     )
     .expect("facade inputs generate");
     let mirror = read(&repository_root().join("lib/subscript-typegpu.generated.d.ts"));
-    for name in [
-        "SubscriptTypegpuSurface",
-        "subscript_typegpu_instance_create_surface",
-        "subscript_typegpu_surface_present",
+    let api = read(&repository_root().join("lib/webgpu.ts"));
+    for (path, source) in [
+        (
+            "crates/facade/subscript-typegpu.h",
+            generated.header.as_str(),
+        ),
+        ("lib/subscript-typegpu.generated.d.ts", mirror.as_str()),
+        ("lib/webgpu.ts", api.as_str()),
+        (
+            "crates/harness/src/native_symbols.generated.rs",
+            generated.native_symbols.as_str(),
+        ),
     ] {
-        assert!(!generated.header.contains(name), "header contains {name}");
-        assert!(!mirror.contains(name), "mirror contains {name}");
+        let identifiers = source
+            .split(|character: char| !(character.is_ascii_alphanumeric() || character == '_'))
+            .filter(|identifier| identifier.contains("Surface"))
+            .collect::<Vec<_>>();
         assert!(
-            !generated.native_symbols.contains(name),
-            "symbol table contains {name}"
+            identifiers.is_empty(),
+            "{path} contains Rust-only surface identifiers: {}",
+            identifiers.join(", ")
         );
     }
     assert!(generated.surface.contains("pub struct SurfaceTable"));

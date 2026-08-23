@@ -109,7 +109,7 @@ fn function_signatures(declarations: &str) -> Vec<FunctionSignature> {
 fn render_webgpu_table(declarations: &str) -> String {
     let signatures = function_signatures(declarations);
     let mut out = String::from(
-        "pub(crate) struct WebgpuTable {\n    pub(crate) _library: libloading::Library,\n",
+        "pub(crate) struct WebgpuTable {\n    pub(crate) library: libloading::Library,\n",
     );
     for signature in &signatures {
         out.push_str(&format!(
@@ -125,7 +125,7 @@ fn render_webgpu_table(declarations: &str) -> String {
             signature.name
         ));
     }
-    out.push_str("            _library: library,\n        })\n    }\n}\n\n");
+    out.push_str("            library,\n        })\n    }\n}\n\n");
     for signature in &signatures {
         out.push_str(&format!(
             "unsafe fn {name}({params}){result} {{\n    let Some(table) = crate::runtime::table() else {{\n        eprintln!(\"subscript-typegpu: cannot call {name}: set SUBSCRIPT_TYPEGPU_BACKEND_LIB\");\n        std::process::abort();\n    }};\n    // SAFETY: the table stores the pinned signature for this symbol.\n    unsafe {{ (table.{name})({args}) }}\n}}\n\n",

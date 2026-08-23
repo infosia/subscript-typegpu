@@ -78,3 +78,16 @@ Rev 5), four-byte alignment traps (BF2 Rev 1). Programs `b14`–`b17`,
 guard) / 7 MAJOR / 15 MINOR, all closed. Evidence: gate green 240
 passed 146 s; live x01–x18 PASS on Metal 47.17 s and Dawn 43.50 s.
 Record: `specs/tracking/p8-library-breadth.md`.
+
+## P9 — the window host (2026-08-23)
+
+`crates/window`: a winit host that owns the window, the surface, the
+instance, the device, and the loop, and calls `init`, `frame`, and
+`shutdown` on a script (W1–W13). The surface family is a generated
+Rust-only module resolved on first use (L14, F23). `examples/window-triangle`
+and `tools/window.sh`. Phase review: 1 CRITICAL (`await_future` on a
+failure status) / 4 MAJOR / 14 MINOR, all closed, plus one measured
+regression (the host compiled without the support module) closed by
+one shared program loader. Evidence: gate 246 passed 168 s; `--frames
+120` on Metal and Dawn; the owner's interactive Dawn run. Record:
+`specs/tracking/p9-window.md`.

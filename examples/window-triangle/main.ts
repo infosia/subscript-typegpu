@@ -69,16 +69,13 @@ let clearIndex: u32 = 0;
 export function init(
   instance: SubscriptTypegpuInstance,
   device: SubscriptTypegpuDevice,
-  format: GPUTextureFormatWire,
+  format: GPUTextureFormat,
 ): void {
-  // The wire and API CEnum aliases are nominal, so compare both through
-  // the pipeline's literal format value.
-  if (format !== "bgra8unorm" || tri_TARGET_FORMAT !== "bgra8unorm") {
+  if (format !== tri_TARGET_FORMAT) {
     print(`FAIL format expected=${tri_TARGET_FORMAT} actual=${format}`);
     return;
   }
   const deviceWrapper: GPUHostOwnedDevice = hostOwnedGPUDevice(instance, device);
-  ownedDevice = deviceWrapper;
   const values: FixedArray<Vertex, 3> = [
     new Vertex(new Vec2f(-0.65, -0.55)),
     new Vertex(new Vec2f(0.65, -0.55)),
@@ -89,13 +86,13 @@ export function init(
     size: (Vertex_STRIDE * 3) as u64,
     usage: GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
-  vertexBuffer = vertices;
   using queue = deviceWrapper.queue();
   queue.writeBuffer(
     vertices,
     0,
     Context.bytesOf<FixedArray<Vertex, 3>>(values),
   );
+  deviceWrapper.pushErrorScope("validation");
   using shader = deviceWrapper.createShaderModule({ code: tri_WGSL });
   using layout = deviceWrapper.createPipelineLayout({ bindGroupLayouts: [] });
   const nativePipeline: GPURenderPipeline = deviceWrapper.createRenderPipeline({
@@ -124,6 +121,15 @@ export function init(
       targets: [{ format: tri_TARGET_FORMAT }],
     },
   });
+  const validationError = deviceWrapper.popErrorScope();
+  if (validationError !== null) {
+    nativePipeline.dispose();
+    vertices.dispose();
+    print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+    return;
+  }
+  ownedDevice = deviceWrapper;
+  vertexBuffer = vertices;
   pipeline = new RenderPipeline(nativePipeline, "undefined");
 }
 

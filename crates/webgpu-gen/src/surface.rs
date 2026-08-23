@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::model::Yml;
+use crate::model::{Arg, Function, Member, Struct, Yml};
 use crate::policy::{Policy, PolicyError};
 
 const REQUIRED: [&str; 22] = [
@@ -81,26 +81,239 @@ fn excluded_constructs(policy: &Policy) -> BTreeSet<String> {
     excluded
 }
 
-fn enum_value(yml: &Yml, name: &str, entry: &str) -> Result<u32, PolicyError> {
-    yml.enum_(name)
-        .and_then(|value| value.value_of(entry))
-        .ok_or_else(|| PolicyError::Unknown {
-            entry: format!("enum.{name}.{entry}"),
-        })
-}
-
-fn flag_value(yml: &Yml, name: &str, entry: &str) -> Result<u64, PolicyError> {
-    yml.bitflag(name)
-        .and_then(|value| value.value_of(entry))
-        .ok_or_else(|| PolicyError::Unknown {
-            entry: format!("bitflag.{name}.{entry}"),
-        })
-}
-
-pub(crate) fn render(yml: &Yml, policy: &Policy) -> Result<String, PolicyError> {
-    if yml.object("surface").is_none() && policy.host_only.is_empty() {
-        return Ok("//! No host-only surface slice in this fixture.\n".to_owned());
+fn invalid(entry: &str, message: impl Into<String>) -> PolicyError {
+    PolicyError::Invalid {
+        entry: entry.to_owned(),
+        message: message.into(),
     }
+}
+
+fn rust_type(yml: &Yml, source: &str) -> Result<String, PolicyError> {
+    let scalar = match source {
+        "uint16" => Some("u16"),
+        "uint32" => Some("u32"),
+        "uint64" => Some("u64"),
+        "int16" => Some("i16"),
+        "int32" => Some("i32"),
+        "int64" => Some("i64"),
+        "size_t" => Some("usize"),
+        "float32" => Some("f32"),
+        "float64" => Some("f64"),
+        "bool" => Some("bool"),
+        "c_void" => Some("c_void"),
+        "string_with_default_empty" | "string_view" => Some("WGPUStringView"),
+        _ => None,
+    };
+    if let Some(scalar) = scalar {
+        return Ok(scalar.to_owned());
+    }
+    for prefix in ["enum.", "bitflag.", "object.", "struct."] {
+        if let Some(name) = source.strip_prefix(prefix) {
+            let exists = match prefix {
+                "enum." => yml.enum_(name).is_some(),
+                "bitflag." => yml.bitflag(name).is_some(),
+                "object." => yml.object(name).is_some(),
+                "struct." => yml.struct_(name).is_some(),
+                _ => false,
+            };
+            if !exists {
+                return Err(PolicyError::Unknown {
+                    entry: source.to_owned(),
+                });
+            }
+            return Ok(crate::naming::wgpu_type(name));
+        }
+    }
+    Err(invalid(source, "unsupported host-only ABI type"))
+}
+
+fn pointed_type(yml: &Yml, source: &str, pointer: Option<&str>) -> Result<String, PolicyError> {
+    let base = rust_type(yml, source)?;
+    match pointer {
+        None => Ok(base),
+        Some("immutable") => Ok(format!("*const {base}")),
+        Some("mutable") => Ok(format!("*mut {base}")),
+        Some(other) => Err(invalid(
+            source,
+            format!("unsupported pointer kind `{other}`"),
+        )),
+    }
+}
+
+fn arg_type(yml: &Yml, arg: &Arg) -> Result<String, PolicyError> {
+    pointed_type(yml, &arg.ty, arg.pointer.as_deref())
+}
+
+fn backend_array_count(member: &str) -> String {
+    let singular = member
+        .strip_suffix("ies")
+        .map(|stem| format!("{stem}y"))
+        .or_else(|| member.strip_suffix('s').map(str::to_owned))
+        .unwrap_or_else(|| member.to_owned());
+    format!("{singular}_count")
+}
+
+fn render_member(out: &mut String, yml: &Yml, member: &Member) -> Result<(), PolicyError> {
+    if let Some(element) = member
+        .ty
+        .strip_prefix("array<")
+        .and_then(|value| value.strip_suffix('>'))
+    {
+        let count = crate::naming::camel(&backend_array_count(&member.name));
+        let element = rust_type(yml, element)?;
+        let pointer = match member.pointer.as_deref() {
+            Some("immutable") => "*const",
+            Some("mutable") => "*mut",
+            other => {
+                return Err(invalid(
+                    &member.name,
+                    format!("array requires a pointer kind, found {other:?}"),
+                ));
+            }
+        };
+        out.push_str(&format!("    pub {count}: usize,\n"));
+        out.push_str(&format!(
+            "    pub {}: {pointer} {element},\n",
+            crate::naming::camel(&member.name)
+        ));
+        return Ok(());
+    }
+    out.push_str(&format!(
+        "    pub {}: {},\n",
+        crate::naming::camel(&member.name),
+        pointed_type(yml, &member.ty, member.pointer.as_deref())?
+    ));
+    Ok(())
+}
+
+fn render_struct(out: &mut String, yml: &Yml, shape: &Struct) -> Result<(), PolicyError> {
+    out.push_str("#[repr(C)]\n#[derive(Clone, Copy)]\n");
+    out.push_str(&format!(
+        "pub struct {} {{\n",
+        crate::naming::wgpu_type(&shape.name)
+    ));
+    match shape.kind.as_str() {
+        "extensible" => out.push_str("    pub nextInChain: *mut WGPUChainedStruct,\n"),
+        "extension" => out.push_str("    pub chain: WGPUChainedStruct,\n"),
+        "standalone" => {}
+        other => {
+            return Err(invalid(
+                &shape.name,
+                format!("unsupported struct kind `{other}`"),
+            ));
+        }
+    }
+    for member in &shape.members {
+        render_member(out, yml, member)?;
+    }
+    out.push_str("}\n\n");
+    Ok(())
+}
+
+fn collect_type(
+    source: &str,
+    objects: &mut BTreeSet<String>,
+    enums: &mut BTreeSet<String>,
+    flags: &mut BTreeSet<String>,
+) {
+    let source = source
+        .strip_prefix("array<")
+        .and_then(|value| value.strip_suffix('>'))
+        .unwrap_or(source);
+    if let Some(name) = source.strip_prefix("object.") {
+        objects.insert(name.to_owned());
+    } else if let Some(name) = source.strip_prefix("enum.") {
+        enums.insert(name.to_owned());
+    } else if let Some(name) = source.strip_prefix("bitflag.") {
+        flags.insert(name.to_owned());
+    }
+}
+
+struct HostFunction<'a> {
+    name: String,
+    receiver: Option<&'a str>,
+    function: Option<&'a Function>,
+    free_members: Option<&'a Struct>,
+}
+
+fn host_function<'a>(yml: &'a Yml, name: &str) -> Result<HostFunction<'a>, PolicyError> {
+    for function in &yml.functions {
+        if format!("wgpu{}", crate::naming::pascal(&function.name)) == name {
+            return Ok(HostFunction {
+                name: name.to_owned(),
+                receiver: None,
+                function: Some(function),
+                free_members: None,
+            });
+        }
+    }
+    for object in &yml.objects {
+        if crate::naming::wgpu_method(&object.name, "add_ref") == name
+            || crate::naming::wgpu_method(&object.name, "release") == name
+        {
+            return Ok(HostFunction {
+                name: name.to_owned(),
+                receiver: Some(&object.name),
+                function: None,
+                free_members: None,
+            });
+        }
+        if let Some(function) = object
+            .methods
+            .iter()
+            .find(|method| crate::naming::wgpu_method(&object.name, &method.name) == name)
+        {
+            return Ok(HostFunction {
+                name: name.to_owned(),
+                receiver: Some(&object.name),
+                function: Some(function),
+                free_members: None,
+            });
+        }
+    }
+    for shape in &yml.structs {
+        if shape.free_members
+            && format!("wgpu{}FreeMembers", crate::naming::pascal(&shape.name)) == name
+        {
+            return Ok(HostFunction {
+                name: name.to_owned(),
+                receiver: None,
+                function: None,
+                free_members: Some(shape),
+            });
+        }
+    }
+    Err(PolicyError::Unknown {
+        entry: name.to_owned(),
+    })
+}
+
+fn function_types(
+    yml: &Yml,
+    function: &HostFunction<'_>,
+) -> Result<(Vec<String>, Option<String>), PolicyError> {
+    let mut params = Vec::new();
+    if let Some(receiver) = function.receiver {
+        params.push(rust_type(yml, &format!("object.{receiver}"))?);
+    }
+    if let Some(shape) = function.free_members {
+        params.push(rust_type(yml, &format!("struct.{}", shape.name))?);
+    }
+    if let Some(source) = function.function {
+        for arg in &source.args {
+            params.push(arg_type(yml, arg)?);
+        }
+        let result = source
+            .returns
+            .as_ref()
+            .map(|returns| rust_type(yml, &returns.ty))
+            .transpose()?;
+        return Ok((params, result));
+    }
+    Ok((params, None))
+}
+
+fn validate_policy(yml: &Yml, policy: &Policy) -> Result<(), PolicyError> {
     let known = known_constructs(yml);
     let excluded = excluded_constructs(policy);
     let required = REQUIRED.into_iter().collect::<BTreeSet<_>>();
@@ -117,16 +330,16 @@ pub(crate) fn render(yml: &Yml, policy: &Policy) -> Result<String, PolicyError> 
             });
         }
         if row.reason.trim().is_empty() {
-            return Err(PolicyError::Invalid {
-                entry: row.construct.clone(),
-                message: "host-only construct requires a reason".to_owned(),
-            });
+            return Err(invalid(
+                &row.construct,
+                "host-only construct requires a reason",
+            ));
         }
         if excluded.contains(&row.construct) {
-            return Err(PolicyError::Invalid {
-                entry: row.construct.clone(),
-                message: "construct is both host_only and exclude".to_owned(),
-            });
+            return Err(invalid(
+                &row.construct,
+                "construct is both host_only and exclude",
+            ));
         }
         if !required.contains(row.construct.as_str()) {
             return Err(PolicyError::Dead {
@@ -139,230 +352,150 @@ pub(crate) fn render(yml: &Yml, policy: &Policy) -> Result<String, PolicyError> 
             construct: (*missing).to_owned(),
         });
     }
+    Ok(())
+}
 
-    let bgra8 = enum_value(yml, "texture_format", "BGRA8_unorm")?;
-    let render_attachment = flag_value(yml, "texture_usage", "render_attachment")?;
-    let alpha_auto = enum_value(yml, "composite_alpha_mode", "auto")?;
-    let present_fifo = enum_value(yml, "present_mode", "fifo")?;
-    let status_success = enum_value(yml, "status", "success")?;
-    let status_error = enum_value(yml, "status", "error")?;
-    let surface_success = enum_value(yml, "surface_get_current_texture_status", "success_optimal")?;
-    let surface_suboptimal = enum_value(
-        yml,
-        "surface_get_current_texture_status",
-        "success_suboptimal",
-    )?;
-    let surface_timeout = enum_value(yml, "surface_get_current_texture_status", "timeout")?;
-    let surface_outdated = enum_value(yml, "surface_get_current_texture_status", "outdated")?;
-    let surface_lost = enum_value(yml, "surface_get_current_texture_status", "lost")?;
-    let surface_error = enum_value(yml, "surface_get_current_texture_status", "error")?;
-    let stype_metal = enum_value(yml, "s_type", "surface_source_metal_layer")?;
-    let stype_windows = enum_value(yml, "s_type", "surface_source_windows_HWND")?;
-    let stype_xlib = enum_value(yml, "s_type", "surface_source_xlib_window")?;
-    let stype_wayland = enum_value(yml, "s_type", "surface_source_wayland_surface")?;
-    let stype_android = enum_value(yml, "s_type", "surface_source_android_native_window")?;
-    let stype_xcb = enum_value(yml, "s_type", "surface_source_XCB_window")?;
+pub(crate) fn render(yml: &Yml, policy: &Policy) -> Result<String, PolicyError> {
+    if yml.object("surface").is_none() && policy.host_only.is_empty() {
+        return Ok("//! No host-only surface slice in this fixture.\n".to_owned());
+    }
+    validate_policy(yml, policy)?;
 
-    Ok(format!(
-        r#"//! Generated from webgpu.yml plus policy.toml. Do not edit.
-#![allow(missing_docs, non_snake_case, non_upper_case_globals)]
+    let selected_structs = policy
+        .host_only
+        .iter()
+        .filter_map(|row| {
+            yml.structs
+                .iter()
+                .find(|shape| crate::naming::wgpu_type(&shape.name) == row.construct)
+        })
+        .collect::<Vec<_>>();
+    let functions = policy
+        .host_only
+        .iter()
+        .filter(|row| row.construct.starts_with("wgpu"))
+        .map(|row| host_function(yml, &row.construct))
+        .collect::<Result<Vec<_>, _>>()?;
 
-use std::ffi::c_void;
-use std::sync::OnceLock;
+    let mut objects = BTreeSet::new();
+    let mut enums = BTreeSet::from(["s_type".to_owned()]);
+    let mut flags = BTreeSet::new();
+    let mut needs_string_view = false;
+    for shape in &selected_structs {
+        for member in &shape.members {
+            collect_type(&member.ty, &mut objects, &mut enums, &mut flags);
+            needs_string_view |= matches!(
+                member.ty.as_str(),
+                "string_with_default_empty" | "string_view"
+            );
+        }
+    }
+    for function in &functions {
+        if let Some(receiver) = function.receiver {
+            objects.insert(receiver.to_owned());
+        }
+        if let Some(source) = function.function {
+            if let Some(returns) = &source.returns {
+                collect_type(&returns.ty, &mut objects, &mut enums, &mut flags);
+                needs_string_view |= matches!(
+                    returns.ty.as_str(),
+                    "string_with_default_empty" | "string_view"
+                );
+            }
+            for arg in &source.args {
+                collect_type(&arg.ty, &mut objects, &mut enums, &mut flags);
+                needs_string_view |=
+                    matches!(arg.ty.as_str(), "string_with_default_empty" | "string_view");
+            }
+        }
+    }
 
-use crate::{{
-    SubscriptTypegpuAdapter as WGPUAdapter, SubscriptTypegpuDevice as WGPUDevice,
-    SubscriptTypegpuInstance as WGPUInstance, SubscriptTypegpuTexture as WGPUTexture,
-}};
+    let mut out = String::from(
+        "//! Generated from webgpu.yml plus policy.toml. Do not edit.\n#![allow(missing_docs, non_snake_case, non_upper_case_globals)]\n\nuse std::ffi::{c_char, c_void};\nuse std::sync::OnceLock;\n\n",
+    );
+    for object in &objects {
+        let name = crate::naming::wgpu_type(object);
+        if object == "surface" {
+            out.push_str(&format!("pub type {name} = *mut c_void;\n"));
+        } else {
+            out.push_str(&format!(
+                "pub type {name} = crate::{};\n",
+                crate::naming::subscript_typegpu_type(object)
+            ));
+        }
+    }
+    out.push('\n');
 
-pub type WGPUSurface = *mut c_void;
-pub type WGPUStatus = u32;
-pub type WGPUSurfaceGetCurrentTextureStatus = u32;
-pub type WGPUTextureFormat = u32;
-pub type WGPUTextureUsage = u64;
-pub type WGPUCompositeAlphaMode = u32;
-pub type WGPUPresentMode = u32;
-pub type WGPUSType = u32;
+    for name in &enums {
+        let value = yml.enum_(name).ok_or_else(|| PolicyError::Unknown {
+            entry: format!("enum.{name}"),
+        })?;
+        let ty = crate::naming::wgpu_type(name);
+        out.push_str(&format!("pub type {ty} = u32;\n"));
+        for (index, entry) in value.entries.iter().enumerate() {
+            let Some(entry) = entry else { continue };
+            out.push_str(&format!(
+                "pub const {}: {ty} = {index};\n",
+                crate::naming::wgpu_enum_member(name, &entry.name)
+            ));
+        }
+        out.push('\n');
+    }
+    for name in &flags {
+        let value = yml.bitflag(name).ok_or_else(|| PolicyError::Unknown {
+            entry: format!("bitflag.{name}"),
+        })?;
+        let ty = crate::naming::wgpu_type(name);
+        out.push_str(&format!("pub type {ty} = u64;\n"));
+        for entry in &value.entries {
+            let number = value
+                .value_of(&entry.name)
+                .ok_or_else(|| PolicyError::Unknown {
+                    entry: format!("bitflag.{name}.{}", entry.name),
+                })?;
+            out.push_str(&format!(
+                "pub const {}: {ty} = {number};\n",
+                crate::naming::wgpu_enum_member(name, &entry.name)
+            ));
+        }
+        out.push('\n');
+    }
 
-pub const WGPUStatus_Success: WGPUStatus = {status_success};
-pub const WGPUStatus_Error: WGPUStatus = {status_error};
-pub const WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal: WGPUSurfaceGetCurrentTextureStatus = {surface_success};
-pub const WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal: WGPUSurfaceGetCurrentTextureStatus = {surface_suboptimal};
-pub const WGPUSurfaceGetCurrentTextureStatus_Timeout: WGPUSurfaceGetCurrentTextureStatus = {surface_timeout};
-pub const WGPUSurfaceGetCurrentTextureStatus_Outdated: WGPUSurfaceGetCurrentTextureStatus = {surface_outdated};
-pub const WGPUSurfaceGetCurrentTextureStatus_Lost: WGPUSurfaceGetCurrentTextureStatus = {surface_lost};
-pub const WGPUSurfaceGetCurrentTextureStatus_Error: WGPUSurfaceGetCurrentTextureStatus = {surface_error};
-pub const WGPUTextureFormat_BGRA8Unorm: WGPUTextureFormat = {bgra8};
-pub const WGPUTextureUsage_RenderAttachment: WGPUTextureUsage = {render_attachment};
-pub const WGPUCompositeAlphaMode_Auto: WGPUCompositeAlphaMode = {alpha_auto};
-pub const WGPUPresentMode_Fifo: WGPUPresentMode = {present_fifo};
-pub const WGPUSType_SurfaceSourceMetalLayer: WGPUSType = {stype_metal};
-pub const WGPUSType_SurfaceSourceWindowsHWND: WGPUSType = {stype_windows};
-pub const WGPUSType_SurfaceSourceXlibWindow: WGPUSType = {stype_xlib};
-pub const WGPUSType_SurfaceSourceWaylandSurface: WGPUSType = {stype_wayland};
-pub const WGPUSType_SurfaceSourceAndroidNativeWindow: WGPUSType = {stype_android};
-pub const WGPUSType_SurfaceSourceXCBWindow: WGPUSType = {stype_xcb};
+    out.push_str("#[repr(C)]\n#[derive(Clone, Copy)]\npub struct WGPUChainedStruct {\n    pub next: *mut WGPUChainedStruct,\n    pub sType: WGPUSType,\n}\n\n");
+    if needs_string_view {
+        out.push_str("#[repr(C)]\n#[derive(Clone, Copy)]\npub struct WGPUStringView {\n    pub data: *const c_char,\n    pub length: usize,\n}\n\n");
+    }
+    for shape in &selected_structs {
+        render_struct(&mut out, yml, shape)?;
+    }
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct WGPUChainedStruct {{
-    pub next: *const WGPUChainedStruct,
-    pub sType: WGPUSType,
-}}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct WGPUStringView {{
-    pub data: *const u8,
-    pub length: usize,
-}}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct WGPUSurfaceDescriptor {{
-    pub nextInChain: *mut WGPUChainedStruct,
-    pub label: WGPUStringView,
-}}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct WGPUSurfaceSourceAndroidNativeWindow {{
-    pub chain: WGPUChainedStruct,
-    pub window: *mut c_void,
-}}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct WGPUSurfaceSourceMetalLayer {{
-    pub chain: WGPUChainedStruct,
-    pub layer: *mut c_void,
-}}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct WGPUSurfaceSourceWaylandSurface {{
-    pub chain: WGPUChainedStruct,
-    pub display: *mut c_void,
-    pub surface: *mut c_void,
-}}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct WGPUSurfaceSourceWindowsHWND {{
-    pub chain: WGPUChainedStruct,
-    pub hinstance: *mut c_void,
-    pub hwnd: *mut c_void,
-}}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct WGPUSurfaceSourceXCBWindow {{
-    pub chain: WGPUChainedStruct,
-    pub connection: *mut c_void,
-    pub window: u32,
-}}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct WGPUSurfaceSourceXlibWindow {{
-    pub chain: WGPUChainedStruct,
-    pub display: *mut c_void,
-    pub window: u64,
-}}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct WGPUSurfaceConfiguration {{
-    pub nextInChain: *mut WGPUChainedStruct,
-    pub device: WGPUDevice,
-    pub format: WGPUTextureFormat,
-    pub usage: WGPUTextureUsage,
-    pub width: u32,
-    pub height: u32,
-    pub viewFormatCount: usize,
-    pub viewFormats: *const WGPUTextureFormat,
-    pub alphaMode: WGPUCompositeAlphaMode,
-    pub presentMode: WGPUPresentMode,
-}}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct WGPUSurfaceCapabilities {{
-    pub nextInChain: *mut WGPUChainedStruct,
-    pub usages: WGPUTextureUsage,
-    pub formatCount: usize,
-    pub formats: *const WGPUTextureFormat,
-    pub presentModeCount: usize,
-    pub presentModes: *const WGPUPresentMode,
-    pub alphaModeCount: usize,
-    pub alphaModes: *const WGPUCompositeAlphaMode,
-}}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct WGPUSurfaceTexture {{
-    pub nextInChain: *mut WGPUChainedStruct,
-    pub texture: WGPUTexture,
-    pub status: WGPUSurfaceGetCurrentTextureStatus,
-}}
-
-// SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-pub type WGPUProcInstanceCreateSurface = unsafe extern "C" fn(WGPUInstance, *const WGPUSurfaceDescriptor) -> WGPUSurface;
-// SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-pub type WGPUProcSurfaceConfigure = unsafe extern "C" fn(WGPUSurface, *const WGPUSurfaceConfiguration);
-// SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-pub type WGPUProcSurfaceUnconfigure = unsafe extern "C" fn(WGPUSurface);
-// SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-pub type WGPUProcSurfaceGetCapabilities = unsafe extern "C" fn(WGPUSurface, WGPUAdapter, *mut WGPUSurfaceCapabilities) -> WGPUStatus;
-// SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-pub type WGPUProcSurfaceCapabilitiesFreeMembers = unsafe extern "C" fn(WGPUSurfaceCapabilities);
-// SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-pub type WGPUProcSurfaceGetCurrentTexture = unsafe extern "C" fn(WGPUSurface, *mut WGPUSurfaceTexture);
-// SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-pub type WGPUProcSurfacePresent = unsafe extern "C" fn(WGPUSurface) -> WGPUStatus;
-// SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-pub type WGPUProcSurfaceAddRef = unsafe extern "C" fn(WGPUSurface);
-// SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-pub type WGPUProcSurfaceRelease = unsafe extern "C" fn(WGPUSurface);
-// SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
-pub type WGPUProcSurfaceSetLabel = unsafe extern "C" fn(WGPUSurface, WGPUStringView);
-
-pub struct SurfaceTable {{
-    pub wgpuInstanceCreateSurface: WGPUProcInstanceCreateSurface,
-    pub wgpuSurfaceConfigure: WGPUProcSurfaceConfigure,
-    pub wgpuSurfaceUnconfigure: WGPUProcSurfaceUnconfigure,
-    pub wgpuSurfaceGetCapabilities: WGPUProcSurfaceGetCapabilities,
-    pub wgpuSurfaceCapabilitiesFreeMembers: WGPUProcSurfaceCapabilitiesFreeMembers,
-    pub wgpuSurfaceGetCurrentTexture: WGPUProcSurfaceGetCurrentTexture,
-    pub wgpuSurfacePresent: WGPUProcSurfacePresent,
-    pub wgpuSurfaceAddRef: WGPUProcSurfaceAddRef,
-    pub wgpuSurfaceRelease: WGPUProcSurfaceRelease,
-    pub wgpuSurfaceSetLabel: WGPUProcSurfaceSetLabel,
-}}
-
-static SURFACE_TABLE: OnceLock<SurfaceTable> = OnceLock::new();
-
-pub fn table() -> Result<&'static SurfaceTable, String> {{
-    if let Some(table) = SURFACE_TABLE.get() {{
-        return Ok(table);
-    }}
-    let loaded = SurfaceTable {{
-        wgpuInstanceCreateSurface: crate::runtime::surface_symbol(b"wgpuInstanceCreateSurface\0")?,
-        wgpuSurfaceConfigure: crate::runtime::surface_symbol(b"wgpuSurfaceConfigure\0")?,
-        wgpuSurfaceUnconfigure: crate::runtime::surface_symbol(b"wgpuSurfaceUnconfigure\0")?,
-        wgpuSurfaceGetCapabilities: crate::runtime::surface_symbol(b"wgpuSurfaceGetCapabilities\0")?,
-        wgpuSurfaceCapabilitiesFreeMembers: crate::runtime::surface_symbol(b"wgpuSurfaceCapabilitiesFreeMembers\0")?,
-        wgpuSurfaceGetCurrentTexture: crate::runtime::surface_symbol(b"wgpuSurfaceGetCurrentTexture\0")?,
-        wgpuSurfacePresent: crate::runtime::surface_symbol(b"wgpuSurfacePresent\0")?,
-        wgpuSurfaceAddRef: crate::runtime::surface_symbol(b"wgpuSurfaceAddRef\0")?,
-        wgpuSurfaceRelease: crate::runtime::surface_symbol(b"wgpuSurfaceRelease\0")?,
-        wgpuSurfaceSetLabel: crate::runtime::surface_symbol(b"wgpuSurfaceSetLabel\0")?,
-    }};
-    let _ = SURFACE_TABLE.set(loaded);
-    SURFACE_TABLE
-        .get()
-        .ok_or_else(|| "surface function table initialization failed".to_owned())
-}}
-"#,
-    ))
+    for function in &functions {
+        let (params, result) = function_types(yml, function)?;
+        let proc_name = format!(
+            "WGPUProc{}",
+            function.name.strip_prefix("wgpu").unwrap_or(&function.name)
+        );
+        out.push_str(&format!(
+            "pub type {proc_name} = unsafe extern \"C\" fn({}){};\n",
+            params.join(", "),
+            result.map_or_else(String::new, |result| format!(" -> {result}"))
+        ));
+    }
+    out.push_str("\npub struct SurfaceTable {\n");
+    for function in &functions {
+        let proc_name = format!(
+            "WGPUProc{}",
+            function.name.strip_prefix("wgpu").unwrap_or(&function.name)
+        );
+        out.push_str(&format!("    pub {}: {proc_name},\n", function.name));
+    }
+    out.push_str("}\n\nstatic SURFACE_TABLE: OnceLock<SurfaceTable> = OnceLock::new();\n\npub fn table() -> Result<&'static SurfaceTable, String> {\n    if let Some(table) = SURFACE_TABLE.get() {\n        return Ok(table);\n    }\n    let loaded = SurfaceTable {\n");
+    for function in &functions {
+        out.push_str(&format!(
+            "        {}: {{\n            // SAFETY: the type comes from this symbol's pinned webgpu.yml declaration.\n            unsafe {{ crate::runtime::surface_symbol(b\"{}\\0\") }}?\n        }},\n",
+            function.name, function.name
+        ));
+    }
+    out.push_str("    };\n    let _ = SURFACE_TABLE.set(loaded);\n    SURFACE_TABLE\n        .get()\n        .ok_or_else(|| \"surface function table initialization failed\".to_owned())\n}\n");
+    Ok(out)
 }

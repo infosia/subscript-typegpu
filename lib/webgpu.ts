@@ -2386,13 +2386,12 @@ export class GPUHostOwnedDevice {
     subscript_typegpu_device_push_error_scope(this.device, filter);
   }
 
-  async popErrorScope(): Promise<GPUError | null> {
+  popErrorScope(): GPUError | null {
     const future: SubscriptTypegpuFutureId = subscript_typegpu_device_pop_error_scope(this.device);
     let status: i32 = subscript_typegpu_future_status(this.instance, future);
     while (status === 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      await Context.suspend();
     }
     if (status !== 1) {
       subscript_typegpu_future_drop(this.instance, future);
