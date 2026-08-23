@@ -245,7 +245,11 @@ fn allowed_binding_item(module: &Module, ty: &Type) -> bool {
         Type::F32 | Type::I32 | Type::U32 => true,
         Type::Class(id) => {
             let class = &module.classes[id.0];
-            class.is_value && (class.pos.file != "typegpu.ts") && (class.pos.file != "webgpu.ts")
+            class.is_value
+                && (class.pos.file != "typegpu.ts")
+                && (class.pos.file != "webgpu.ts")
+                && !(class.pos.file == "typegpu-types.ts"
+                    && matches!(class.name.as_str(), "Vec2b" | "Vec3b" | "Vec4b"))
         }
         _ => false,
     }

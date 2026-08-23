@@ -1,15 +1,6 @@
-use std::collections::BTreeSet;
-
 use subscript_compiler::SourceFile;
 
 use crate::support;
-
-fn names(values: &[subscript_compiler::hir::Function]) -> BTreeSet<&str> {
-    values
-        .iter()
-        .map(|function| function.name.as_str())
-        .collect()
-}
 
 #[test]
 fn every_library_method_has_the_sc6_body() {
@@ -25,51 +16,42 @@ fn every_library_method_has_the_sc6_body() {
             .iter()
             .filter(|class| class.pos.file == "typegpu-types.ts")
             .count(),
-        17
+        20
     );
     for class in module
         .classes
         .iter()
         .filter(|class| class.pos.file == "typegpu-types.ts")
     {
-        let expected = match class.name.as_str() {
-            "Vec2f" | "Vec4f" => {
-                ["add", "dot", "length", "mul", "normalize", "scale", "sub"].as_slice()
-            }
-            "Vec3f" => [
-                "add",
-                "cross",
-                "dot",
-                "length",
-                "mul",
-                "normalize",
-                "scale",
-                "sub",
-            ]
-            .as_slice(),
-            "Vec2i" | "Vec3i" | "Vec4i" | "Vec2u" | "Vec3u" | "Vec4u" => {
-                ["add", "dot", "mul", "scale", "sub"].as_slice()
-            }
-            "Vec2h" | "Vec3h" | "Vec4h" => [].as_slice(),
-            "AtomicU32" | "AtomicI32" => {
-                ["add", "exchange", "load", "max", "min", "store", "sub"].as_slice()
-            }
-            "Mat2x2f" | "Mat3x3f" | "Mat4x4f" => ["mul", "mulVec", "transpose"].as_slice(),
-            name => panic!("unexpected library class {name}"),
-        };
-        assert_eq!(
-            names(&class.methods),
-            expected.iter().copied().collect(),
-            "{} methods",
-            class.name
-        );
         assert!(
             class.methods.iter().all(|method| !method.body.is_empty()),
             "{} has an empty method body",
             class.name
         );
     }
-    for factory in ["mat2x2fIdentity", "mat3x3fIdentity", "mat4x4fIdentity"] {
+    for factory in [
+        "v3fFrom2",
+        "v4fFrom2",
+        "v4fFrom3",
+        "v2fSplat",
+        "v3fSplat",
+        "v4fSplat",
+        "v3iFrom2",
+        "v4iFrom2",
+        "v4iFrom3",
+        "v2iSplat",
+        "v3iSplat",
+        "v4iSplat",
+        "v3uFrom2",
+        "v4uFrom2",
+        "v4uFrom3",
+        "v2uSplat",
+        "v3uSplat",
+        "v4uSplat",
+        "mat2x2fIdentity",
+        "mat3x3fIdentity",
+        "mat4x4fIdentity",
+    ] {
         let function = module
             .functions
             .iter()

@@ -452,32 +452,165 @@ pub(crate) fn ident(name: &str) -> String {
 pub(crate) enum MethodEmission {
     Binary(&'static str),
     Builtin(&'static str),
+    Unary(&'static str),
+    Swizzle(&'static str),
 }
 
+#[derive(Debug)]
+struct MethodGroup {
+    receivers: &'static [&'static str],
+    methods: &'static [(&'static str, MethodEmission)],
+}
+
+const FLOAT_VECTORS: &[&str] = &["Vec2f", "Vec3f", "Vec4f"];
+const SIGNED_VECTORS: &[&str] = &["Vec2i", "Vec3i", "Vec4i"];
+const UNSIGNED_VECTORS: &[&str] = &["Vec2u", "Vec3u", "Vec4u"];
+const BOOL_VECTORS: &[&str] = &["Vec2b", "Vec3b", "Vec4b"];
+const MATRICES: &[&str] = &["Mat2x2f", "Mat3x3f", "Mat4x4f"];
+
+const VECTOR_BASE: &[(&str, MethodEmission)] = &[
+    ("add", MethodEmission::Binary("+")),
+    ("sub", MethodEmission::Binary("-")),
+    ("mul", MethodEmission::Binary("*")),
+    ("scale", MethodEmission::Binary("*")),
+    ("dot", MethodEmission::Builtin("dot")),
+];
+const FLOAT_METHODS: &[(&str, MethodEmission)] = &[
+    ("length", MethodEmission::Builtin("length")),
+    ("normalize", MethodEmission::Builtin("normalize")),
+    ("abs", MethodEmission::Builtin("abs")),
+    ("floor", MethodEmission::Builtin("floor")),
+    ("ceil", MethodEmission::Builtin("ceil")),
+    ("fract", MethodEmission::Builtin("fract")),
+    ("sqrt", MethodEmission::Builtin("sqrt")),
+    ("exp", MethodEmission::Builtin("exp")),
+    ("log", MethodEmission::Builtin("log")),
+    ("sin", MethodEmission::Builtin("sin")),
+    ("cos", MethodEmission::Builtin("cos")),
+    ("tan", MethodEmission::Builtin("tan")),
+    ("sign", MethodEmission::Builtin("sign")),
+    ("min", MethodEmission::Builtin("min")),
+    ("max", MethodEmission::Builtin("max")),
+    ("clamp", MethodEmission::Builtin("clamp")),
+    ("pow", MethodEmission::Builtin("pow")),
+    ("mix", MethodEmission::Builtin("mix")),
+    ("step", MethodEmission::Builtin("step")),
+    ("smoothstep", MethodEmission::Builtin("smoothstep")),
+    ("distance", MethodEmission::Builtin("distance")),
+    ("reflect", MethodEmission::Builtin("reflect")),
+    ("refract", MethodEmission::Builtin("refract")),
+    ("faceForward", MethodEmission::Builtin("faceForward")),
+];
+const SIGNED_METHODS: &[(&str, MethodEmission)] = &[
+    ("abs", MethodEmission::Builtin("abs")),
+    ("min", MethodEmission::Builtin("min")),
+    ("max", MethodEmission::Builtin("max")),
+    ("clamp", MethodEmission::Builtin("clamp")),
+];
+const UNSIGNED_METHODS: &[(&str, MethodEmission)] = &[
+    ("min", MethodEmission::Builtin("min")),
+    ("max", MethodEmission::Builtin("max")),
+    ("clamp", MethodEmission::Builtin("clamp")),
+];
+const COMPARISON_METHODS: &[(&str, MethodEmission)] = &[
+    ("lt", MethodEmission::Binary("<")),
+    ("le", MethodEmission::Binary("<=")),
+    ("gt", MethodEmission::Binary(">")),
+    ("ge", MethodEmission::Binary(">=")),
+    ("eq", MethodEmission::Binary("==")),
+    ("ne", MethodEmission::Binary("!=")),
+    ("select", MethodEmission::Builtin("select")),
+];
+const VEC3_SWIZZLES: &[(&str, MethodEmission)] = &[
+    ("xy", MethodEmission::Swizzle("xy")),
+    ("xz", MethodEmission::Swizzle("xz")),
+    ("yz", MethodEmission::Swizzle("yz")),
+];
+const VEC4_SWIZZLES: &[(&str, MethodEmission)] = &[
+    ("xy", MethodEmission::Swizzle("xy")),
+    ("xz", MethodEmission::Swizzle("xz")),
+    ("xw", MethodEmission::Swizzle("xw")),
+    ("yz", MethodEmission::Swizzle("yz")),
+    ("yw", MethodEmission::Swizzle("yw")),
+    ("zw", MethodEmission::Swizzle("zw")),
+    ("xyz", MethodEmission::Swizzle("xyz")),
+    ("xyw", MethodEmission::Swizzle("xyw")),
+    ("xzw", MethodEmission::Swizzle("xzw")),
+    ("yzw", MethodEmission::Swizzle("yzw")),
+];
+const METHOD_GROUPS: &[MethodGroup] = &[
+    MethodGroup {
+        receivers: FLOAT_VECTORS,
+        methods: VECTOR_BASE,
+    },
+    MethodGroup {
+        receivers: SIGNED_VECTORS,
+        methods: VECTOR_BASE,
+    },
+    MethodGroup {
+        receivers: UNSIGNED_VECTORS,
+        methods: VECTOR_BASE,
+    },
+    MethodGroup {
+        receivers: FLOAT_VECTORS,
+        methods: FLOAT_METHODS,
+    },
+    MethodGroup {
+        receivers: SIGNED_VECTORS,
+        methods: SIGNED_METHODS,
+    },
+    MethodGroup {
+        receivers: UNSIGNED_VECTORS,
+        methods: UNSIGNED_METHODS,
+    },
+    MethodGroup {
+        receivers: FLOAT_VECTORS,
+        methods: COMPARISON_METHODS,
+    },
+    MethodGroup {
+        receivers: SIGNED_VECTORS,
+        methods: COMPARISON_METHODS,
+    },
+    MethodGroup {
+        receivers: UNSIGNED_VECTORS,
+        methods: COMPARISON_METHODS,
+    },
+    MethodGroup {
+        receivers: BOOL_VECTORS,
+        methods: &[
+            ("any", MethodEmission::Builtin("any")),
+            ("all", MethodEmission::Builtin("all")),
+            ("not", MethodEmission::Unary("!")),
+        ],
+    },
+    MethodGroup {
+        receivers: &["Vec3f"],
+        methods: &[("cross", MethodEmission::Builtin("cross"))],
+    },
+    MethodGroup {
+        receivers: &["Vec3f", "Vec3i", "Vec3u"],
+        methods: VEC3_SWIZZLES,
+    },
+    MethodGroup {
+        receivers: &["Vec4f", "Vec4i", "Vec4u"],
+        methods: VEC4_SWIZZLES,
+    },
+    MethodGroup {
+        receivers: MATRICES,
+        methods: &[
+            ("mul", MethodEmission::Binary("*")),
+            ("mulVec", MethodEmission::Binary("*")),
+            ("transpose", MethodEmission::Builtin("transpose")),
+        ],
+    },
+];
+
 pub(crate) fn method(receiver: &str, name: &str) -> Option<MethodEmission> {
-    let vector = receiver.starts_with("Vec2")
-        || receiver.starts_with("Vec3")
-        || receiver.starts_with("Vec4");
-    if vector {
-        return Some(match name {
-            "add" => MethodEmission::Binary("+"),
-            "sub" => MethodEmission::Binary("-"),
-            "mul" | "scale" => MethodEmission::Binary("*"),
-            "dot" => MethodEmission::Builtin("dot"),
-            "cross" => MethodEmission::Builtin("cross"),
-            "length" => MethodEmission::Builtin("length"),
-            "normalize" => MethodEmission::Builtin("normalize"),
-            _ => return None,
-        });
-    }
-    if matches!(receiver, "Mat2x2f" | "Mat3x3f" | "Mat4x4f") {
-        return Some(match name {
-            "mul" | "mulVec" => MethodEmission::Binary("*"),
-            "transpose" => MethodEmission::Builtin("transpose"),
-            _ => return None,
-        });
-    }
-    None
+    METHOD_GROUPS
+        .iter()
+        .filter(|group| group.receivers.contains(&receiver))
+        .flat_map(|group| group.methods)
+        .find_map(|(method, emission)| (*method == name).then_some(*emission))
 }
 
 pub(crate) fn math(function: MathFn) -> Option<&'static str> {
@@ -517,12 +650,32 @@ pub(crate) fn free_function(name: &str) -> Option<&'static str> {
         "v2u" => "vec2<u32>",
         "v3u" => "vec3<u32>",
         "v4u" => "vec4<u32>",
+        "v3fFrom2" => "vec3<f32>",
+        "v4fFrom2" | "v4fFrom3" => "vec4<f32>",
+        "v2fSplat" => "vec2<f32>",
+        "v3fSplat" => "vec3<f32>",
+        "v4fSplat" => "vec4<f32>",
+        "v3iFrom2" => "vec3<i32>",
+        "v4iFrom2" | "v4iFrom3" => "vec4<i32>",
+        "v2iSplat" => "vec2<i32>",
+        "v3iSplat" => "vec3<i32>",
+        "v4iSplat" => "vec4<i32>",
+        "v3uFrom2" => "vec3<u32>",
+        "v4uFrom2" | "v4uFrom3" => "vec4<u32>",
+        "v2uSplat" => "vec2<u32>",
+        "v3uSplat" => "vec3<u32>",
+        "v4uSplat" => "vec4<u32>",
         _ => return None,
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+    use std::path::PathBuf;
+
+    use subscript_compiler::SourceFile;
+
     use super::*;
 
     #[test]
@@ -534,7 +687,61 @@ mod tests {
         );
         assert_eq!(math(MathFn::Fround), Some(""));
         assert_eq!(free_function("smoothstep"), Some("smoothstep"));
-        assert_eq!(method("Vec3f", "reflect"), None);
+        assert_eq!(
+            method("Vec3f", "reflect"),
+            Some(MethodEmission::Builtin("reflect"))
+        );
+        assert_eq!(method("Vec3h", "abs"), None);
+    }
+
+    #[test]
+    fn k10_table_matches_vector_and_matrix_hir_methods() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(2)
+            .expect("generator crate is under the repository root")
+            .to_path_buf();
+        let path = root.join("lib/typegpu-types.ts");
+        let source = std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+        let module =
+            subscript_compiler::check_program(&[SourceFile::new("typegpu-types.ts", source)])
+                .expect("check typegpu-types.ts");
+        let hir = module
+            .classes
+            .iter()
+            .filter(|class| {
+                class.pos.file == "typegpu-types.ts"
+                    && (class.name.starts_with("Vec") || class.name.starts_with("Mat"))
+            })
+            .flat_map(|class| {
+                class
+                    .methods
+                    .iter()
+                    .map(|function| (class.name.clone(), function.name.clone()))
+            })
+            .collect::<BTreeSet<_>>();
+        let table = METHOD_GROUPS
+            .iter()
+            .flat_map(|group| {
+                group.receivers.iter().flat_map(|receiver| {
+                    group
+                        .methods
+                        .iter()
+                        .map(|(name, _)| ((*receiver).to_owned(), (*name).to_owned()))
+                })
+            })
+            .collect::<BTreeSet<_>>();
+        let extra = table.difference(&hir).cloned().collect::<Vec<_>>();
+        assert!(
+            extra.is_empty(),
+            "K10 table has rows without HIR methods: {extra:?}"
+        );
+        let missing = hir.difference(&table).cloned().collect::<Vec<_>>();
+        assert!(
+            missing.is_empty(),
+            "K10 table lacks HIR methods: {missing:?}"
+        );
     }
 
     #[test]

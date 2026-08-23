@@ -574,6 +574,9 @@ fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String, Diagnostic
                 "Vec2u" => "vec2<u32>".to_owned(),
                 "Vec3u" => "vec3<u32>".to_owned(),
                 "Vec4u" => "vec4<u32>".to_owned(),
+                "Vec2b" => "vec2<bool>".to_owned(),
+                "Vec3b" => "vec3<bool>".to_owned(),
+                "Vec4b" => "vec4<bool>".to_owned(),
                 "Vec2h" => "vec2<f16>".to_owned(),
                 "Vec3h" => "vec3<f16>".to_owned(),
                 "Vec4h" => "vec4<f16>".to_owned(),
@@ -2120,6 +2123,7 @@ impl<'a> Emitter<'a> {
                         let precedence = match op {
                             "+" | "-" => 7,
                             "*" => 8,
+                            "<" | "<=" | ">" | ">=" | "==" | "!=" => 5,
                             _ => 0,
                         };
                         let recv = binary_operand(&recv_value, precedence, false);
@@ -2136,6 +2140,22 @@ impl<'a> Emitter<'a> {
                             .collect::<Vec<_>>()
                             .join(", ");
                         (format!("{builtin}({}, {args})", recv_value.text), 10)
+                    }
+                    MethodEmission::Unary(op) if arg_values.is_empty() => {
+                        let recv = if recv_value.precedence <= 9 {
+                            format!("({})", recv_value.text)
+                        } else {
+                            recv_value.text.clone()
+                        };
+                        (format!("{op}{recv}"), 9)
+                    }
+                    MethodEmission::Swizzle(fields) if arg_values.is_empty() => {
+                        let recv = if recv_value.precedence < 10 {
+                            format!("({})", recv_value.text)
+                        } else {
+                            recv_value.text.clone()
+                        };
+                        (format!("{recv}.{fields}"), 10)
                     }
                     _ => {
                         return Err(diagnostic(

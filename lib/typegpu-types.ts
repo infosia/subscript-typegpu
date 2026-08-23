@@ -39,6 +39,41 @@ export class Vec2f {
     }
     return this.scale(1.0 / magnitude);
   }
+
+  abs(): Vec2f { return new Vec2f(Math.abs(this.x as f64) as f32, Math.abs(this.y as f64) as f32); }
+  floor(): Vec2f { return new Vec2f(Math.floor(this.x as f64) as f32, Math.floor(this.y as f64) as f32); }
+  ceil(): Vec2f { return new Vec2f(Math.ceil(this.x as f64) as f32, Math.ceil(this.y as f64) as f32); }
+  fract(): Vec2f { return new Vec2f(fract(this.x), fract(this.y)); }
+  sqrt(): Vec2f { return new Vec2f(Math.sqrt(this.x as f64) as f32, Math.sqrt(this.y as f64) as f32); }
+  exp(): Vec2f { return new Vec2f(Math.exp(this.x as f64) as f32, Math.exp(this.y as f64) as f32); }
+  log(): Vec2f { return new Vec2f(Math.log(this.x as f64) as f32, Math.log(this.y as f64) as f32); }
+  sin(): Vec2f { return new Vec2f(Math.sin(this.x as f64) as f32, Math.sin(this.y as f64) as f32); }
+  cos(): Vec2f { return new Vec2f(Math.cos(this.x as f64) as f32, Math.cos(this.y as f64) as f32); }
+  tan(): Vec2f { return new Vec2f(Math.tan(this.x as f64) as f32, Math.tan(this.y as f64) as f32); }
+  sign(): Vec2f { return new Vec2f(sign(this.x), sign(this.y)); }
+  min(other: Vec2f): Vec2f { return new Vec2f(Math.min(this.x as f64, other.x as f64) as f32, Math.min(this.y as f64, other.y as f64) as f32); }
+  max(other: Vec2f): Vec2f { return new Vec2f(Math.max(this.x as f64, other.x as f64) as f32, Math.max(this.y as f64, other.y as f64) as f32); }
+  clamp(low: Vec2f, high: Vec2f): Vec2f { return new Vec2f(clamp(this.x, low.x, high.x), clamp(this.y, low.y, high.y)); }
+  pow(other: Vec2f): Vec2f { return new Vec2f(Math.pow(this.x as f64, other.x as f64) as f32, Math.pow(this.y as f64, other.y as f64) as f32); }
+  mix(other: Vec2f, amount: f32): Vec2f { return new Vec2f(mix(this.x, other.x, amount), mix(this.y, other.y, amount)); }
+  step(edge: Vec2f): Vec2f { return new Vec2f(step(this.x, edge.x), step(this.y, edge.y)); }
+  smoothstep(low: Vec2f, high: Vec2f): Vec2f { return new Vec2f(smoothstep(this.x, low.x, high.x), smoothstep(this.y, low.y, high.y)); }
+  distance(other: Vec2f): f32 { return this.sub(other).length(); }
+  reflect(normal: Vec2f): Vec2f { return this.sub(normal.scale(2.0 * this.dot(normal))); }
+  refract(normal: Vec2f, eta: f32): Vec2f {
+    const product: f32 = this.dot(normal);
+    const factor: f32 = 1.0 - eta * eta * (1.0 - product * product);
+    if (factor < 0.0) return new Vec2f(0.0, 0.0);
+    return this.scale(eta).sub(normal.scale(eta * product + (Math.sqrt(factor as f64) as f32)));
+  }
+  faceForward(incident: Vec2f, reference: Vec2f): Vec2f { return incident.dot(reference) < 0.0 ? this : this.scale(-1.0); }
+  lt(other: Vec2f): Vec2b { return new Vec2b(this.x < other.x, this.y < other.y); }
+  le(other: Vec2f): Vec2b { return new Vec2b(this.x <= other.x, this.y <= other.y); }
+  gt(other: Vec2f): Vec2b { return new Vec2b(this.x > other.x, this.y > other.y); }
+  ge(other: Vec2f): Vec2b { return new Vec2b(this.x >= other.x, this.y >= other.y); }
+  eq(other: Vec2f): Vec2b { return new Vec2b(this.x === other.x, this.y === other.y); }
+  ne(other: Vec2f): Vec2b { return new Vec2b(this.x !== other.x, this.y !== other.y); }
+  select(other: Vec2f, mask: Vec2b): Vec2f { return new Vec2f(mask.x ? other.x : this.x, mask.y ? other.y : this.y); }
 }
 
 @CStruct({ align: 16 })
@@ -92,6 +127,44 @@ export class Vec3f {
     }
     return this.scale(1.0 / magnitude);
   }
+
+  abs(): Vec3f { return new Vec3f(Math.abs(this.x as f64) as f32, Math.abs(this.y as f64) as f32, Math.abs(this.z as f64) as f32); }
+  floor(): Vec3f { return new Vec3f(Math.floor(this.x as f64) as f32, Math.floor(this.y as f64) as f32, Math.floor(this.z as f64) as f32); }
+  ceil(): Vec3f { return new Vec3f(Math.ceil(this.x as f64) as f32, Math.ceil(this.y as f64) as f32, Math.ceil(this.z as f64) as f32); }
+  fract(): Vec3f { return new Vec3f(fract(this.x), fract(this.y), fract(this.z)); }
+  sqrt(): Vec3f { return new Vec3f(Math.sqrt(this.x as f64) as f32, Math.sqrt(this.y as f64) as f32, Math.sqrt(this.z as f64) as f32); }
+  exp(): Vec3f { return new Vec3f(Math.exp(this.x as f64) as f32, Math.exp(this.y as f64) as f32, Math.exp(this.z as f64) as f32); }
+  log(): Vec3f { return new Vec3f(Math.log(this.x as f64) as f32, Math.log(this.y as f64) as f32, Math.log(this.z as f64) as f32); }
+  sin(): Vec3f { return new Vec3f(Math.sin(this.x as f64) as f32, Math.sin(this.y as f64) as f32, Math.sin(this.z as f64) as f32); }
+  cos(): Vec3f { return new Vec3f(Math.cos(this.x as f64) as f32, Math.cos(this.y as f64) as f32, Math.cos(this.z as f64) as f32); }
+  tan(): Vec3f { return new Vec3f(Math.tan(this.x as f64) as f32, Math.tan(this.y as f64) as f32, Math.tan(this.z as f64) as f32); }
+  sign(): Vec3f { return new Vec3f(sign(this.x), sign(this.y), sign(this.z)); }
+  min(other: Vec3f): Vec3f { return new Vec3f(Math.min(this.x as f64, other.x as f64) as f32, Math.min(this.y as f64, other.y as f64) as f32, Math.min(this.z as f64, other.z as f64) as f32); }
+  max(other: Vec3f): Vec3f { return new Vec3f(Math.max(this.x as f64, other.x as f64) as f32, Math.max(this.y as f64, other.y as f64) as f32, Math.max(this.z as f64, other.z as f64) as f32); }
+  clamp(low: Vec3f, high: Vec3f): Vec3f { return new Vec3f(clamp(this.x, low.x, high.x), clamp(this.y, low.y, high.y), clamp(this.z, low.z, high.z)); }
+  pow(other: Vec3f): Vec3f { return new Vec3f(Math.pow(this.x as f64, other.x as f64) as f32, Math.pow(this.y as f64, other.y as f64) as f32, Math.pow(this.z as f64, other.z as f64) as f32); }
+  mix(other: Vec3f, amount: f32): Vec3f { return new Vec3f(mix(this.x, other.x, amount), mix(this.y, other.y, amount), mix(this.z, other.z, amount)); }
+  step(edge: Vec3f): Vec3f { return new Vec3f(step(this.x, edge.x), step(this.y, edge.y), step(this.z, edge.z)); }
+  smoothstep(low: Vec3f, high: Vec3f): Vec3f { return new Vec3f(smoothstep(this.x, low.x, high.x), smoothstep(this.y, low.y, high.y), smoothstep(this.z, low.z, high.z)); }
+  distance(other: Vec3f): f32 { return this.sub(other).length(); }
+  reflect(normal: Vec3f): Vec3f { return this.sub(normal.scale(2.0 * this.dot(normal))); }
+  refract(normal: Vec3f, eta: f32): Vec3f {
+    const product: f32 = this.dot(normal);
+    const factor: f32 = 1.0 - eta * eta * (1.0 - product * product);
+    if (factor < 0.0) return new Vec3f(0.0, 0.0, 0.0);
+    return this.scale(eta).sub(normal.scale(eta * product + (Math.sqrt(factor as f64) as f32)));
+  }
+  faceForward(incident: Vec3f, reference: Vec3f): Vec3f { return incident.dot(reference) < 0.0 ? this : this.scale(-1.0); }
+  lt(other: Vec3f): Vec3b { return new Vec3b(this.x < other.x, this.y < other.y, this.z < other.z); }
+  le(other: Vec3f): Vec3b { return new Vec3b(this.x <= other.x, this.y <= other.y, this.z <= other.z); }
+  gt(other: Vec3f): Vec3b { return new Vec3b(this.x > other.x, this.y > other.y, this.z > other.z); }
+  ge(other: Vec3f): Vec3b { return new Vec3b(this.x >= other.x, this.y >= other.y, this.z >= other.z); }
+  eq(other: Vec3f): Vec3b { return new Vec3b(this.x === other.x, this.y === other.y, this.z === other.z); }
+  ne(other: Vec3f): Vec3b { return new Vec3b(this.x !== other.x, this.y !== other.y, this.z !== other.z); }
+  select(other: Vec3f, mask: Vec3b): Vec3f { return new Vec3f(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z); }
+  xy(): Vec2f { return new Vec2f(this.x, this.y); }
+  xz(): Vec2f { return new Vec2f(this.x, this.z); }
+  yz(): Vec2f { return new Vec2f(this.y, this.z); }
 }
 
 @CStruct({ align: 16 })
@@ -139,6 +212,51 @@ export class Vec4f {
     }
     return this.scale(1.0 / magnitude);
   }
+
+  abs(): Vec4f { return new Vec4f(Math.abs(this.x as f64) as f32, Math.abs(this.y as f64) as f32, Math.abs(this.z as f64) as f32, Math.abs(this.w as f64) as f32); }
+  floor(): Vec4f { return new Vec4f(Math.floor(this.x as f64) as f32, Math.floor(this.y as f64) as f32, Math.floor(this.z as f64) as f32, Math.floor(this.w as f64) as f32); }
+  ceil(): Vec4f { return new Vec4f(Math.ceil(this.x as f64) as f32, Math.ceil(this.y as f64) as f32, Math.ceil(this.z as f64) as f32, Math.ceil(this.w as f64) as f32); }
+  fract(): Vec4f { return new Vec4f(fract(this.x), fract(this.y), fract(this.z), fract(this.w)); }
+  sqrt(): Vec4f { return new Vec4f(Math.sqrt(this.x as f64) as f32, Math.sqrt(this.y as f64) as f32, Math.sqrt(this.z as f64) as f32, Math.sqrt(this.w as f64) as f32); }
+  exp(): Vec4f { return new Vec4f(Math.exp(this.x as f64) as f32, Math.exp(this.y as f64) as f32, Math.exp(this.z as f64) as f32, Math.exp(this.w as f64) as f32); }
+  log(): Vec4f { return new Vec4f(Math.log(this.x as f64) as f32, Math.log(this.y as f64) as f32, Math.log(this.z as f64) as f32, Math.log(this.w as f64) as f32); }
+  sin(): Vec4f { return new Vec4f(Math.sin(this.x as f64) as f32, Math.sin(this.y as f64) as f32, Math.sin(this.z as f64) as f32, Math.sin(this.w as f64) as f32); }
+  cos(): Vec4f { return new Vec4f(Math.cos(this.x as f64) as f32, Math.cos(this.y as f64) as f32, Math.cos(this.z as f64) as f32, Math.cos(this.w as f64) as f32); }
+  tan(): Vec4f { return new Vec4f(Math.tan(this.x as f64) as f32, Math.tan(this.y as f64) as f32, Math.tan(this.z as f64) as f32, Math.tan(this.w as f64) as f32); }
+  sign(): Vec4f { return new Vec4f(sign(this.x), sign(this.y), sign(this.z), sign(this.w)); }
+  min(other: Vec4f): Vec4f { return new Vec4f(Math.min(this.x as f64, other.x as f64) as f32, Math.min(this.y as f64, other.y as f64) as f32, Math.min(this.z as f64, other.z as f64) as f32, Math.min(this.w as f64, other.w as f64) as f32); }
+  max(other: Vec4f): Vec4f { return new Vec4f(Math.max(this.x as f64, other.x as f64) as f32, Math.max(this.y as f64, other.y as f64) as f32, Math.max(this.z as f64, other.z as f64) as f32, Math.max(this.w as f64, other.w as f64) as f32); }
+  clamp(low: Vec4f, high: Vec4f): Vec4f { return new Vec4f(clamp(this.x, low.x, high.x), clamp(this.y, low.y, high.y), clamp(this.z, low.z, high.z), clamp(this.w, low.w, high.w)); }
+  pow(other: Vec4f): Vec4f { return new Vec4f(Math.pow(this.x as f64, other.x as f64) as f32, Math.pow(this.y as f64, other.y as f64) as f32, Math.pow(this.z as f64, other.z as f64) as f32, Math.pow(this.w as f64, other.w as f64) as f32); }
+  mix(other: Vec4f, amount: f32): Vec4f { return new Vec4f(mix(this.x, other.x, amount), mix(this.y, other.y, amount), mix(this.z, other.z, amount), mix(this.w, other.w, amount)); }
+  step(edge: Vec4f): Vec4f { return new Vec4f(step(this.x, edge.x), step(this.y, edge.y), step(this.z, edge.z), step(this.w, edge.w)); }
+  smoothstep(low: Vec4f, high: Vec4f): Vec4f { return new Vec4f(smoothstep(this.x, low.x, high.x), smoothstep(this.y, low.y, high.y), smoothstep(this.z, low.z, high.z), smoothstep(this.w, low.w, high.w)); }
+  distance(other: Vec4f): f32 { return this.sub(other).length(); }
+  reflect(normal: Vec4f): Vec4f { return this.sub(normal.scale(2.0 * this.dot(normal))); }
+  refract(normal: Vec4f, eta: f32): Vec4f {
+    const product: f32 = this.dot(normal);
+    const factor: f32 = 1.0 - eta * eta * (1.0 - product * product);
+    if (factor < 0.0) return new Vec4f(0.0, 0.0, 0.0, 0.0);
+    return this.scale(eta).sub(normal.scale(eta * product + (Math.sqrt(factor as f64) as f32)));
+  }
+  faceForward(incident: Vec4f, reference: Vec4f): Vec4f { return incident.dot(reference) < 0.0 ? this : this.scale(-1.0); }
+  lt(other: Vec4f): Vec4b { return new Vec4b(this.x < other.x, this.y < other.y, this.z < other.z, this.w < other.w); }
+  le(other: Vec4f): Vec4b { return new Vec4b(this.x <= other.x, this.y <= other.y, this.z <= other.z, this.w <= other.w); }
+  gt(other: Vec4f): Vec4b { return new Vec4b(this.x > other.x, this.y > other.y, this.z > other.z, this.w > other.w); }
+  ge(other: Vec4f): Vec4b { return new Vec4b(this.x >= other.x, this.y >= other.y, this.z >= other.z, this.w >= other.w); }
+  eq(other: Vec4f): Vec4b { return new Vec4b(this.x === other.x, this.y === other.y, this.z === other.z, this.w === other.w); }
+  ne(other: Vec4f): Vec4b { return new Vec4b(this.x !== other.x, this.y !== other.y, this.z !== other.z, this.w !== other.w); }
+  select(other: Vec4f, mask: Vec4b): Vec4f { return new Vec4f(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z, mask.w ? other.w : this.w); }
+  xy(): Vec2f { return new Vec2f(this.x, this.y); }
+  xz(): Vec2f { return new Vec2f(this.x, this.z); }
+  xw(): Vec2f { return new Vec2f(this.x, this.w); }
+  yz(): Vec2f { return new Vec2f(this.y, this.z); }
+  yw(): Vec2f { return new Vec2f(this.y, this.w); }
+  zw(): Vec2f { return new Vec2f(this.z, this.w); }
+  xyz(): Vec3f { return new Vec3f(this.x, this.y, this.z); }
+  xyw(): Vec3f { return new Vec3f(this.x, this.y, this.w); }
+  xzw(): Vec3f { return new Vec3f(this.x, this.z, this.w); }
+  yzw(): Vec3f { return new Vec3f(this.y, this.z, this.w); }
 }
 
 @CStruct({ align: 8 })
@@ -156,6 +274,17 @@ export class Vec2i {
   mul(other: Vec2i): Vec2i { return new Vec2i(this.x * other.x, this.y * other.y); }
   scale(s: i32): Vec2i { return new Vec2i(this.x * s, this.y * s); }
   dot(other: Vec2i): i32 { return this.x * other.x + this.y * other.y; }
+  abs(): Vec2i { return new Vec2i(Math.abs(this.x as f64) as i32, Math.abs(this.y as f64) as i32); }
+  min(other: Vec2i): Vec2i { return new Vec2i(Math.min(this.x as f64, other.x as f64) as i32, Math.min(this.y as f64, other.y as f64) as i32); }
+  max(other: Vec2i): Vec2i { return new Vec2i(Math.max(this.x as f64, other.x as f64) as i32, Math.max(this.y as f64, other.y as f64) as i32); }
+  clamp(low: Vec2i, high: Vec2i): Vec2i { return this.max(low).min(high); }
+  lt(other: Vec2i): Vec2b { return new Vec2b(this.x < other.x, this.y < other.y); }
+  le(other: Vec2i): Vec2b { return new Vec2b(this.x <= other.x, this.y <= other.y); }
+  gt(other: Vec2i): Vec2b { return new Vec2b(this.x > other.x, this.y > other.y); }
+  ge(other: Vec2i): Vec2b { return new Vec2b(this.x >= other.x, this.y >= other.y); }
+  eq(other: Vec2i): Vec2b { return new Vec2b(this.x === other.x, this.y === other.y); }
+  ne(other: Vec2i): Vec2b { return new Vec2b(this.x !== other.x, this.y !== other.y); }
+  select(other: Vec2i, mask: Vec2b): Vec2i { return new Vec2i(mask.x ? other.x : this.x, mask.y ? other.y : this.y); }
 }
 
 @CStruct({ align: 16 })
@@ -175,6 +304,20 @@ export class Vec3i {
   mul(other: Vec3i): Vec3i { return new Vec3i(this.x * other.x, this.y * other.y, this.z * other.z); }
   scale(s: i32): Vec3i { return new Vec3i(this.x * s, this.y * s, this.z * s); }
   dot(other: Vec3i): i32 { return this.x * other.x + this.y * other.y + this.z * other.z; }
+  abs(): Vec3i { return new Vec3i(Math.abs(this.x as f64) as i32, Math.abs(this.y as f64) as i32, Math.abs(this.z as f64) as i32); }
+  min(other: Vec3i): Vec3i { return new Vec3i(Math.min(this.x as f64, other.x as f64) as i32, Math.min(this.y as f64, other.y as f64) as i32, Math.min(this.z as f64, other.z as f64) as i32); }
+  max(other: Vec3i): Vec3i { return new Vec3i(Math.max(this.x as f64, other.x as f64) as i32, Math.max(this.y as f64, other.y as f64) as i32, Math.max(this.z as f64, other.z as f64) as i32); }
+  clamp(low: Vec3i, high: Vec3i): Vec3i { return this.max(low).min(high); }
+  lt(other: Vec3i): Vec3b { return new Vec3b(this.x < other.x, this.y < other.y, this.z < other.z); }
+  le(other: Vec3i): Vec3b { return new Vec3b(this.x <= other.x, this.y <= other.y, this.z <= other.z); }
+  gt(other: Vec3i): Vec3b { return new Vec3b(this.x > other.x, this.y > other.y, this.z > other.z); }
+  ge(other: Vec3i): Vec3b { return new Vec3b(this.x >= other.x, this.y >= other.y, this.z >= other.z); }
+  eq(other: Vec3i): Vec3b { return new Vec3b(this.x === other.x, this.y === other.y, this.z === other.z); }
+  ne(other: Vec3i): Vec3b { return new Vec3b(this.x !== other.x, this.y !== other.y, this.z !== other.z); }
+  select(other: Vec3i, mask: Vec3b): Vec3i { return new Vec3i(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z); }
+  xy(): Vec2i { return new Vec2i(this.x, this.y); }
+  xz(): Vec2i { return new Vec2i(this.x, this.z); }
+  yz(): Vec2i { return new Vec2i(this.y, this.z); }
 }
 
 @CStruct({ align: 16 })
@@ -196,6 +339,27 @@ export class Vec4i {
   mul(other: Vec4i): Vec4i { return new Vec4i(this.x * other.x, this.y * other.y, this.z * other.z, this.w * other.w); }
   scale(s: i32): Vec4i { return new Vec4i(this.x * s, this.y * s, this.z * s, this.w * s); }
   dot(other: Vec4i): i32 { return this.x * other.x + this.y * other.y + this.z * other.z + this.w * other.w; }
+  abs(): Vec4i { return new Vec4i(Math.abs(this.x as f64) as i32, Math.abs(this.y as f64) as i32, Math.abs(this.z as f64) as i32, Math.abs(this.w as f64) as i32); }
+  min(other: Vec4i): Vec4i { return new Vec4i(Math.min(this.x as f64, other.x as f64) as i32, Math.min(this.y as f64, other.y as f64) as i32, Math.min(this.z as f64, other.z as f64) as i32, Math.min(this.w as f64, other.w as f64) as i32); }
+  max(other: Vec4i): Vec4i { return new Vec4i(Math.max(this.x as f64, other.x as f64) as i32, Math.max(this.y as f64, other.y as f64) as i32, Math.max(this.z as f64, other.z as f64) as i32, Math.max(this.w as f64, other.w as f64) as i32); }
+  clamp(low: Vec4i, high: Vec4i): Vec4i { return this.max(low).min(high); }
+  lt(other: Vec4i): Vec4b { return new Vec4b(this.x < other.x, this.y < other.y, this.z < other.z, this.w < other.w); }
+  le(other: Vec4i): Vec4b { return new Vec4b(this.x <= other.x, this.y <= other.y, this.z <= other.z, this.w <= other.w); }
+  gt(other: Vec4i): Vec4b { return new Vec4b(this.x > other.x, this.y > other.y, this.z > other.z, this.w > other.w); }
+  ge(other: Vec4i): Vec4b { return new Vec4b(this.x >= other.x, this.y >= other.y, this.z >= other.z, this.w >= other.w); }
+  eq(other: Vec4i): Vec4b { return new Vec4b(this.x === other.x, this.y === other.y, this.z === other.z, this.w === other.w); }
+  ne(other: Vec4i): Vec4b { return new Vec4b(this.x !== other.x, this.y !== other.y, this.z !== other.z, this.w !== other.w); }
+  select(other: Vec4i, mask: Vec4b): Vec4i { return new Vec4i(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z, mask.w ? other.w : this.w); }
+  xy(): Vec2i { return new Vec2i(this.x, this.y); }
+  xz(): Vec2i { return new Vec2i(this.x, this.z); }
+  xw(): Vec2i { return new Vec2i(this.x, this.w); }
+  yz(): Vec2i { return new Vec2i(this.y, this.z); }
+  yw(): Vec2i { return new Vec2i(this.y, this.w); }
+  zw(): Vec2i { return new Vec2i(this.z, this.w); }
+  xyz(): Vec3i { return new Vec3i(this.x, this.y, this.z); }
+  xyw(): Vec3i { return new Vec3i(this.x, this.y, this.w); }
+  xzw(): Vec3i { return new Vec3i(this.x, this.z, this.w); }
+  yzw(): Vec3i { return new Vec3i(this.y, this.z, this.w); }
 }
 
 @CStruct({ align: 8 })
@@ -213,6 +377,16 @@ export class Vec2u {
   mul(other: Vec2u): Vec2u { return new Vec2u(this.x * other.x, this.y * other.y); }
   scale(s: u32): Vec2u { return new Vec2u(this.x * s, this.y * s); }
   dot(other: Vec2u): u32 { return this.x * other.x + this.y * other.y; }
+  min(other: Vec2u): Vec2u { return new Vec2u(Math.min(this.x as f64, other.x as f64) as u32, Math.min(this.y as f64, other.y as f64) as u32); }
+  max(other: Vec2u): Vec2u { return new Vec2u(Math.max(this.x as f64, other.x as f64) as u32, Math.max(this.y as f64, other.y as f64) as u32); }
+  clamp(low: Vec2u, high: Vec2u): Vec2u { return this.max(low).min(high); }
+  lt(other: Vec2u): Vec2b { return new Vec2b(this.x < other.x, this.y < other.y); }
+  le(other: Vec2u): Vec2b { return new Vec2b(this.x <= other.x, this.y <= other.y); }
+  gt(other: Vec2u): Vec2b { return new Vec2b(this.x > other.x, this.y > other.y); }
+  ge(other: Vec2u): Vec2b { return new Vec2b(this.x >= other.x, this.y >= other.y); }
+  eq(other: Vec2u): Vec2b { return new Vec2b(this.x === other.x, this.y === other.y); }
+  ne(other: Vec2u): Vec2b { return new Vec2b(this.x !== other.x, this.y !== other.y); }
+  select(other: Vec2u, mask: Vec2b): Vec2u { return new Vec2u(mask.x ? other.x : this.x, mask.y ? other.y : this.y); }
 }
 
 @CStruct({ align: 16 })
@@ -232,6 +406,19 @@ export class Vec3u {
   mul(other: Vec3u): Vec3u { return new Vec3u(this.x * other.x, this.y * other.y, this.z * other.z); }
   scale(s: u32): Vec3u { return new Vec3u(this.x * s, this.y * s, this.z * s); }
   dot(other: Vec3u): u32 { return this.x * other.x + this.y * other.y + this.z * other.z; }
+  min(other: Vec3u): Vec3u { return new Vec3u(Math.min(this.x as f64, other.x as f64) as u32, Math.min(this.y as f64, other.y as f64) as u32, Math.min(this.z as f64, other.z as f64) as u32); }
+  max(other: Vec3u): Vec3u { return new Vec3u(Math.max(this.x as f64, other.x as f64) as u32, Math.max(this.y as f64, other.y as f64) as u32, Math.max(this.z as f64, other.z as f64) as u32); }
+  clamp(low: Vec3u, high: Vec3u): Vec3u { return this.max(low).min(high); }
+  lt(other: Vec3u): Vec3b { return new Vec3b(this.x < other.x, this.y < other.y, this.z < other.z); }
+  le(other: Vec3u): Vec3b { return new Vec3b(this.x <= other.x, this.y <= other.y, this.z <= other.z); }
+  gt(other: Vec3u): Vec3b { return new Vec3b(this.x > other.x, this.y > other.y, this.z > other.z); }
+  ge(other: Vec3u): Vec3b { return new Vec3b(this.x >= other.x, this.y >= other.y, this.z >= other.z); }
+  eq(other: Vec3u): Vec3b { return new Vec3b(this.x === other.x, this.y === other.y, this.z === other.z); }
+  ne(other: Vec3u): Vec3b { return new Vec3b(this.x !== other.x, this.y !== other.y, this.z !== other.z); }
+  select(other: Vec3u, mask: Vec3b): Vec3u { return new Vec3u(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z); }
+  xy(): Vec2u { return new Vec2u(this.x, this.y); }
+  xz(): Vec2u { return new Vec2u(this.x, this.z); }
+  yz(): Vec2u { return new Vec2u(this.y, this.z); }
 }
 
 @CStruct({ align: 16 })
@@ -253,6 +440,77 @@ export class Vec4u {
   mul(other: Vec4u): Vec4u { return new Vec4u(this.x * other.x, this.y * other.y, this.z * other.z, this.w * other.w); }
   scale(s: u32): Vec4u { return new Vec4u(this.x * s, this.y * s, this.z * s, this.w * s); }
   dot(other: Vec4u): u32 { return this.x * other.x + this.y * other.y + this.z * other.z + this.w * other.w; }
+  min(other: Vec4u): Vec4u { return new Vec4u(Math.min(this.x as f64, other.x as f64) as u32, Math.min(this.y as f64, other.y as f64) as u32, Math.min(this.z as f64, other.z as f64) as u32, Math.min(this.w as f64, other.w as f64) as u32); }
+  max(other: Vec4u): Vec4u { return new Vec4u(Math.max(this.x as f64, other.x as f64) as u32, Math.max(this.y as f64, other.y as f64) as u32, Math.max(this.z as f64, other.z as f64) as u32, Math.max(this.w as f64, other.w as f64) as u32); }
+  clamp(low: Vec4u, high: Vec4u): Vec4u { return this.max(low).min(high); }
+  lt(other: Vec4u): Vec4b { return new Vec4b(this.x < other.x, this.y < other.y, this.z < other.z, this.w < other.w); }
+  le(other: Vec4u): Vec4b { return new Vec4b(this.x <= other.x, this.y <= other.y, this.z <= other.z, this.w <= other.w); }
+  gt(other: Vec4u): Vec4b { return new Vec4b(this.x > other.x, this.y > other.y, this.z > other.z, this.w > other.w); }
+  ge(other: Vec4u): Vec4b { return new Vec4b(this.x >= other.x, this.y >= other.y, this.z >= other.z, this.w >= other.w); }
+  eq(other: Vec4u): Vec4b { return new Vec4b(this.x === other.x, this.y === other.y, this.z === other.z, this.w === other.w); }
+  ne(other: Vec4u): Vec4b { return new Vec4b(this.x !== other.x, this.y !== other.y, this.z !== other.z, this.w !== other.w); }
+  select(other: Vec4u, mask: Vec4b): Vec4u { return new Vec4u(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z, mask.w ? other.w : this.w); }
+  xy(): Vec2u { return new Vec2u(this.x, this.y); }
+  xz(): Vec2u { return new Vec2u(this.x, this.z); }
+  xw(): Vec2u { return new Vec2u(this.x, this.w); }
+  yz(): Vec2u { return new Vec2u(this.y, this.z); }
+  yw(): Vec2u { return new Vec2u(this.y, this.w); }
+  zw(): Vec2u { return new Vec2u(this.z, this.w); }
+  xyz(): Vec3u { return new Vec3u(this.x, this.y, this.z); }
+  xyw(): Vec3u { return new Vec3u(this.x, this.y, this.w); }
+  xzw(): Vec3u { return new Vec3u(this.x, this.z, this.w); }
+  yzw(): Vec3u { return new Vec3u(this.y, this.z, this.w); }
+}
+
+@CStruct
+export class Vec2b {
+  x: boolean;
+  y: boolean;
+
+  constructor(x: boolean, y: boolean) {
+    this.x = x;
+    this.y = y;
+  }
+
+  any(): boolean { return this.x || this.y; }
+  all(): boolean { return this.x && this.y; }
+  not(): Vec2b { return new Vec2b(!this.x, !this.y); }
+}
+
+@CStruct
+export class Vec3b {
+  x: boolean;
+  y: boolean;
+  z: boolean;
+
+  constructor(x: boolean, y: boolean, z: boolean) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+
+  any(): boolean { return this.x || this.y || this.z; }
+  all(): boolean { return this.x && this.y && this.z; }
+  not(): Vec3b { return new Vec3b(!this.x, !this.y, !this.z); }
+}
+
+@CStruct
+export class Vec4b {
+  x: boolean;
+  y: boolean;
+  z: boolean;
+  w: boolean;
+
+  constructor(x: boolean, y: boolean, z: boolean, w: boolean) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.w = w;
+  }
+
+  any(): boolean { return this.x || this.y || this.z || this.w; }
+  all(): boolean { return this.x && this.y && this.z && this.w; }
+  not(): Vec4b { return new Vec4b(!this.x, !this.y, !this.z, !this.w); }
 }
 
 @CStruct({ align: 4 })
@@ -513,6 +771,24 @@ export function v4i(x: i32, y: i32, z: i32, w: i32): Vec4i { return new Vec4i(x,
 export function v2u(x: u32, y: u32): Vec2u { return new Vec2u(x, y); }
 export function v3u(x: u32, y: u32, z: u32): Vec3u { return new Vec3u(x, y, z); }
 export function v4u(x: u32, y: u32, z: u32, w: u32): Vec4u { return new Vec4u(x, y, z, w); }
+export function v3fFrom2(v: Vec2f, z: f32): Vec3f { return new Vec3f(v.x, v.y, z); }
+export function v4fFrom2(v: Vec2f, z: f32, w: f32): Vec4f { return new Vec4f(v.x, v.y, z, w); }
+export function v4fFrom3(v: Vec3f, w: f32): Vec4f { return new Vec4f(v.x, v.y, v.z, w); }
+export function v2fSplat(s: f32): Vec2f { return new Vec2f(s, s); }
+export function v3fSplat(s: f32): Vec3f { return new Vec3f(s, s, s); }
+export function v4fSplat(s: f32): Vec4f { return new Vec4f(s, s, s, s); }
+export function v3iFrom2(v: Vec2i, z: i32): Vec3i { return new Vec3i(v.x, v.y, z); }
+export function v4iFrom2(v: Vec2i, z: i32, w: i32): Vec4i { return new Vec4i(v.x, v.y, z, w); }
+export function v4iFrom3(v: Vec3i, w: i32): Vec4i { return new Vec4i(v.x, v.y, v.z, w); }
+export function v2iSplat(s: i32): Vec2i { return new Vec2i(s, s); }
+export function v3iSplat(s: i32): Vec3i { return new Vec3i(s, s, s); }
+export function v4iSplat(s: i32): Vec4i { return new Vec4i(s, s, s, s); }
+export function v3uFrom2(v: Vec2u, z: u32): Vec3u { return new Vec3u(v.x, v.y, z); }
+export function v4uFrom2(v: Vec2u, z: u32, w: u32): Vec4u { return new Vec4u(v.x, v.y, z, w); }
+export function v4uFrom3(v: Vec3u, w: u32): Vec4u { return new Vec4u(v.x, v.y, v.z, w); }
+export function v2uSplat(s: u32): Vec2u { return new Vec2u(s, s); }
+export function v3uSplat(s: u32): Vec3u { return new Vec3u(s, s, s); }
+export function v4uSplat(s: u32): Vec4u { return new Vec4u(s, s, s, s); }
 export function v2h(x: f16, y: f16): Vec2h { return new Vec2h(x, y); }
 export function v3h(x: f16, y: f16, z: f16): Vec3h { return new Vec3h(x, y, z); }
 export function v4h(x: f16, y: f16, z: f16, w: f16): Vec4h { return new Vec4h(x, y, z, w); }

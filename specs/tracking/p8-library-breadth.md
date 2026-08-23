@@ -31,3 +31,18 @@ plan's exit item for `x14` through `read` moves to the step 1 close.
   rasterizer-side definition that RN14's host rasterizer does not
   have.
 - `Vec*b` classes are value classes, never schemas (SC5).
+
+## Steps 2 and 3 (2026-08-23)
+
+K25–K27 in `lib/typegpu-types.ts` with host bodies, the K10 table in
+`crates/typegpu-gen/src/mapping.rs`, the K10 Rev 1 table-vs-HIR test
+(scratch red both ways: an extra row `scratchExtra`, a missing row
+for `abs`, a scratch class method `scratchMissing`), K28 fixtures
+(SC5 `Vec2b` field, PI5 `Vec*b` wrapper, checker `Vec3h has no
+method abs`), `b13-vector-builtins` with five `host:` lines,
+`x14-live-vector-builtins` through the BF3 explicit path.
+
+Evidence: `tools/gate.sh --require-backend` green, 235 passed, 137 s
+under load (see `build-time.md`). `tools/live.sh` x01–x14 PASS:
+Metal (yawgpu) 40.57 s, Dawn 37.12 s. The budget check for the
+program gate (120 s) is open until an idle re-measurement.
