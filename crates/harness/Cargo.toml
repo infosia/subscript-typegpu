@@ -14,11 +14,13 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-libc = "0.2"
 subscript-typegpu-facade = { path = "../facade" }
 subscript-typegpu-gen = { path = "../typegpu-gen" }
 subscript-compiler.workspace = true
 subscript-codegen.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [dev-dependencies]
 naga = { version = "29", features = ["wgsl-in"] }

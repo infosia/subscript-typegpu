@@ -3918,8 +3918,20 @@ wgpuAdapterRelease: unsafe extern "C" fn(WGPUAdapter),
 
 impl WebgpuTable {
     pub(crate) fn load(path: &std::path::Path) -> Result<Self, String> {
-        // SAFETY: the library stays owned by the returned table.
-        let library = unsafe { libloading::Library::new(path) }
+        #[cfg(windows)]
+        // SAFETY: The library stays owned by the returned table.
+        // The Windows flag searches the backend directory for dependent libraries.
+        let library = unsafe {
+            libloading::os::windows::Library::load_with_flags(
+                path,
+                libloading::os::windows::LOAD_WITH_ALTERED_SEARCH_PATH,
+            )
+        }
+        .map(libloading::Library::from);
+        #[cfg(not(windows))]
+        // SAFETY: The library stays owned by the returned table.
+        let library = unsafe { libloading::Library::new(path) };
+        let library = library
             .map_err(|error| format!("load {}: {error}", path.display()))?;
         fn symbol<T: Copy>(
             library: &libloading::Library,

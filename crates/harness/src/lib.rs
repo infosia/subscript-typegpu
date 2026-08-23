@@ -152,32 +152,43 @@ static COVERAGE_MEMORY: OnceLock<CoverageMemory> = OnceLock::new();
 fn coverage_counts() -> &'static [AtomicU64] {
     let memory = COVERAGE_MEMORY.get_or_init(|| {
         let len = native_symbols_generated::facade_export_names().len();
-        let byte_len = len
-            .checked_mul(std::mem::size_of::<AtomicU64>())
-            .expect("facade coverage array size");
-        // SAFETY: the mapping is anonymous, process-shared, and remains live for the
-        // process lifetime. Its zeroed storage is valid for `AtomicU64`.
-        let address = unsafe {
-            libc::mmap(
-                std::ptr::null_mut(),
-                byte_len,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_SHARED | libc::MAP_ANON,
-                -1,
-                0,
-            )
+        #[cfg(unix)]
+        let address = {
+            let byte_len = len
+                .checked_mul(std::mem::size_of::<AtomicU64>())
+                .expect("facade coverage array size");
+            // SAFETY: The anonymous shared mapping remains live for the process lifetime.
+            // Its zeroed storage is valid for `AtomicU64`.
+            let address = unsafe {
+                libc::mmap(
+                    std::ptr::null_mut(),
+                    byte_len,
+                    libc::PROT_READ | libc::PROT_WRITE,
+                    libc::MAP_SHARED | libc::MAP_ANON,
+                    -1,
+                    0,
+                )
+            };
+            assert_ne!(
+                address,
+                libc::MAP_FAILED,
+                "allocate facade coverage counters"
+            );
+            address as usize
         };
-        assert_ne!(
-            address,
-            libc::MAP_FAILED,
-            "allocate facade coverage counters"
-        );
-        CoverageMemory {
-            address: address as usize,
-            len,
-        }
+        #[cfg(not(unix))]
+        let address = {
+            let counters = (0..len)
+                .map(|_| AtomicU64::new(0))
+                .collect::<Vec<_>>()
+                .into_boxed_slice();
+            // SAFETY: The leaked allocation remains live for the process lifetime.
+            // Each counter starts at zero with valid `AtomicU64` storage.
+            Box::leak(counters).as_ptr() as usize
+        };
+        CoverageMemory { address, len }
     });
-    // SAFETY: `coverage_counts` creates this process-lifetime mapping at exactly
+    // SAFETY: `coverage_counts` creates this process-lifetime storage at exactly
     // `len * size_of::<AtomicU64>()` bytes and never changes its address or length.
     unsafe { std::slice::from_raw_parts(memory.address as *const AtomicU64, memory.len) }
 }

@@ -6,8 +6,9 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use subscript_codegen::{
-    add_c11_optimized_flags, add_executable_output, emit_c_without_main, host_c_compiler,
-    runtime_system_libraries, tool_output_report, value_class_layouts,
+    add_c11_optimized_flags, add_executable_output, add_object_directory, emit_c_without_main,
+    host_c_compiler, include_directory_arg, runtime_system_libraries, tool_output_report,
+    value_class_layouts,
 };
 use subscript_compiler::{hir, SourceFile};
 use subscript_typegpu_gen::{Generated, GeneratedLayout};
@@ -215,9 +216,12 @@ fn compile_probe(
     let compiler = host_c_compiler().expect("resolve host C compiler");
     let mut command = compiler.command();
     add_c11_optimized_flags(&mut command, compiler.style());
+    add_object_directory(&mut command, &directory.0, compiler.style());
     command
-        .arg("-I")
-        .arg(repository_root().join("crates/facade"))
+        .arg(include_directory_arg(
+            compiler.style(),
+            &repository_root().join("crates/facade"),
+        ))
         .arg(&source_path)
         .args(subscript_typegpu_harness::ship_link_inputs().expect("facade link inputs"))
         .arg(subscript_typegpu_harness::ensure_runtime_staticlib().expect("runtime archive"))

@@ -91,6 +91,8 @@ pub(crate) fn initialize_table() -> bool {
         return false;
     };
     let path = std::path::PathBuf::from(path);
+    // When the process can resolve the path, the loader uses its absolute form.
+    let path = std::path::absolute(&path).unwrap_or(path);
     let loaded = match generated::WebgpuTable::load(&path) {
         Ok(table) => table,
         Err(error) => {
