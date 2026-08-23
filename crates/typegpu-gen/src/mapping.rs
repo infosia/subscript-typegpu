@@ -651,7 +651,7 @@ pub(crate) fn math(function: MathFn) -> Option<&'static str> {
 }
 
 pub(crate) fn free_function(name: &str) -> Option<&'static str> {
-    let base = name.split('<').next().unwrap_or(name);
+    let base = crate::base_name(name);
     Some(match base {
         "clamp" => "clamp",
         "mix" => "mix",

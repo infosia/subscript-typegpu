@@ -829,6 +829,31 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { n
 }
 
 #[test]
+fn wgsl_shell_preserves_relative_indentation_and_empty_lines() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, WgslShellSpec, computePipeline, wgslShell } from "./typegpu";
+class Layout { output!: MutStorage<u32>; }
+function choose(input: u32): u32 { return input; }
+const shell: WgslShellSpec = wgslShell<(input: u32) => u32>(choose, {
+  body: "    if (input > 0u) {\n      return input;\n\n    }\n    return 0u;",
+});
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.output.set(0, choose(1)); }
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(
+        wgsl.contains(
+            "fn choose(input: u32) -> u32 {\n  if (input > 0u) {\n    return input;\n\n  }\n  return 0u;\n}"
+        ),
+        "{wgsl}"
+    );
+    assert!(!wgsl.lines().any(|line| line.ends_with(' ')), "{wgsl}");
+    validate(wgsl);
+}
+
+#[test]
 fn guarded_pipeline_emits_the_hidden_last_binding_and_three_axis_fence() {
     let generated = generate(
         r#"
@@ -855,5 +880,12 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { n
         generated.support_module
     );
     assert!(!generated.support_module.contains("pipeline_guard!:"));
+    assert!(
+        generated
+            .support_module
+            .contains("  ], pipeline.guardBuffer(0));"),
+        "{}",
+        generated.support_module
+    );
     validate(wgsl);
 }

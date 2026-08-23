@@ -218,6 +218,12 @@ fn dispatch_threads_rounds_all_three_axes() {
             "dispatchThreads lacks workgroup axis {axis}"
         );
     }
+    assert!(
+        source.contains(
+            "\"ComputePipeline.dispatchTimed\",\n      x * this.workgroup[0],\n      y * this.workgroup[1],\n      z * this.workgroup[2],"
+        ),
+        "dispatchTimed does not write three-axis guard bounds",
+    );
 }
 
 #[test]

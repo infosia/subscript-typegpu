@@ -11,9 +11,29 @@ mod shell;
 
 use std::collections::BTreeSet;
 
+use subscript_compiler::hir::{Expr, ExprKind, Module};
 use subscript_compiler::{CheckOptions, Diagnostic, Pos, RuleCode, SourceFile};
 
 use crate::layout::{Layout, TypeTree};
+
+pub(crate) fn base_name(name: &str) -> &str {
+    name.split('<').next().unwrap_or(name)
+}
+
+pub(crate) fn descriptor_field<'a>(
+    module: &Module,
+    expr: &'a Expr,
+    field_name: &str,
+) -> Option<Option<&'a Expr>> {
+    let ExprKind::DescriptorLit { class, fields } = &expr.kind else {
+        return None;
+    };
+    module.classes[class.0]
+        .fields
+        .iter()
+        .position(|field| field.name == field_name)
+        .map(|index| fields.get(index).and_then(Option::as_ref))
+}
 
 /// The generated layouts for one schema.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -283,13 +303,18 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
             .flat_map(|layout| &layout.bindings)
             .map(|binding| binding.name.clone()),
     );
-    generated_names.extend(
-        module
-            .globals
-            .iter()
-            .filter(|global| global.pos.file != "typegpu.ts")
-            .map(|global| global.name.clone()),
-    );
+    for pipeline in &pipeline_definitions {
+        generated_names.extend(
+            kernel::reached_global_names(&module, pipeline, &shell_program)
+                .map_err(|item| vec![item])?,
+        );
+    }
+    for pipeline in &render_definitions {
+        generated_names.extend(
+            kernel::reached_render_global_names(&module, pipeline, &shell_program)
+                .map_err(|item| vec![item])?,
+        );
+    }
     shell::validate_collisions(&shell_program, &generated_names)?;
     if let Some(pipeline) = render_definitions.iter().find(|pipeline| {
         schemas

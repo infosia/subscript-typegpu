@@ -339,10 +339,9 @@ fn kernel_globals(
             ExprKind::Call {
                 callee: Callee::Func(name),
                 args,
-            } if function_declared_in(module, name, "typegpu.ts") => Some((
-                name.split('<').next().unwrap_or(name.as_str()),
-                args.as_slice(),
-            )),
+            } if function_declared_in(module, name, "typegpu.ts") => {
+                Some((crate::base_name(name), args.as_slice()))
+            }
             _ => None,
         };
         let (ty, kind) = match wrapper {
@@ -425,6 +424,36 @@ fn render_kernel_globals(
         .collect())
 }
 
+pub(crate) fn reached_global_names(
+    module: &Module,
+    pipeline: &Pipeline,
+    shells: &crate::shell::ShellProgram,
+) -> Result<BTreeSet<String>, Diagnostic> {
+    let kernel = function(module, &pipeline.entry)
+        .ok_or_else(|| generator_diagnostic("kernel disappeared from HIR", pipeline.pos.clone()))?;
+    Ok(kernel_globals(module, kernel, shells)?
+        .into_iter()
+        .map(|global| global.name)
+        .collect())
+}
+
+pub(crate) fn reached_render_global_names(
+    module: &Module,
+    pipeline: &RenderPipeline,
+    shells: &crate::shell::ShellProgram,
+) -> Result<BTreeSet<String>, Diagnostic> {
+    let vertex = function(module, &pipeline.vertex_entry).ok_or_else(|| {
+        generator_diagnostic("vertex kernel disappeared from HIR", pipeline.pos.clone())
+    })?;
+    let fragment = function(module, &pipeline.fragment_entry).ok_or_else(|| {
+        generator_diagnostic("fragment kernel disappeared from HIR", pipeline.pos.clone())
+    })?;
+    Ok(render_kernel_globals(module, [vertex, fragment], shells)?
+        .into_iter()
+        .map(|global| global.name)
+        .collect())
+}
+
 fn expression_blocks_host(module: &Module, expression: &Expr) -> bool {
     match &expression.kind {
         ExprKind::Unary { operand, .. }
@@ -442,7 +471,7 @@ fn expression_blocks_host(module: &Module, expression: &Expr) -> bool {
             let callee_blocks = match callee {
                 Callee::Func(name) => {
                     matches!(
-                        name.split('<').next().unwrap_or(name),
+                        crate::base_name(name),
                         "workgroupBarrier" | "storageBarrier"
                     ) && function_declared_in(module, name, "typegpu.ts")
                 }
@@ -556,6 +585,27 @@ pub(crate) fn host_runnable(
         }
     }
     Ok(true)
+}
+
+pub(crate) fn reaches_barrier(
+    module: &Module,
+    kernel: &Function,
+    shells: &crate::shell::ShellProgram,
+) -> Result<bool, Diagnostic> {
+    if contains_barrier(module, &kernel.body) {
+        return Ok(true);
+    }
+    for helper in dependencies(module, kernel, shells)? {
+        if crate::shell::function_is_shell(shells, &helper) {
+            continue;
+        }
+        if function(module, &helper)
+            .is_some_and(|function| contains_barrier(module, &function.body))
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 pub(crate) fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String, Diagnostic> {
@@ -1273,7 +1323,7 @@ fn barrier_call<'a>(module: &Module, expr: &'a Expr) -> Option<&'a str> {
     if !args.is_empty() || !function_declared_in(module, name, "typegpu.ts") {
         return None;
     }
-    let base = name.split('<').next().unwrap_or(name);
+    let base = crate::base_name(name);
     matches!(base, "workgroupBarrier" | "storageBarrier").then_some(base)
 }
 
@@ -1941,7 +1991,7 @@ impl<'a> Emitter<'a> {
                 })
             }
             Callee::Func(name) => {
-                let base = name.split('<').next().unwrap_or(name);
+                let base = crate::base_name(name);
                 if matches!(base, "workgroupBarrier" | "storageBarrier")
                     && function_declared_in(self.module, name, "typegpu.ts")
                 {
@@ -1954,7 +2004,7 @@ impl<'a> Emitter<'a> {
                 let is_library = function(self.module, name)
                     .is_some_and(|function| function.pos.file == "typegpu-types.ts");
                 let mapped = is_library.then(|| mapping::free_function(name)).flatten();
-                let called = mapped.unwrap_or_else(|| name.split('<').next().unwrap_or(name));
+                let called = mapped.unwrap_or_else(|| crate::base_name(name));
                 let called = if mapped.is_some() {
                     called.to_owned()
                 } else {
@@ -2707,7 +2757,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                 }
                 Callee::Func(name) => UniformityTaint::NonUniform(format!(
                     "helper result `{}`",
-                    name.split('<').next().unwrap_or(name)
+                    crate::base_name(name)
                 )),
                 Callee::Method { recv, name }
                     if args.is_empty()
@@ -3654,6 +3704,7 @@ fn module_scope_names(
     globals: &[KernelGlobal],
     helpers: &[String],
     entries: &[&str],
+    declaration_names: Option<&BTreeSet<String>>,
 ) -> BTreeSet<String> {
     let mut names = structs
         .iter()
@@ -3669,9 +3720,10 @@ fn module_scope_names(
     names.extend(
         helpers
             .iter()
-            .map(|name| mapping::ident(name.split('<').next().unwrap_or(name))),
+            .map(|name| mapping::ident(crate::base_name(name))),
     );
     names.extend(entries.iter().map(|name| mapping::ident(name)));
+    names.extend(declaration_names.into_iter().flatten().cloned());
     names.extend(
         [
             "globalId",
@@ -3736,14 +3788,34 @@ fn emit_shell(
         mapping::ident(&shell.name),
         params.join(", ")
     ));
+    let lines = shell.body.split('\n').collect::<Vec<_>>();
+    let common_indent = lines
+        .iter()
+        .filter_map(|line| {
+            let line = line.trim_end_matches(crate::shell::is_wgsl_blankspace);
+            (!line.is_empty()).then(|| {
+                line.chars()
+                    .take_while(|ch| crate::shell::is_wgsl_blankspace(*ch))
+                    .count()
+            })
+        })
+        .min()
+        .unwrap_or(0);
     let mut body = String::new();
-    for line in shell.body.lines() {
+    for line in lines {
+        let line = line.trim_end_matches(crate::shell::is_wgsl_blankspace);
+        let start = line
+            .char_indices()
+            .nth(common_indent)
+            .map_or(line.len(), |(index, _)| index);
+        let line = &line[start..];
+        if line.is_empty() {
+            body.push('\n');
+            continue;
+        }
         body.push_str("  ");
-        body.push_str(line.trim());
+        body.push_str(line);
         body.push('\n');
-    }
-    if shell.body.is_empty() {
-        body.push_str("  \n");
     }
     append_recorded_text(out, &body, format!("shell {}", shell.name), spans);
     out.push_str("}\n\n");
@@ -3769,7 +3841,6 @@ pub(crate) fn emit(
         .iter()
         .filter_map(|name| crate::shell::shell_for_function(shells, name))
         .collect::<Vec<_>>();
-    let shell_order = shells.declarations.is_some() || !reached_shells.is_empty();
     let globals = kernel_globals(module, kernel, shells)?;
     let module_names = module_scope_names(
         structs,
@@ -3777,6 +3848,7 @@ pub(crate) fn emit(
         &globals,
         &helpers,
         &[&pipeline.entry],
+        shells.declarations.as_ref().map(|item| &item.names),
     );
     validate_statement_subset(&kernel.body)?;
     for binding in pipeline.layouts.iter().flat_map(|layout| &layout.bindings) {
@@ -3850,7 +3922,7 @@ pub(crate) fn emit(
         };
         helper_text.push_str(&format!(
             "fn {}({}){result} {{\n",
-            mapping::ident(name.split('<').next().unwrap_or(name.as_str())),
+            mapping::ident(crate::base_name(name)),
             params.join(", ")
         ));
         helper_emitter.statements(&helper.body, 1, &mut helper_text)?;
@@ -3912,9 +3984,6 @@ pub(crate) fn emit(
         out.push_str(structure);
         out.push('\n');
     }
-    if !shell_order {
-        out.push_str(&emit_kernel_globals(module, &globals)?);
-    }
     for shell in reached_shells {
         emit_shell(module, shell, &pipeline.layouts, &mut out, &mut spans)?;
     }
@@ -3924,9 +3993,7 @@ pub(crate) fn emit(
         }
     }
     out.push('\n');
-    if shell_order {
-        out.push_str(&emit_kernel_globals(module, &globals)?);
-    }
+    out.push_str(&emit_kernel_globals(module, &globals)?);
     out.push_str(&helper_text);
     let parameters = [
         "globalId",
@@ -4150,7 +4217,7 @@ fn render_helpers(
         };
         out.push_str(&format!(
             "fn {}({}){result} {{\n",
-            mapping::ident(name.split('<').next().unwrap_or(&name)),
+            mapping::ident(crate::base_name(&name)),
             params.join(", ")
         ));
         emitter.statements(&helper.body, 1, &mut out)?;
@@ -4183,16 +4250,13 @@ pub(crate) fn emit_render(
             }
         }
     }
-    let shell_order = shells.declarations.is_some()
-        || helper_names
-            .iter()
-            .any(|name| crate::shell::function_is_shell(shells, name));
     let mut module_names = module_scope_names(
         structs,
         &pipeline.layouts,
         &globals,
         &helper_names,
         &[&pipeline.vertex_entry, &pipeline.fragment_entry],
+        shells.declarations.as_ref().map(|item| &item.names),
     );
     module_names.insert(mapping::ident(&pipeline.varyings_name));
     let layout_count = pipeline.layouts.len();
@@ -4261,9 +4325,6 @@ pub(crate) fn emit_render(
         out.push('\n');
     }
     out.push_str(&render_interface_structs(module, pipeline)?);
-    if !shell_order {
-        out.push_str(&emit_kernel_globals(module, &globals)?);
-    }
     for name in &helper_names {
         if let Some(shell) = crate::shell::shell_for_function(shells, name) {
             emit_shell(module, shell, &pipeline.layouts, &mut out, &mut spans)?;
@@ -4277,9 +4338,7 @@ pub(crate) fn emit_render(
     if !pipeline.layouts.is_empty() {
         out.push('\n');
     }
-    if shell_order {
-        out.push_str(&emit_kernel_globals(module, &globals)?);
-    }
+    out.push_str(&emit_kernel_globals(module, &globals)?);
     out.push_str(&render_helpers(
         module,
         pipeline,

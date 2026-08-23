@@ -170,3 +170,21 @@ two module orders with K14 unrevised. Resolutions: PI15 Rev 1
 guarded dispatch per encoder with a trap), PI18 Rev 1, K14 Rev 5
 (one order, goldens regenerated), K31 wording. Code fixes in one
 Codex round.
+
+Code fixes landed: all 22 findings. Scratch reds: PI15 barrier
+(`guarded pipeline 'rejected' reaches a barrier`), PI15 multi-layout,
+K30 shell collision, K29 and K30 nested declarations, BF2 `patch`,
+BF8 `copyTo`, PI15 encoder trap (`ComputePipeline.dispatch x=2 y=1
+z=1`), BF9 map failure through a destroyed device. Goldens changed
+by K14 Rev 5: `b09-kernel-depth.kernelDepth.wgsl`,
+`b10-workgroup.workgroup.wgsl`, `x08-live-reduction.reduction.wgsl`
+(module variables after the bindings), each validated by `naga`.
+
+Evidence at the close: `tools/gate.sh --require-backend` green, 240
+passed, 146 s. `tools/live.sh` x01–x18 PASS: Metal (yawgpu) 47.17 s,
+Dawn 43.50 s.
+
+## Close
+
+P8 slice 2 COMPLETE 2026-08-23. Open: a guarded kernel with a barrier
+(rejected, no design), the ship tier of the window host (P9).

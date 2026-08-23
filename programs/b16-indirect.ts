@@ -141,22 +141,25 @@ export async function main(): Promise<void> {
     });
     using indices = device.createBuffer({
       label: "b16-indices",
-      size: 6,
+      size: 8,
       usage: GPUBufferUsage.INDEX + GPUBufferUsage.COPY_DST,
     });
+    const dispatchOffset: u64 = 0;
+    const drawOffset: u64 = 12;
+    const drawIndexedOffset: u64 = 28;
     device.queue().writeBuffer(
       indirect,
-      0,
+      dispatchOffset,
       Context.bytesOf<DispatchIndirectArgs>(new DispatchIndirectArgs(1, 1, 1)),
     );
     device.queue().writeBuffer(
       indirect,
-      12,
+      drawOffset,
       Context.bytesOf<DrawIndirectArgs>(new DrawIndirectArgs(3, 1, 0, 0)),
     );
     device.queue().writeBuffer(
       indirect,
-      28,
+      drawIndexedOffset,
       Context.bytesOf<DrawIndexedIndirectArgs>(new DrawIndexedIndirectArgs(3, 1, 0, 0, 0)),
     );
     device.queue().writeBuffer(
@@ -171,7 +174,7 @@ export async function main(): Promise<void> {
     device.queue().writeBuffer(
       indices,
       0,
-      Context.bytesOf<FixedArray<u16, 3>>([0, 1, 2]),
+      Context.bytesOf<FixedArray<u16, 4>>([0, 1, 2, 0]),
     );
     using target = device.createTexture({
       label: "b16-target",
@@ -214,7 +217,7 @@ export async function main(): Promise<void> {
       [bufferResource(output)],
     );
     using encoder = device.createCommandEncoderDefault();
-    compute.dispatchIndirect(encoder, [computeGroup], indirect, 0);
+    compute.dispatchIndirect(encoder, [computeGroup], indirect, dispatchOffset);
     using pass = encoder.beginRenderPass({
       colorAttachments: [{
         view,
@@ -224,9 +227,9 @@ export async function main(): Promise<void> {
       }],
     });
     render.bind(pass, [], [vertices]);
-    pass.drawIndirect(indirect, 12);
+    pass.drawIndirect(indirect, drawOffset);
     render.setIndexBuffer(pass, indices);
-    pass.drawIndexedIndirect(indirect, 28);
+    pass.drawIndexedIndirect(indirect, drawIndexedOffset);
     pass.end();
     using command = encoder.finishDefault();
     device.queue().submit([command]);
@@ -242,7 +245,7 @@ export async function main(): Promise<void> {
     print(`DispatchIndirectArgs_SIZE=${DispatchIndirectArgs_SIZE}`);
     print(`DrawIndirectArgs_SIZE=${DrawIndirectArgs_SIZE}`);
     print(`DrawIndexedIndirectArgs_SIZE=${DrawIndexedIndirectArgs_SIZE}`);
-    print("offsets=0,12,28");
+    print(`offsets=${dispatchOffset},${drawOffset},${drawIndexedOffset}`);
     print(`indirectRender_INDEX_FORMAT=${indirectRender_INDEX_FORMAT}`);
     print(`host:out=${host.output.get(0)}`);
     print("indirect:submitted");

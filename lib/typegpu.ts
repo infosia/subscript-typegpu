@@ -286,11 +286,6 @@ export class Buffer<T> {
     if (elementIndex >= this.count) {
       authorTrap("BF9", "Buffer.readOne", `elementIndex=${elementIndex} elementCount=1 count=${this.count}`);
     }
-    const byteOffset: u64 = (elementIndex as u64) * (this.elementSize as u64);
-    const byteLength: u64 = this.elementSize as u64;
-    if (byteOffset % 4 !== 0 || byteLength % 4 !== 0) {
-      authorTrap("BF9", "Buffer.readOne", `byteOffset=${byteOffset} byteLength=${byteLength}`);
-    }
     return await this.read(device, elementIndex, 1);
   }
 
@@ -589,6 +584,45 @@ function hostInvocation(
   );
 }
 
+function simulateComputeLoop<L>(
+  kernel: (res: L, ctx: ComputeInvocation) => void,
+  res: L,
+  spec: ComputePipelineSpec,
+  workgroups: FixedArray<u32, 3>,
+  bounds: FixedArray<u32, 3>,
+  applyBounds: boolean,
+): void {
+  for (let workgroupZ: u32 = 0; workgroupZ < workgroups[2]; workgroupZ += 1) {
+    for (let workgroupY: u32 = 0; workgroupY < workgroups[1]; workgroupY += 1) {
+      for (let workgroupX: u32 = 0; workgroupX < workgroups[0]; workgroupX += 1) {
+        for (let localZ: u32 = 0; localZ < spec.workgroupSize[2]; localZ += 1) {
+          for (let localY: u32 = 0; localY < spec.workgroupSize[1]; localY += 1) {
+            for (let localX: u32 = 0; localX < spec.workgroupSize[0]; localX += 1) {
+              const invocation: ComputeInvocation = hostInvocation(
+                spec,
+                workgroups,
+                workgroupX,
+                workgroupY,
+                workgroupZ,
+                localX,
+                localY,
+                localZ,
+              );
+              if (!applyBounds
+                || !spec.guarded
+                || (invocation.globalId.x < bounds[0]
+                  && invocation.globalId.y < bounds[1]
+                  && invocation.globalId.z < bounds[2])) {
+                kernel(res, invocation);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 export function simulateCompute<L>(
   kernel: (res: L, ctx: ComputeInvocation) => void,
   res: L,
@@ -597,31 +631,7 @@ export function simulateCompute<L>(
   hostRunnable: boolean,
 ): void {
   requireHostRunnable("simulateCompute", spec, hostRunnable);
-  for (let workgroupZ: u32 = 0; workgroupZ < workgroups[2]; workgroupZ += 1) {
-    for (let workgroupY: u32 = 0; workgroupY < workgroups[1]; workgroupY += 1) {
-      for (let workgroupX: u32 = 0; workgroupX < workgroups[0]; workgroupX += 1) {
-        for (let localZ: u32 = 0; localZ < spec.workgroupSize[2]; localZ += 1) {
-          for (let localY: u32 = 0; localY < spec.workgroupSize[1]; localY += 1) {
-            for (let localX: u32 = 0; localX < spec.workgroupSize[0]; localX += 1) {
-              kernel(
-                res,
-                hostInvocation(
-                  spec,
-                  workgroups,
-                  workgroupX,
-                  workgroupY,
-                  workgroupZ,
-                  localX,
-                  localY,
-                  localZ,
-                ),
-              );
-            }
-          }
-        }
-      }
-    }
-  }
+  simulateComputeLoop<L>(kernel, res, spec, workgroups, [0, 0, 0], false);
 }
 
 export function simulateComputeThreads<L>(
@@ -639,34 +649,7 @@ export function simulateComputeThreads<L>(
     (y + spec.workgroupSize[1] - 1) / spec.workgroupSize[1],
     (z + spec.workgroupSize[2] - 1) / spec.workgroupSize[2],
   ];
-  for (let workgroupZ: u32 = 0; workgroupZ < workgroups[2]; workgroupZ += 1) {
-    for (let workgroupY: u32 = 0; workgroupY < workgroups[1]; workgroupY += 1) {
-      for (let workgroupX: u32 = 0; workgroupX < workgroups[0]; workgroupX += 1) {
-        for (let localZ: u32 = 0; localZ < spec.workgroupSize[2]; localZ += 1) {
-          for (let localY: u32 = 0; localY < spec.workgroupSize[1]; localY += 1) {
-            for (let localX: u32 = 0; localX < spec.workgroupSize[0]; localX += 1) {
-              const invocation: ComputeInvocation = hostInvocation(
-                spec,
-                workgroups,
-                workgroupX,
-                workgroupY,
-                workgroupZ,
-                localX,
-                localY,
-                localZ,
-              );
-              if (!spec.guarded
-                || (invocation.globalId.x < x
-                  && invocation.globalId.y < y
-                  && invocation.globalId.z < z)) {
-                kernel(res, invocation);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+  simulateComputeLoop<L>(kernel, res, spec, workgroups, [x, y, z], true);
 }
 
 export function simulateCompute2<L0, L1>(
@@ -893,6 +876,7 @@ export class ComputePipeline {
   private guarded: boolean;
   private guardGroups: u32[];
   private guardBuffers: GPUBuffer[];
+  private guardEncoder: GPUCommandEncoder | null;
 
   constructor(
     pipeline: GPUComputePipeline,
@@ -908,6 +892,7 @@ export class ComputePipeline {
     this.guarded = guarded;
     this.guardGroups = guardGroups;
     this.guardBuffers = guardBuffers;
+    this.guardEncoder = null;
   }
 
   bindGroupLayout(group: u32): GPUBindGroupLayout {
@@ -925,12 +910,25 @@ export class ComputePipeline {
     return null;
   }
 
-  private writeGuard(x: u32, y: u32, z: u32): void {
+  private writeGuard(
+    encoder: GPUCommandEncoder,
+    method: string,
+    x: u32,
+    y: u32,
+    z: u32,
+  ): void {
     if (!this.guarded) return;
+    if (this.guardEncoder !== null) {
+      if (this.guardEncoder.commandEncoder === encoder.commandEncoder) {
+        authorTrap("PI15", method, `x=${x} y=${y} z=${z}`);
+        return;
+      }
+    }
     if (this.device === null) {
       authorTrap("PI15", "ComputePipeline.guard", "device=missing");
       return;
     }
+    this.guardEncoder = encoder;
     const bytes: u8[] = Context.bytesOf<FixedArray<u32, 4>>([x, y, z, 0]);
     using queue = this.device.queue();
     let index: i32 = 0;
@@ -966,6 +964,8 @@ export class ComputePipeline {
     z: u32,
   ): void {
     this.writeGuard(
+      encoder,
+      "ComputePipeline.dispatch",
       x * this.workgroup[0],
       y * this.workgroup[1],
       z * this.workgroup[2],
@@ -980,7 +980,7 @@ export class ComputePipeline {
     y: u32,
     z: u32,
   ): void {
-    this.writeGuard(x, y, z);
+    this.writeGuard(encoder, "ComputePipeline.dispatchThreads", x, y, z);
     this.recordDispatch(
       encoder,
       groups,
@@ -1019,6 +1019,13 @@ export class ComputePipeline {
     z: u32,
     pair: TimestampPair,
   ): void {
+    this.writeGuard(
+      encoder,
+      "ComputePipeline.dispatchTimed",
+      x * this.workgroup[0],
+      y * this.workgroup[1],
+      z * this.workgroup[2],
+    );
     using pass = encoder.beginComputePass({
       timestampWrites: {
         querySet: pair.querySet(),

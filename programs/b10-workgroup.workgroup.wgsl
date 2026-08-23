@@ -2,11 +2,11 @@ struct WorkCounter {
   total: atomic<u32>,
 }
 
+@group(0) @binding(0) var<storage, read_write> counters: array<WorkCounter>;
+
 var<private> privateOffset: u32 = 3u;
 var<workgroup> sharedValues: array<u32, 4>;
 var<workgroup> sharedCounter: atomic<u32>;
-
-@group(0) @binding(0) var<storage, read_write> counters: array<WorkCounter>;
 
 @compute @workgroup_size(4, 1, 1)
 fn workgroupKernel(@builtin(workgroup_id) workgroupId: vec3<u32>, @builtin(local_invocation_index) localIndex: u32) {

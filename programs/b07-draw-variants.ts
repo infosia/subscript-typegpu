@@ -1,6 +1,6 @@
 // program: b07-draw-variants
 // purpose: prove indexed instanced and non-indexed render draws in one program
-// exercises: RN1-RN15, K1-K16, LY3, BF1-BF5
+// exercises: RN1-RN15, RN18, K1-K16, LY3, BF1-BF5
 // questions: none
 
 import {

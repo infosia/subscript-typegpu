@@ -60,16 +60,12 @@ fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
-fn base_name(name: &str) -> &str {
-    name.split('<').next().unwrap_or(name)
-}
-
 fn render_shape(module: &Module, name: &str) -> Option<(usize, usize, Option<usize>)> {
     let declaration = pipeline::function(module, name)?;
     if declaration.params.first()?.pos.file != "typegpu.ts" {
         return None;
     }
-    Some(match base_name(name) {
+    Some(match crate::base_name(name) {
         "renderPipeline" => (0, 0, None),
         "renderPipelineL" => (1, 0, None),
         "renderPipelineInstanced" => (0, 0, Some(1)),
@@ -243,26 +239,21 @@ fn descriptor_string(
     required: bool,
     default: &str,
 ) -> Result<String, Diagnostic> {
-    let ExprKind::DescriptorLit { class, fields } = &expr.kind else {
+    let ExprKind::DescriptorLit { .. } = &expr.kind else {
         return Err(diagnostic(
             "RN1",
             "render options must be a descriptor literal",
             expr.pos.clone(),
         ));
     };
-    let descriptor = &module.classes[class.0];
-    let Some(index) = descriptor
-        .fields
-        .iter()
-        .position(|field| field.name == field_name)
-    else {
+    let Some(field) = crate::descriptor_field(module, expr, field_name) else {
         return Err(diagnostic(
             "RN1",
             format!("render options have no `{field_name}` member"),
             expr.pos.clone(),
         ));
     };
-    match fields.get(index).and_then(Option::as_ref) {
+    match field {
         Some(Expr {
             kind: ExprKind::Str(value),
             ..
@@ -311,25 +302,20 @@ fn descriptor_string(
 }
 
 fn index_format(module: &Module, expr: &Expr) -> Result<Option<String>, Diagnostic> {
-    let ExprKind::DescriptorLit { class, fields } = &expr.kind else {
+    let ExprKind::DescriptorLit { .. } = &expr.kind else {
         return Err(diagnostic(
             "RN18",
             "render options must be a descriptor literal",
             expr.pos.clone(),
         ));
     };
-    let descriptor = &module.classes[class.0];
-    let Some(index) = descriptor
-        .fields
-        .iter()
-        .position(|field| field.name == "indexFormat")
-    else {
+    let Some(field) = crate::descriptor_field(module, expr, "indexFormat") else {
         return Err(generator_diagnostic(
             "library RenderPipelineSpec lost its indexFormat field",
             expr.pos.clone(),
         ));
     };
-    match fields.get(index).and_then(Option::as_ref) {
+    match field {
         None => Ok(None),
         Some(Expr {
             kind: ExprKind::Str(value),

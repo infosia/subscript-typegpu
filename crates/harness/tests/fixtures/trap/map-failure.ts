@@ -26,5 +26,6 @@ export async function main(): Promise<void> {
     GPUBufferUsage.COPY_SRC,
     "trap-map-failure",
   );
+  device.destroy();
   await buffer.read(device, 0, 1);
 }

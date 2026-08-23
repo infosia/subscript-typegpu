@@ -175,7 +175,30 @@ fn c_type(module: &hir::Module, expected: &GeneratedLayout, source: &str) -> Str
     let index = module
         .classes
         .iter()
-        .position(|class| class.name == expected.name)
+        .position(|class| {
+            class.name == expected.name
+                && !matches!(
+                    class.pos.file.as_str(),
+                    "typegpu-types.ts" | "typegpu.ts" | "webgpu.ts"
+                )
+        })
+        .or_else(|| {
+            matches!(
+                expected.name.as_str(),
+                "DispatchIndirectArgs" | "DrawIndirectArgs" | "DrawIndexedIndirectArgs"
+            )
+            .then(|| {
+                module
+                    .classes
+                    .iter()
+                    .position(|class| {
+                        class.name == expected.name && class.pos.file == "typegpu-types.ts"
+                    })
+                    .unwrap_or_else(|| {
+                        panic!("PI17 schema `{}` is absent from the HIR", expected.name)
+                    })
+            })
+        })
         .unwrap_or_else(|| panic!("emitted C cannot name schema `{}`", expected.name));
     let name = format!("Sub_{index}_{}", expected.name);
     assert!(

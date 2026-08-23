@@ -63,45 +63,22 @@ fn attribution<'a>(
         .map(|span| span.label.as_str())
 }
 
-fn naga_parse_message(
+fn naga_message(
     program: &Path,
     pipeline: &str,
-    source: &str,
     generated: &subscript_typegpu_gen::Generated,
-    error: &naga::front::wgsl::ParseError,
+    line: Option<u32>,
+    stage: &str,
+    error: &dyn std::fmt::Display,
 ) -> String {
-    let label = error
-        .location(source)
-        .and_then(|location| attribution(generated, pipeline, location.line_number));
+    let label = line.and_then(|line| attribution(generated, pipeline, line));
     match label {
         Some(label) => format!(
-            "{label}: {} pipeline {pipeline}: naga parse: {error}",
+            "{label}: {} pipeline {pipeline}: naga {stage}: {error}",
             program.display()
         ),
         None => format!(
-            "{} pipeline {pipeline}: K15 (generator): naga parse: {error}",
-            program.display()
-        ),
-    }
-}
-
-fn naga_validation_message(
-    program: &Path,
-    pipeline: &str,
-    source: &str,
-    generated: &subscript_typegpu_gen::Generated,
-    error: &naga::WithSpan<naga::valid::ValidationError>,
-) -> String {
-    let label = error
-        .location(source)
-        .and_then(|location| attribution(generated, pipeline, location.line_number));
-    match label {
-        Some(label) => format!(
-            "{label}: {} pipeline {pipeline}: naga validate: {error}",
-            program.display()
-        ),
-        None => format!(
-            "{} pipeline {pipeline}: K15 (generator): naga validate: {error}",
+            "{} pipeline {pipeline}: K15 (generator): naga {stage}: {error}",
             program.display()
         ),
     }
@@ -133,9 +110,10 @@ fn every_pipeline_matches_its_golden_and_validates() {
                 first_differing_line(actual, &expected),
             );
             let module = naga::front::wgsl::parse_str(actual).unwrap_or_else(|error| {
+                let line = error.location(actual).map(|location| location.line_number);
                 panic!(
                     "{}",
-                    naga_parse_message(&program, pipeline, actual, &generated, &error)
+                    naga_message(&program, pipeline, &generated, line, "parse", &error)
                 )
             });
             let capabilities = if actual.starts_with("enable f16;") {
@@ -146,9 +124,10 @@ fn every_pipeline_matches_its_golden_and_validates() {
             Validator::new(ValidationFlags::all(), capabilities)
                 .validate(&module)
                 .unwrap_or_else(|error| {
+                    let line = error.location(actual).map(|location| location.line_number);
                     panic!(
                         "{}",
-                        naga_validation_message(&program, pipeline, actual, &generated, &error)
+                        naga_message(&program, pipeline, &generated, line, "validate", &error)
                     )
                 });
         }
@@ -175,12 +154,16 @@ fn naga_errors_inside_shells_start_with_the_shell_name() {
     let generated = generated(&program);
     let (pipeline, source) = generated.pipelines.first().expect("fixture pipeline");
     let message = match naga::front::wgsl::parse_str(source) {
-        Err(error) => naga_parse_message(&program, pipeline, source, &generated, &error),
+        Err(error) => {
+            let line = error.location(source).map(|location| location.line_number);
+            naga_message(&program, pipeline, &generated, line, "parse", &error)
+        }
         Ok(module) => {
             let error = Validator::new(ValidationFlags::all(), Capabilities::empty())
                 .validate(&module)
                 .expect_err("shell fixture must fail naga validation");
-            naga_validation_message(&program, pipeline, source, &generated, &error)
+            let line = error.location(source).map(|location| location.line_number);
+            naga_message(&program, pipeline, &generated, line, "validate", &error)
         }
     };
     assert!(

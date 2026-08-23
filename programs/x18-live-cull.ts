@@ -298,7 +298,7 @@ export async function main(): Promise<void> {
       print("FAIL second submit");
       return;
     }
-    // Pixel centres are converted to NDC with Y flipped; ccw signed area is the host front face.
+    // Pixel centres are converted to NDC with Y flipped. The ccw signed area is the host front face.
     if (!await checkImage(firstRead, a, b, c, "front")) {
       return;
     }

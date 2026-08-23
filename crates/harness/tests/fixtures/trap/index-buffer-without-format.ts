@@ -1,5 +1,8 @@
-// expected-rule: RN18
+// program: index-buffer-without-format
 // purpose: prove RenderPipeline.setIndexBuffer requires an index format
+// exercises: RN18
+// questions: none
+// expected-rule: RN18
 
 import { createRenderPipeline, RenderPipelineSpec } from "./typegpu";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice, GPUTextureUsage } from "./webgpu";

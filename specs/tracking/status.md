@@ -66,3 +66,15 @@ argument order, shared by host body and emission) / 3 MAJOR / 14
 MINOR, all closed. Evidence: gate green 235 passed 114 s; live
 x01–x14 PASS on Metal 35.55 s and Dawn 32.88 s. Record:
 `specs/tracking/p8-library-breadth.md`.
+
+## P8 — library breadth, slice 2 (2026-08-23)
+
+WGSL shells with host bodies and `naga` attribution (K29–K31), guarded
+dispatch as a runtime-owned `guard` layout entry (PI15), indirect
+dispatch and the argument schemas (PI16, PI17), `indexFormat` on the
+render spec (RN18), cull proven live (RN19), one module order (K14
+Rev 5), four-byte alignment traps (BF2 Rev 1). Programs `b14`–`b17`,
+`x15`–`x18`. Phase review: 1 CRITICAL (a barrier inside the injected
+guard) / 7 MAJOR / 15 MINOR, all closed. Evidence: gate green 240
+passed 146 s; live x01–x18 PASS on Metal 47.17 s and Dawn 43.50 s.
+Record: `specs/tracking/p8-library-breadth.md`.

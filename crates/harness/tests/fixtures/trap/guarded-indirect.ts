@@ -1,5 +1,8 @@
-// expected-rule: PI16
+// program: guarded-indirect
 // purpose: prove a guarded pipeline rejects indirect dispatch
+// exercises: PI16
+// questions: none
+// expected-rule: PI16
 
 import { BindGroupLayoutSpec, ComputePipeline, ComputePipelineSpec, createComputePipeline } from "./typegpu";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice, GPUShaderStage } from "./webgpu";

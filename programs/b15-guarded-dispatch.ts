@@ -4,11 +4,9 @@
 // questions: none
 
 import {
-  bufferResource,
   ComputeInvocation,
   ComputePipelineSpec,
   computePipeline,
-  createBindGroup,
   createComputePipeline,
   MutStorage,
   simulateComputeThreads,
@@ -20,6 +18,8 @@ import {
   GPUDevice,
 } from "./webgpu";
 import {
+  createGuardedLayoutResources,
+  createGuardedPipelineBindGroup0,
   guardedPipeline_ENTRY,
   guardedPipeline_HOST_RUNNABLE,
   guardedPipeline_LAYOUT0,
@@ -86,12 +86,11 @@ export async function main(): Promise<void> {
       print("FAIL");
       return;
     }
-    using bindGroup = createBindGroup(
+    const resources = createGuardedLayoutResources(output);
+    using bindGroup = createGuardedPipelineBindGroup0(
       device,
-      pipeline.bindGroupLayout(0),
-      guardedPipeline_LAYOUT0,
-      [bufferResource(output)],
-      pipeline.guardBuffer(0),
+      pipeline,
+      resources,
     );
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], 6, 1, 1);
@@ -109,7 +108,8 @@ export async function main(): Promise<void> {
       guardedPipeline_HOST_RUNNABLE,
     );
     const guard = guardedPipeline_LAYOUT0.entries[1];
-    print("guard.group=0");
+    const guardGroup: u32 = 0;
+    print(`guard.group=${guardGroup}`);
     print(`guard.binding=${guard.binding}`);
     print(`layout.entries=${guardedPipeline_LAYOUT0.entries.length}`);
     print(`host:out=${host.output.get(0)},${host.output.get(5)},${host.output.get(6)},${host.output.get(7)}`);

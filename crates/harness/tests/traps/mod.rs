@@ -66,6 +66,16 @@ fn runtime_traps_are_named_and_numbered() {
             false,
         ),
         (
+            "patch-unaligned.ts",
+            "BF2 Buffer.patch byteOffset=2 byteLength=2",
+            false,
+        ),
+        (
+            "copy-unaligned.ts",
+            "BF8 Buffer.copyTo byteOffset=0 byteLength=2",
+            false,
+        ),
+        (
             "write-past-end.ts",
             "BF8 Buffer.write elementIndex=1 elementCount=2 count=2",
             false,
@@ -93,6 +103,11 @@ fn runtime_traps_are_named_and_numbered() {
         (
             "owned-read-one-past-end.ts",
             "BF9 Buffer.readOne elementIndex=1 elementCount=1 count=1",
+            false,
+        ),
+        (
+            "map-failure.ts",
+            "BF9 Buffer.read elementIndex=0 elementCount=1 count=1",
             false,
         ),
         (
@@ -158,6 +173,11 @@ fn runtime_traps_are_named_and_numbered() {
         (
             "guarded-indirect.ts",
             "PI16 ComputePipeline.dispatchIndirect guarded=true",
+            false,
+        ),
+        (
+            "guarded-second-dispatch.ts",
+            "PI15 ComputePipeline.dispatch x=2 y=1 z=1",
             false,
         ),
         (

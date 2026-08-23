@@ -336,26 +336,21 @@ fn literal_u32(expr: &Expr) -> Option<u32> {
 }
 
 fn workgroup(module: &Module, expr: &Expr) -> Result<[u32; 3], Diagnostic> {
-    let ExprKind::DescriptorLit { class, fields } = &expr.kind else {
+    let ExprKind::DescriptorLit { .. } = &expr.kind else {
         return Err(diagnostic(
             "PI1",
             "pipeline workgroup options must be a descriptor literal",
             expr.pos.clone(),
         ));
     };
-    let descriptor = &module.classes[class.0];
-    let Some(index) = descriptor
-        .fields
-        .iter()
-        .position(|field| field.name == "workgroupSize")
-    else {
+    let Some(field) = crate::descriptor_field(module, expr, "workgroupSize") else {
         return Err(diagnostic(
             "PI1",
             "pipeline options omit workgroupSize",
             expr.pos.clone(),
         ));
     };
-    let Some(Some(value)) = fields.get(index) else {
+    let Some(value) = field else {
         return Err(diagnostic(
             "PI1",
             "pipeline workgroup size is not literal",
@@ -412,25 +407,20 @@ fn validate_pipeline_name(
     expr: &Expr,
     declaration: &str,
 ) -> Result<(), Diagnostic> {
-    let ExprKind::DescriptorLit { class, fields } = &expr.kind else {
+    let ExprKind::DescriptorLit { .. } = &expr.kind else {
         return Err(diagnostic(
             "PI1",
             "pipeline options must be a descriptor literal",
             expr.pos.clone(),
         ));
     };
-    let descriptor = &module.classes[class.0];
-    let Some(index) = descriptor
-        .fields
-        .iter()
-        .position(|field| field.name == "name")
-    else {
+    let Some(field) = crate::descriptor_field(module, expr, "name") else {
         return Err(generator_diagnostic(
             "library ComputePipelineSpec lost its name field",
             expr.pos.clone(),
         ));
     };
-    let Some(Some(value)) = fields.get(index) else {
+    let Some(value) = field else {
         return Err(diagnostic(
             "PI1",
             format!("pipeline `{declaration}` options omit name"),
@@ -455,25 +445,20 @@ fn validate_pipeline_name(
 }
 
 fn guarded_option(module: &Module, expr: &Expr) -> Result<bool, Diagnostic> {
-    let ExprKind::DescriptorLit { class, fields } = &expr.kind else {
+    let ExprKind::DescriptorLit { .. } = &expr.kind else {
         return Err(diagnostic(
             "PI15",
             "guarded pipeline options must be a descriptor literal",
             expr.pos.clone(),
         ));
     };
-    let descriptor = &module.classes[class.0];
-    let Some(index) = descriptor
-        .fields
-        .iter()
-        .position(|field| field.name == "guarded")
-    else {
+    let Some(field) = crate::descriptor_field(module, expr, "guarded") else {
         return Err(generator_diagnostic(
             "library ComputePipelineSpec lost its guarded field",
             expr.pos.clone(),
         ));
     };
-    match fields.get(index).and_then(Option::as_ref) {
+    match field {
         None => Ok(false),
         Some(Expr {
             kind: ExprKind::Bool(value),
@@ -495,7 +480,7 @@ pub(crate) fn function<'a>(module: &'a Module, name: &str) -> Option<&'a Functio
 }
 
 fn compute_arity(module: &Module, name: &str) -> Option<usize> {
-    let base = name.split('<').next().unwrap_or(name);
+    let base = crate::base_name(name);
     let declaration = function(module, name)?;
     if declaration.params.first()?.pos.file != "typegpu.ts" {
         return None;
@@ -683,6 +668,31 @@ pub(crate) fn discover(
                 continue;
             }
         };
+        if guarded && arity != 1 {
+            diagnostics.push(diagnostic(
+                "PI15",
+                "guarded is legal on the one-layout computePipeline form only",
+                options.pos.clone(),
+            ));
+            continue;
+        }
+        if guarded {
+            match crate::kernel::reaches_barrier(module, kernel, shells) {
+                Ok(true) => {
+                    diagnostics.push(diagnostic(
+                        "PI15",
+                        format!("guarded pipeline `{}` reaches a barrier", global.name),
+                        kernel.pos.clone(),
+                    ));
+                    continue;
+                }
+                Ok(false) => {}
+                Err(error) => {
+                    diagnostics.push(error);
+                    continue;
+                }
+            }
+        }
         let host_runnable = match crate::kernel::host_runnable(module, kernel, shells) {
             Ok(value) => value,
             Err(error) => {

@@ -34,12 +34,8 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
-fn base_name(name: &str) -> &str {
-    name.split('<').next().unwrap_or(name)
-}
-
 fn library_call(module: &Module, name: &str, expected: &str) -> bool {
-    base_name(name) == expected
+    crate::base_name(name) == expected
         && module
             .functions
             .iter()
@@ -54,26 +50,21 @@ fn library_call(module: &Module, name: &str, expected: &str) -> bool {
 }
 
 fn descriptor_body(module: &Module, expr: &Expr) -> Result<String, Diagnostic> {
-    let ExprKind::DescriptorLit { class, fields } = &expr.kind else {
+    let ExprKind::DescriptorLit { .. } = &expr.kind else {
         return Err(diagnostic(
             "K29",
             "WGSL shell options must be a descriptor literal",
             expr.pos.clone(),
         ));
     };
-    let descriptor = &module.classes[class.0];
-    let Some(index) = descriptor
-        .fields
-        .iter()
-        .position(|field| field.name == "body")
-    else {
+    let Some(field) = crate::descriptor_field(module, expr, "body") else {
         return Err(diagnostic(
             "K29",
             "WgslShellSpec has no body field",
             expr.pos.clone(),
         ));
     };
-    match fields.get(index).and_then(Option::as_ref) {
+    match field {
         Some(Expr {
             kind: ExprKind::Str(body),
             ..
@@ -91,6 +82,14 @@ fn descriptor_body(module: &Module, expr: &Expr) -> Result<String, Diagnostic> {
     }
 }
 
+pub(crate) fn is_wgsl_blankspace(ch: char) -> bool {
+    matches!(
+        ch,
+        '\u{0020}' | '\u{0009}' | '\u{000A}'
+            ..='\u{000D}' | '\u{0085}' | '\u{200E}' | '\u{200F}' | '\u{2028}' | '\u{2029}'
+    )
+}
+
 fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
     let bytes = text.as_bytes();
     let mut out = Vec::new();
@@ -98,8 +97,12 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
     let mut braces = 0_i32;
     while index < bytes.len() {
         let byte = bytes[index];
-        if matches!(byte, b' ' | b'\t' | b'\r' | b'\n') {
-            index += 1;
+        let ch = text[index..]
+            .chars()
+            .next()
+            .expect("token index is a character boundary");
+        if is_wgsl_blankspace(ch) {
+            index += ch.len_utf8();
             continue;
         }
         if byte == b'/' && bytes.get(index + 1) == Some(&b'/') {
@@ -143,7 +146,7 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
             out.push(text[start..index].to_owned());
             continue;
         }
-        let token = (byte as char).to_string();
+        let token = ch.to_string();
         if byte == b'{' {
             braces += 1;
         } else if byte == b'}' {
@@ -157,7 +160,7 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
             }
         }
         out.push(token);
-        index += 1;
+        index += ch.len_utf8();
     }
     if braces != 0 {
         return Err(diagnostic(
@@ -203,91 +206,98 @@ fn declaration_names(tokens: &[String]) -> BTreeSet<String> {
         .collect()
 }
 
-fn visit_expr(module: &Module, expr: &Expr, diagnostics: &mut Vec<Diagnostic>) {
+fn visit_expr(module: &Module, expr: &Expr, diagnostics: &mut Vec<Diagnostic>, location: &str) {
     match &expr.kind {
         ExprKind::Call { callee, args } => {
             if let Callee::Func(name) = callee {
                 if library_call(module, name, "wgslShell") {
                     diagnostics.push(diagnostic(
                         "K29",
-                        "a WGSL shell declaration appears inside a function",
+                        format!("a WGSL shell declaration appears {location}"),
                         expr.pos.clone(),
                     ));
                 } else if library_call(module, name, "wgslDeclarations") {
                     diagnostics.push(diagnostic(
                         "K30",
-                        "wgslDeclarations appears inside a function",
+                        format!("wgslDeclarations appears {location}"),
                         expr.pos.clone(),
                     ));
                 }
             }
             if let Callee::Value(value) = callee {
-                visit_expr(module, value, diagnostics);
+                visit_expr(module, value, diagnostics, location);
             }
             if let Callee::Method { recv, .. } = callee {
-                visit_expr(module, recv, diagnostics);
+                visit_expr(module, recv, diagnostics, location);
             }
             for arg in args {
-                visit_expr(module, arg, diagnostics);
+                visit_expr(module, arg, diagnostics, location);
             }
         }
         ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
         | ExprKind::Field { obj: operand, .. }
-        | ExprKind::JsonResultValue(operand) => visit_expr(module, operand, diagnostics),
+        | ExprKind::JsonResultValue(operand) => visit_expr(module, operand, diagnostics, location),
         ExprKind::Binary { left, right, .. }
         | ExprKind::Assign {
             target: left,
             value: right,
             ..
         } => {
-            visit_expr(module, left, diagnostics);
-            visit_expr(module, right, diagnostics);
+            visit_expr(module, left, diagnostics, location);
+            visit_expr(module, right, diagnostics, location);
         }
         ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => {
             for arg in args {
-                visit_expr(module, arg, diagnostics);
+                visit_expr(module, arg, diagnostics, location);
             }
         }
         ExprKind::DescriptorLit { fields, .. } => {
             for field in fields.iter().flatten() {
-                visit_expr(module, field, diagnostics);
+                visit_expr(module, field, diagnostics, location);
             }
         }
         ExprKind::Index { obj, index, .. } => {
-            visit_expr(module, obj, diagnostics);
-            visit_expr(module, index, diagnostics);
+            visit_expr(module, obj, diagnostics, location);
+            visit_expr(module, index, diagnostics, location);
         }
         ExprKind::Cond { cond, then, els } => {
-            visit_expr(module, cond, diagnostics);
-            visit_expr(module, then, diagnostics);
-            visit_expr(module, els, diagnostics);
+            visit_expr(module, cond, diagnostics, location);
+            visit_expr(module, then, diagnostics, location);
+            visit_expr(module, els, diagnostics, location);
         }
         _ => {}
     }
 }
 
-fn visit_statements(module: &Module, statements: &[Stmt], diagnostics: &mut Vec<Diagnostic>) {
+fn visit_statements(
+    module: &Module,
+    statements: &[Stmt],
+    diagnostics: &mut Vec<Diagnostic>,
+    location: &str,
+) {
     for statement in statements {
         match statement {
-            Stmt::Let { init, .. } | Stmt::Expr(init) => visit_expr(module, init, diagnostics),
+            Stmt::Let { init, .. } | Stmt::Expr(init) => {
+                visit_expr(module, init, diagnostics, location)
+            }
             Stmt::Return {
                 value: Some(value), ..
-            } => visit_expr(module, value, diagnostics),
+            } => visit_expr(module, value, diagnostics, location),
             Stmt::Return { value: None, .. } => {}
             Stmt::If {
                 cond, then, els, ..
             } => {
-                visit_expr(module, cond, diagnostics);
-                visit_statements(module, then, diagnostics);
+                visit_expr(module, cond, diagnostics, location);
+                visit_statements(module, then, diagnostics, location);
                 if let Some(els) = els {
-                    visit_statements(module, els, diagnostics);
+                    visit_statements(module, els, diagnostics, location);
                 }
             }
             Stmt::While { cond, body, .. } => {
-                visit_expr(module, cond, diagnostics);
-                visit_statements(module, body, diagnostics);
+                visit_expr(module, cond, diagnostics, location);
+                visit_statements(module, body, diagnostics, location);
             }
             Stmt::For {
                 init,
@@ -297,27 +307,27 @@ fn visit_statements(module: &Module, statements: &[Stmt], diagnostics: &mut Vec<
                 ..
             } => {
                 if let Some(init) = init {
-                    visit_statements(module, std::slice::from_ref(init), diagnostics);
+                    visit_statements(module, std::slice::from_ref(init), diagnostics, location);
                 }
                 if let Some(cond) = cond {
-                    visit_expr(module, cond, diagnostics);
+                    visit_expr(module, cond, diagnostics, location);
                 }
                 if let Some(step) = step {
-                    visit_expr(module, step, diagnostics);
+                    visit_expr(module, step, diagnostics, location);
                 }
-                visit_statements(module, body, diagnostics);
+                visit_statements(module, body, diagnostics, location);
             }
             Stmt::ForOf { subject, body, .. } => {
-                visit_expr(module, subject, diagnostics);
-                visit_statements(module, body, diagnostics);
+                visit_expr(module, subject, diagnostics, location);
+                visit_statements(module, body, diagnostics, location);
             }
             Stmt::Switch { disc, cases, .. } => {
-                visit_expr(module, disc, diagnostics);
+                visit_expr(module, disc, diagnostics, location);
                 for case in cases {
-                    visit_statements(module, &case.body, diagnostics);
+                    visit_statements(module, &case.body, diagnostics, location);
                 }
             }
-            Stmt::Block(body) => visit_statements(module, body, diagnostics),
+            Stmt::Block(body) => visit_statements(module, body, diagnostics, location),
             _ => {}
         }
     }
@@ -327,7 +337,49 @@ pub(crate) fn discover(module: &Module) -> Result<ShellProgram, Vec<Diagnostic>>
     let mut diagnostics = Vec::new();
     for function in &module.functions {
         if function.pos.file != "typegpu.ts" {
-            visit_statements(module, &function.body, &mut diagnostics);
+            visit_statements(
+                module,
+                &function.body,
+                &mut diagnostics,
+                "inside a function",
+            );
+        }
+    }
+    for global in &module.globals {
+        let direct_shell = matches!(
+            &global.init.kind,
+            ExprKind::Call {
+                callee: Callee::Func(callee),
+                ..
+            } if library_call(module, callee, "wgslShell")
+        );
+        if !direct_shell {
+            visit_expr(
+                module,
+                &global.init,
+                &mut diagnostics,
+                "inside a top-level statement",
+            );
+        }
+    }
+    for statement in &module.top_level {
+        let direct_declarations = matches!(
+            statement,
+            Stmt::Expr(Expr {
+                kind: ExprKind::Call {
+                    callee: Callee::Func(callee),
+                    ..
+                },
+                ..
+            }) if library_call(module, callee, "wgslDeclarations")
+        );
+        if !direct_declarations {
+            visit_statements(
+                module,
+                std::slice::from_ref(statement),
+                &mut diagnostics,
+                "inside a top-level statement",
+            );
         }
     }
     let mut shells = Vec::new();
@@ -365,7 +417,7 @@ pub(crate) fn discover(module: &Module) -> Result<ShellProgram, Vec<Diagnostic>>
         match descriptor_body(module, options) {
             Ok(body) => match tokens(&body, &options.pos) {
                 Ok(_) => shells.push(Shell {
-                    name: function.split('<').next().unwrap_or(function).to_owned(),
+                    name: crate::base_name(function).to_owned(),
                     function: function.clone(),
                     body,
                     pos: global.pos.clone(),
@@ -439,8 +491,12 @@ pub(crate) fn validate_collisions(
     generated_names: &BTreeSet<String>,
 ) -> Result<(), Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
+    let emitted_names = generated_names
+        .iter()
+        .map(|name| crate::mapping::ident(name))
+        .collect::<BTreeSet<_>>();
     for shell in &program.shells {
-        if generated_names.contains(&shell.name) {
+        if emitted_names.contains(&shell.name) {
             diagnostics.push(diagnostic(
                 "K30",
                 format!(
@@ -452,7 +508,7 @@ pub(crate) fn validate_collisions(
         }
     }
     if let Some(declarations) = &program.declarations {
-        for name in declarations.names.intersection(generated_names) {
+        for name in declarations.names.intersection(&emitted_names) {
             diagnostics.push(diagnostic(
                 "K30",
                 format!("WGSL declaration name `{name}` collides with a generated declaration"),
@@ -511,4 +567,30 @@ pub(crate) fn validate_signature<'a>(
         let _ = crate::kernel::wgsl_type(module, &function.ret, &function.pos)?;
     }
     Ok(function)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::tokens;
+    use subscript_compiler::Pos;
+
+    #[test]
+    fn fence_uses_the_wgsl_blankspace_set() {
+        let pos = Pos::new("blankspace.ts", 1, 1);
+        for blank in [
+            '\u{0020}', '\u{0009}', '\u{000A}', '\u{000B}', '\u{000C}', '\u{000D}', '\u{0085}',
+            '\u{200E}', '\u{200F}', '\u{2028}', '\u{2029}',
+        ] {
+            assert_eq!(
+                tokens(&format!("left{blank}right"), &pos).expect("WGSL blankspace"),
+                ["left", "right"],
+                "U+{:04X}",
+                blank as u32,
+            );
+        }
+        assert_eq!(
+            tokens("left\u{0008}right", &pos).expect("non-blank token"),
+            ["left", "\u{0008}", "right"],
+        );
+    }
 }
