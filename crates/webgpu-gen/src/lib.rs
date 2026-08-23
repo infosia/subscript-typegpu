@@ -16,6 +16,7 @@ mod native_symbols;
 mod patterns;
 mod plan;
 mod policy;
+mod surface;
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -30,13 +31,15 @@ pub const GPUWEB_IDL_INPUTS: [&str; 2] = [
     "third_party/gpuweb/spec/sections/copies.bs",
 ];
 
-/// The two generated artifacts, as exact file bytes.
+/// The generated facade artifacts, as exact file bytes.
 #[derive(Debug)]
 pub struct Generated {
     /// `facade/subscript-typegpu.h` content.
     pub header: String,
     /// `facade/src/generated.rs` content.
     pub rust: String,
+    /// Rust-only surface types and dynamically resolved function table.
+    pub surface: String,
     /// Harness facade symbol table content.
     pub native_symbols: String,
     /// Facade export names in declaration order.
@@ -197,6 +200,7 @@ fn filter_rust_exports(mut rust: String, excluded: &BTreeSet<String>) -> Result<
 pub fn generate(yml_text: &str, policy_text: &str) -> Result<Generated, Error> {
     let yml: model::Yml = serde_yaml::from_str(yml_text).map_err(Error::Yaml)?;
     let policy: policy::Policy = toml::from_str(policy_text).map_err(Error::Toml)?;
+    let surface = surface::render(&yml, &policy)?;
     let plan = plan::build(&yml, &policy)?;
     let excluded_exports = export_exclusions(&policy, &plan)?;
     let cenum_aliases = policy
@@ -245,6 +249,7 @@ pub fn generate(yml_text: &str, policy_text: &str) -> Result<Generated, Error> {
             &excluded_exports,
         ),
         rust,
+        surface,
         native_symbols: symbols.source,
         export_names: symbols.names,
         cenum_aliases,

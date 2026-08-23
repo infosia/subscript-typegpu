@@ -36,6 +36,10 @@ fn write_libclang_free_outputs(
         &generated.rust,
     )?;
     write(
+        &root.join("crates/facade/src/surface.rs"),
+        &generated.surface,
+    )?;
+    write(
         &root.join("crates/harness/src/native_symbols.generated.rs"),
         &generated.native_symbols,
     )?;

@@ -15,6 +15,7 @@ mod simulate;
 mod traps;
 mod uniformity;
 mod wgsl_goldens;
+mod window;
 
 // Re-pin with specs/subscript-typegpu-project-plan.md section 5,
 // "The substrate generator".

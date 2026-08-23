@@ -39,6 +39,7 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-23 | P8 review fixes, load average 2.9 | 45 s | 0 s | 117 s | 114 s | 6 |
 | 2026-08-23 | P8 slice 2 (4 `b`, 4 `x` programs, 11 fixtures), load average 2.6 | 45 s | 0 s | 148 s | 142 s | 6 |
 | 2026-08-23 | P8 slice 2 review fixes | 45 s | 0 s | 148 s | 146 s | 6 |
+| 2026-08-23 | P9 window host crate added (cold build 45 s → 48 s; the seventh executable is the window binary, no tests) | 48 s | 0 s | 149 s | 144 s | 7 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate

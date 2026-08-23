@@ -29,6 +29,97 @@ pattern = "limits-fill"
 name = "has_instance_feature"
 pattern = "feature-probe"
 
+# F23 Rust-only surface slice. These constructs are resolved by the native
+# window host and never enter the C header, ambient mirror, or symbol table.
+
+[[host_only]]
+construct = "wgpuInstanceCreateSurface"
+reason = "Native window handles remain inside the Rust host"
+
+[[host_only]]
+construct = "wgpuSurfaceConfigure"
+reason = "Surface configuration remains inside the Rust host"
+
+[[host_only]]
+construct = "wgpuSurfaceUnconfigure"
+reason = "Surface configuration remains inside the Rust host"
+
+[[host_only]]
+construct = "wgpuSurfaceGetCapabilities"
+reason = "Surface capabilities remain inside the Rust host"
+
+[[host_only]]
+construct = "wgpuSurfaceCapabilitiesFreeMembers"
+reason = "Surface capabilities remain inside the Rust host"
+
+[[host_only]]
+construct = "wgpuSurfaceGetCurrentTexture"
+reason = "Surface texture acquisition remains inside the Rust host"
+
+[[host_only]]
+construct = "wgpuSurfacePresent"
+reason = "Presentation remains inside the Rust host"
+
+[[host_only]]
+construct = "wgpuSurfaceAddRef"
+reason = "Surface ownership remains inside the Rust host"
+
+[[host_only]]
+construct = "wgpuSurfaceRelease"
+reason = "Surface ownership remains inside the Rust host"
+
+[[host_only]]
+construct = "wgpuSurfaceSetLabel"
+reason = "Surface labels remain inside the Rust host"
+
+[[host_only]]
+construct = "WGPUSurfaceDescriptor"
+reason = "Native surface descriptors remain inside the Rust host"
+
+[[host_only]]
+construct = "WGPUSurfaceSourceAndroidNativeWindow"
+reason = "Native window handles remain inside the Rust host"
+
+[[host_only]]
+construct = "WGPUSurfaceSourceMetalLayer"
+reason = "Native window handles remain inside the Rust host"
+
+[[host_only]]
+construct = "WGPUSurfaceSourceWaylandSurface"
+reason = "Native window handles remain inside the Rust host"
+
+[[host_only]]
+construct = "WGPUSurfaceSourceWindowsHWND"
+reason = "Native window handles remain inside the Rust host"
+
+[[host_only]]
+construct = "WGPUSurfaceSourceXCBWindow"
+reason = "Native window handles remain inside the Rust host"
+
+[[host_only]]
+construct = "WGPUSurfaceSourceXlibWindow"
+reason = "Native window handles remain inside the Rust host"
+
+[[host_only]]
+construct = "WGPUSurfaceConfiguration"
+reason = "Surface configuration remains inside the Rust host"
+
+[[host_only]]
+construct = "WGPUSurfaceCapabilities"
+reason = "Surface capabilities remain inside the Rust host"
+
+[[host_only]]
+construct = "WGPUSurfaceTexture"
+reason = "Surface textures remain inside the Rust host"
+
+[[host_only]]
+construct = "WGPUStatus"
+reason = "Surface operation status remains inside the Rust host"
+
+[[host_only]]
+construct = "WGPUSurfaceGetCurrentTextureStatus"
+reason = "Surface acquisition status remains inside the Rust host"
+
 [[map]]
 method = "instance.process_events"
 pattern = "sync"

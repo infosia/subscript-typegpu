@@ -55,6 +55,8 @@ run_gate() {
         return 1
     fi
 
+    cargo build --offline -p subscript-typegpu-window
+
     tools/hygiene.sh
     pending_count=$(grep -c '^pending:' "$last_test_log" || true)
     grep '^pending:' "$last_test_log" || true

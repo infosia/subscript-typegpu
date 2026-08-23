@@ -3619,7 +3619,7 @@ fn convert_render_bundle_descriptor(source: SubscriptTypegpuRenderBundleDescript
 }
 
 pub(crate) struct WebgpuTable {
-    _library: libloading::Library,
+    pub(crate) _library: libloading::Library,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.
 wgpuCreateInstance: unsafe extern "C" fn(*const WGPUInstanceDescriptor)-> WGPUInstance,
     // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.

@@ -108,8 +108,9 @@ fn function_signatures(declarations: &str) -> Vec<FunctionSignature> {
 
 fn render_webgpu_table(declarations: &str) -> String {
     let signatures = function_signatures(declarations);
-    let mut out =
-        String::from("pub(crate) struct WebgpuTable {\n    _library: libloading::Library,\n");
+    let mut out = String::from(
+        "pub(crate) struct WebgpuTable {\n    pub(crate) _library: libloading::Library,\n",
+    );
     for signature in &signatures {
         out.push_str(&format!(
             "    // SAFETY: the function pointer signature matches the pinned webgpu.h declaration.\n\

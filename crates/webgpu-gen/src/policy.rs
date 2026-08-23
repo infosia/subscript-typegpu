@@ -22,6 +22,10 @@ pub(crate) struct Policy {
     /// (facade-generator.md F18).
     #[serde(default)]
     pub exclude: Vec<ExcludeRow>,
+    /// webgpu.h constructs used only by the native window host. These are
+    /// emitted into the Rust-only surface table and never enter the facade.
+    #[serde(default)]
+    pub host_only: Vec<HostOnlyRow>,
     /// Generated facade exports which have no selected API-layer consumer.
     #[serde(default)]
     pub export_exclude: Vec<ExportExcludeRow>,
@@ -418,6 +422,16 @@ pub(crate) struct MapRow {
 pub(crate) struct ExcludeRow {
     /// `object.method`, or `addref` for the implicit AddRef family.
     pub construct: String,
+    pub reason: String,
+}
+
+/// `[[host_only]]` row (F23).
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct HostOnlyRow {
+    /// Exact webgpu.h function, structure, or status-enum name.
+    pub construct: String,
+    /// Why the construct is restricted to the Rust window host.
     pub reason: String,
 }
 

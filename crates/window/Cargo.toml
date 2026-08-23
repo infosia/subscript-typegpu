@@ -1,0 +1,20 @@
+[package]
+name = "subscript-typegpu-window"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+subscript-codegen.workspace = true
+subscript-compiler.workspace = true
+subscript-typegpu-facade = { path = "../facade" }
+subscript-typegpu-gen = { path = "../typegpu-gen" }
+subscript-typegpu-harness = { path = "../harness" }
+winit.workspace = true
+raw-window-handle.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2.workspace = true
+objc2-app-kit = { workspace = true, features = ["NSResponder", "NSView", "objc2-quartz-core"] }
+objc2-quartz-core = { workspace = true, features = ["CALayer", "CAMetalLayer"] }

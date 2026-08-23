@@ -10,6 +10,16 @@ fn fixture(name: &str) -> String {
     std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
 }
 
+fn repo_file(relative: &str) -> String {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("repository root")
+        .join(relative);
+    std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
+}
+
 fn generate_error(policy_fixture: &str) -> String {
     subscript_typegpu_webgpu_gen::generate(&fixture("mini.yml"), &fixture(policy_fixture))
         .err()
@@ -64,5 +74,21 @@ fn unpoliced_freestanding_function() {
             "policy-unpoliced-freestanding.toml",
         ),
         "policy error (unpoliced): `inspect_hub` is reachable from the subset but has neither a rule pattern nor a policy entry"
+    );
+}
+
+#[test]
+fn host_only_construct_cannot_also_be_excluded() {
+    let yml = repo_file("third_party/webgpu-headers/webgpu.yml");
+    let mut policy = repo_file("crates/webgpu-gen/policy.toml");
+    policy.push_str(
+        "\n[[exclude]]\nconstruct = \"instance.create_surface\"\nreason = \"conflict fixture\"\n",
+    );
+    let error = subscript_typegpu_webgpu_gen::generate(&yml, &policy)
+        .expect_err("host_only plus exclude must fail")
+        .to_string();
+    assert_eq!(
+        error,
+        "policy error (invalid): `wgpuInstanceCreateSurface`: construct is both host_only and exclude"
     );
 }

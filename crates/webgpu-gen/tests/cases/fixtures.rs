@@ -45,7 +45,8 @@ fn emitted_unsafe_lines_have_safety_comments() {
         &repo_file("crates/webgpu-gen/policy.toml"),
     )
     .expect("facade inputs generate");
-    let lines = generated.rust.lines().collect::<Vec<_>>();
+    let emitted = format!("{}\n{}", generated.rust, generated.surface);
+    let lines = emitted.lines().collect::<Vec<_>>();
     let uncovered = lines
         .iter()
         .enumerate()
@@ -93,4 +94,5 @@ fn generation_is_deterministic() {
     let b = subscript_typegpu_webgpu_gen::generate(&yml, &policy).expect("generates");
     assert_eq!(a.header, b.header);
     assert_eq!(a.rust, b.rust);
+    assert_eq!(a.surface, b.surface);
 }

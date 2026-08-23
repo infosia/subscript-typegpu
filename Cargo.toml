@@ -5,6 +5,7 @@ members = [
     "crates/webgpu-gen",
     "crates/typegpu-gen",
     "crates/harness",
+    "crates/window",
 ]
 
 [workspace.package]
@@ -20,6 +21,11 @@ subscript-codegen = { git = "https://github.com/infosia/subscript.git", rev = "f
 libloading = "0.8"
 # subscript pins serde exactly. The workspace follows the pin so one serde resolves.
 serde = { version = "=1.0.219", features = ["derive"] }
+winit = "=0.30.13"
+raw-window-handle = "=0.6.2"
+objc2 = "=0.5.2"
+objc2-app-kit = "=0.2.2"
+objc2-quartz-core = "=0.2.2"
 
 [profile.dev]
 debug = "line-tables-only"

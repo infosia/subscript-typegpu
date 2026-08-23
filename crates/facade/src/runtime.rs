@@ -103,6 +103,21 @@ pub(crate) fn initialize_table() -> bool {
     WEBGPU_TABLE.set(loaded).is_ok() || WEBGPU_TABLE.get().is_some()
 }
 
+pub(crate) fn surface_symbol<T: Copy>(name: &'static [u8]) -> Result<T, String> {
+    if !initialize_table() {
+        return Err("backend function table is unavailable".to_owned());
+    }
+    let table = table().ok_or_else(|| "backend function table is unavailable".to_owned())?;
+    // SAFETY: the generated surface table supplies the pinned webgpu.h type
+    // for each symbol and the library remains owned by `WebgpuTable`.
+    unsafe { table._library.get::<T>(name) }
+        .map(|symbol| *symbol)
+        .map_err(|error| {
+            let name = std::str::from_utf8(&name[..name.len() - 1]).unwrap_or("<invalid>");
+            format!("missing symbol {name}: {error}")
+        })
+}
+
 fn futures() -> std::sync::MutexGuard<'static, BTreeMap<u64, Slot>> {
     FUTURES
         .lock()

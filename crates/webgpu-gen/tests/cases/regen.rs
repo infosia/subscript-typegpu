@@ -155,6 +155,34 @@ fn native_symbols_are_current() {
 }
 
 #[test]
+fn surface_table_is_current() {
+    compare("crates/facade/src/surface.rs");
+}
+
+#[test]
+fn surface_slice_is_rust_only() {
+    let generated = subscript_typegpu_webgpu_gen::generate(
+        &read(&repository_root().join("third_party/webgpu-headers/webgpu.yml")),
+        &read(&repository_root().join("crates/webgpu-gen/policy.toml")),
+    )
+    .expect("facade inputs generate");
+    let mirror = read(&repository_root().join("lib/subscript-typegpu.generated.d.ts"));
+    for name in [
+        "SubscriptTypegpuSurface",
+        "subscript_typegpu_instance_create_surface",
+        "subscript_typegpu_surface_present",
+    ] {
+        assert!(!generated.header.contains(name), "header contains {name}");
+        assert!(!mirror.contains(name), "mirror contains {name}");
+        assert!(
+            !generated.native_symbols.contains(name),
+            "symbol table contains {name}"
+        );
+    }
+    assert!(generated.surface.contains("pub struct SurfaceTable"));
+}
+
+#[test]
 fn hard_coded_calls_are_in_the_function_table() {
     let generated = read(&repository_root().join("crates/facade/src/generated.rs"));
     for name in [

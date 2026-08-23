@@ -5,6 +5,8 @@
 #[rustfmt::skip]
 pub mod generated;
 mod runtime;
+#[rustfmt::skip]
+pub mod surface;
 
 pub use generated::*;
 

@@ -5664,6 +5664,16 @@ fn render_wire_enum_aliases(plan: &ApiPlan) -> Result<String, ApiPolicyError> {
             ));
         }
         out.push_str("}>;\n\n");
+        if enum_plan.name == "GPUTextureFormat" {
+            out.push_str("type GPUTextureFormatWire = CEnum<{\n");
+            for member in enum_plan.members.iter().chain(&enum_plan.exclusions) {
+                out.push_str(&format!(
+                    "  {:?}: {},\n",
+                    member.idl_name, member.wire_value
+                ));
+            }
+            out.push_str("}>;\n\n");
+        }
     }
     Ok(out)
 }
