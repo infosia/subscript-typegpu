@@ -74,3 +74,4 @@ Each gate program has an `.expected` file with the same stem. Generated pipeline
 - `tools` contains regeneration, gate, hygiene, and live commands.
 
 See [docs/tutorial.md](docs/tutorial.md) for a typed particle pipeline example.
+See [docs/from-typegpu.md](docs/from-typegpu.md) for a topic-by-topic comparison with TypeGPU.

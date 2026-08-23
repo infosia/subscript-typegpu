@@ -84,3 +84,11 @@ question (P2 review M6), and the diagnostic sweep.
   test checks that every code line the tutorial quotes exists in the
   program it names (T12-style mechanical gate). The prose is
   reviewed once (CLAUDE.md "Two rounds").
+  Rev 1, 2026-08-23: a second document, `docs/from-typegpu.md`,
+  compares TypeGPU with this library topic by topic. Its TypeGPU
+  examples are quotes from the TypeGPU documentation at a named
+  version, and the document states once that this repository does not
+  run them. Its subscript examples use the same `program=` fence, and
+  the quote test scans every `docs/*.md` file. The document quotes
+  TypeGPU's `tgpu` namespace, so `tools/hygiene.sh` exempts that one
+  file from the banned-prefix check. `README.md` links both documents.

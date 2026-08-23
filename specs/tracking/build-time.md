@@ -31,6 +31,7 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-23 | Retrospective close, the tree committed as `c0ebfed` | 45 s | 0.2 s | 86 s | 84 s | 6 |
 | 2026-08-23 | PI14 error scopes in every program, `x13-live-rejection` | 46 s | 0 s | 88 s | 86 s | 6 |
 | 2026-08-23 | windows-msvc port merged (`2d592b7`), reference machine re-check | — | — | — | 93 s | 6 |
+| 2026-08-23 | EG9 Rev 1, `docs/from-typegpu.md` and the docs gate over `docs/*.md` | 47 s | 0 s | 88 s | 85 s | 6 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate

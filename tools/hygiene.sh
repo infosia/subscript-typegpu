@@ -41,10 +41,16 @@ while IFS= read -r file; do
                 echo "hygiene: review residue in $file" >&2
                 failed=1
             fi
-            if grep -niE '(^|[^a-z])(sgpu|stgpu|tgpu)' "$file"; then
-                echo "hygiene: banned prefix in $file" >&2
-                failed=1
-            fi
+            case "$file" in
+                docs/from-typegpu.md)
+                    ;;
+                *)
+                    if grep -niE '(^|[^a-z])(sgpu|stgpu|tgpu)' "$file"; then
+                        echo "hygiene: banned prefix in $file" >&2
+                        failed=1
+                    fi
+                    ;;
+            esac
             ;;
     esac
 done <"$file_list"
