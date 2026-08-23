@@ -14,6 +14,19 @@ use crate::schema::Schema;
 
 type Prelude = Vec<(usize, String)>;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct WgslSpan {
+    pub(crate) label: String,
+    pub(crate) start_line: u32,
+    pub(crate) end_line: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct EmittedWgsl {
+    pub(crate) text: String,
+    pub(crate) spans: Vec<WgslSpan>,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct Snippet {
     pub(crate) text: String,
@@ -624,6 +637,7 @@ fn binding_declaration(
             "var<uniform> {name}: {};",
             wgsl_type(module, &binding.item_ty, &binding.pos)?,
         ),
+        BindingKind::Guard => format!("var<uniform> {name}: vec3<u32>;"),
         BindingKind::Storage | BindingKind::MutStorage => format!(
             "var<{}> {name}: array<{}>;",
             binding.kind.wgsl(),
@@ -3675,16 +3689,88 @@ fn module_scope_names(
     names
 }
 
+fn next_line(out: &str) -> u32 {
+    out.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1
+}
+
+fn append_recorded_text(out: &mut String, text: &str, label: String, spans: &mut Vec<WgslSpan>) {
+    let start_line = next_line(out);
+    out.push_str(text);
+    if !text.ends_with('\n') {
+        out.push('\n');
+    }
+    let end_line = next_line(out).saturating_sub(1).max(start_line);
+    spans.push(WgslSpan {
+        label,
+        start_line,
+        end_line,
+    });
+}
+
+fn emit_shell(
+    module: &Module,
+    shell: &crate::shell::Shell,
+    layouts: &[crate::pipeline::Layout],
+    out: &mut String,
+    spans: &mut Vec<WgslSpan>,
+) -> Result<(), Diagnostic> {
+    let function = crate::shell::validate_signature(module, shell, layouts)?;
+    let params = function
+        .params
+        .iter()
+        .map(|param| {
+            Ok(format!(
+                "{}: {}",
+                mapping::ident(&param.name),
+                wgsl_type(module, &param.ty, &param.pos)?
+            ))
+        })
+        .collect::<Result<Vec<_>, Diagnostic>>()?;
+    let result = if function.ret == Type::Void {
+        String::new()
+    } else {
+        format!(" -> {}", wgsl_type(module, &function.ret, &function.pos)?)
+    };
+    out.push_str(&format!(
+        "fn {}({}){result} {{\n",
+        mapping::ident(&shell.name),
+        params.join(", ")
+    ));
+    let mut body = String::new();
+    for line in shell.body.lines() {
+        body.push_str("  ");
+        body.push_str(line.trim());
+        body.push('\n');
+    }
+    if shell.body.is_empty() {
+        body.push_str("  \n");
+    }
+    append_recorded_text(out, &body, format!("shell {}", shell.name), spans);
+    out.push_str("}\n\n");
+    Ok(())
+}
+
 pub(crate) fn emit(
     module: &Module,
     pipeline: &Pipeline,
     structs: &[(String, String)],
     uses_f16: bool,
-) -> Result<String, Diagnostic> {
+    shells: &crate::shell::ShellProgram,
+) -> Result<EmittedWgsl, Diagnostic> {
     let kernel = function(module, &pipeline.entry)
         .ok_or_else(|| generator_diagnostic("kernel disappeared from HIR", pipeline.pos.clone()))?;
-    let helpers = dependencies(module, kernel)?;
-    let globals = kernel_globals(module, kernel)?;
+    let dependencies = dependencies(module, kernel, shells)?;
+    let helpers = dependencies
+        .iter()
+        .filter(|name| !crate::shell::function_is_shell(shells, name))
+        .cloned()
+        .collect::<Vec<_>>();
+    let reached_shells = dependencies
+        .iter()
+        .filter_map(|name| crate::shell::shell_for_function(shells, name))
+        .collect::<Vec<_>>();
+    let shell_order = shells.declarations.is_some() || !reached_shells.is_empty();
+    let globals = kernel_globals(module, kernel, shells)?;
     let module_names = module_scope_names(
         structs,
         &pipeline.layouts,
@@ -3771,10 +3857,36 @@ pub(crate) fn emit(
         helper_text.push_str("}\n\n");
     }
     let mut entry_body = String::new();
-    emitter.statements(&kernel.body, 1, &mut entry_body)?;
+    if pipeline.guarded {
+        emitter.used_builtins.insert("globalId".to_owned());
+        let guard = pipeline
+            .layouts
+            .last()
+            .and_then(|layout| {
+                layout
+                    .bindings
+                    .iter()
+                    .find(|binding| binding.kind == BindingKind::Guard)
+            })
+            .ok_or_else(|| {
+                generator_diagnostic(
+                    "guarded pipeline lost its guard binding",
+                    pipeline.pos.clone(),
+                )
+            })?;
+        entry_body.push_str(&format!(
+            "  if (globalId.x < {guard}.x && globalId.y < {guard}.y && globalId.z < {guard}.z) {{\n",
+            guard = mapping::ident(&guard.name),
+        ));
+        emitter.statements(&kernel.body, 2, &mut entry_body)?;
+        entry_body.push_str("  }\n");
+    } else {
+        emitter.statements(&kernel.body, 1, &mut entry_body)?;
+    }
     BarrierValidator::new(&emitter, kernel).validate(kernel)?;
 
     let mut out = String::new();
+    let mut spans = Vec::new();
     if uses_f16
         || pipeline
             .layouts
@@ -3787,17 +3899,34 @@ pub(crate) fn emit(
     {
         out.push_str("enable f16;\n\n");
     }
+    if let Some(declarations) = &shells.declarations {
+        append_recorded_text(
+            &mut out,
+            &declarations.text,
+            "declarations".to_owned(),
+            &mut spans,
+        );
+        out.push('\n');
+    }
     for (_, structure) in structs {
         out.push_str(structure);
         out.push('\n');
     }
-    out.push_str(&emit_kernel_globals(module, &globals)?);
+    if !shell_order {
+        out.push_str(&emit_kernel_globals(module, &globals)?);
+    }
+    for shell in reached_shells {
+        emit_shell(module, shell, &pipeline.layouts, &mut out, &mut spans)?;
+    }
     for layout in &pipeline.layouts {
         for binding in &layout.bindings {
             out.push_str(&binding_declaration(module, layout.group, binding)?);
         }
     }
     out.push('\n');
+    if shell_order {
+        out.push_str(&emit_kernel_globals(module, &globals)?);
+    }
     out.push_str(&helper_text);
     let parameters = [
         "globalId",
@@ -3821,12 +3950,13 @@ pub(crate) fn emit(
     ));
     out.push_str(&entry_body);
     out.push_str("}\n");
-    Ok(out)
+    Ok(EmittedWgsl { text: out, spans })
 }
 
 pub(crate) fn referenced_render_schema_names(
     module: &Module,
     pipeline: &RenderPipeline,
+    shells: &crate::shell::ShellProgram,
 ) -> Result<Vec<String>, Diagnostic> {
     let mut seen = BTreeSet::new();
     let mut out = Vec::new();
@@ -3842,7 +3972,7 @@ pub(crate) fn referenced_render_schema_names(
                 pipeline.pos.clone(),
             )
         })?;
-        for name in dependencies(module, kernel)? {
+        for name in dependencies(module, kernel, shells)? {
             let helper = function(module, &name).ok_or_else(|| {
                 generator_diagnostic(
                     "a render helper disappeared from typed HIR",
@@ -3853,8 +3983,10 @@ pub(crate) fn referenced_render_schema_names(
                 collect_schema_type(module, &param.ty, &mut seen, &mut out);
             }
             collect_schema_type(module, &helper.ret, &mut seen, &mut out);
-            for stmt in &helper.body {
-                collect_schema_stmt(module, stmt, &mut seen, &mut out);
+            if !crate::shell::function_is_shell(shells, &name) {
+                for stmt in &helper.body {
+                    collect_schema_stmt(module, stmt, &mut seen, &mut out);
+                }
             }
         }
         for stmt in &kernel.body {
@@ -3873,7 +4005,7 @@ pub(crate) fn referenced_render_schema_names(
             pipeline.pos.clone(),
         )
     })?;
-    for global in render_kernel_globals(module, [vertex, fragment])? {
+    for global in render_kernel_globals(module, [vertex, fragment], shells)? {
         collect_schema_type(module, &global.ty, &mut seen, &mut out);
     }
     let interface_names = pipeline
@@ -3953,11 +4085,15 @@ fn render_helpers(
     kernels: [&Function; 2],
     globals: &[KernelGlobal],
     module_names: &BTreeSet<String>,
+    shells: &crate::shell::ShellProgram,
 ) -> Result<String, Diagnostic> {
     let mut names = Vec::new();
     let mut seen = BTreeSet::new();
     for kernel in kernels {
-        for name in dependencies(module, kernel)? {
+        for name in dependencies(module, kernel, shells)? {
+            if crate::shell::function_is_shell(shells, &name) {
+                continue;
+            }
             if seen.insert(name.clone()) {
                 names.push(name);
             }
@@ -4028,7 +4164,8 @@ pub(crate) fn emit_render(
     pipeline: &RenderPipeline,
     structs: &[(String, String)],
     schemas: &[Schema],
-) -> Result<String, Diagnostic> {
+    shells: &crate::shell::ShellProgram,
+) -> Result<EmittedWgsl, Diagnostic> {
     crate::render::reject_vertex_storage_writes(module, pipeline)?;
     let vertex = function(module, &pipeline.vertex_entry).ok_or_else(|| {
         generator_diagnostic("vertex kernel disappeared from HIR", pipeline.pos.clone())
@@ -4036,16 +4173,20 @@ pub(crate) fn emit_render(
     let fragment = function(module, &pipeline.fragment_entry).ok_or_else(|| {
         generator_diagnostic("fragment kernel disappeared from HIR", pipeline.pos.clone())
     })?;
-    let globals = render_kernel_globals(module, [vertex, fragment])?;
+    let globals = render_kernel_globals(module, [vertex, fragment], shells)?;
     let mut helper_names = Vec::new();
     let mut seen_helpers = BTreeSet::new();
     for kernel in [vertex, fragment] {
-        for name in dependencies(module, kernel)? {
+        for name in dependencies(module, kernel, shells)? {
             if seen_helpers.insert(name.clone()) {
                 helper_names.push(name);
             }
         }
     }
+    let shell_order = shells.declarations.is_some()
+        || helper_names
+            .iter()
+            .any(|name| crate::shell::function_is_shell(shells, name));
     let mut module_names = module_scope_names(
         structs,
         &pipeline.layouts,
@@ -4102,15 +4243,32 @@ pub(crate) fn emit_render(
             .iter()
             .any(|varying| crate::render::type_uses_f16(module, &varying.ty));
     let mut out = String::new();
+    let mut spans = Vec::new();
     if uses_f16 {
         out.push_str("enable f16;\n\n");
+    }
+    if let Some(declarations) = &shells.declarations {
+        append_recorded_text(
+            &mut out,
+            &declarations.text,
+            "declarations".to_owned(),
+            &mut spans,
+        );
+        out.push('\n');
     }
     for (_, structure) in structs {
         out.push_str(structure);
         out.push('\n');
     }
     out.push_str(&render_interface_structs(module, pipeline)?);
-    out.push_str(&emit_kernel_globals(module, &globals)?);
+    if !shell_order {
+        out.push_str(&emit_kernel_globals(module, &globals)?);
+    }
+    for name in &helper_names {
+        if let Some(shell) = crate::shell::shell_for_function(shells, name) {
+            emit_shell(module, shell, &pipeline.layouts, &mut out, &mut spans)?;
+        }
+    }
     for layout in &pipeline.layouts {
         for binding in &layout.bindings {
             out.push_str(&binding_declaration(module, layout.group, binding)?);
@@ -4119,12 +4277,16 @@ pub(crate) fn emit_render(
     if !pipeline.layouts.is_empty() {
         out.push('\n');
     }
+    if shell_order {
+        out.push_str(&emit_kernel_globals(module, &globals)?);
+    }
     out.push_str(&render_helpers(
         module,
         pipeline,
         [vertex, fragment],
         &globals,
         &module_names,
+        shells,
     )?);
 
     let mut vertex_parameters = vertex.params[layout_count..layout_count + vertex_value_count]
@@ -4176,5 +4338,5 @@ pub(crate) fn emit_render(
     ));
     out.push_str(&fragment_body);
     out.push_str("}\n");
-    Ok(out)
+    Ok(EmittedWgsl { text: out, spans })
 }

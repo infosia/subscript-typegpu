@@ -853,3 +853,54 @@ export function mat4x4fIdentity(): Mat4x4f {
     v4f(0.0, 0.0, 0.0, 1.0),
   );
 }
+
+@CStruct
+export class DispatchIndirectArgs {
+  x: u32;
+  y: u32;
+  z: u32;
+
+  constructor(x: u32, y: u32, z: u32) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+}
+
+@CStruct
+export class DrawIndirectArgs {
+  vertexCount: u32;
+  instanceCount: u32;
+  firstVertex: u32;
+  firstInstance: u32;
+
+  constructor(vertexCount: u32, instanceCount: u32, firstVertex: u32, firstInstance: u32) {
+    this.vertexCount = vertexCount;
+    this.instanceCount = instanceCount;
+    this.firstVertex = firstVertex;
+    this.firstInstance = firstInstance;
+  }
+}
+
+@CStruct
+export class DrawIndexedIndirectArgs {
+  indexCount: u32;
+  instanceCount: u32;
+  firstIndex: u32;
+  baseVertex: i32;
+  firstInstance: u32;
+
+  constructor(
+    indexCount: u32,
+    instanceCount: u32,
+    firstIndex: u32,
+    baseVertex: i32,
+    firstInstance: u32,
+  ) {
+    this.indexCount = indexCount;
+    this.instanceCount = instanceCount;
+    this.firstIndex = firstIndex;
+    this.baseVertex = baseVertex;
+    this.firstInstance = firstInstance;
+  }
+}

@@ -1,0 +1,8 @@
+DispatchIndirectArgs_SIZE=12
+DrawIndirectArgs_SIZE=16
+DrawIndexedIndirectArgs_SIZE=20
+offsets=0,12,28
+indirectRender_INDEX_FORMAT=uint16
+host:out=1
+indirect:submitted
+PASS

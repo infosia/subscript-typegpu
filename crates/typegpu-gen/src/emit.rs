@@ -23,7 +23,10 @@ pub(crate) fn bind_group_factory_name(declaration: &str, group: u32) -> String {
 
 fn resource_type(kind: BindingKind) -> &'static str {
     match kind {
-        BindingKind::Uniform | BindingKind::Storage | BindingKind::MutStorage => "GPUBuffer",
+        BindingKind::Uniform
+        | BindingKind::Storage
+        | BindingKind::MutStorage
+        | BindingKind::Guard => "GPUBuffer",
         BindingKind::Texture(_) | BindingKind::StorageTexture(_) => "GPUTextureView",
         BindingKind::Sampler => "GPUSampler",
     }
@@ -31,7 +34,10 @@ fn resource_type(kind: BindingKind) -> &'static str {
 
 fn resource_factory(kind: BindingKind) -> &'static str {
     match kind {
-        BindingKind::Uniform | BindingKind::Storage | BindingKind::MutStorage => "bufferResource",
+        BindingKind::Uniform
+        | BindingKind::Storage
+        | BindingKind::MutStorage
+        | BindingKind::Guard => "bufferResource",
         BindingKind::Texture(_) | BindingKind::StorageTexture(_) => "textureResource",
         BindingKind::Sampler => "samplerResource",
     }
@@ -42,7 +48,11 @@ fn emit_resources_class(out: &mut String, layout: &crate::pipeline::Layout) {
         "@Descriptor\nexport class {}Resources {{\n",
         layout.name
     ));
-    for binding in &layout.bindings {
+    for binding in layout
+        .bindings
+        .iter()
+        .filter(|binding| binding.kind != BindingKind::Guard)
+    {
         out.push_str(&format!(
             "  {}!: {};\n",
             binding.name,
@@ -54,7 +64,11 @@ fn emit_resources_class(out: &mut String, layout: &crate::pipeline::Layout) {
         "export function create{}Resources(\n",
         layout.name
     ));
-    for binding in &layout.bindings {
+    for binding in layout
+        .bindings
+        .iter()
+        .filter(|binding| binding.kind != BindingKind::Guard)
+    {
         out.push_str(&format!(
             "  {}: {},\n",
             binding.name,
@@ -62,7 +76,11 @@ fn emit_resources_class(out: &mut String, layout: &crate::pipeline::Layout) {
         ));
     }
     out.push_str(&format!("): {}Resources {{\n  return {{\n", layout.name));
-    for binding in &layout.bindings {
+    for binding in layout
+        .bindings
+        .iter()
+        .filter(|binding| binding.kind != BindingKind::Guard)
+    {
         out.push_str(&format!("    {}: {},\n", binding.name, binding.name));
     }
     out.push_str("  };\n}\n\n");
@@ -79,14 +97,25 @@ fn emit_bind_group_factory(
         "export function {factory}(\n  device: GPUDevice,\n  pipeline: {pipeline_type},\n  resources: {}Resources,\n): GPUBindGroup {{\n  using layout = pipeline.bindGroupLayout({});\n  return createBindGroup(device, layout, {declaration}_LAYOUT{}, [\n",
         layout.name, layout.group, layout.group,
     ));
-    for binding in &layout.bindings {
+    for binding in layout
+        .bindings
+        .iter()
+        .filter(|binding| binding.kind != BindingKind::Guard)
+    {
         out.push_str(&format!(
             "    {}(resources.{}),\n",
             resource_factory(binding.kind),
             binding.name
         ));
     }
-    out.push_str("  ]);\n}\n");
+    if pipeline_type == "ComputePipeline" {
+        out.push_str(&format!(
+            "  ], pipeline.guardBuffer({}));\n}}\n",
+            layout.group
+        ));
+    } else {
+        out.push_str("  ]);\n}\n");
+    }
 }
 
 fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
@@ -255,6 +284,7 @@ fn emit_binding_entry(
             "minBindingSize: {}",
             binding_size(module, schemas, &binding.item_ty, &binding.pos)?,
         ),
+        BindingKind::Guard => "minBindingSize: 16".to_owned(),
         BindingKind::Texture(sample) => {
             format!("minBindingSize: 0, sampleType: \"{}\"", sample.webgpu(),)
         }
@@ -385,6 +415,12 @@ pub(crate) fn support_module(
             fragment = crate::mapping::ident(&pipeline.fragment_entry),
             format = pipeline.target_format,
         ));
+        if let Some(index_format) = &pipeline.index_format {
+            out.push_str(&format!(
+                "export const {name}_INDEX_FORMAT: GPUIndexFormat = \"{index_format}\";\n",
+                name = pipeline.declaration,
+            ));
+        }
         for layout in &pipeline.layouts {
             out.push_str(&format!(
                 "\nexport const {}_LAYOUT{}: BindGroupLayoutSpec = {{ entries: [\n",

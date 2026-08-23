@@ -44,7 +44,13 @@ fn library_call(module: &Module, name: &str, expected: &str) -> bool {
             .functions
             .iter()
             .find(|function| function.name == name)
-            .is_some_and(|function| function.pos.file == "typegpu.ts")
+            .is_some_and(|function| {
+                function.pos.file == "typegpu.ts"
+                    || function
+                        .params
+                        .first()
+                        .is_some_and(|param| param.pos.file == "typegpu.ts")
+            })
 }
 
 fn descriptor_body(module: &Module, expr: &Expr) -> Result<String, Diagnostic> {
@@ -56,7 +62,11 @@ fn descriptor_body(module: &Module, expr: &Expr) -> Result<String, Diagnostic> {
         ));
     };
     let descriptor = &module.classes[class.0];
-    let Some(index) = descriptor.fields.iter().position(|field| field.name == "body") else {
+    let Some(index) = descriptor
+        .fields
+        .iter()
+        .position(|field| field.name == "body")
+    else {
         return Err(diagnostic(
             "K29",
             "WgslShellSpec has no body field",
@@ -114,7 +124,11 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
                 }
             }
             if depth != 0 {
-                return Err(diagnostic("K30", "WGSL text has an unclosed comment", pos.clone()));
+                return Err(diagnostic(
+                    "K30",
+                    "WGSL text has an unclosed comment",
+                    pos.clone(),
+                ));
             }
             continue;
         }
@@ -135,22 +149,27 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
         } else if byte == b'}' {
             braces -= 1;
             if braces < 0 {
-                return Err(diagnostic("K30", "WGSL text has unbalanced braces", pos.clone()));
+                return Err(diagnostic(
+                    "K30",
+                    "WGSL text has unbalanced braces",
+                    pos.clone(),
+                ));
             }
         }
         out.push(token);
         index += 1;
     }
     if braces != 0 {
-        return Err(diagnostic("K30", "WGSL text has unbalanced braces", pos.clone()));
+        return Err(diagnostic(
+            "K30",
+            "WGSL text has unbalanced braces",
+            pos.clone(),
+        ));
     }
     for token in &out {
         if matches!(
             token.as_str(),
-            "override"
-                | "workgroupBarrier"
-                | "storageBarrier"
-                | "textureBarrier"
+            "override" | "workgroupBarrier" | "storageBarrier" | "textureBarrier"
         ) {
             return Err(diagnostic(
                 "K30",
@@ -165,7 +184,10 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
         {
             return Err(diagnostic(
                 "K30",
-                format!("WGSL text contains forbidden token sequence `{}{}`", pair[0], pair[1]),
+                format!(
+                    "WGSL text contains forbidden token sequence `{}{}`",
+                    pair[0], pair[1]
+                ),
                 pos.clone(),
             ));
         }
@@ -250,11 +272,10 @@ fn visit_statements(module: &Module, statements: &[Stmt], diagnostics: &mut Vec<
     for statement in statements {
         match statement {
             Stmt::Let { init, .. } | Stmt::Expr(init) => visit_expr(module, init, diagnostics),
-            Stmt::Return { value, .. } => {
-                if let Some(value) = value {
-                    visit_expr(module, value, diagnostics);
-                }
-            }
+            Stmt::Return {
+                value: Some(value), ..
+            } => visit_expr(module, value, diagnostics),
+            Stmt::Return { value: None, .. } => {}
             Stmt::If {
                 cond, then, els, ..
             } => {
@@ -422,16 +443,16 @@ pub(crate) fn validate_collisions(
         if generated_names.contains(&shell.name) {
             diagnostics.push(diagnostic(
                 "K30",
-                format!("WGSL shell name `{}` collides with a generated declaration", shell.name),
+                format!(
+                    "WGSL shell name `{}` collides with a generated declaration",
+                    shell.name
+                ),
                 shell.pos.clone(),
             ));
         }
     }
     if let Some(declarations) = &program.declarations {
-        for name in declarations
-            .names
-            .intersection(generated_names)
-        {
+        for name in declarations.names.intersection(generated_names) {
             diagnostics.push(diagnostic(
                 "K30",
                 format!("WGSL declaration name `{name}` collides with a generated declaration"),
@@ -450,18 +471,15 @@ pub(crate) fn function_is_shell(program: &ShellProgram, name: &str) -> bool {
     program.shells.iter().any(|shell| shell.function == name)
 }
 
-pub(crate) fn shell_for_function<'a>(
-    program: &'a ShellProgram,
-    name: &str,
-) -> Option<&'a Shell> {
+pub(crate) fn shell_for_function<'a>(program: &'a ShellProgram, name: &str) -> Option<&'a Shell> {
     program.shells.iter().find(|shell| shell.function == name)
 }
 
-pub(crate) fn validate_signature(
-    module: &Module,
+pub(crate) fn validate_signature<'a>(
+    module: &'a Module,
     shell: &Shell,
     layouts: &[crate::pipeline::Layout],
-) -> Result<&Function, Diagnostic> {
+) -> Result<&'a Function, Diagnostic> {
     let function = module
         .functions
         .iter()
@@ -480,12 +498,17 @@ pub(crate) fn validate_signature(
         }) {
             return Err(diagnostic(
                 "K29",
-                format!("WGSL shell `{}` takes a layout or ComputeInvocation", shell.name),
+                format!(
+                    "WGSL shell `{}` takes a layout or ComputeInvocation",
+                    shell.name
+                ),
                 param.pos.clone(),
             ));
         }
         let _ = crate::kernel::wgsl_type(module, &param.ty, &param.pos)?;
     }
-    let _ = crate::kernel::wgsl_type(module, &function.ret, &function.pos)?;
+    if function.ret != subscript_compiler::Type::Void {
+        let _ = crate::kernel::wgsl_type(module, &function.ret, &function.pos)?;
+    }
     Ok(function)
 }

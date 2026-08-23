@@ -13,6 +13,7 @@ pub(crate) enum BindingKind {
     Texture(TextureSampleType),
     StorageTexture(StorageTextureFormat),
     Sampler,
+    Guard,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,6 +64,7 @@ impl BindingKind {
             Self::Uniform => "uniform",
             Self::Storage => "storage, read",
             Self::MutStorage => "storage, read_write",
+            Self::Guard => "uniform",
             Self::Texture(_) | Self::StorageTexture(_) | Self::Sampler => "",
         }
     }
@@ -75,11 +77,15 @@ impl BindingKind {
             Self::Texture(_) => "texture",
             Self::StorageTexture(_) => "storageTexture",
             Self::Sampler => "sampler",
+            Self::Guard => "guard",
         }
     }
 
     pub(crate) fn is_buffer(self) -> bool {
-        matches!(self, Self::Uniform | Self::Storage | Self::MutStorage)
+        matches!(
+            self,
+            Self::Uniform | Self::Storage | Self::MutStorage | Self::Guard
+        )
     }
 }
 
@@ -105,6 +111,7 @@ pub(crate) struct Pipeline {
     pub(crate) entry: String,
     pub(crate) workgroup: [u32; 3],
     pub(crate) host_runnable: bool,
+    pub(crate) guarded: bool,
     pub(crate) layouts: Vec<Layout>,
     pub(crate) pos: Pos,
 }
@@ -447,6 +454,39 @@ fn validate_pipeline_name(
     Ok(())
 }
 
+fn guarded_option(module: &Module, expr: &Expr) -> Result<bool, Diagnostic> {
+    let ExprKind::DescriptorLit { class, fields } = &expr.kind else {
+        return Err(diagnostic(
+            "PI15",
+            "guarded pipeline options must be a descriptor literal",
+            expr.pos.clone(),
+        ));
+    };
+    let descriptor = &module.classes[class.0];
+    let Some(index) = descriptor
+        .fields
+        .iter()
+        .position(|field| field.name == "guarded")
+    else {
+        return Err(generator_diagnostic(
+            "library ComputePipelineSpec lost its guarded field",
+            expr.pos.clone(),
+        ));
+    };
+    match fields.get(index).and_then(Option::as_ref) {
+        None => Ok(false),
+        Some(Expr {
+            kind: ExprKind::Bool(value),
+            ..
+        }) => Ok(*value),
+        Some(value) => Err(diagnostic(
+            "PI15",
+            "pipeline guarded option must be a boolean literal",
+            value.pos.clone(),
+        )),
+    }
+}
+
 pub(crate) fn function<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
     module
         .functions
@@ -542,7 +582,10 @@ fn stmt_has_compute(module: &Module, stmt: &Stmt) -> bool {
     }
 }
 
-pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>> {
+pub(crate) fn discover(
+    module: &Module,
+    shells: &crate::shell::ShellProgram,
+) -> Result<Vec<Pipeline>, Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
     for function in &module.functions {
         if function.pos.file != "typegpu.ts"
@@ -633,7 +676,14 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
             diagnostics.push(error);
             continue;
         }
-        let host_runnable = match crate::kernel::host_runnable(module, kernel) {
+        let guarded = match guarded_option(module, options) {
+            Ok(value) => value,
+            Err(error) => {
+                diagnostics.push(error);
+                continue;
+            }
+        };
+        let host_runnable = match crate::kernel::host_runnable(module, kernel, shells) {
             Ok(value) => value,
             Err(error) => {
                 diagnostics.push(error);
@@ -641,14 +691,39 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
             }
         };
         match workgroup(module, options) {
-            Ok(workgroup) if layouts.len() == arity => pipelines.push(Pipeline {
-                declaration: global.name.clone(),
-                entry: entry.clone(),
-                workgroup,
-                host_runnable,
-                layouts,
-                pos: global.pos.clone(),
-            }),
+            Ok(workgroup) if layouts.len() == arity => {
+                if guarded {
+                    let Some(last) = layouts.last_mut() else {
+                        diagnostics.push(generator_diagnostic(
+                            "guarded pipeline has no last layout",
+                            global.pos.clone(),
+                        ));
+                        continue;
+                    };
+                    let binding = last
+                        .bindings
+                        .iter()
+                        .map(|binding| binding.index)
+                        .max()
+                        .map_or(0, |binding| binding + 1);
+                    last.bindings.push(Binding {
+                        name: format!("{}_guard", global.name),
+                        index: binding,
+                        kind: BindingKind::Guard,
+                        item_ty: Type::U32,
+                        pos: options.pos.clone(),
+                    });
+                }
+                pipelines.push(Pipeline {
+                    declaration: global.name.clone(),
+                    entry: entry.clone(),
+                    workgroup,
+                    host_runnable,
+                    guarded,
+                    layouts,
+                    pos: global.pos.clone(),
+                });
+            }
             Ok(_) => {}
             Err(error) => diagnostics.push(error),
         }

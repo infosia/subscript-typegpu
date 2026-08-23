@@ -40,6 +40,7 @@ pub(crate) struct RenderPipeline {
     pub(crate) varyings_name: String,
     pub(crate) varyings: Vec<Varying>,
     pub(crate) target_format: String,
+    pub(crate) index_format: Option<String>,
     pub(crate) pos: Pos,
 }
 
@@ -309,6 +310,60 @@ fn descriptor_string(
     }
 }
 
+fn index_format(module: &Module, expr: &Expr) -> Result<Option<String>, Diagnostic> {
+    let ExprKind::DescriptorLit { class, fields } = &expr.kind else {
+        return Err(diagnostic(
+            "RN18",
+            "render options must be a descriptor literal",
+            expr.pos.clone(),
+        ));
+    };
+    let descriptor = &module.classes[class.0];
+    let Some(index) = descriptor
+        .fields
+        .iter()
+        .position(|field| field.name == "indexFormat")
+    else {
+        return Err(generator_diagnostic(
+            "library RenderPipelineSpec lost its indexFormat field",
+            expr.pos.clone(),
+        ));
+    };
+    match fields.get(index).and_then(Option::as_ref) {
+        None => Ok(None),
+        Some(Expr {
+            kind: ExprKind::Str(value),
+            ..
+        }) => Ok((value != "undefined").then(|| value.clone())),
+        Some(Expr {
+            kind: ExprKind::Int(value),
+            ty: Type::StringAlias(alias),
+            pos,
+            ..
+        }) => {
+            let definition = &module.string_aliases[alias.0];
+            let index = if let Some(wire_values) = &definition.wire_values {
+                wire_values
+                    .iter()
+                    .position(|wire| i64::from(*wire) == *value)
+            } else {
+                usize::try_from(*value).ok()
+            };
+            let member = index
+                .and_then(|index| definition.members.get(index))
+                .ok_or_else(|| {
+                    diagnostic("RN18", "indexFormat has an unknown value", pos.clone())
+                })?;
+            Ok((member != "undefined").then(|| member.clone()))
+        }
+        Some(value) => Err(diagnostic(
+            "RN18",
+            "indexFormat must be a literal",
+            value.pos.clone(),
+        )),
+    }
+}
+
 fn contains_render_call_expr(module: &Module, expr: &Expr) -> bool {
     if matches!(&expr.kind, ExprKind::Call { callee: Callee::Func(name), .. } if render_shape(module, name).is_some())
     {
@@ -553,6 +608,13 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
                 continue;
             }
         };
+        let index_format = match index_format(module, options) {
+            Ok(value) => value,
+            Err(error) => {
+                diagnostics.push(error);
+                continue;
+            }
+        };
         for (field, default) in [
             ("topology", "triangle-list"),
             ("cullMode", "none"),
@@ -571,6 +633,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             varyings_name,
             varyings,
             target_format,
+            index_format,
             pos: global.pos.clone(),
         };
         if let Some(error) = unreached_binding(module, &pipeline) {

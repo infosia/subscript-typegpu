@@ -39,6 +39,19 @@ pub struct GeneratedComputePipeline {
     pub host_runnable: bool,
 }
 
+/// A named author-WGSL line range in one generated module.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeneratedWgslSpan {
+    /// The pipeline declaration that owns the module.
+    pub pipeline: String,
+    /// `shell <name>` or `declarations`.
+    pub label: String,
+    /// First one-based line in the range.
+    pub start_line: u32,
+    /// Last one-based line in the range.
+    pub end_line: u32,
+}
+
 /// Generated TypeGPU support for one checked program.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Generated {
@@ -54,6 +67,8 @@ pub struct Generated {
     pub pipelines: Vec<(String, String)>,
     /// Compute pipeline declarations and their host-simulation facts.
     pub compute_pipelines: Vec<GeneratedComputePipeline>,
+    /// Recorded author-WGSL ranges for K31 attribution.
+    pub wgsl_spans: Vec<GeneratedWgslSpan>,
 }
 
 #[derive(Debug)]
@@ -179,8 +194,43 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     let options = discovery_options(files)?;
     let module = subscript_compiler::check_program_with(files, &options)?;
     let support = support_import(&module)?;
-    let pipeline_definitions = pipeline::discover(&module)?;
+    let shell_program = shell::discover(&module)?;
+    let pipeline_definitions = pipeline::discover(&module, &shell_program)?;
     let render_definitions = render::discover(&module)?;
+    let kernel_names = pipeline_definitions
+        .iter()
+        .map(|pipeline| pipeline.entry.as_str())
+        .chain(render_definitions.iter().flat_map(|pipeline| {
+            [
+                pipeline.vertex_entry.as_str(),
+                pipeline.fragment_entry.as_str(),
+            ]
+        }))
+        .collect::<BTreeSet<_>>();
+    if let Some(shell) = shell_program
+        .shells
+        .iter()
+        .find(|shell| kernel_names.contains(shell.function.as_str()))
+    {
+        return Err(vec![diagnostic(
+            "K29",
+            format!("WGSL shell `{}` is also a pipeline kernel", shell.name),
+            shell.pos.clone(),
+        )]);
+    }
+    let all_layouts = pipeline_definitions
+        .iter()
+        .flat_map(|pipeline| &pipeline.layouts)
+        .chain(
+            render_definitions
+                .iter()
+                .flat_map(|pipeline| &pipeline.layouts),
+        )
+        .cloned()
+        .collect::<Vec<_>>();
+    for shell in &shell_program.shells {
+        shell::validate_signature(&module, shell, &all_layouts).map_err(|item| vec![item])?;
+    }
     let pipeline_declarations = pipeline_definitions
         .iter()
         .map(|pipeline| pipeline.declaration.clone())
@@ -194,15 +244,53 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     intended.extend(pipeline::schema_names(&module, &pipeline_definitions));
     intended.extend(render::schema_names(&render_definitions));
     for pipeline in &pipeline_definitions {
-        intended
-            .extend(kernel::referenced_schema_names(&module, pipeline).map_err(|item| vec![item])?);
+        intended.extend(
+            kernel::referenced_schema_names(&module, pipeline, &shell_program)
+                .map_err(|item| vec![item])?,
+        );
     }
     for pipeline in &render_definitions {
         intended.extend(
-            kernel::referenced_render_schema_names(&module, pipeline).map_err(|item| vec![item])?,
+            kernel::referenced_render_schema_names(&module, pipeline, &shell_program)
+                .map_err(|item| vec![item])?,
         );
     }
     let schemas = schema::discover(&module, &intended, support.as_ref().map(|item| &item.pos))?;
+    let mut generated_names = schemas
+        .iter()
+        .map(|schema| schema.name.clone())
+        .collect::<BTreeSet<_>>();
+    generated_names.extend(
+        pipeline_definitions
+            .iter()
+            .map(|pipeline| pipeline.entry.clone()),
+    );
+    generated_names.extend(render_definitions.iter().flat_map(|pipeline| {
+        [
+            pipeline.vertex_entry.clone(),
+            pipeline.fragment_entry.clone(),
+        ]
+    }));
+    generated_names.extend(
+        pipeline_definitions
+            .iter()
+            .flat_map(|pipeline| &pipeline.layouts)
+            .chain(
+                render_definitions
+                    .iter()
+                    .flat_map(|pipeline| &pipeline.layouts),
+            )
+            .flat_map(|layout| &layout.bindings)
+            .map(|binding| binding.name.clone()),
+    );
+    generated_names.extend(
+        module
+            .globals
+            .iter()
+            .filter(|global| global.pos.file != "typegpu.ts")
+            .map(|global| global.name.clone()),
+    );
+    shell::validate_collisions(&shell_program, &generated_names)?;
     if let Some(pipeline) = render_definitions.iter().find(|pipeline| {
         schemas
             .iter()
@@ -222,7 +310,7 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         .map(|schema| (schema.name.clone(), emit::wgsl_struct(schema)))
         .collect::<Vec<_>>();
     let wgsl_module = emit::wgsl_module(&schemas, &wgsl_structs);
-    let mut pipelines = pipeline_definitions
+    let emitted_compute = pipeline_definitions
         .iter()
         .map(|pipeline| {
             fn append_tree(tree: &TypeTree, names: &mut Vec<String>, seen: &mut BTreeSet<String>) {
@@ -236,7 +324,7 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
                     append_tree(&member.ty, names, seen);
                 }
             }
-            let references = kernel::referenced_schema_names(&module, pipeline)?;
+            let references = kernel::referenced_schema_names(&module, pipeline, &shell_program)?;
             let mut names = Vec::new();
             let mut seen = BTreeSet::new();
             for name in references {
@@ -259,15 +347,22 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
                     .find(|schema| &schema.name == name)
                     .is_some_and(|schema| emit::uses_f16(&schema.tree))
             });
-            let text = kernel::emit(&module, pipeline, &selected_structs, uses_f16)?;
-            Ok((pipeline.declaration.clone(), text))
+            let emitted = kernel::emit(
+                &module,
+                pipeline,
+                &selected_structs,
+                uses_f16,
+                &shell_program,
+            )?;
+            Ok((pipeline.declaration.clone(), emitted))
         })
         .collect::<Result<Vec<_>, Diagnostic>>()
         .map_err(|diagnostic| vec![diagnostic])?;
-    let render_texts = render_definitions
+    let emitted_render = render_definitions
         .iter()
         .map(|pipeline| {
-            let references = kernel::referenced_render_schema_names(&module, pipeline)?;
+            let references =
+                kernel::referenced_render_schema_names(&module, pipeline, &shell_program)?;
             let selected_structs = references
                 .iter()
                 .filter_map(|name| {
@@ -277,12 +372,38 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
                         .cloned()
                 })
                 .collect::<Vec<_>>();
-            let text = kernel::emit_render(&module, pipeline, &selected_structs, &schemas)?;
-            Ok((pipeline.declaration.clone(), text))
+            let emitted = kernel::emit_render(
+                &module,
+                pipeline,
+                &selected_structs,
+                &schemas,
+                &shell_program,
+            )?;
+            Ok((pipeline.declaration.clone(), emitted))
         })
         .collect::<Result<Vec<_>, Diagnostic>>()
         .map_err(|diagnostic| vec![diagnostic])?;
+    let mut pipelines = emitted_compute
+        .iter()
+        .map(|(name, emitted)| (name.clone(), emitted.text.clone()))
+        .collect::<Vec<_>>();
+    let render_texts = emitted_render
+        .iter()
+        .map(|(name, emitted)| (name.clone(), emitted.text.clone()))
+        .collect::<Vec<_>>();
     pipelines.extend(render_texts.iter().cloned());
+    let wgsl_spans = emitted_compute
+        .iter()
+        .chain(&emitted_render)
+        .flat_map(|(pipeline, emitted)| {
+            emitted.spans.iter().map(|span| GeneratedWgslSpan {
+                pipeline: pipeline.clone(),
+                label: span.label.clone(),
+                start_line: span.start_line,
+                end_line: span.end_line,
+            })
+        })
+        .collect();
     let support_module = emit::support_module(
         &module,
         &schemas,
@@ -337,5 +458,6 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         layouts,
         pipelines,
         compute_pipelines,
+        wgsl_spans,
     })
 }

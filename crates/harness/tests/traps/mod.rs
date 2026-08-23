@@ -76,13 +76,13 @@ fn runtime_traps_are_named_and_numbered() {
             false,
         ),
         (
-            "read-past-end.ts",
-            "BF8 readOne elementIndex=2 elementCount=1 count=2",
+            "read-unaligned.ts",
+            "BF9 Buffer.read byteOffset=0 byteLength=2",
             false,
         ),
         (
-            "map-failure.ts",
-            "BF9 Buffer.read elementIndex=0 elementCount=1 count=1",
+            "read-past-end.ts",
+            "BF8 readOne elementIndex=2 elementCount=1 count=2",
             false,
         ),
         (
@@ -93,6 +93,11 @@ fn runtime_traps_are_named_and_numbered() {
         (
             "owned-read-one-past-end.ts",
             "BF9 Buffer.readOne elementIndex=1 elementCount=1 count=1",
+            false,
+        ),
+        (
+            "write-unaligned.ts",
+            "BF2 Buffer.write byteOffset=0 byteLength=6",
             false,
         ),
         (
@@ -149,6 +154,16 @@ fn runtime_traps_are_named_and_numbered() {
             "simulate-storage-barrier.ts",
             "CL2 simulateCompute pipeline=blocked",
             true,
+        ),
+        (
+            "guarded-indirect.ts",
+            "PI16 ComputePipeline.dispatchIndirect guarded=true",
+            false,
+        ),
+        (
+            "index-buffer-without-format.ts",
+            "RN18 RenderPipeline.setIndexBuffer indexFormat=undefined",
+            false,
         ),
     ] {
         assert_trap(&directory.join(name), expected, generate_support);

@@ -51,6 +51,62 @@ fn generated(program: &Path) -> subscript_typegpu_gen::Generated {
     })
 }
 
+fn attribution<'a>(
+    generated: &'a subscript_typegpu_gen::Generated,
+    pipeline: &str,
+    line: u32,
+) -> Option<&'a str> {
+    generated
+        .wgsl_spans
+        .iter()
+        .find(|span| span.pipeline == pipeline && line >= span.start_line && line <= span.end_line)
+        .map(|span| span.label.as_str())
+}
+
+fn naga_parse_message(
+    program: &Path,
+    pipeline: &str,
+    source: &str,
+    generated: &subscript_typegpu_gen::Generated,
+    error: &naga::front::wgsl::ParseError,
+) -> String {
+    let label = error
+        .location(source)
+        .and_then(|location| attribution(generated, pipeline, location.line_number));
+    match label {
+        Some(label) => format!(
+            "{label}: {} pipeline {pipeline}: naga parse: {error}",
+            program.display()
+        ),
+        None => format!(
+            "{} pipeline {pipeline}: K15 (generator): naga parse: {error}",
+            program.display()
+        ),
+    }
+}
+
+fn naga_validation_message(
+    program: &Path,
+    pipeline: &str,
+    source: &str,
+    generated: &subscript_typegpu_gen::Generated,
+    error: &naga::WithSpan<naga::valid::ValidationError>,
+) -> String {
+    let label = error
+        .location(source)
+        .and_then(|location| attribution(generated, pipeline, location.line_number));
+    match label {
+        Some(label) => format!(
+            "{label}: {} pipeline {pipeline}: naga validate: {error}",
+            program.display()
+        ),
+        None => format!(
+            "{} pipeline {pipeline}: K15 (generator): naga validate: {error}",
+            program.display()
+        ),
+    }
+}
+
 #[test]
 fn every_pipeline_matches_its_golden_and_validates() {
     let mut count = 0;
@@ -60,7 +116,8 @@ fn every_pipeline_matches_its_golden_and_validates() {
             .file_stem()
             .and_then(|name| name.to_str())
             .expect("program stem");
-        for (pipeline, actual) in generated(&program).pipelines {
+        let generated = generated(&program);
+        for (pipeline, actual) in &generated.pipelines {
             count += 1;
             let golden = root()
                 .join("programs")
@@ -70,15 +127,15 @@ fn every_pipeline_matches_its_golden_and_validates() {
                 .unwrap_or_else(|error| panic!("read {}: {error}", golden.display()));
             assert_eq!(
                 actual,
-                expected,
+                &expected,
                 "{} pipeline {pipeline} first differs at line {}. Run tools/regen.sh",
                 program.display(),
-                first_differing_line(&actual, &expected),
+                first_differing_line(actual, &expected),
             );
-            let module = naga::front::wgsl::parse_str(&actual).unwrap_or_else(|error| {
+            let module = naga::front::wgsl::parse_str(actual).unwrap_or_else(|error| {
                 panic!(
-                    "{} pipeline {pipeline}: K15 (generator): naga parse: {error}",
-                    program.display()
+                    "{}",
+                    naga_parse_message(&program, pipeline, actual, &generated, &error)
                 )
             });
             let capabilities = if actual.starts_with("enable f16;") {
@@ -90,8 +147,8 @@ fn every_pipeline_matches_its_golden_and_validates() {
                 .validate(&module)
                 .unwrap_or_else(|error| {
                     panic!(
-                        "{} pipeline {pipeline}: K15 (generator): naga validate: {error}",
-                        program.display()
+                        "{}",
+                        naga_validation_message(&program, pipeline, actual, &generated, &error)
                     )
                 });
         }
@@ -110,4 +167,24 @@ fn every_pipeline_matches_its_golden_and_validates() {
             );
         }
     }
+}
+
+#[test]
+fn naga_errors_inside_shells_start_with_the_shell_name() {
+    let program = root().join("crates/harness/tests/fixtures/wgsl/shell-naga-error.ts");
+    let generated = generated(&program);
+    let (pipeline, source) = generated.pipelines.first().expect("fixture pipeline");
+    let message = match naga::front::wgsl::parse_str(source) {
+        Err(error) => naga_parse_message(&program, pipeline, source, &generated, &error),
+        Ok(module) => {
+            let error = Validator::new(ValidationFlags::all(), Capabilities::empty())
+                .validate(&module)
+                .expect_err("shell fixture must fail naga validation");
+            naga_validation_message(&program, pipeline, source, &generated, &error)
+        }
+    };
+    assert!(
+        message.starts_with("shell badShell:"),
+        "unexpected shell attribution: {message}"
+    );
 }

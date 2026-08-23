@@ -33,6 +33,14 @@ fn is_library_file(file: &str) -> bool {
     matches!(file, "webgpu.ts" | "typegpu-types.ts" | "typegpu.ts")
 }
 
+fn is_indirect_schema(class: &ClassDef) -> bool {
+    class.pos.file == "typegpu-types.ts"
+        && matches!(
+            class.name.as_str(),
+            "DispatchIndirectArgs" | "DrawIndirectArgs" | "DrawIndexedIndirectArgs"
+        )
+}
+
 fn vector_shape(name: &str) -> Option<(Scalar, u8)> {
     Some(match name {
         "Vec2f" => (Scalar::F32, 2),
@@ -314,12 +322,9 @@ pub(crate) fn discover(
     let mut diagnostics = Vec::new();
     let mut reachable = BTreeSet::new();
     for name in intended {
-        let Some((index, class)) = module
-            .classes
-            .iter()
-            .enumerate()
-            .find(|(_, class)| class.name == *name && !is_library_file(&class.pos.file))
-        else {
+        let Some((index, class)) = module.classes.iter().enumerate().find(|(_, class)| {
+            class.name == *name && (!is_library_file(&class.pos.file) || is_indirect_schema(class))
+        }) else {
             diagnostics.push(diagnostic(
                 "SC1",
                 format!("`{name}` is not a schema"),

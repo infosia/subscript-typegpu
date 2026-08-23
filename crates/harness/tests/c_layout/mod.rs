@@ -175,7 +175,7 @@ fn c_type(module: &hir::Module, expected: &GeneratedLayout, source: &str) -> Str
     let index = module
         .classes
         .iter()
-        .position(|class| class.name == expected.name && class.pos.file != "typegpu-types.ts")
+        .position(|class| class.name == expected.name)
         .unwrap_or_else(|| panic!("emitted C cannot name schema `{}`", expected.name));
     let name = format!("Sub_{index}_{}", expected.name);
     assert!(

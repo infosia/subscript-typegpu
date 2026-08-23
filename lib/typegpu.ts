@@ -168,9 +168,13 @@ export class Buffer<T> {
     if (elementIndex > this.count || elementCount > this.count - elementIndex) {
       authorTrap("BF8", "Buffer.write", `elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`);
     }
+    const byteOffset: u64 = (elementIndex as u64) * (this.elementSize as u64);
+    if (byteOffset % 4 !== 0 || byteLength % 4 !== 0) {
+      authorTrap("BF2", "Buffer.write", `byteOffset=${byteOffset} byteLength=${byteLength}`);
+    }
     queue.writeBuffer(
       this.buffer,
-      (elementIndex as u64) * (this.elementSize as u64),
+      byteOffset,
       bytes,
     );
   }
@@ -186,9 +190,13 @@ export class Buffer<T> {
     if (elementIndex >= this.count) {
       authorTrap("BF8", "Buffer.writeOne", `elementIndex=${elementIndex} elementCount=1 count=${this.count}`);
     }
+    const byteOffset: u64 = (elementIndex as u64) * (this.elementSize as u64);
+    if (byteOffset % 4 !== 0 || byteLength % 4 !== 0) {
+      authorTrap("BF2", "Buffer.writeOne", `byteOffset=${byteOffset} byteLength=${byteLength}`);
+    }
     queue.writeBuffer(
       this.buffer,
-      (elementIndex as u64) * (this.elementSize as u64),
+      byteOffset,
       bytes,
     );
   }
@@ -204,9 +212,13 @@ export class Buffer<T> {
     if (fieldOffset > this.elementSize || byteLength > this.elementSize - fieldOffset) {
       authorTrap("EG2", "Buffer.patch", `fieldOffset=${fieldOffset} byteLength=${byteLength} elementSize=${this.elementSize}`);
     }
+    const byteOffset: u64 = (elementIndex as u64) * (this.elementSize as u64) + (fieldOffset as u64);
+    if (byteOffset % 4 !== 0 || byteLength % 4 !== 0) {
+      authorTrap("BF2", "Buffer.patch", `byteOffset=${byteOffset} byteLength=${byteLength}`);
+    }
     queue.writeBuffer(
       this.buffer,
-      (elementIndex as u64) * (this.elementSize as u64) + (fieldOffset as u64),
+      byteOffset,
       bytes,
     );
   }
@@ -223,12 +235,17 @@ export class Buffer<T> {
     if (elementCount > target.count) {
       authorTrap("BF8", "Buffer.copyTo", `targetCount=${target.count} elementCount=${elementCount} elementSize=${this.elementSize}`);
     }
+    const byteOffset: u64 = (elementIndex as u64) * (this.elementSize as u64);
+    const byteLength: u64 = (elementCount as u64) * (this.elementSize as u64);
+    if (byteOffset % 4 !== 0 || byteLength % 4 !== 0) {
+      authorTrap("BF8", "Buffer.copyTo", `byteOffset=${byteOffset} byteLength=${byteLength}`);
+    }
     encoder.copyBufferToBuffer(
       this.buffer,
-      (elementIndex as u64) * (this.elementSize as u64),
+      byteOffset,
       target.buffer,
       0,
-      (elementCount as u64) * (this.elementSize as u64),
+      byteLength,
     );
   }
 
@@ -238,6 +255,11 @@ export class Buffer<T> {
     }
     if (elementIndex > this.count || elementCount > this.count - elementIndex) {
       authorTrap("BF9", "Buffer.read", `elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`);
+    }
+    const byteOffset: u64 = (elementIndex as u64) * (this.elementSize as u64);
+    const byteLength: u64 = (elementCount as u64) * (this.elementSize as u64);
+    if (byteOffset % 4 !== 0 || byteLength % 4 !== 0) {
+      authorTrap("BF9", "Buffer.read", `byteOffset=${byteOffset} byteLength=${byteLength}`);
     }
     const staging: Buffer<T> = createBuffer<T>(
       device,
@@ -250,7 +272,6 @@ export class Buffer<T> {
     this.copyTo(encoder, staging, elementIndex, elementCount);
     using command = encoder.finishDefault();
     device.queue().submit([command]);
-    const byteLength: u64 = (elementCount as u64) * (this.elementSize as u64);
     if (!await staging.handle().mapAsync(GPUMapMode.READ, 0, byteLength)) {
       staging.dispose();
       authorTrap("BF9", "Buffer.read", `elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`);
@@ -264,6 +285,11 @@ export class Buffer<T> {
   async readOne(device: GPUDevice, elementIndex: u32): Promise<u8[]> {
     if (elementIndex >= this.count) {
       authorTrap("BF9", "Buffer.readOne", `elementIndex=${elementIndex} elementCount=1 count=${this.count}`);
+    }
+    const byteOffset: u64 = (elementIndex as u64) * (this.elementSize as u64);
+    const byteLength: u64 = this.elementSize as u64;
+    if (byteOffset % 4 !== 0 || byteLength % 4 !== 0) {
+      authorTrap("BF9", "Buffer.readOne", `byteOffset=${byteOffset} byteLength=${byteLength}`);
     }
     return await this.read(device, elementIndex, 1);
   }
@@ -608,17 +634,39 @@ export function simulateComputeThreads<L>(
   hostRunnable: boolean,
 ): void {
   requireHostRunnable("simulateComputeThreads", spec, hostRunnable);
-  simulateCompute<L>(
-    kernel,
-    res,
-    spec,
-    [
-      (x + spec.workgroupSize[0] - 1) / spec.workgroupSize[0],
-      (y + spec.workgroupSize[1] - 1) / spec.workgroupSize[1],
-      (z + spec.workgroupSize[2] - 1) / spec.workgroupSize[2],
-    ],
-    hostRunnable,
-  );
+  const workgroups: FixedArray<u32, 3> = [
+    (x + spec.workgroupSize[0] - 1) / spec.workgroupSize[0],
+    (y + spec.workgroupSize[1] - 1) / spec.workgroupSize[1],
+    (z + spec.workgroupSize[2] - 1) / spec.workgroupSize[2],
+  ];
+  for (let workgroupZ: u32 = 0; workgroupZ < workgroups[2]; workgroupZ += 1) {
+    for (let workgroupY: u32 = 0; workgroupY < workgroups[1]; workgroupY += 1) {
+      for (let workgroupX: u32 = 0; workgroupX < workgroups[0]; workgroupX += 1) {
+        for (let localZ: u32 = 0; localZ < spec.workgroupSize[2]; localZ += 1) {
+          for (let localY: u32 = 0; localY < spec.workgroupSize[1]; localY += 1) {
+            for (let localX: u32 = 0; localX < spec.workgroupSize[0]; localX += 1) {
+              const invocation: ComputeInvocation = hostInvocation(
+                spec,
+                workgroups,
+                workgroupX,
+                workgroupY,
+                workgroupZ,
+                localX,
+                localY,
+                localZ,
+              );
+              if (!spec.guarded
+                || (invocation.globalId.x < x
+                  && invocation.globalId.y < y
+                  && invocation.globalId.z < z)) {
+                kernel(res, invocation);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 export function simulateCompute2<L0, L1>(
@@ -744,6 +792,7 @@ export class RenderPipelineSpec {
   topology?: GPUPrimitiveTopology = "triangle-list";
   cullMode?: GPUCullMode = "none";
   frontFace?: GPUFrontFace = "ccw";
+  indexFormat?: GPUIndexFormat = "undefined";
 }
 
 @Descriptor
@@ -770,6 +819,7 @@ export function renderPipeline<V, O>(
     topology: spec.topology,
     cullMode: spec.cullMode,
     frontFace: spec.frontFace,
+    indexFormat: spec.indexFormat,
   };
 }
 
@@ -783,6 +833,7 @@ export function renderPipelineL<L, V, O>(
     topology: spec.topology,
     cullMode: spec.cullMode,
     frontFace: spec.frontFace,
+    indexFormat: spec.indexFormat,
   };
 }
 
@@ -796,6 +847,7 @@ export function renderPipelineInstanced<V, I, O>(
     topology: spec.topology,
     cullMode: spec.cullMode,
     frontFace: spec.frontFace,
+    indexFormat: spec.indexFormat,
   };
 }
 
@@ -836,18 +888,59 @@ export class BindGroupLayoutSpec {
 
 export class ComputePipeline {
   private pipeline: GPUComputePipeline;
+  private device: GPUDevice | null;
   private workgroup: FixedArray<u32, 3>;
+  private guarded: boolean;
+  private guardGroups: u32[];
+  private guardBuffers: GPUBuffer[];
 
-  constructor(pipeline: GPUComputePipeline, workgroup: FixedArray<u32, 3>) {
+  constructor(
+    pipeline: GPUComputePipeline,
+    workgroup: FixedArray<u32, 3>,
+    device: GPUDevice | null = null,
+    guarded: boolean = false,
+    guardGroups: u32[] = [],
+    guardBuffers: GPUBuffer[] = [],
+  ) {
     this.pipeline = pipeline;
+    this.device = device;
     this.workgroup = workgroup;
+    this.guarded = guarded;
+    this.guardGroups = guardGroups;
+    this.guardBuffers = guardBuffers;
   }
 
   bindGroupLayout(group: u32): GPUBindGroupLayout {
     return this.pipeline.getBindGroupLayout(group);
   }
 
-  dispatch(
+  guardBuffer(group: u32): GPUBuffer | null {
+    let index: i32 = 0;
+    while (index < this.guardGroups.length) {
+      if (this.guardGroups[index] === group) {
+        return this.guardBuffers[index];
+      }
+      index = index + 1;
+    }
+    return null;
+  }
+
+  private writeGuard(x: u32, y: u32, z: u32): void {
+    if (!this.guarded) return;
+    if (this.device === null) {
+      authorTrap("PI15", "ComputePipeline.guard", "device=missing");
+      return;
+    }
+    const bytes: u8[] = Context.bytesOf<FixedArray<u32, 4>>([x, y, z, 0]);
+    using queue = this.device.queue();
+    let index: i32 = 0;
+    while (index < this.guardBuffers.length) {
+      queue.writeBuffer(this.guardBuffers[index], 0, bytes);
+      index = index + 1;
+    }
+  }
+
+  private recordDispatch(
     encoder: GPUCommandEncoder,
     groups: GPUBindGroup[],
     x: u32,
@@ -865,6 +958,21 @@ export class ComputePipeline {
     pass.end();
   }
 
+  dispatch(
+    encoder: GPUCommandEncoder,
+    groups: GPUBindGroup[],
+    x: u32,
+    y: u32,
+    z: u32,
+  ): void {
+    this.writeGuard(
+      x * this.workgroup[0],
+      y * this.workgroup[1],
+      z * this.workgroup[2],
+    );
+    this.recordDispatch(encoder, groups, x, y, z);
+  }
+
   dispatchThreads(
     encoder: GPUCommandEncoder,
     groups: GPUBindGroup[],
@@ -872,13 +980,35 @@ export class ComputePipeline {
     y: u32,
     z: u32,
   ): void {
-    this.dispatch(
+    this.writeGuard(x, y, z);
+    this.recordDispatch(
       encoder,
       groups,
       (x + this.workgroup[0] - 1) / this.workgroup[0],
       (y + this.workgroup[1] - 1) / this.workgroup[1],
       (z + this.workgroup[2] - 1) / this.workgroup[2],
     );
+  }
+
+  dispatchIndirect(
+    encoder: GPUCommandEncoder,
+    groups: GPUBindGroup[],
+    buffer: GPUBuffer,
+    offset: u64,
+  ): void {
+    if (this.guarded) {
+      authorTrap("PI16", "ComputePipeline.dispatchIndirect", "guarded=true");
+      return;
+    }
+    using pass = encoder.beginComputePassDefault();
+    pass.setPipeline(this.pipeline);
+    let group: i32 = 0;
+    while (group < groups.length) {
+      pass.setBindGroup(group as u32, groups[group]);
+      group = group + 1;
+    }
+    pass.dispatchWorkgroupsIndirect(buffer, offset);
+    pass.end();
   }
 
   dispatchTimed(
@@ -907,6 +1037,11 @@ export class ComputePipeline {
   }
 
   dispose(): void {
+    let index: i32 = 0;
+    while (index < this.guardBuffers.length) {
+      this.guardBuffers[index].dispose();
+      index = index + 1;
+    }
     this.pipeline.dispose();
   }
 
@@ -969,9 +1104,11 @@ export function createTimestampPair(device: GPUDevice): TimestampPair | null {
 
 export class RenderPipeline {
   private pipeline: GPURenderPipeline;
+  private indexFormat: GPUIndexFormat;
 
-  constructor(pipeline: GPURenderPipeline) {
+  constructor(pipeline: GPURenderPipeline, indexFormat: GPUIndexFormat) {
     this.pipeline = pipeline;
+    this.indexFormat = indexFormat;
   }
 
   bindGroupLayout(group: u32): GPUBindGroupLayout {
@@ -996,6 +1133,14 @@ export class RenderPipeline {
     }
   }
 
+  setIndexBuffer(pass: GPURenderPassEncoder, buffer: GPUBuffer): void {
+    if (this.indexFormat === "undefined") {
+      authorTrap("RN18", "RenderPipeline.setIndexBuffer", "indexFormat=undefined");
+      return;
+    }
+    pass.setIndexBuffer(buffer, this.indexFormat, 0, buffer.size());
+  }
+
   dispose(): void {
     this.pipeline.dispose();
   }
@@ -1016,7 +1161,7 @@ function createNativeBindGroupLayouts(
     let binding: i32 = 0;
     while (binding < layouts[group].entries.length) {
       const source: BindGroupLayoutEntrySpec = layouts[group].entries[binding];
-      if (source.kind === "uniform") {
+      if (source.kind === "uniform" || source.kind === "guard") {
         entries.push({
           binding: source.binding,
           visibility: source.visibility,
@@ -1075,6 +1220,24 @@ export function createComputePipeline(
   layouts: BindGroupLayoutSpec[],
   workgroup: FixedArray<u32, 3>,
 ): ComputePipeline {
+  const guardGroups: u32[] = [];
+  const guardBuffers: GPUBuffer[] = [];
+  let guardGroup: i32 = 0;
+  while (guardGroup < layouts.length) {
+    let guardEntry: i32 = 0;
+    while (guardEntry < layouts[guardGroup].entries.length) {
+      if (layouts[guardGroup].entries[guardEntry].kind === "guard") {
+        guardGroups.push(guardGroup as u32);
+        guardBuffers.push(device.createBuffer({
+          label: "typegpu-dispatch-guard",
+          size: 16,
+          usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
+        }));
+      }
+      guardEntry = guardEntry + 1;
+    }
+    guardGroup = guardGroup + 1;
+  }
   const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayouts(device, layouts);
   using shader = device.createShaderModule({ code: wgsl });
   using layout = device.createPipelineLayout({ bindGroupLayouts: nativeLayouts });
@@ -1087,7 +1250,14 @@ export function createComputePipeline(
     nativeLayouts[group].dispose();
     group = group + 1;
   }
-  return new ComputePipeline(pipeline, workgroup);
+  return new ComputePipeline(
+    pipeline,
+    workgroup,
+    device,
+    guardBuffers.length > 0,
+    guardGroups,
+    guardBuffers,
+  );
 }
 
 /** Creates inside the caller's validation error scope; this helper does not await. */
@@ -1144,7 +1314,7 @@ export function createRenderPipeline(
     nativeLayouts[group].dispose();
     group = group + 1;
   }
-  return new RenderPipeline(pipeline);
+  return new RenderPipeline(pipeline, spec.indexFormat);
 }
 
 export const COMPUTE_VISIBILITY: u64 = GPUShaderStage.COMPUTE;
@@ -1156,15 +1326,33 @@ export function createBindGroup(
   layout: GPUBindGroupLayout,
   spec: BindGroupLayoutSpec,
   resources: BindingResource[],
+  guardBuffer: GPUBuffer | null = null,
 ): GPUBindGroup {
-  if (spec.entries.length !== resources.length) {
-    authorTrap("PI9", "createBindGroup", `expected ${spec.entries.length} resources but received ${resources.length}`);
+  let authorCount: i32 = 0;
+  let countIndex: i32 = 0;
+  while (countIndex < spec.entries.length) {
+    if (spec.entries[countIndex].kind !== "guard") authorCount = authorCount + 1;
+    countIndex = countIndex + 1;
+  }
+  if (authorCount !== resources.length) {
+    authorTrap("PI9", "createBindGroup", `expected ${authorCount} resources but received ${resources.length}`);
   }
   const entries: GPUBindGroupEntry[] = [];
   let index: i32 = 0;
-  while (index < resources.length) {
+  let resourceIndex: i32 = 0;
+  while (index < spec.entries.length) {
     const specEntry: BindGroupLayoutEntrySpec = spec.entries[index];
-    const resource: BindingResource = resources[index];
+    let resource: BindingResource = { buffer: null, textureView: null, sampler: null };
+    if (specEntry.kind === "guard") {
+      if (guardBuffer === null) {
+        authorTrap("PI15", "createBindGroup", `binding=${specEntry.binding} has no guard buffer`);
+      } else {
+        resource = bufferResource(guardBuffer);
+      }
+    } else {
+      resource = resources[resourceIndex];
+      resourceIndex = resourceIndex + 1;
+    }
     let actual: string = "none";
     let fieldCount: u32 = 0;
     if (resource.buffer !== null) {
@@ -1184,6 +1372,7 @@ export function createBindGroup(
     }
     let expected: string = "unknown";
     if (specEntry.kind === "uniform" || specEntry.kind === "read-only-storage"
+      || specEntry.kind === "guard"
       || specEntry.kind === "storage") expected = "buffer";
     if (specEntry.kind === "texture" || specEntry.kind === "storageTexture") expected = "texture";
     if (specEntry.kind === "sampler" || specEntry.kind === "comparisonSampler") expected = "sampler";

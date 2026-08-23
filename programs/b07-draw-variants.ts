@@ -24,6 +24,7 @@ import {
 import {
   Instance_STRIDE,
   quad_FRAGMENT_ENTRY,
+  quad_INDEX_FORMAT,
   quad_TARGET_FORMAT,
   quad_VERTEX_ENTRY,
   quad_VERTEX_LAYOUT0,
@@ -94,7 +95,7 @@ function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
 export const quad: RenderPipelineSpec = renderPipelineInstanced<Vertex, Instance, Varyings>(
   quadVert,
   frag,
-  { format: "rgba8unorm" },
+  { format: "rgba8unorm", indexFormat: "uint16" },
 );
 
 export const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(triVert, frag, {
@@ -206,7 +207,7 @@ export async function main(): Promise<void> {
       }],
     });
     quadPipeline.bind(pass, [], [vertices.handle(), instances.handle()]);
-    pass.setIndexBuffer(indexBuffer, "uint16", 0, 12);
+    quadPipeline.setIndexBuffer(pass, indexBuffer);
     pass.drawIndexed(6, 3);
     triPipeline.bind(pass, [], [vertices.handle()]);
     pass.draw(3);
@@ -225,6 +226,7 @@ export async function main(): Promise<void> {
     print(`color.shaderLocation=${quad_VERTEX_LAYOUT1.attributes[1].shaderLocation}`);
     print(`tri_VERTEX_LAYOUT0.arrayStride=${tri_VERTEX_LAYOUT0.arrayStride}`);
     print(`tri_TARGET_FORMAT=${tri_TARGET_FORMAT}`);
+    print(`quad_INDEX_FORMAT=${quad_INDEX_FORMAT}`);
     print(`quad_WGSL_LINES=${quad_WGSL.split("\n").length}`);
     print(`tri_WGSL_LINES=${tri_WGSL.split("\n").length}`);
     print("drawIndexed:submitted");

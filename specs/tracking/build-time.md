@@ -37,6 +37,7 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-23 | Re-pin subscript `ac9436f` (R36), load average 3.6 | — | — | — | 117 s | 6 |
 | 2026-08-23 | P8 slice 1 step 1 (`Buffer<T>.read`, b12), load average 6.2 during the run | 45 s | 0 s | 131 s | 132 s | 6 |
 | 2026-08-23 | P8 review fixes, load average 2.9 | 45 s | 0 s | 117 s | 114 s | 6 |
+| 2026-08-23 | P8 slice 2 (4 `b`, 4 `x` programs, 11 fixtures), load average 2.6 | 45 s | 0 s | 148 s | 142 s | 6 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate

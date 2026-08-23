@@ -16,7 +16,7 @@ fn every_library_method_has_the_sc6_body() {
             .iter()
             .filter(|class| class.pos.file == "typegpu-types.ts")
             .count(),
-        20
+        23
     );
     for class in module
         .classes

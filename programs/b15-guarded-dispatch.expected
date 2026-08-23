@@ -1,0 +1,5 @@
+guard.group=0
+guard.binding=1
+layout.entries=2
+host:out=100,105,999,999
+PASS

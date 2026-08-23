@@ -135,3 +135,22 @@ gives `0,0,2,0,1,0`, the readback gives zeros. Cause: a 6-byte
 drops it, and no error scope surrounds a write. Resolution: BF2 Rev
 1 (the write and copy paths trap on a byte offset or length that is
 not a multiple of 4), x18 writes four indices.
+
+## Slice 2 landed (2026-08-23)
+
+K29–K31 shells (`wgslShell`, `wgslDeclarations`, the fence, the
+line-span attribution), PI15 guarded dispatch (`guard` layout entry,
+runtime-owned buffer, three-axis guard, host fence in
+`simulateComputeThreads`), PI16/PI17 indirect (`dispatchIndirect`,
+three `@CStruct` argument schemas, C layout probe covers them), RN18
+index format (`_INDEX_FORMAT`, `RenderPipeline.setIndexBuffer`,
+`b07` on the spec form), RN19 cull (signed-area host rasterizer,
+index buffer read back first). Programs `b14`–`b17`, `x15`–`x18`.
+Scratch reds: K29 ×2, K30 ×4, K31 attribution (`shell badShell:
+... naga parse: no definition in scope for identifier`), PI15, PI16,
+RN18 ×2, BF2 Rev 1 ×2.
+
+Evidence: `tools/gate.sh --require-backend` green, 238 passed, 142 s
+at load average 2.6 (slice 1 close: 114 s, 235 tests; the increment
+is four `b` programs on both tiers). `tools/live.sh` x01–x18 PASS:
+Metal (yawgpu) 47.12 s, Dawn 43.65 s.

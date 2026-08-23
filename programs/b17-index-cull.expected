@@ -1,0 +1,5 @@
+culled_INDEX_FORMAT=uint16
+culled.cullMode=back
+culled.frontFace=ccw
+render:submitted
+PASS

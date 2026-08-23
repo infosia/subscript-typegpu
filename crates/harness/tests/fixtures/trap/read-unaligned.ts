@@ -1,12 +1,19 @@
-// program: map-failure
-// purpose: prove that Buffer.read traps when the backend refuses an aligned staging map
+// program: read-unaligned
+// purpose: prove that Buffer.read rejects a two-byte WebGPU copy
 // exercises: BF9
 // questions: none
-// precondition: the backend refuses the aligned four-byte map
 // expected-rule: BF9
 
-import { Buffer, createBuffer } from "./typegpu";
-import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
+import {
+  Buffer,
+  createBuffer,
+} from "./typegpu";
+import {
+  gpu,
+  GPUAdapter,
+  GPUBufferUsage,
+  GPUDevice,
+} from "./webgpu";
 
 export async function main(): Promise<void> {
   const adapter: GPUAdapter | null = await gpu.requestAdapter();
@@ -19,12 +26,12 @@ export async function main(): Promise<void> {
     print("FAIL device");
     return;
   }
-  using buffer: Buffer<u32> = createBuffer<u32>(
+  using buffer: Buffer<u16> = createBuffer<u16>(
     device,
-    4,
+    2,
     1,
     GPUBufferUsage.COPY_SRC,
-    "trap-map-failure",
+    "trap-read-unaligned",
   );
   await buffer.read(device, 0, 1);
 }

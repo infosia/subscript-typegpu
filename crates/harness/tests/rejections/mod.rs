@@ -62,8 +62,13 @@ fn every_fixture_is_red_with_rule_and_owner() {
         let expected_message = source
             .lines()
             .find_map(|line| line.strip_prefix("// expected-message: "));
-        let diagnostics = subscript_typegpu_gen::generate(&inputs)
-            .expect_err("rejection fixture unexpectedly generated");
+        let diagnostics = match subscript_typegpu_gen::generate(&inputs) {
+            Ok(generated) => panic!(
+                "{} unexpectedly generated: {generated:?}",
+                fixture.display()
+            ),
+            Err(diagnostics) => diagnostics,
+        };
         assert_eq!(
             diagnostics.len(),
             1,

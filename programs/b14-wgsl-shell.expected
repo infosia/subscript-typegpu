@@ -1,0 +1,3 @@
+shellPipeline_WGSL_LINES=15
+host:out=12
+PASS

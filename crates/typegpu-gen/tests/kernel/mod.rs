@@ -747,6 +747,7 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from
   right: FixedArray<f32, 2>;
   constructor(left: FixedArray<f32, 2>, right: FixedArray<f32, 2>) { this.left = left; this.right = right; }
 }
+
 class Layout { packs!: Storage<Pack>; }
 function control(res: Layout, ctx: ComputeInvocation): void {
   let i: u32 = 0;
@@ -791,4 +792,68 @@ export const controlPipeline: ComputePipelineSpec = computePipeline<Layout>(cont
         for_of_prelude < for_of,
         "for-of prelude was not flushed:\n{wgsl}"
     );
+}
+
+#[test]
+fn wgsl_shell_uses_the_typed_signature_and_literal_body() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, WgslShellSpec, computePipeline, wgslDeclarations, wgslShell } from "./typegpu";
+class Layout { output!: MutStorage<u32>; }
+wgslDeclarations("const SHELL_BIAS: u32 = 7u;");
+function addBias(input: u32): u32 { print(`host=${input}`); return input + 100; }
+export const shell: WgslShellSpec = wgslShell<(input: u32) => u32>(addBias, { body: "return input + SHELL_BIAS;" });
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = addBias(5); }
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(
+        wgsl.starts_with("const SHELL_BIAS: u32 = 7u;\n\n"),
+        "{wgsl}"
+    );
+    assert!(
+        wgsl.contains("fn addBias(input: u32) -> u32 {\n  return input + SHELL_BIAS;\n}"),
+        "{wgsl}"
+    );
+    assert!(!wgsl.contains("input + 100"), "{wgsl}");
+    assert!(!wgsl.contains("host="), "{wgsl}");
+    assert!(wgsl.find("fn addBias").unwrap() < wgsl.find("@group").unwrap());
+    let span = generated
+        .wgsl_spans
+        .iter()
+        .find(|span| span.label == "shell addBias")
+        .expect("shell span");
+    assert_eq!(span.start_line, span.end_line);
+    validate(wgsl);
+}
+
+#[test]
+fn guarded_pipeline_emits_the_hidden_last_binding_and_three_axis_fence() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { output!: MutStorage<u32>; }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[ctx.globalId.x] = 9; }
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 2, 1], guarded: true });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(
+        wgsl.contains("@group(0) @binding(1) var<uniform> pipeline_guard: vec3<u32>;"),
+        "{wgsl}"
+    );
+    assert!(
+        wgsl.contains("if (globalId.x < pipeline_guard.x && globalId.y < pipeline_guard.y && globalId.z < pipeline_guard.z)"),
+        "{wgsl}"
+    );
+    assert!(
+        generated.support_module.contains(
+            "binding: 1, visibility: COMPUTE_VISIBILITY, kind: \"guard\", minBindingSize: 16"
+        ),
+        "{}",
+        generated.support_module
+    );
+    assert!(!generated.support_module.contains("pipeline_guard!:"));
+    validate(wgsl);
 }
