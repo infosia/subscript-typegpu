@@ -120,13 +120,19 @@ does not say otherwise. Schemas are `schema.md`.
   layout constants by name, and the WGSL line count. Noop draws
   nothing, so no pixel is read.
 - **RN14 — Live programs compare pixels with a host rasterizer.**
-  `x05-live-triangle` draws one flat-colored triangle into a 64×64
-  `rgba8unorm` target whose vertices put no pixel center on an edge,
-  copies the texture to a buffer (`bytesPerRow` 256), maps, reads,
-  and compares every pixel with the host's own point-in-triangle
-  test at pixel centers: inside → the color, outside → the clear
-  color. It prints `PASS` or `FAIL x=<n> y=<n> expected=<rgba>
-  got=<rgba>`. No reference hash exists.
+  Rev 1, 2026-08-24. `x05-live-triangle` draws one flat-colored
+  triangle into a 64×64 `rgba8unorm` target whose vertices put no
+  pixel center on an edge, copies the texture to a buffer
+  (`bytesPerRow` 256), maps, reads, and compares every pixel with
+  the host's own point-in-triangle test at pixel centers: inside →
+  the color, outside → the clear color. It prints `PASS` or `FAIL
+  x=<n> y=<n> expected=<rgba> got=<rgba>`. No reference hash exists.
+  A fragment color constant in a pixel-oracle program must not
+  produce an exact `.5` product with 255. The float-to-unorm
+  rounding of a tie is implementation-defined: for `0.5`, NVIDIA
+  (Vulkan and D3D12) returns 127 and Apple (Metal) returns 128
+  (measured 2026-08-24, `x17-live-indirect` pixel 1,2). `0.6` maps
+  to 153 on both.
 - **RN15 — Draw variants.** `b07-draw-variants` and
   `x06-live-draw-variants` cover `drawIndexed` with an index buffer
   and an instanced draw through `renderPipelineInstanced`, with the
