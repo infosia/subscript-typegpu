@@ -39,6 +39,20 @@ collide.
   null instance. A null instance from the library after a request
   prints one line that names the request and the library path. The
   gate never sets the variable. The live lane sets it.
+- **L14 — The surface family is host-only and resolved on demand.**
+  Rev 0, 2026-08-23. The ten webgpu.h surface functions
+  (`wgpuInstanceCreateSurface`, `wgpuSurfaceConfigure`,
+  `wgpuSurfaceUnconfigure`, `wgpuSurfaceGetCapabilities`,
+  `wgpuSurfaceCapabilitiesFreeMembers`, `wgpuSurfaceGetCurrentTexture`,
+  `wgpuSurfacePresent`, `wgpuSurfaceAddRef`, `wgpuSurfaceRelease`,
+  `wgpuSurfaceSetLabel`) and their structs are generated from the
+  pinned header into the facade crate as a Rust-only module
+  `surface` (F23). The loader does not resolve them at instance
+  creation. `surface::table()` resolves the ten symbols from the
+  loaded library on first use and returns an error that names the
+  missing symbol when the backend lacks one. No surface construct
+  enters `subscript-typegpu.h`, the mirror, or the symbol table.
+  The window host (W-rules) is the only consumer.
 - **L5 — The ship tier links the same crate.** The facade builds as
   `lib` and `staticlib`. The staticlib carries `libloading` and the
   platform's dynamic loader library. No other link input exists.

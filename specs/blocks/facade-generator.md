@@ -100,6 +100,15 @@ letter with this block, so the pipelines area uses `PL`.
   facade's export count at P6: 157, from 163 (six descriptor-less or
   unused variants).
 
+- **F23 — Host-only rows.** Rev 0, 2026-08-23. A `[[host_only]]`
+  policy row names a webgpu.h function or struct. The generator
+  emits its Rust FFI declaration and a table slot into
+  `crates/facade/src/surface.rs` (a generated file with its own
+  regeneration gate) and emits nothing for it into the C header, the
+  mirror, `lib/webgpu.ts`, or the harness symbol table. A
+  `[[host_only]]` row and an `[[exclude]]` row for the same
+  construct is a policy error. The surface family (L14) is the only
+  use.
 ## 7a. The mirror's banner
 
 - **F21 — The mirror is bindgen's output, byte for byte.** The

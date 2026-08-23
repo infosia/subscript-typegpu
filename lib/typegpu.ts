@@ -485,37 +485,49 @@ export function workgroupBarrier(): void {}
 export function storageBarrier(): void {}
 
 @Descriptor
+export class WgslShellSpec {
+  body!: string;
+}
+
+export function wgslShell<F>(fn: F, spec: WgslShellSpec): WgslShellSpec {
+  return spec;
+}
+
+export function wgslDeclarations(text: string): void {}
+
+@Descriptor
 export class ComputePipelineSpec {
   workgroupSize!: FixedArray<u32, 3>;
   name?: string = "";
+  guarded?: boolean = false;
 }
 
 export function computePipeline<L>(
   kernel: (res: L, ctx: ComputeInvocation) => void,
   spec: ComputePipelineSpec,
 ): ComputePipelineSpec {
-  return { workgroupSize: spec.workgroupSize, name: spec.name };
+  return { workgroupSize: spec.workgroupSize, name: spec.name, guarded: spec.guarded };
 }
 
 export function computePipeline2<L0, L1>(
   kernel: (res0: L0, res1: L1, ctx: ComputeInvocation) => void,
   spec: ComputePipelineSpec,
 ): ComputePipelineSpec {
-  return { workgroupSize: spec.workgroupSize, name: spec.name };
+  return { workgroupSize: spec.workgroupSize, name: spec.name, guarded: spec.guarded };
 }
 
 export function computePipeline3<L0, L1, L2>(
   kernel: (res0: L0, res1: L1, res2: L2, ctx: ComputeInvocation) => void,
   spec: ComputePipelineSpec,
 ): ComputePipelineSpec {
-  return { workgroupSize: spec.workgroupSize, name: spec.name };
+  return { workgroupSize: spec.workgroupSize, name: spec.name, guarded: spec.guarded };
 }
 
 export function computePipeline4<L0, L1, L2, L3>(
   kernel: (res0: L0, res1: L1, res2: L2, res3: L3, ctx: ComputeInvocation) => void,
   spec: ComputePipelineSpec,
 ): ComputePipelineSpec {
-  return { workgroupSize: spec.workgroupSize, name: spec.name };
+  return { workgroupSize: spec.workgroupSize, name: spec.name, guarded: spec.guarded };
 }
 
 function requireHostRunnable(

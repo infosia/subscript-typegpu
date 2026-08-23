@@ -7,6 +7,7 @@ mod mapping;
 mod pipeline;
 mod render;
 mod schema;
+mod shell;
 
 use std::collections::BTreeSet;
 

@@ -280,8 +280,12 @@ fn wrapper_item_type(module: &Module, ty: &Type, field_name: &str) -> Option<Typ
     }
 }
 
-fn kernel_globals(module: &Module, kernel: &Function) -> Result<Vec<KernelGlobal>, Diagnostic> {
-    let helpers = dependencies(module, kernel)?;
+fn kernel_globals(
+    module: &Module,
+    kernel: &Function,
+    shells: &crate::shell::ShellProgram,
+) -> Result<Vec<KernelGlobal>, Diagnostic> {
+    let helpers = dependencies(module, kernel, shells)?;
     let mut reached = BTreeSet::new();
     for statement in &kernel.body {
         global_names_stmt(statement, &mut reached);
@@ -393,10 +397,11 @@ fn kernel_globals(module: &Module, kernel: &Function) -> Result<Vec<KernelGlobal
 fn render_kernel_globals(
     module: &Module,
     kernels: [&Function; 2],
+    shells: &crate::shell::ShellProgram,
 ) -> Result<Vec<KernelGlobal>, Diagnostic> {
     let mut reached = BTreeMap::new();
     for kernel in kernels {
-        for global in kernel_globals(module, kernel)? {
+        for global in kernel_globals(module, kernel, shells)? {
             reached.insert(global.name.clone(), global);
         }
     }
@@ -510,8 +515,12 @@ fn statements_block_host(module: &Module, statements: &[Stmt]) -> bool {
     })
 }
 
-pub(crate) fn host_runnable(module: &Module, kernel: &Function) -> Result<bool, Diagnostic> {
-    let globals = kernel_globals(module, kernel)?;
+pub(crate) fn host_runnable(
+    module: &Module,
+    kernel: &Function,
+    shells: &crate::shell::ShellProgram,
+) -> Result<bool, Diagnostic> {
+    let globals = kernel_globals(module, kernel, shells)?;
     if globals.iter().any(|global| {
         matches!(
             global.kind,
@@ -523,7 +532,10 @@ pub(crate) fn host_runnable(module: &Module, kernel: &Function) -> Result<bool, 
     if statements_block_host(module, &kernel.body) {
         return Ok(false);
     }
-    for helper in dependencies(module, kernel)? {
+    for helper in dependencies(module, kernel, shells)? {
+        if crate::shell::function_is_shell(shells, &helper) {
+            continue;
+        }
         if function(module, &helper)
             .is_some_and(|function| statements_block_host(module, &function.body))
         {
@@ -533,7 +545,7 @@ pub(crate) fn host_runnable(module: &Module, kernel: &Function) -> Result<bool, 
     Ok(true)
 }
 
-fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String, Diagnostic> {
+pub(crate) fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String, Diagnostic> {
     Ok(match ty {
         Type::F32 => "f32".to_owned(),
         Type::I32 => "i32".to_owned(),
@@ -3497,6 +3509,7 @@ fn collect_schema_stmt(
 pub(crate) fn referenced_schema_names(
     module: &Module,
     pipeline: &Pipeline,
+    shells: &crate::shell::ShellProgram,
 ) -> Result<Vec<String>, Diagnostic> {
     let kernel = function(module, &pipeline.entry).ok_or_else(|| {
         generator_diagnostic(
@@ -3511,10 +3524,10 @@ pub(crate) fn referenced_schema_names(
             collect_schema_type(module, &binding.item_ty, &mut seen, &mut out);
         }
     }
-    for global in kernel_globals(module, kernel)? {
+    for global in kernel_globals(module, kernel, shells)? {
         collect_schema_type(module, &global.ty, &mut seen, &mut out);
     }
-    for name in dependencies(module, kernel)? {
+    for name in dependencies(module, kernel, shells)? {
         let helper = function(module, &name).ok_or_else(|| {
             generator_diagnostic("a helper disappeared from typed HIR", pipeline.pos.clone())
         })?;
@@ -3522,8 +3535,10 @@ pub(crate) fn referenced_schema_names(
             collect_schema_type(module, &param.ty, &mut seen, &mut out);
         }
         collect_schema_type(module, &helper.ret, &mut seen, &mut out);
-        for stmt in &helper.body {
-            collect_schema_stmt(module, stmt, &mut seen, &mut out);
+        if !crate::shell::function_is_shell(shells, &name) {
+            for stmt in &helper.body {
+                collect_schema_stmt(module, stmt, &mut seen, &mut out);
+            }
         }
     }
     for stmt in &kernel.body {
@@ -3532,16 +3547,26 @@ pub(crate) fn referenced_schema_names(
     Ok(out)
 }
 
-fn dependencies(module: &Module, kernel: &Function) -> Result<Vec<String>, Diagnostic> {
+fn dependencies(
+    module: &Module,
+    kernel: &Function,
+    shells: &crate::shell::ShellProgram,
+) -> Result<Vec<String>, Diagnostic> {
     fn visit(
         module: &Module,
         name: &str,
+        shells: &crate::shell::ShellProgram,
         stack: &mut Vec<String>,
         done: &mut BTreeSet<String>,
         order: &mut Vec<String>,
         pos: &Pos,
     ) -> Result<(), Diagnostic> {
         if done.contains(name) {
+            return Ok(());
+        }
+        if crate::shell::function_is_shell(shells, name) {
+            done.insert(name.to_owned());
+            order.push(name.to_owned());
             return Ok(());
         }
         if let Some(start) = stack.iter().position(|item| item == name) {
@@ -3568,7 +3593,7 @@ fn dependencies(module: &Module, kernel: &Function) -> Result<Vec<String>, Diagn
             called_functions_stmt(stmt, &mut calls);
         }
         for called in calls {
-            visit(module, &called, stack, done, order, &function.pos)?;
+            visit(module, &called, shells, stack, done, order, &function.pos)?;
         }
         stack.pop();
         done.insert(name.to_owned());
@@ -3585,6 +3610,7 @@ fn dependencies(module: &Module, kernel: &Function) -> Result<Vec<String>, Diagn
         visit(
             module,
             &called,
+            shells,
             &mut Vec::new(),
             &mut done,
             &mut order,
