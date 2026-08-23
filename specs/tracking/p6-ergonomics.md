@@ -35,7 +35,9 @@ coverage test runs every program's dev tier a second time.
 
 Live runs by the planner outside the sandbox at `e07b434`: Metal
 (yawgpu) ok, 26.28 seconds, `x01`–`x12` `PASS`. **Dawn** (EG5,
-`libwebgpu_dawn.dylib`, `SUBSCRIPT_TYPEGPU_BACKEND=default`): ok,
+`libwebgpu_dawn.dylib` from <https://github.com/infosia/dawn> at
+`d25c666dec`, a release build of 2026-06-30, the same revision
+yawgpu pins for Tint; `SUBSCRIPT_TYPEGPU_BACKEND=default`): ok,
 25.23 seconds, `x01`–`x12` `PASS`. Dawn accepted every module and
 every bind group, the uniform bindings with `minBindingSize` 8
 included. The P2 review's M6 claim (a uniform struct needs a
