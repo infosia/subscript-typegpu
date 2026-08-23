@@ -3,7 +3,7 @@
 P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
 2026-08-22. Rev 2 (K18–K24), 2026-08-23. Rev 3 (K18, K19, K22),
 2026-08-23. Rev 4 (K14 shadowing), 2026-08-23. Rev 5 (K10, K25–K28),
-2026-08-23. Plan §3 D2, D3, D7, D9 and §4
+2026-08-23. Rev 6 (K25 Rev 1 argument order, K27 count), 2026-08-23. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -79,10 +79,10 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `a * b`, `mulVec` → `m * v`, `transpose` → `transpose(m)`. Integer
   vectors map the same operators. K25, K26, and K27 add rows. The
   table is the one place a method gets GPU meaning. A method outside
-  the table is a diagnostic. A harness test reads the method set of
-  every vector and matrix class in `lib/typegpu-types.ts` from the
-  HIR and asserts that the table has a row for each method and no
-  row for a method that does not exist.
+  the table is a diagnostic. A generator test reads the method set
+  of every vector, matrix, and atomic class in `lib/typegpu-types.ts`
+  from the HIR and asserts that the table has a row for each method
+  and no row for a method that does not exist.
 
 - **K11 — Scalar builtins.** `Math.abs`, `min`, `max`, `floor`,
   `ceil`, `sqrt`, `pow`, `exp`, `log`, `sin`, `cos`, `tan`, `fround`
@@ -230,8 +230,8 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 
 ## Vector builtins (P8)
 
-- **K25 — Componentwise builtins.** `Vec2f`, `Vec3f`, and `Vec4f`
-  gain the methods `abs()`, `floor()`, `ceil()`, `fract()`,
+- **K25 — Componentwise builtins.** Rev 1. `Vec2f`, `Vec3f`, and
+  `Vec4f` gain the methods `abs()`, `floor()`, `ceil()`, `fract()`,
   `sqrt()`, `exp()`, `log()`, `sin()`, `cos()`, `tan()`, `sign()`,
   `min(other)`, `max(other)`, `clamp(low, high)`, `pow(other)`,
   `mix(other, amount: f32)`, `step(edge)`, `smoothstep(low, high)`,
@@ -239,11 +239,23 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   f32)`, and `faceForward(incident, reference)`. `Vec*i` gain
   `abs()`, `min(other)`, `max(other)`, and `clamp(low, high)`.
   `Vec*u` gain `min(other)`, `max(other)`, and `clamp(low, high)`.
-  Each maps to the WGSL builtin of the same name with the receiver
-  as the first argument. Each has a real host body over the scalar
+  Each maps to the WGSL builtin of the same name. The receiver is
+  the builtin's value argument, so the argument order follows the
+  WGSL signature: `v.step(edge)` → `step(edge, v)`,
+  `v.smoothstep(low, high)` → `smoothstep(low, high, v)`,
+  `v.mix(other, a)` → `mix(v, other, a)`, `v.clamp(low, high)` →
+  `clamp(v, low, high)`, `v.refract(n, eta)` → `refract(v, n, eta)`,
+  `v.faceForward(i, r)` → `faceForward(v, i, r)`, and the rest with
+  the receiver first. Each has a real host body over the scalar
   operation, so the CPU lane runs it. The host bodies use `Math`
   members from K11 and the scalar free functions, never a second
-  formula.
+  formula. `Vec*i.abs()` of `i32` minimum is outside the domain: the
+  host returns a value the `i32` cannot hold, WGSL returns the
+  minimum. A gate program prints `step`, `smoothstep`, `mix`,
+  `clamp`, `refract`, `faceForward`, and `select` on inputs whose
+  result differs for every argument order, and the phase tracking
+  records one hand check of those golden values against the WGSL
+  specification.
 - **K26 — Comparisons, bool vectors, `select`.** `lib/typegpu-types.ts`
   adds `Vec2b`, `Vec3b`, and `Vec4b` with `boolean` fields `x`, `y`,
   `z`, `w`, the methods `any(): boolean`, `all(): boolean`, and
@@ -266,9 +278,10 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   generator runs. `lib/typegpu-types.ts` adds the factories
   `v3fFrom2(v: Vec2f, z: f32)`, `v4fFrom2(v: Vec2f, z: f32, w:
   f32)`, `v4fFrom3(v: Vec3f, w: f32)`, `v2fSplat(s: f32)`,
-  `v3fSplat(s)`, `v4fSplat(s)`, and the same seven shapes for the
+  `v3fSplat(s)`, `v4fSplat(s)`, and the same six shapes for the
   `i` and `u` families. They emit `vec3<f32>(v, z)`, `vec4<f32>(v,
-  z, w)`, `vec4<f32>(v, w)`, and `vec3<f32>(s)`. The factories join
+  z, w)`, `vec4<f32>(v, w)`, `vec2<f32>(s)`, `vec3<f32>(s)`, and
+  `vec4<f32>(s)`, with `i32` and `u32` for the other families. The factories join
   the K9 `v3f` family. A swizzle is never an assignment target:
   `v.xy() = ...` is not subscript.
 - **K28 — The P8 rejections.** A `Vec*b` field in a schema (SC5), a

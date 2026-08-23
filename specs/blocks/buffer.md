@@ -50,7 +50,10 @@ this block. The byte path is subscript R34 at `bb9dadc`
   bytes with `MAP_READ + COPY_DST`, records `copyTo` into a fresh
   command encoder, submits on `device.queue()`, awaits
   `mapAsync(READ)`, copies the bytes out with `readBuffer`, unmaps,
-  disposes the staging buffer, and returns the bytes. When
+  disposes the staging buffer, and returns the bytes. Before it
+  creates the staging buffer, it checks `elementIndex + elementCount
+  <= count` and traps with `BF9`, `Buffer.read`, and the three
+  numbers. When
   `mapAsync` returns `false`, the method disposes the staging buffer
   and traps with `BF9`, the method, and the three numbers, because a
   failed map is a device-level failure and a nullable array is not
@@ -61,7 +64,8 @@ this block. The byte path is subscript R34 at `bb9dadc`
 - **BF10 — The usage is known.** `createBuffer<T>` stores the usage
   it receives. `read` traps with `BF10`, the method, and the usage
   value when `COPY_SRC` is absent, before it creates the staging
-  buffer. `write` traps the same way when `COPY_DST` is absent.
+  buffer. `write`, `writeOne`, and `patch` trap the same way when
+  `COPY_DST` is absent.
 - **BF11 — `read` is a gate program and the live path.** `b12-readback`
   writes a `FixedArray<Particle, 4>`, reads it back through `read`
   on Noop, decodes with `fromBytes`, and prints `roundtrip:match`

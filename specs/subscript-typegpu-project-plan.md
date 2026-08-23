@@ -483,8 +483,9 @@ Contracts: `buffer.md` Rev 1 (BF9–BF11) and `kernel.md` Rev 5
    BF10). `b12-readback` is the gate program.
 2. Componentwise vector builtins, comparisons with `Vec*b`, and
    `select` (K25, K26). `b13-vector-builtins` runs every new method
-   once on the host through `simulateCompute` and prints one `host:`
-   line per method family by value.
+   once on the host through `simulateCompute`, on a two-, a three-,
+   and a four-wide receiver, and prints one `host:` line (CL4) with
+   the method families joined.
 3. In-order swizzles and the `From`/`Splat` factories (K27).
    `b13` covers them.
 
@@ -500,7 +501,7 @@ transcendental methods (`sqrt`, `exp`, `log`, `sin`, `cos`, `tan`,
 through `read` (BF11).
 
 Exit: (1) `b12` and `b13` goldens are byte-identical on both tiers,
-and their `.wgsl` goldens validate. (2) `x14` prints `PASS` on Metal
+and `b13`'s `.wgsl` golden validates. (2) `x14` prints `PASS` on Metal
 and on Dawn. (3) The K10 Rev 1 table test exists and a scratch
 mismatch is recorded red. (4) K28 and BF10 fixtures are red. (5)
 `docs/from-typegpu.md` "Vector math", "Buffers", and the two "Not

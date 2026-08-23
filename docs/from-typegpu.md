@@ -699,8 +699,10 @@ These TypeGPU features have no equivalent.
   `tgpu.resolve`, `tgpu.const`, slots, derived values, accessors.
 - `root.createGuardedComputePipeline` and default workgroup sizes.
 - `buffer.clear`, `buffer.copyFrom`, `common.writeSoA`.
-- Operators on vectors, `std` as a namespace, `tsover`, swizzles as
-  properties, and the derivative builtins `dpdx`, `dpdy`, `fwidth`.
+- Operators on vectors, `std` as a namespace, `tsover`, and swizzles
+  as properties.
+- The derivative builtins `dpdx`, `dpdy`, `fwidth` and the pack and
+  unpack builtins are not in the library yet.
 - Integer and depth textures, texture dimensions other than 2D, sampler
   filters other than `nearest` on the host.
 - Render pipelines with multiple color targets, depth-stencil, or

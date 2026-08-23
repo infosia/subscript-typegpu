@@ -2,7 +2,7 @@
 # One id per line. Maintained by hand with the blocks.
 # Any `Q<n>` or `R<n>` is subscript's (a language question or a change request) and is allowed without a line here.
 # A diagnostic cites exactly one id, the rule it enforces. Composite forms such as `K17/K5` are not ids.
-# Meta-rules (a list of rejections) are never cited by a diagnostic: K17, K24, PI13, RN16, SC14, TX8.
+# Meta-rules (a list of rejections) are never cited by a diagnostic: K17, K24, PI13, RN16, SC14, TX8, K28.
 A3
 A5
 B1
@@ -104,6 +104,7 @@ K22
 K23
 K24
 K25
+K25 Rev 1
 K26
 K27
 K28
@@ -149,6 +150,7 @@ PI11
 PI12
 PI13
 PI14
+PI14 Rev 1
 PI2
 PI3
 PI4
