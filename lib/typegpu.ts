@@ -15,6 +15,7 @@ import {
   GPURenderPassEncoder,
   GPURenderPipeline,
   GPUSampler,
+  GPUSamplerDescriptor,
   GPUShaderStage,
   GPUBufferUsage,
   GPUTextureView,
@@ -55,7 +56,10 @@ export class Texture2d<T> {
   }
 
   sampleLevel(sampler: Sampler, uv: Vec2f, level: f32): Vec4f {
-    if (this.width === 0 || this.height === 0 || level !== 0.0 || !sampler.isNearest()) {
+    if (!sampler.isNearest()) {
+      authorTrap("TX3", "sampleLevel", "filterMode is not nearest");
+    }
+    if (this.width === 0 || this.height === 0 || level !== 0.0) {
       return new Vec4f(0.0, 0.0, 0.0, 0.0);
     }
     let x: i32 = Math.floor((uv.x * (this.width as f32)) as f64) as i32;
@@ -68,6 +72,9 @@ export class Texture2d<T> {
   }
 
   sample(sampler: Sampler, uv: Vec2f): Vec4f {
+    if (!sampler.isNearest()) {
+      authorTrap("TX3", "sample", "filterMode is not nearest");
+    }
     return this.sampleLevel(sampler, uv, 0.0);
   }
 
@@ -86,6 +93,13 @@ export class Sampler {
   isNearest(): boolean {
     return this.filterMode === "nearest";
   }
+}
+
+export function samplerFromDescriptor(descriptor: GPUSamplerDescriptor): Sampler {
+  if (descriptor.minFilter === "nearest" && descriptor.magFilter === "nearest") {
+    return new Sampler("nearest");
+  }
+  return new Sampler("non-nearest");
 }
 
 export class Rgba8unorm {}
@@ -515,6 +529,29 @@ export function simulateCompute<L>(
       }
     }
   }
+}
+
+export function simulateComputeThreads<L>(
+  kernel: (res: L, ctx: ComputeInvocation) => void,
+  res: L,
+  spec: ComputePipelineSpec,
+  x: u32,
+  y: u32,
+  z: u32,
+  hostRunnable: boolean,
+): void {
+  requireHostRunnable("simulateComputeThreads", spec, hostRunnable);
+  simulateCompute<L>(
+    kernel,
+    res,
+    spec,
+    [
+      (x + spec.workgroupSize[0] - 1) / spec.workgroupSize[0],
+      (y + spec.workgroupSize[1] - 1) / spec.workgroupSize[1],
+      (z + spec.workgroupSize[2] - 1) / spec.workgroupSize[2],
+    ],
+    hostRunnable,
+  );
 }
 
 export function simulateCompute2<L0, L1>(

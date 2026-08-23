@@ -15,6 +15,7 @@ import {
   createRenderPipeline,
   renderPipelineL,
   samplerResource,
+  samplerFromDescriptor,
   textureResource,
 } from "./typegpu";
 import { Vec2f, Vec4f } from "./typegpu-types";
@@ -24,6 +25,7 @@ import {
   GPUBufferUsage,
   GPUDevice,
   GPUMapMode,
+  GPUSamplerDescriptor,
   GPUTextureUsage,
 } from "./webgpu";
 import {
@@ -150,7 +152,11 @@ export async function main(): Promise<void> {
     });
     using sourceView = source.createView();
     using targetView = target.createView();
-    using nearest = device.createSampler({ minFilter: "nearest", magFilter: "nearest" });
+    const nearestDescriptor: GPUSamplerDescriptor = {
+      minFilter: "nearest",
+      magFilter: "nearest",
+    };
+    using nearest = device.createSampler(nearestDescriptor);
     using readback = device.createBuffer({
       label: "x11-readback", size: 1024,
       usage: GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
@@ -195,7 +201,7 @@ export async function main(): Promise<void> {
     const pixels: u8[] = readback.readMappedRange(0, 1024);
     print("readback:mapped");
     const hostTexture = new Texture2d<f32>(checkerPixels(), 4, 4);
-    const hostSampler = new Sampler("nearest");
+    const hostSampler = samplerFromDescriptor(nearestDescriptor);
     let y: i32 = 0;
     while (y < 4) {
       let x: i32 = 0;

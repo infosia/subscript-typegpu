@@ -6,4 +6,4 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from
 class Declared { input!: Storage<Item>; }
 class KernelLayout { input!: Storage<Item>; }
 function kernel(res: KernelLayout, ctx: ComputeInvocation): void { const value: Item = res.input[0]; }
-export const pipeline: ComputePipelineSpec = computePipeline<Declared>(kernel, { workgroupSize: [1, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<Declared>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

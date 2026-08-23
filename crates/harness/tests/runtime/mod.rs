@@ -15,7 +15,8 @@ fn wrappers_execute_their_real_host_bodies() {
     std::fs::create_dir_all(&directory).expect("create runtime test directory");
     let program = directory.join("runtime-host.ts");
     std::fs::write(&program, r#"
-import { MutStorage, PrivateVar, Rgba8unorm, Sampler, Storage, StorageTexture2d, Texture2d, Uniform, WorkgroupArray, WorkgroupVar, privateVar, storageBarrier, workgroupArray, workgroupBarrier, workgroupVar } from "./typegpu";
+import { MutStorage, PrivateVar, Rgba8unorm, Sampler, Storage, StorageTexture2d, Texture2d, Uniform, WorkgroupArray, WorkgroupVar, privateVar, samplerFromDescriptor, storageBarrier, workgroupArray, workgroupBarrier, workgroupVar } from "./typegpu";
+import { GPUSamplerDescriptor } from "./webgpu";
 import { AtomicI32, AtomicU32, Vec2f, Vec2i, Vec4f } from "./typegpu-types";
 export function main(): void {
   const uniform: Uniform<u32> = new Uniform<u32>(7);
@@ -40,7 +41,8 @@ export function main(): void {
   print(`signed=${signed.add(-6)},${signed.min(-3)},${signed.max(9)},${signed.exchange(1)},${signed.load()}`);
   const texturePixels: Vec4f[] = [new Vec4f(1.0, 0.0, 0.0, 1.0), new Vec4f(0.0, 1.0, 0.0, 1.0)];
   const texture = new Texture2d<f32>(texturePixels, 2, 1);
-  const sampler = new Sampler("nearest");
+  const samplerDescriptor: GPUSamplerDescriptor = { minFilter: "nearest", magFilter: "nearest" };
+  const sampler = samplerFromDescriptor(samplerDescriptor);
   const dimensions = texture.dimensions();
   const loaded = texture.load(new Vec2i(1, 0), 0);
   const sampled = texture.sample(sampler, new Vec2f(0.25, 0.5));
@@ -71,6 +73,54 @@ export function main(): void {
 }
 
 #[test]
+fn non_nearest_host_sampling_traps_at_each_method() {
+    let directory = std::env::temp_dir().join(format!(
+        "subscript-typegpu-sampler-trap-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&directory).expect("create sampler trap directory");
+    let program = directory.join("sampler-trap.ts");
+    for (call, expected) in [
+        (
+            "texture.sampleLevel(sampler, new Vec2f(0.5, 0.5), 0.0)",
+            "TX3 sampleLevel filterMode is not nearest",
+        ),
+        (
+            "texture.sample(sampler, new Vec2f(0.5, 0.5))",
+            "TX3 sample filterMode is not nearest",
+        ),
+    ] {
+        let source = r#"
+import { Texture2d, samplerFromDescriptor } from "./typegpu";
+import { Vec2f, Vec4f } from "./typegpu-types";
+import { GPUSamplerDescriptor } from "./webgpu";
+export function main(): void {
+  const descriptor: GPUSamplerDescriptor = { minFilter: "linear", magFilter: "linear" };
+  const sampler = samplerFromDescriptor(descriptor);
+  const texture = new Texture2d<f32>([new Vec4f(1.0, 0.0, 0.0, 1.0)], 1, 1);
+  $CALL;
+}
+"#
+        .replace("$CALL", call);
+        std::fs::write(&program, source).expect("write sampler trap program");
+        let files =
+            subscript_typegpu_harness::program_files(&program).expect("load sampler trap program");
+        let libraries = [subscript_typegpu_harness::facade_library()];
+        let mut session =
+            subscript_codegen::ReloadSession::new_with_native_libraries(&files, &libraries)
+                .expect("compile sampler trap program");
+        assert!(session.call_main().is_err(), "{call} did not trap");
+        let output = String::from_utf8(session.take_output()).expect("UTF-8 sampler trap output");
+        assert!(
+            output.contains(expected),
+            "{call} lacks `{expected}`:\n{output}"
+        );
+    }
+    std::fs::remove_file(&program).expect("remove sampler trap program");
+    std::fs::remove_dir(&directory).expect("remove sampler trap directory");
+}
+
+#[test]
 fn simulate_compute_forms_run_every_invocation_in_row_major_order() {
     let directory =
         std::env::temp_dir().join(format!("subscript-typegpu-simulate-{}", std::process::id()));
@@ -79,15 +129,32 @@ fn simulate_compute_forms_run_every_invocation_in_row_major_order() {
     std::fs::write(
         &program,
         r#"
-import { ComputeInvocation, ComputePipelineSpec, simulateCompute, simulateCompute2, simulateCompute3, simulateCompute4 } from "./typegpu";
+import { ComputeInvocation, ComputePipelineSpec, simulateCompute, simulateCompute2, simulateCompute3, simulateCompute4, simulateComputeThreads } from "./typegpu";
 class State {
   values: u32[];
   constructor() { this.values = []; }
+}
+class BuiltinState {
+  count: u32;
+  failures: u32;
+  constructor() { this.count = 0; this.failures = 0; }
 }
 function one(a: State, ctx: ComputeInvocation): void { a.values.push(ctx.globalId.x + ctx.globalId.y * 10 + ctx.globalId.z * 100); }
 function two(a: State, b: State, ctx: ComputeInvocation): void { a.values.push(ctx.localIndex); b.values.push(ctx.localIndex); }
 function three(a: State, b: State, c: State, ctx: ComputeInvocation): void { a.values.push(ctx.localIndex); b.values.push(ctx.localIndex); c.values.push(ctx.localIndex); }
 function four(a: State, b: State, c: State, d: State, ctx: ComputeInvocation): void { a.values.push(ctx.localIndex); b.values.push(ctx.localIndex); c.values.push(ctx.localIndex); d.values.push(ctx.localIndex); }
+function builtins(state: BuiltinState, ctx: ComputeInvocation): void {
+  const expectedIndex: u32 = (ctx.localId.z * 2 + ctx.localId.y) * 4 + ctx.localId.x;
+  if (ctx.localIndex !== expectedIndex) state.failures += 1;
+  if (ctx.workgroupId.x !== ctx.globalId.x / 4) state.failures += 1;
+  if (ctx.workgroupId.y !== ctx.globalId.y / 2) state.failures += 1;
+  if (ctx.workgroupId.z !== ctx.globalId.z / 2) state.failures += 1;
+  if (ctx.localId.x !== ctx.globalId.x % 4) state.failures += 1;
+  if (ctx.localId.y !== ctx.globalId.y % 2) state.failures += 1;
+  if (ctx.localId.z !== ctx.globalId.z % 2) state.failures += 1;
+  if (ctx.numWorkgroups.x !== 2 || ctx.numWorkgroups.y !== 2 || ctx.numWorkgroups.z !== 1) state.failures += 1;
+  state.count += 1;
+}
 export function main(): void {
   const spec: ComputePipelineSpec = { name: "runtime", workgroupSize: [2, 2, 2] };
   const a = new State();
@@ -100,6 +167,10 @@ export function main(): void {
   simulateCompute3<State, State, State>(three, a, b, c, spec, [2, 1, 1], true);
   simulateCompute4<State, State, State, State>(four, a, b, c, d, spec, [2, 1, 1], true);
   print(`counts=${a.values.length},${b.values.length},${c.values.length},${d.values.length}`);
+  const builtinSpec: ComputePipelineSpec = { name: "builtins", workgroupSize: [4, 2, 2] };
+  const builtinState = new BuiltinState();
+  simulateComputeThreads<BuiltinState>(builtins, builtinState, builtinSpec, 8, 4, 2, true);
+  print(`builtins=${builtinState.count},${builtinState.failures}`);
 }
 "#,
     )
@@ -116,7 +187,10 @@ export function main(): void {
     );
     std::fs::remove_file(&program).expect("remove simulate test program");
     std::fs::remove_dir(&directory).expect("remove simulate test directory");
-    assert_eq!(result.stdout, b"order=0,111,2,113\ncounts=64,48,32,16\n");
+    assert_eq!(
+        result.stdout,
+        b"order=0,111,2,113\ncounts=64,48,32,16\nbuiltins=64,0\n"
+    );
 }
 
 #[test]

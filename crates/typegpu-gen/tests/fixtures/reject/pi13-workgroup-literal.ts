@@ -4,4 +4,4 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from
 class Layout { input!: Storage<Item>; }
 const size: FixedArray<u32, 3> = [1, 1, 1];
 function kernel(res: Layout, ctx: ComputeInvocation): void {}
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: size });
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: size });

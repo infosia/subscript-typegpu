@@ -43,7 +43,7 @@ function kernel(textures: Textures, settings: Settings, ctx: ComputeInvocation):
   const sampled = textures.source.sampleLevel(textures.nearest, new Vec2f(0.5, 0.5), 0.0);
   textures.target.store(new Vec2i(size.x as i32, 0), loaded.add(sampled));
 }
-export const pipeline: ComputePipelineSpec = computePipeline2<Textures, Settings>(kernel, { workgroupSize: [1, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline2<Textures, Settings>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -112,7 +112,7 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
   res.r32float.store(new Vec2i(0, 0), sampled);
   res.rgba32float.store(new Vec2i(dimensions.x as i32, 0), new Vec4f(0.0, 0.0, 0.0, 1.0));
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;

@@ -5,4 +5,4 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } f
 class Layout { output!: MutStorage<Item>; }
 let mutableValue: u32 = 1;
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = new Item(mutableValue); }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

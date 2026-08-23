@@ -14,6 +14,7 @@ import {
   createBindGroup,
   createComputePipeline,
   samplerResource,
+  samplerFromDescriptor,
   textureResource,
 } from "./typegpu";
 import { Vec2f, Vec2i, Vec4f } from "./typegpu-types";
@@ -23,6 +24,7 @@ import {
   GPUBufferUsage,
   GPUDevice,
   GPUMapMode,
+  GPUSamplerDescriptor,
   GPUTextureUsage,
 } from "./webgpu";
 import {
@@ -52,7 +54,7 @@ function textureCopyKernel(res: TextureCopyLayout, ctx: ComputeInvocation): void
 
 export const textureCopy: ComputePipelineSpec = computePipeline<TextureCopyLayout>(
   textureCopyKernel,
-  { workgroupSize: [4, 4, 1] },
+  { name: "textureCopy", workgroupSize: [4, 4, 1] },
 );
 
 function checkerBytes(): u8[] {
@@ -110,7 +112,11 @@ export async function main(): Promise<void> {
     });
     using sourceView = source.createView();
     using targetView = target.createView();
-    using nearest = device.createSampler({ minFilter: "nearest", magFilter: "nearest" });
+    const nearestDescriptor: GPUSamplerDescriptor = {
+      minFilter: "nearest",
+      magFilter: "nearest",
+    };
+    using nearest = device.createSampler(nearestDescriptor);
     using readback = device.createBuffer({
       label: "x10-readback",
       size: 1024,
@@ -150,7 +156,7 @@ export async function main(): Promise<void> {
     const pixels: u8[] = readback.readMappedRange(0, 1024);
     print("readback:mapped");
     const hostTexture = new Texture2d<f32>(checkerPixels(), 4, 4);
-    const hostSampler = new Sampler("nearest");
+    const hostSampler = samplerFromDescriptor(nearestDescriptor);
     let y: i32 = 0;
     while (y < 4) {
       let x: i32 = 0;

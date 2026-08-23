@@ -6,4 +6,4 @@ class Layout { output!: MutStorage<Item>; }
 const FIRST: u32 = SECOND + 1;
 const SECOND: u32 = FIRST + 1;
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = new Item(FIRST); }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

@@ -195,7 +195,7 @@ function renderPipeline<V, O>(vertex: (value: V, ctx: VertexInvocation) => O, fr
 function kernel(res: Layout, ctx: ComputeInvocation): void {}
 function vert(value: Vertex, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(value.position.x, value.position.y, 0.0, 1.0)); }
 function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { return input.position; }
-export const compute: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
+export const compute: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "compute", workgroupSize: [1, 1, 1] });
 export const render: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
 "#,
     );

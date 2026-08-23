@@ -112,6 +112,7 @@ pub(crate) struct ProgramOutput {
     dev: Vec<u8>,
     ship: Vec<u8>,
     coverage: Vec<String>,
+    generated: subscript_typegpu_gen::Generated,
 }
 
 impl ProgramOutput {
@@ -125,6 +126,10 @@ impl ProgramOutput {
 
     pub(crate) fn coverage(&self) -> &[String] {
         &self.coverage
+    }
+
+    pub(crate) fn generated(&self) -> &subscript_typegpu_gen::Generated {
+        &self.generated
     }
 }
 
@@ -182,10 +187,18 @@ fn run_suite() -> Vec<ProgramOutput> {
         .into_iter()
         .map(|program| {
             let (dev, coverage) = run_dev_with_coverage(&program);
+            let generated = subscript_typegpu_gen::generate(
+                &subscript_typegpu_harness::program_files(&program)
+                    .unwrap_or_else(|error| panic!("load {}: {error}", program.display())),
+            )
+            .unwrap_or_else(|diagnostics| {
+                panic!("generate {}: {diagnostics:?}", program.display())
+            });
             ProgramOutput {
                 dev,
                 ship: run_ship(&program),
                 coverage,
+                generated,
                 program,
             }
         })

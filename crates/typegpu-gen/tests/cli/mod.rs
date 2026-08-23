@@ -64,18 +64,14 @@ fn cli_writes_the_same_support_and_wgsl_as_the_library_for_every_program() {
         let generated = subscript_typegpu_gen::generate(&support::program_files(&program))
             .unwrap_or_else(|diagnostics| panic!("generate {stem} in memory: {diagnostics:?}"));
         let expected_host_runnable = !matches!(stem, "b10-workgroup" | "x08-live-reduction");
-        for (pipeline, _) in &generated.pipelines {
-            if !generated
-                .support_module
-                .contains(&format!("{pipeline}_HOST_RUNNABLE"))
-            {
-                continue;
-            }
+        for pipeline in &generated.compute_pipelines {
             assert!(
                 generated.support_module.contains(&format!(
-                    "export const {pipeline}_HOST_RUNNABLE: boolean = {expected_host_runnable};"
+                    "export const {name}_HOST_RUNNABLE: boolean = {expected_host_runnable};",
+                    name = pipeline.declaration,
                 )),
-                "{stem}.{pipeline} has the wrong host-runnable constant:\n{}",
+                "{stem}.{} has no matching host-runnable constant:\n{}",
+                pipeline.declaration,
                 generated.support_module,
             );
         }

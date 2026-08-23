@@ -1,6 +1,6 @@
 // program: x02-live-saxpy
 // purpose: compute SAXPY with a uniform block and compare every result
-// exercises: BF7, PI12, T4, T15, uniform and storage bindings, readback
+// exercises: BF7, CL1, CL3, CL4, PI12, T4, T15, uniform and storage bindings, readback
 // questions: none
 
 import {
@@ -13,7 +13,7 @@ import {
   computePipeline,
   ComputePipelineSpec,
   MutStorage,
-  simulateCompute,
+  simulateComputeThreads,
   Storage,
   Uniform,
   bufferResource,
@@ -139,11 +139,13 @@ export async function main(): Promise<void> {
     hostLayout.params = new Uniform<SaxpyParams>(new SaxpyParams(aValue, count));
     hostLayout.x = new Storage<Item>(hostX);
     hostLayout.y = new MutStorage<Item>(hostY);
-    simulateCompute<SaxpyLayout>(
+    simulateComputeThreads<SaxpyLayout>(
       saxpyKernel,
       hostLayout,
       saxpy,
-      [1, 1, 1],
+      count,
+      1,
+      1,
       saxpy_HOST_RUNNABLE,
     );
     using params: Buffer<SaxpyParams> = createBuffer<SaxpyParams>(

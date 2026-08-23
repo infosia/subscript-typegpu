@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use subscript_codegen::ReloadSession;
+use subscript_compiler::SourceFile;
 
 fn repository_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -10,9 +11,26 @@ fn repository_root() -> PathBuf {
         .to_path_buf()
 }
 
-fn assert_trap(fixture: &Path, expected: &str) {
-    let files = subscript_typegpu_harness::program_files(fixture)
+fn assert_trap(fixture: &Path, expected: &str, generate_support: bool) {
+    let mut files = subscript_typegpu_harness::program_files(fixture)
         .unwrap_or_else(|error| panic!("load {}: {error}", fixture.display()));
+    if generate_support {
+        let generated = subscript_typegpu_gen::generate(&files).unwrap_or_else(|diagnostics| {
+            panic!(
+                "generate {}:\n{}",
+                fixture.display(),
+                subscript_compiler::render_diagnostics(&files, &diagnostics),
+            )
+        });
+        let stem = fixture
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .expect("trap fixture has a UTF-8 stem");
+        files.push(SourceFile::new(
+            format!("{stem}.typegpu.ts"),
+            generated.support_module,
+        ));
+    }
     let libraries = [subscript_typegpu_harness::facade_library()];
     let mut session = ReloadSession::new_with_native_libraries(&files, &libraries)
         .unwrap_or_else(|error| panic!("compile {} dev: {error}", fixture.display()));
@@ -41,52 +59,63 @@ fn runtime_traps_are_named_and_numbered() {
         return;
     }
     let directory = repository_root().join("crates/harness/tests/fixtures/trap");
-    for (name, expected) in [
+    for (name, expected, generate_support) in [
         (
             "patch-past-field.ts",
             "EG2 Buffer.patch fieldOffset=3 byteLength=2 elementSize=4",
+            false,
         ),
         (
             "write-past-end.ts",
             "BF8 Buffer.write elementIndex=1 elementCount=2 count=2",
+            false,
         ),
         (
             "write-non-multiple.ts",
             "BF8 Buffer.write byteLength=3 elementSize=4 remainder=3",
+            false,
         ),
         (
             "read-past-end.ts",
             "BF8 readOne elementIndex=2 elementCount=1 count=2",
+            false,
         ),
         (
             "resource-kind-mismatch.ts",
             "TX4 createBindGroup binding=3 expected=texture actual=buffer",
+            false,
         ),
         (
             "resource-count-mismatch.ts",
             "PI9 createBindGroup expected 1 resources but received 0",
+            false,
         ),
         (
             "resource-two-fields.ts",
             "TX4 createBindGroup binding=1 resourceFields=2",
+            false,
         ),
         (
             "sampled-texture-store.ts",
             "TX3 store is not legal on Texture2d",
+            false,
         ),
         (
             "storage-texture-no-format.ts",
             "TX5 storageTexture binding=2 has no format",
+            false,
         ),
         (
             "unknown-layout-kind.ts",
             "TX5 bind group layout binding=4 has unknown kind=mystery",
+            false,
         ),
         (
-            "simulate-barrier.ts",
+            "simulate-storage-barrier.ts",
             "CL2 simulateCompute pipeline=blocked",
+            true,
         ),
     ] {
-        assert_trap(&directory.join(name), expected);
+        assert_trap(&directory.join(name), expected, generate_support);
     }
 }

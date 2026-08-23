@@ -1,6 +1,6 @@
 // program: x04-live-control-flow
 // purpose: prove loop-condition and nested conditional lowerings on a live backend
-// exercises: K9, K14, T15
+// exercises: CL1, CL3, CL4, K9, K14, T15
 // questions: none
 
 import {
@@ -15,7 +15,7 @@ import {
   createBuffer,
   createComputePipeline,
   readBuffer,
-  simulateCompute,
+  simulateComputeThreads,
 } from "./typegpu";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice, GPUMapMode } from "./webgpu";
 import {
@@ -71,11 +71,13 @@ export async function main(): Promise<void> {
       new Item(-1.0), new Item(1.0), new Item(3.0), new Item(4.0),
     ]);
     hostLayout.output = new MutStorage<Item>([new Item(0.0)]);
-    simulateCompute<ControlLayout>(
+    simulateComputeThreads<ControlLayout>(
       controlFlowKernel,
       hostLayout,
       controlFlow,
-      [1, 1, 1],
+      1,
+      1,
+      1,
       controlFlow_HOST_RUNNABLE,
     );
     using input: Buffer<Item> = createBuffer<Item>(device, Item_STRIDE, 4, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST, "x04-input");

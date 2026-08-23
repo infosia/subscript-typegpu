@@ -3,13 +3,20 @@
 import {
   ComputeInvocation,
   ComputePipelineSpec,
+  MutStorage,
   computePipeline,
   simulateCompute,
+  storageBarrier,
 } from "./typegpu";
+import { blocked_HOST_RUNNABLE } from "./simulate-storage-barrier.typegpu";
 
-class BlockedLayout {}
+class BlockedLayout {
+  output!: MutStorage<u32>;
+}
 
-function blockedKernel(res: BlockedLayout, ctx: ComputeInvocation): void {}
+function blockedKernel(res: BlockedLayout, ctx: ComputeInvocation): void {
+  storageBarrier();
+}
 
 const blocked: ComputePipelineSpec = computePipeline<BlockedLayout>(blockedKernel, {
   name: "blocked",
@@ -17,11 +24,13 @@ const blocked: ComputePipelineSpec = computePipeline<BlockedLayout>(blockedKerne
 });
 
 export function main(): void {
+  const layout = new BlockedLayout();
+  layout.output = new MutStorage<u32>([0]);
   simulateCompute<BlockedLayout>(
     blockedKernel,
-    new BlockedLayout(),
+    layout,
     blocked,
     [1, 1, 1],
-    false,
+    blocked_HOST_RUNNABLE,
   );
 }

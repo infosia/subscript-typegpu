@@ -5,4 +5,4 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } f
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output!: MutStorage<Item>; }
 function kernel(res: Layout, ctx: ComputeInvocation): void { const local: AtomicU32 = new AtomicU32(0); res.output[0] = new Item(local.add(1)); }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

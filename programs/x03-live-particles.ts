@@ -1,6 +1,6 @@
 // program: x03-live-particles
 // purpose: integrate particles for four GPU steps and compare all components
-// exercises: BF7, PI12, T4, T15, vector schema, helper function, repeated dispatch
+// exercises: BF7, CL1, CL3, CL4, PI12, T4, T15, vector schema, helper function, repeated dispatch
 // questions: none
 
 import {
@@ -13,7 +13,7 @@ import {
   computePipeline,
   ComputePipelineSpec,
   MutStorage,
-  simulateCompute,
+  simulateComputeThreads,
   Uniform,
   bufferResource,
 } from "./typegpu";
@@ -149,11 +149,13 @@ export async function main(): Promise<void> {
     hostLayout.particles = new MutStorage<Particle>(hostParticles);
     let step: u32 = 0;
     while (step < steps) {
-      simulateCompute<ParticleLayout>(
+      simulateComputeThreads<ParticleLayout>(
         particleKernel,
         hostLayout,
         particles,
-        [1, 1, 1],
+        count,
+        1,
+        1,
         particles_HOST_RUNNABLE,
       );
       step = step + 1;

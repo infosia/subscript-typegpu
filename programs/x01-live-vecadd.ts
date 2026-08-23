@@ -1,6 +1,6 @@
 // program: x01-live-vecadd
 // purpose: compute vector addition on a real adapter and compare every result
-// exercises: BF7, PI12, T4, T15, storage bindings, readback
+// exercises: BF7, CL1, CL3, CL4, PI12, T4, T15, storage bindings, readback
 // questions: none
 
 import {
@@ -13,7 +13,7 @@ import {
   computePipeline,
   ComputePipelineSpec,
   MutStorage,
-  simulateCompute,
+  simulateComputeThreads,
   Storage,
   bufferResource,
 } from "./typegpu";
@@ -126,11 +126,13 @@ export async function main(): Promise<void> {
     hostLayout.a = new Storage<Item>(hostA);
     hostLayout.b = new Storage<Item>(hostB);
     hostLayout.out = new MutStorage<Item>(hostOut);
-    simulateCompute<VecAddLayout>(
+    simulateComputeThreads<VecAddLayout>(
       vecAddKernel,
       hostLayout,
       vecAdd,
-      [1, 1, 1],
+      count,
+      1,
+      1,
       vecAdd_HOST_RUNNABLE,
     );
     using a: Buffer<Item> = createBuffer<Item>(

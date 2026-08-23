@@ -27,6 +27,17 @@ pub struct GeneratedLayout {
     pub wgsl: Layout,
 }
 
+/// One generated compute pipeline and its host-simulation facts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeneratedComputePipeline {
+    /// The module-level pipeline declaration.
+    pub declaration: String,
+    /// The named kernel function.
+    pub kernel: String,
+    /// Whether sequential host simulation preserves the kernel's behavior.
+    pub host_runnable: bool,
+}
+
 /// Generated TypeGPU support for one checked program.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Generated {
@@ -40,6 +51,8 @@ pub struct Generated {
     pub layouts: Vec<GeneratedLayout>,
     /// Pipeline declaration names and their complete WGSL modules.
     pub pipelines: Vec<(String, String)>,
+    /// Compute pipeline declarations and their host-simulation facts.
+    pub compute_pipelines: Vec<GeneratedComputePipeline>,
 }
 
 #[derive(Debug)]
@@ -339,11 +352,20 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
             wgsl: layout::wgsl_layout(&schema.tree),
         })
         .collect();
+    let compute_pipelines = pipeline_definitions
+        .iter()
+        .map(|pipeline| GeneratedComputePipeline {
+            declaration: pipeline.declaration.clone(),
+            kernel: pipeline.entry.clone(),
+            host_runnable: pipeline.host_runnable,
+        })
+        .collect();
     Ok(Generated {
         support_module,
         wgsl_structs,
         wgsl_module,
         layouts,
         pipelines,
+        compute_pipelines,
     })
 }

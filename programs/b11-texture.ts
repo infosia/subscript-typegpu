@@ -1,6 +1,6 @@
 // program: b11-texture
 // purpose: prove sampled, sampler, storage-texture, and second-group uniform bindings
-// exercises: TX1, TX2, TX3, TX4, TX5, TX6, PI1, PI2, PI3, PI5, PI8, PI9, K14, K15, K16
+// exercises: CL1, CL3, CL4, CL5, TX1, TX2, TX3, TX4, TX5, TX6, PI1, PI2, PI3, PI5, PI8, PI9, K14, K15, K16
 // questions: none
 
 import {
@@ -16,6 +16,7 @@ import {
   createBindGroup,
   createComputePipeline,
   samplerResource,
+  samplerFromDescriptor,
   simulateCompute2,
   textureResource,
 } from "./typegpu";
@@ -25,6 +26,7 @@ import {
   GPUAdapter,
   GPUBufferUsage,
   GPUDevice,
+  GPUSamplerDescriptor,
   GPUTextureUsage,
 } from "./webgpu";
 import {
@@ -52,7 +54,7 @@ class SampleParams {
 
 class TextureLayout {
   source!: Texture2d<f32>;
-  linear!: Sampler;
+  nearest!: Sampler;
   target!: StorageTexture2d<Rgba8unorm>;
 }
 
@@ -73,7 +75,7 @@ function textureKernel(
     ((ctx.globalId.x as f32) + 0.5) / (params.width as f32),
     ((ctx.globalId.y as f32) + 0.5) / (params.height as f32),
   );
-  const sampled: Vec4f = textures.source.sampleLevel(textures.linear, uv, 0.0);
+  const sampled: Vec4f = textures.source.sampleLevel(textures.nearest, uv, 0.0);
   textures.target.store(coords, loaded.add(sampled).scale(0.5));
 }
 
@@ -104,7 +106,11 @@ export async function main(): Promise<void> {
     });
     using sourceView = source.createView();
     using targetView = target.createView();
-    using linear = device.createSampler({ minFilter: "linear", magFilter: "linear" });
+    const nearestDescriptor: GPUSamplerDescriptor = {
+      minFilter: "nearest",
+      magFilter: "nearest",
+    };
+    using nearest = device.createSampler(nearestDescriptor);
     using params = device.createBuffer({
       label: "b11-params",
       size: SampleParams_SIZE as u64,
@@ -120,7 +126,7 @@ export async function main(): Promise<void> {
     using nativeLayout0 = pipeline.bindGroupLayout(0);
     using nativeLayout1 = pipeline.bindGroupLayout(1);
     using group0 = createBindGroup(device, nativeLayout0, texturePass_LAYOUT0, [
-      textureResource(sourceView), samplerResource(linear), textureResource(targetView),
+      textureResource(sourceView), samplerResource(nearest), textureResource(targetView),
     ]);
     using group1 = createBindGroup(device, nativeLayout1, texturePass_LAYOUT1, [
       bufferResource(params),
@@ -133,7 +139,7 @@ export async function main(): Promise<void> {
     const hostTargetPixels: Vec4f[] = [new Vec4f(0.0, 0.0, 0.0, 0.0)];
     const hostTextures = new TextureLayout();
     hostTextures.source = new Texture2d<f32>(hostSourcePixels, 1, 1);
-    hostTextures.linear = new Sampler("nearest");
+    hostTextures.nearest = samplerFromDescriptor(nearestDescriptor);
     hostTextures.target = new StorageTexture2d<Rgba8unorm>(hostTargetPixels, 1, 1);
     const hostParams = new ParamsLayout();
     hostParams.params = new Uniform<SampleParams>(new SampleParams(1, 1));
@@ -146,7 +152,7 @@ export async function main(): Promise<void> {
       texturePass_HOST_RUNNABLE,
     );
     print(`source.kind=${texturePass_LAYOUT0.entries[0].kind}`);
-    print(`linear.kind=${texturePass_LAYOUT0.entries[1].kind}`);
+    print(`nearest.kind=${texturePass_LAYOUT0.entries[1].kind}`);
     print(`target.kind=${texturePass_LAYOUT0.entries[2].kind}`);
     print(`params.kind=${texturePass_LAYOUT1.entries[0].kind}`);
     print(`texturePass_WGSL_LINES=${texturePass_WGSL.split("\n").length}`);

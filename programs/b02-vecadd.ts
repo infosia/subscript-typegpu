@@ -1,6 +1,6 @@
 // program: b02-vecadd
 // purpose: prove one generated storage pipeline from typed HIR through dispatch
-// exercises: K1-K16, PI1-PI11
+// exercises: CL1, CL3, CL4, K1-K16, PI1-PI11
 // questions: none
 
 import {

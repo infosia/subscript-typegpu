@@ -1,6 +1,6 @@
 // program: x09-live-switch
 // purpose: compare switch break and loop continue decisions for every lane
-// exercises: K18, K23, T15
+// exercises: CL1, CL3, CL4, K18, K23, T15
 // questions: none
 
 import {
@@ -13,7 +13,7 @@ import {
   createBuffer,
   createComputePipeline,
   readBuffer,
-  simulateCompute,
+  simulateComputeThreads,
   bufferResource,
 } from "./typegpu";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice, GPUMapMode } from "./webgpu";
@@ -79,11 +79,13 @@ export async function main(): Promise<void> {
     }
     const hostLayout = new SwitchLayout();
     hostLayout.output = new MutStorage<SwitchValue>(hostValues);
-    simulateCompute<SwitchLayout>(
+    simulateComputeThreads<SwitchLayout>(
       liveSwitchKernel,
       hostLayout,
       liveSwitch,
-      [1, 1, 1],
+      count,
+      1,
+      1,
       liveSwitch_HOST_RUNNABLE,
     );
     using output: Buffer<SwitchValue> = createBuffer<SwitchValue>(

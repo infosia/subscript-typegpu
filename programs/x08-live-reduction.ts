@@ -70,6 +70,7 @@ function reductionKernel(res: ReductionLayout, ctx: ComputeInvocation): void {
 }
 
 export const reduction: ComputePipelineSpec = computePipeline<ReductionLayout>(reductionKernel, {
+  name: "reduction",
   workgroupSize: [256, 1, 1],
 });
 

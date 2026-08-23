@@ -41,7 +41,7 @@ function nonUniform(res: Layout, ctx: ComputeInvocation): void {
   if (ctx.localIndex === 0) { workgroupBarrier(); }
   res.output[ctx.globalId.x] = new Item(ctx.localIndex);
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(nonUniform, { workgroupSize: [4, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(nonUniform, { name: "pipeline", workgroupSize: [4, 1, 1] });
 "#,
         ),
     ];

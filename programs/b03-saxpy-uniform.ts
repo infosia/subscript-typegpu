@@ -1,6 +1,6 @@
 // program: b03-saxpy-uniform
 // purpose: prove a uniform parameter block with storage input and mutable output
-// exercises: K1-K16, PI1-PI11, LY11
+// exercises: CL1, CL3, CL4, K1-K16, PI1-PI11, LY11
 // questions: none
 
 import {

@@ -72,6 +72,8 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
 }
 ```
 
+`simulateCompute` calls this kernel over host wrapper storage. Its generated host-runnable constant prevents sequential simulation of kernels that require GPU synchronization.
+
 ## Declare the pipeline
 
 The declaration connects the layout type, the kernel function, and the workgroup size.

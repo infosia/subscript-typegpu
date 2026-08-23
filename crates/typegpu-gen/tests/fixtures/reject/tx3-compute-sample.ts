@@ -6,4 +6,4 @@ class Layout { source!: Texture2d<f32>; nearest!: Sampler; }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   const color: Vec4f = res.source.sample(res.nearest, new Vec2f(0.5, 0.5));
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

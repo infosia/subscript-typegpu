@@ -76,29 +76,11 @@ fn every_cited_rule_id_resolves() {
     let table_path = root.join("specs/blocks/rule-ids.txt");
     let table_source = std::fs::read_to_string(&table_path)
         .unwrap_or_else(|error| panic!("read {}: {error}", table_path.display()));
-    let mut allowed = table_source
+    let allowed = table_source
         .lines()
         .map(str::trim)
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .collect::<BTreeSet<_>>();
-    let cpu_lane_path = root.join("specs/blocks/cpu-lane.md");
-    let cpu_lane_source = std::fs::read_to_string(&cpu_lane_path)
-        .unwrap_or_else(|error| panic!("read {}: {error}", cpu_lane_path.display()));
-    for (rule, heading) in [
-        (
-            "CL1",
-            "**CL1 — A kernel runs on the host through its own body.**",
-        ),
-        ("CL2", "**CL2 — Single-threaded, so no barrier.**"),
-        ("CL3", "**CL3 — Same numbers.**"),
-        ("CL4", "**CL4 — The lane is a gate module.**"),
-    ] {
-        assert!(
-            cpu_lane_source.contains(heading),
-            "{rule} exemption must remain backed by the CPU-lane contract",
-        );
-        allowed.insert(rule);
-    }
     let descriptor_kinds = [
         "U8", "U16", "U32", "U64", "I32", "F32", "F64", "L0", "L1", "L2", "L3",
     ]

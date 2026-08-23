@@ -71,19 +71,11 @@ fn fixture_rules(root: &Path) -> BTreeSet<String> {
 }
 
 fn allowed_rules(root: &Path) -> BTreeSet<String> {
-    let mut rules = read(&root.join("specs/blocks/rule-ids.txt"))
+    read(&root.join("specs/blocks/rule-ids.txt"))
         .lines()
         .filter(|line| !line.is_empty() && !line.starts_with('#') && !line.contains(' '))
         .map(str::to_owned)
-        .collect::<BTreeSet<_>>();
-    const CPU_LANE_RULE_ID_EXEMPTION: &str = "CL2";
-    assert!(
-        read(&root.join("specs/blocks/cpu-lane.md"))
-            .contains("**CL2 — Single-threaded, so no barrier.**"),
-        "CL2 exemption must remain backed by the CPU-lane contract",
-    );
-    rules.insert(CPU_LANE_RULE_ID_EXEMPTION.to_owned());
-    rules
+        .collect()
 }
 
 fn assert_site(

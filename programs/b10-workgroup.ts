@@ -60,6 +60,7 @@ function workgroupKernel(res: WorkgroupLayout, ctx: ComputeInvocation): void {
 }
 
 export const workgroup: ComputePipelineSpec = computePipeline<WorkgroupLayout>(workgroupKernel, {
+  name: "workgroup",
   workgroupSize: [4, 1, 1],
 });
 

@@ -7,4 +7,4 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
   visit([1 as u32, 2 as u32]);
 }
 function visit(values: u32[]): void { for (const value of values) {} }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

@@ -9,4 +9,4 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
   if (index < 4) { workgroupBarrier(); }
   res.output[0] = new Item(index);
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [4, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });

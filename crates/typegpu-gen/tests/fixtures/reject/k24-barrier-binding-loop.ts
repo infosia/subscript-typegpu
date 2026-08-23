@@ -6,4 +6,4 @@ class Layout { input!: Storage<Item>; }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   while (res.input[0].value > 0) { workgroupBarrier(); break; }
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [4, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });

@@ -1,5 +1,5 @@
 source.kind=texture
-linear.kind=sampler
+nearest.kind=sampler
 target.kind=storageTexture
 params.kind=uniform
 texturePass_WGSL_LINES=23

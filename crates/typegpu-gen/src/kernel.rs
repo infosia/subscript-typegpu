@@ -8,7 +8,7 @@ use subscript_compiler::hir::{
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 use crate::mapping::{self, MethodEmission};
-use crate::pipeline::{BindingKind, Pipeline};
+use crate::pipeline::{library_class, BindingKind, Pipeline};
 use crate::render::RenderPipeline;
 use crate::schema::Schema;
 
@@ -120,6 +120,10 @@ fn type_contains_atomic(module: &Module, ty: &Type) -> bool {
         }
     }
     visit(module, ty, &mut BTreeSet::new())
+}
+
+fn is_private_var(module: &Module, ty: &Type) -> bool {
+    library_class(module, ty).is_some_and(|class| class.name.starts_with("PrivateVar<"))
 }
 
 #[derive(Debug, Clone)]
@@ -407,8 +411,9 @@ fn expression_blocks_host(module: &Module, expression: &Expr) -> bool {
                         "workgroupBarrier" | "storageBarrier"
                     ) && function_declared_in(module, name, "typegpu.ts")
                 }
-                Callee::Method { recv, .. } => {
+                Callee::Method { recv, name } => {
                     atomic_scalar(module, &recv.ty).is_some()
+                        || (name == "set" && is_private_var(module, &recv.ty))
                         || expression_blocks_host(module, recv)
                 }
                 Callee::Value(value) => expression_blocks_host(module, value),

@@ -61,6 +61,7 @@ function shadowKernel(res: ShadowLayout, ctx: ComputeInvocation): void {
 }
 
 export const uniformReread: ComputePipelineSpec = computePipeline<ShadowLayout>(shadowKernel, {
+  name: "uniformReread",
   workgroupSize: [1, 1, 1],
 });
 

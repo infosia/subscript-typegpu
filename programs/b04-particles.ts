@@ -1,6 +1,6 @@
 // program: b04-particles
 // purpose: prove a schema with vectors and a kernel helper function
-// exercises: K1-K16, PI1-PI11, LY3, LY11
+// exercises: CL1, CL3, CL4, K1-K16, PI1-PI11, LY3, LY11
 // questions: none
 
 import {

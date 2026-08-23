@@ -1,6 +1,6 @@
 // program: b09-kernel-depth
 // purpose: prove module constants and structured switch control flow
-// exercises: K18, K19, K23
+// exercises: CL1, CL3, CL4, K18, K19, K23
 // questions: none
 
 import {

@@ -5,4 +5,4 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, wo
 class Layout { output!: MutStorage<Item>; }
 function helper(): void { workgroupBarrier(); }
 function kernel(res: Layout, ctx: ComputeInvocation): void { helper(); res.output[0] = new Item(1); }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

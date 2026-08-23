@@ -3,4 +3,4 @@
 import { ComputeInvocation, ComputePipelineSpec, computePipeline } from "./typegpu";
 class EmptyLayout {}
 function kernel(empty: EmptyLayout, ctx: ComputeInvocation): void {}
-export const pipeline: ComputePipelineSpec = computePipeline<EmptyLayout>(kernel, { workgroupSize: [1, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<EmptyLayout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

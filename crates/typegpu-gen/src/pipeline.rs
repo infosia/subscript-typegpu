@@ -397,6 +397,53 @@ fn workgroup(module: &Module, expr: &Expr) -> Result<[u32; 3], Diagnostic> {
     Ok([x, y, z])
 }
 
+fn validate_pipeline_name(
+    module: &Module,
+    expr: &Expr,
+    declaration: &str,
+) -> Result<(), Diagnostic> {
+    let ExprKind::DescriptorLit { class, fields } = &expr.kind else {
+        return Err(diagnostic(
+            "PI1",
+            "pipeline options must be a descriptor literal",
+            expr.pos.clone(),
+        ));
+    };
+    let descriptor = &module.classes[class.0];
+    let Some(index) = descriptor
+        .fields
+        .iter()
+        .position(|field| field.name == "name")
+    else {
+        return Err(generator_diagnostic(
+            "library ComputePipelineSpec lost its name field",
+            expr.pos.clone(),
+        ));
+    };
+    let Some(Some(value)) = fields.get(index) else {
+        return Err(diagnostic(
+            "PI1",
+            format!("pipeline `{declaration}` options omit name"),
+            expr.pos.clone(),
+        ));
+    };
+    let ExprKind::Str(name) = &value.kind else {
+        return Err(diagnostic(
+            "PI1",
+            format!("pipeline `{declaration}` name is not a string literal"),
+            value.pos.clone(),
+        ));
+    };
+    if name != declaration {
+        return Err(diagnostic(
+            "PI1",
+            format!("pipeline `{declaration}` options name is `{name}`"),
+            value.pos.clone(),
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn function<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
     module
         .functions
@@ -579,6 +626,10 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<Pipeline>, Vec<Diagnostic>
             ));
             continue;
         };
+        if let Err(error) = validate_pipeline_name(module, options, &global.name) {
+            diagnostics.push(error);
+            continue;
+        }
         let host_runnable = match crate::kernel::host_runnable(module, kernel) {
             Ok(value) => value,
             Err(error) => {

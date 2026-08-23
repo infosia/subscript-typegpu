@@ -4,4 +4,4 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from
 class Ref { value: f32 = 0.0; }
 class Layout { input!: Storage<Item>; }
 function kernel(res: Layout, ctx: ComputeInvocation): void { const bad: Ref = new Ref(); }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

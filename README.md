@@ -60,6 +60,8 @@ Programs use a letter, a two-digit number, and a short name.
 
 Each gate program has an `.expected` file with the same stem. Generated pipelines have `.wgsl` files with the same stem.
 
+`simulateCompute` runs a host-runnable kernel through its script body and wrapper storage. `simulateComputeThreads` uses the same thread counts as `dispatchThreads`.
+
 ## Repository layout
 
 - `crates/facade` contains the generated C ABI facade and its loader.
