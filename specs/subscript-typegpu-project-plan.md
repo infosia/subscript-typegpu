@@ -576,6 +576,41 @@ advances the clear color, resize reconfigures without a message,
 close prints `window:frames=<n>`. The cold build increment is
 recorded.
 
+### P10 — the example ports (after P9)
+
+TypeGPU's documentation examples (MIT, Software Mansion) are ported
+as far as the library reaches, per `examples.md` (EX1–EX7). A port
+reimplements the idea (EX6). The survey of all 77 upstream examples
+and their feature needs is `specs/tracking/p10-examples.md`.
+
+Slice 1, no new library surface. Headless: `matrix-multiplication`,
+`matrix-next` (workgroup tiles against a CPU reference), `dispatch`
+(thread-count checks). Windowed: `triangle`, `gradient-tiles`,
+`square`, `xor-dev-centrifuge-2`, `confetti`, `boids`,
+`fluid-double-buffering`. `tools/example.sh` runs a headless example
+through the harness dev lane.
+
+Slice 2, two library modules. `lib/typegpu-sdf.ts` and
+`lib/typegpu-noise.ts`: pure functions and module constants in the
+kernel subset with real host bodies, K10 untouched (a kernel calls
+them as K2 helpers). Ports: `ray-marching`, `caustics`,
+`smoky-triangle`, `vaporrave`, `fluid-with-atomics` (the brush on
+the key scalar, EX7), and `prng-cpu-gpu` as a headless differential
+check of the noise module.
+
+Deferred, by the missing feature (the survey ranks these gaps):
+read-only storage textures (slime-mold, game-of-life, the jump-flood
+pair), image decode and byte-to-texture upload (blur, image-tuning,
+clouds), pointer input (stable-fluid, the drawing examples), depth
+(the 3D set), blending and multisample (the geometry set). Webcam,
+network, ONNX, WebGL, react, and three.js examples are out of scope.
+
+Exit per slice: every ported example compiles in the gate (EX4), a
+headless example prints its `check:` line `pass` on both tiers, a
+windowed example runs `--frames 120` to `window:frames=120` on Metal
+and on Dawn, and the owner's visual run is recorded. Comments obey
+EX2, written or revised by the planning side. Budgets hold.
+
 ## 9. Risk register
 
 | Id | Risk | Mitigation / trigger |
