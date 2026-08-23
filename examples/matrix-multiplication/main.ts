@@ -55,23 +55,25 @@ class MatrixLayout {
 function multiplyKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
   const left: Matrix = res.left.get(0);
   const right: Matrix = res.right.get(0);
-  const row: u32 = ctx.globalId.y;
-  const column: u32 = ctx.globalId.x;
-  if (row < left.size.x && column < right.size.y) {
-    let total: f32 = 0.0;
-    for (let inner: u32 = 0; inner < left.size.y; inner += 1) {
-      total += left.body[(row * left.size.y + inner) as i32]
-        * right.body[(inner * right.size.y + column) as i32];
+  const output: Matrix = res.product.get(0);
+  for (let row: u32 = 0; row < left.size.x; row += 1) {
+    for (let column: u32 = 0; column < right.size.y; column += 1) {
+      let total: f32 = 0.0;
+      for (let inner: u32 = 0; inner < left.size.y; inner += 1) {
+        total += left.body[(row * left.size.y + inner) as i32]
+          * right.body[(inner * right.size.y + column) as i32];
+      }
+      output.body[(row * right.size.y + column) as i32] = total;
     }
-    res.product[0].body[(row * right.size.y + column) as i32] = total;
   }
+  res.product.set(0, output);
 }
 
 export const multiply: ComputePipelineSpec = computePipeline<MatrixLayout>(
   multiplyKernel,
   {
     name: "multiply",
-    workgroupSize: [4, 4, 1],
+    workgroupSize: [1, 1, 1],
   },
 );
 
@@ -191,7 +193,7 @@ export async function main(): Promise<void> {
         ],
       );
       using encoder = device.createCommandEncoderDefault();
-      pipeline.dispatchThreads(encoder, [bindGroup], 4, 4, 1);
+      pipeline.dispatchThreads(encoder, [bindGroup], 1, 1, 1);
       using command = encoder.finishDefault();
       queue.submit([command]);
 
@@ -203,8 +205,8 @@ export async function main(): Promise<void> {
         multiplyKernel,
         host,
         multiply,
-        4,
-        4,
+        1,
+        1,
         1,
         multiply_HOST_RUNNABLE,
       );

@@ -64,14 +64,18 @@ class MatrixLayout {
 function naiveKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
   const left: Matrix = res.left.get(0);
   const right: Matrix = res.right.get(0);
-  const row: u32 = ctx.globalId.y;
-  const column: u32 = ctx.globalId.x;
-  let total: f32 = 0.0;
-  for (let inner: u32 = 0; inner < 4; inner += 1) {
-    total += left.body[(row * 4 + inner) as i32]
-      * right.body[(inner * 4 + column) as i32];
+  const output: Matrix = res.product.get(0);
+  for (let row: u32 = 0; row < 4; row += 1) {
+    for (let column: u32 = 0; column < 4; column += 1) {
+      let total: f32 = 0.0;
+      for (let inner: u32 = 0; inner < 4; inner += 1) {
+        total += left.body[(row * 4 + inner) as i32]
+          * right.body[(inner * 4 + column) as i32];
+      }
+      output.body[(row * 4 + column) as i32] = total;
+    }
   }
-  res.product[0].body[(row * 4 + column) as i32] = total;
+  res.product.set(0, output);
 }
 
 // This port fixes both matrices and the tile to 4-by-4 for one inspectable dispatch.
@@ -96,7 +100,7 @@ function tiledKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
 
 export const naive: ComputePipelineSpec = computePipeline<MatrixLayout>(naiveKernel, {
   name: "naive",
-  workgroupSize: [4, 4, 1],
+  workgroupSize: [1, 1, 1],
 });
 
 export const tiled: ComputePipelineSpec = computePipeline<MatrixLayout>(tiledKernel, {
@@ -240,7 +244,7 @@ export async function main(): Promise<void> {
         ],
       );
       using encoder = device.createCommandEncoderDefault();
-      naivePipeline.dispatchThreads(encoder, [naiveGroup], 4, 4, 1);
+      naivePipeline.dispatchThreads(encoder, [naiveGroup], 1, 1, 1);
       tiledPipeline.dispatchThreads(encoder, [tiledGroup], 4, 4, 1);
       using command = encoder.finishDefault();
       queue.submit([command]);
@@ -253,8 +257,8 @@ export async function main(): Promise<void> {
         naiveKernel,
         host,
         naive,
-        4,
-        4,
+        1,
+        1,
         1,
         naive_HOST_RUNNABLE,
       );
