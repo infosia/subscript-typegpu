@@ -125,3 +125,13 @@ cull). Its measured lessons kept: the shell signature comes from the
 typed source function, never from a second declaration; a
 reordering of indices does not change an image under `cullMode:
 "none"`; a cull test first reads the index buffer back.
+
+## Slice 2 live run 1 (2026-08-23)
+
+x15–x17 PASS on Metal and Dawn. x18 failed `FAIL index readback` on
+both. Probe (ship tier, Metal): `Context.bytesOf<FixedArray<u16, 3>>`
+gives `0,0,2,0,1,0`, the readback gives zeros. Cause: a 6-byte
+`writeBuffer` violates WebGPU's multiple-of-4 rule, the backend
+drops it, and no error scope surrounds a write. Resolution: BF2 Rev
+1 (the write and copy paths trap on a byte offset or length that is
+not a multiple of 4), x18 writes four indices.

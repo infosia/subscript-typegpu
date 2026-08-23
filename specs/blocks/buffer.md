@@ -1,7 +1,8 @@
 # Block: buffer (BF-rules)
 
 P1 slice 2 contract. Rev 0, 2026-08-22. Rev 1 (BF9–BF11), 2026-08-23.
-Rev 2 (BF9 Rev 1, the R36 pin `ac9436f`), 2026-08-23.
+Rev 2 (BF9 Rev 1, the R36 pin `ac9436f`), 2026-08-23. Rev 3 (BF2
+Rev 1 four-byte alignment), 2026-08-23.
 Plan §3 D4 and §4 govern
 this block. The byte path is subscript R34 at `bb9dadc`
 (stdlib.md §18 there): `Context.bytesOf<T>`, `bytesInto<T>`,
@@ -16,14 +17,24 @@ this block. The byte path is subscript R34 at `bb9dadc`
   the element size, and the count. `dispose()` and
   `[Symbol.dispose]()` release the `GPUBuffer`. `handle(): GPUBuffer`
   gives the underlying handle for bind groups.
-- **BF2 — Bytes cross, values stay typed.** The host converts with
-  R34 at the call site, because the array length is a literal there:
+- **BF2 — Bytes cross, values stay typed.** Rev 1, 2026-08-23. The
+  host converts with R34 at the call site, because the array length
+  is a literal there:
   `buffer.write(queue, 0, Context.bytesOf<FixedArray<Particle, 64>>(particles))`.
   `write(queue, elementIndex: u32, bytes: u8[])` checks that
-  `bytes.length` is a multiple of the element size and that
-  `elementIndex + bytes.length / elementSize <= count`, and traps
-  with all three numbers otherwise. `writeOne(queue, elementIndex,
-  bytes)` requires `bytes.length == elementSize`.
+  `bytes.length` is a multiple of the element size, that
+  `elementIndex + bytes.length / elementSize <= count`, and that the
+  byte offset `elementIndex * elementSize` and `bytes.length` are
+  multiples of 4, and traps with the numbers otherwise. The last
+  check is WebGPU's `writeBuffer` rule: a backend rejects a 6-byte
+  write and records no error outside an error scope, so the trap is
+  the only early signal (measured 2026-08-23 on yawgpu and Dawn with
+  a 3-index `u16` buffer: the readback stayed zero). `writeOne` and
+  `patch` apply the same three checks. A `u16` index buffer is
+  therefore written as a `FixedArray<u16, 4>` or longer even
+  multiple. `read`, `readOne`, and `copyTo` apply the same
+  multiple-of-4 rule to their byte offset and byte length (WebGPU's
+  `copyBufferToBuffer` rule) and trap with `BF9` or `BF8`.
 - **BF3 — Reading is explicit.** `readBuffer<T>(readback: Buffer<T>,
   elementIndex: u32, elementCount: u32): u8[]` (a free function)
   copies from a
