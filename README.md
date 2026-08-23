@@ -225,6 +225,14 @@ CAUTION: Run the live lane only with a real adapter. The command executes every 
 tools/live.sh
 ```
 
+CAUTION: Run the window host only with a real adapter and a display. The command opens a window.
+
+```sh
+tools/window.sh examples/window-triangle/main.ts
+```
+
+`tools/window.sh` reads the same two environment variables as `tools/live.sh`. The host owns the window, the surface, the instance, the device, and the event loop, and calls three exports on the script: `init(instance, device, format)` once, `frame(view, width, height, key)` once per frame, and `shutdown()` once. `--frames <n>` closes the window after `n` frames. On close the host prints `window:frames=<n>`.
+
 All Cargo commands in these tools use offline mode.
 
 ## Programs
@@ -245,10 +253,12 @@ Each gate program has an `.expected` file with the same stem. Generated pipeline
 - `crates/webgpu-gen` contains the facade and WebGPU API generator.
 - `crates/typegpu-gen` contains the schema, layout, and WGSL generator.
 - `crates/harness` contains the dev, ship, coverage, documentation, and live test lanes.
+- `crates/window` contains the window host.
+- `examples` contains the window example, outside the program suite.
 - `lib` contains the script libraries and generated ambient files.
 - `programs` contains gate and live programs with their goldens.
 - `specs` contains the contracts and tracking records.
-- `tools` contains regeneration, gate, hygiene, and live commands.
+- `tools` contains regeneration, gate, hygiene, live, and window commands.
 
 ## Documents
 

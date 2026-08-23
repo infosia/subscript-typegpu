@@ -770,6 +770,10 @@ These subscript-typegpu properties have no equivalent.
 - `simulateCompute` with the `HOST_RUNNABLE` constant.
 - A WGSL shell with a host body that the CPU lane runs, and a
   `naga` error attributed to the shell by name.
+- A window host outside the browser: `tools/window.sh` runs a
+  script that exports `init`, `frame`, and `shutdown`, and the host
+  owns the window, the surface, and the loop. TypeGPU draws into a
+  canvas through `GPUCanvasContext`.
 
 ## Where to go next
 
