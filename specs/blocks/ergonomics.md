@@ -97,3 +97,13 @@ question (P2 review M6), and the diagnostic sweep.
   `b04-particles` with the same `program=` fence, and pairs each quote
   with its TypeGPU counterpart in one or two sentences. The quote test
   scans `README.md` with `docs/*.md`.
+
+- **EG10 — The pipeline helpers accept a host-owned device.** Rev 0,
+  2026-08-24. `lib/typegpu.ts` exports `createRenderPipelineHost`
+  and `createComputePipelineHost` with the signatures of RN11 and
+  PI9 and a `GPUHostOwnedDevice` first parameter, because subscript
+  has no common interface over the two device classes and a windowed
+  example otherwise repeats the descriptor by hand. The bodies stay
+  single-sourced: the shared part lives in one helper over the
+  values both device classes produce. A windowed example uses the
+  host form.

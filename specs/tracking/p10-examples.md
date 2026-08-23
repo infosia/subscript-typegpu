@@ -36,3 +36,18 @@ counts). On Noop the three print `check:<name> noop`. Windowed on
 Metal with `--frames 60`: all four print `window:frames=60`, exit 0.
 `triangle` the same on Dawn. Comments per EX2 follow in a separate
 commit by the planning side.
+
+## Round 1 comment review (2026-08-24)
+
+EX2 comments were drafted with an upstream cross-check and applied
+by the planning side. The review also found: the `xor` shell's
+subscript body computes a different image than its WGSL body (a K29
+violation — the CPU lane can never match); dead `frameCount` state
+in three windowed examples; four copies of the render-pipeline
+descriptor because RN11's helper takes `GPUDevice` and a windowed
+example holds `GPUHostOwnedDevice` (resolved as EG10); one
+formula-vs-literal check in `dispatch`; a no-effect barrier in
+`matrix-next`'s tiled kernel; `read` versus `readOne` spelling
+drift. The upstream slider freezes are stated in each header (EX7),
+and the unused `key` parameter is the W2 signature, kept. A cleanup
+round fixes the code findings.
