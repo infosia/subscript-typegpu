@@ -162,6 +162,7 @@ export async function main(): Promise<void> {
       usage: GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
     });
     print("inputs:written");
+    device.pushErrorScope("validation");
     using pipeline = createRenderPipeline(
       device,
       tri_WGSL,
@@ -171,6 +172,11 @@ export async function main(): Promise<void> {
       [tri_VERTEX_LAYOUT0],
       tri,
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+      return;
+    }
     print("pipeline:created");
     using encoder = device.createCommandEncoderDefault();
     using pass = encoder.beginRenderPass({

@@ -237,6 +237,7 @@ export async function main(): Promise<void> {
       usage: GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
     });
     print("inputs:written");
+    device.pushErrorScope("validation");
     using pipeline = createRenderPipeline(
       device,
       quad_WGSL,
@@ -246,6 +247,11 @@ export async function main(): Promise<void> {
       [quad_VERTEX_LAYOUT0, quad_VERTEX_LAYOUT1],
       quad,
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+      return;
+    }
     print("pipeline:created");
     using encoder = device.createCommandEncoderDefault();
     using pass = encoder.beginRenderPass({

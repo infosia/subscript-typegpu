@@ -96,6 +96,7 @@ export async function main(): Promise<void> {
       size: bytes,
       usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_SRC,
     });
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       vecAdd_WGSL,
@@ -103,6 +104,12 @@ export async function main(): Promise<void> {
       [vecAdd_LAYOUT0],
       [vecAdd_WORKGROUP_X, vecAdd_WORKGROUP_Y, vecAdd_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
+    }
     const resources: VecAddLayoutResources = createVecAddLayoutResources(a, b, out);
     using bindGroup = createVecAddBindGroup0(device, pipeline, resources);
     using encoder = device.createCommandEncoderDefault();

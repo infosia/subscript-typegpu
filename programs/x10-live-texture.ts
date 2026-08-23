@@ -129,6 +129,7 @@ export async function main(): Promise<void> {
       { width: 4, height: 4, depthOrArrayLayers: 1 },
     );
     print("inputs:written");
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       textureCopy_WGSL,
@@ -136,6 +137,11 @@ export async function main(): Promise<void> {
       [textureCopy_LAYOUT0],
       [textureCopy_WORKGROUP_X, textureCopy_WORKGROUP_Y, textureCopy_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+      return;
+    }
     print("pipeline:created");
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(device, nativeLayout, textureCopy_LAYOUT0, [

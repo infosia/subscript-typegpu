@@ -51,6 +51,7 @@ export async function main(): Promise<void> {
       return;
     }
     using pair = pairResult;
+    device.pushErrorScope("validation");
     using shader = device.createShaderModule({
       label: "a05-shader",
       code: "@compute @workgroup_size(1) fn main() {}",
@@ -60,6 +61,12 @@ export async function main(): Promise<void> {
       layout: null,
       compute: { module: shader, entryPoint: "main" },
     });
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
+    }
     using pipeline = new ComputePipeline(nativePipeline, [1, 1, 1]);
     using readback: Buffer<FixedArray<u64, 2>> = createBuffer<FixedArray<u64, 2>>(
       device,

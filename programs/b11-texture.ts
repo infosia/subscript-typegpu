@@ -116,6 +116,7 @@ export async function main(): Promise<void> {
       size: SampleParams_SIZE as u64,
       usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
     });
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       texturePass_WGSL,
@@ -123,6 +124,12 @@ export async function main(): Promise<void> {
       [texturePass_LAYOUT0, texturePass_LAYOUT1],
       [texturePass_WORKGROUP_X, texturePass_WORKGROUP_Y, texturePass_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
+    }
     using nativeLayout0 = pipeline.bindGroupLayout(0);
     using nativeLayout1 = pipeline.bindGroupLayout(1);
     using group0 = createBindGroup(device, nativeLayout0, texturePass_LAYOUT0, [

@@ -85,7 +85,13 @@ export async function main(): Promise<void> {
     using readback: Buffer<Item> = createBuffer<Item>(device, Item_STRIDE, 1, GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST, "x04-readback");
     const queue = device.queue();
     input.write(queue, 0, Context.bytesOf<FixedArray<Item, 4>>(inputValues));
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(device, controlFlow_WGSL, controlFlow_ENTRY, [controlFlow_LAYOUT0], [controlFlow_WORKGROUP_X, controlFlow_WORKGROUP_Y, controlFlow_WORKGROUP_Z]);
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+      return;
+    }
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(device, nativeLayout, controlFlow_LAYOUT0, [bufferResource(input.handle()), bufferResource(output.handle())]);
     using encoder = device.createCommandEncoderDefault();

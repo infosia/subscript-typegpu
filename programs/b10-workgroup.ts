@@ -78,6 +78,7 @@ export async function main(): Promise<void> {
       size: (WorkCounter_SIZE * count) as u64,
       usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
     });
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       workgroup_WGSL,
@@ -85,6 +86,12 @@ export async function main(): Promise<void> {
       [workgroup_LAYOUT0],
       [workgroup_WORKGROUP_X, workgroup_WORKGROUP_Y, workgroup_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
+    }
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(device, nativeLayout, workgroup_LAYOUT0, [bufferResource(counters)]);
     using encoder = device.createCommandEncoderDefault();

@@ -40,7 +40,9 @@ export async function main(): Promise<void> {
     if (scoped === null) {
       print("errors:empty");
     } else {
-      print("errors:reported");
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
     }
     device.destroy();
   }

@@ -102,6 +102,7 @@ export async function main(): Promise<void> {
       GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
       "x09-readback",
     );
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       liveSwitch_WGSL,
@@ -109,6 +110,11 @@ export async function main(): Promise<void> {
       [liveSwitch_LAYOUT0],
       [liveSwitch_WORKGROUP_X, liveSwitch_WORKGROUP_Y, liveSwitch_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+      return;
+    }
     print("pipeline:created");
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(device, nativeLayout, liveSwitch_LAYOUT0, [bufferResource(output.handle())]);

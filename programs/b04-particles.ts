@@ -106,6 +106,7 @@ export async function main(): Promise<void> {
       size: (Particle_SIZE * count) as u64,
       usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
     });
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       particles_WGSL,
@@ -113,6 +114,12 @@ export async function main(): Promise<void> {
       [particles_LAYOUT0],
       [particles_WORKGROUP_X, particles_WORKGROUP_Y, particles_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
+    }
     const resources: ParticleLayoutResources = createParticleLayoutResources(
       params,
       particlesBuffer,

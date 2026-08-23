@@ -74,6 +74,7 @@ export async function main(): Promise<void> {
       size: (DepthItem_SIZE * count) as u64,
       usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_SRC,
     });
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       kernelDepth_WGSL,
@@ -81,6 +82,12 @@ export async function main(): Promise<void> {
       [kernelDepth_LAYOUT0],
       [kernelDepth_WORKGROUP_X, kernelDepth_WORKGROUP_Y, kernelDepth_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
+    }
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(device, nativeLayout, kernelDepth_LAYOUT0, [bufferResource(output)]);
     using encoder = device.createCommandEncoderDefault();

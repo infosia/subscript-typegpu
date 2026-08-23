@@ -81,6 +81,7 @@ import {
   UnsignedVectors_SIZE,
   UnsignedVectors_WGSL,
 } from "./b01-layout.typegpu";
+import { gpu, GPUAdapter, GPUDevice } from "./webgpu";
 
 @CStruct
 class Params {
@@ -163,7 +164,32 @@ function retainSchemaTypes(
   return 0;
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
+  const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
+  if (adapterResult === null) {
+    print("FAIL adapter");
+    gpu.dispose();
+    return;
+  }
+  const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
+  if (deviceResult === null) {
+    print("FAIL device");
+    adapterResult.dispose();
+    gpu.dispose();
+    return;
+  }
+  {
+    using adapter = adapterResult;
+    using device = deviceResult;
+    device.pushErrorScope("validation");
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
+    }
+  }
+  gpu.dispose();
   print(`Params size=${Params_SIZE} align=${Params_ALIGN} dt=${Params_OFFSET_dt} count=${Params_OFFSET_count}`);
   print(`Particle size=${Particle_SIZE} align=${Particle_ALIGN} pos=${Particle_OFFSET_pos} vel=${Particle_OFFSET_vel} stride=${Particle_STRIDE}`);
   print(`Mixed size=${Mixed_SIZE} align=${Mixed_ALIGN} a=${Mixed_OFFSET_a} p=${Mixed_OFFSET_p}`);

@@ -167,6 +167,7 @@ export async function main(): Promise<void> {
     a.write(queue, 0, Context.bytesOf<FixedArray<Item, 64>>(aValues));
     b.write(queue, 0, Context.bytesOf<FixedArray<Item, 64>>(bValues));
     print("inputs:written");
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       vecAdd_WGSL,
@@ -174,6 +175,11 @@ export async function main(): Promise<void> {
       [vecAdd_LAYOUT0],
       [vecAdd_WORKGROUP_X, vecAdd_WORKGROUP_Y, vecAdd_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+      return;
+    }
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(
       device,

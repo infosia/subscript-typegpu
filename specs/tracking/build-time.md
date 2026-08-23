@@ -29,6 +29,7 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-23 | P7 slice 1, the tree committed as `1da3db8` | 46 s | 0.2 s | 84 s | 81 s | 6 |
 | 2026-08-23 | P7 close, the tree committed as `167d34e` | 45 s | 0.2 s | 86 s | 84 s | 6 |
 | 2026-08-23 | Retrospective close, the tree committed as `c0ebfed` | 45 s | 0.2 s | 86 s | 84 s | 6 |
+| 2026-08-23 | PI14 error scopes in every program, `x13-live-rejection` | 46 s | 0 s | 88 s | 86 s | 6 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate

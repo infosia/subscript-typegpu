@@ -44,6 +44,7 @@ export async function main(): Promise<void> {
     using adapter = adapterResult;
     using device = deviceResult;
     const queue = device.queue();
+    device.pushErrorScope("validation");
     using shader: GPUShaderModule = device.createShaderModule({ label: "a03-shader", code: SHADER });
     shader.label("a03-shader-label");
     using bindGroupLayout = device.createBindGroupLayout({ label: "a03-layout", entries: [] });
@@ -107,6 +108,12 @@ export async function main(): Promise<void> {
         targets: [{ format: "rgba8unorm" }],
       },
     });
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
+    }
     if (renderAsync !== null) {
       renderAsync.label("a03-render-async-label");
       renderAsync.dispose();

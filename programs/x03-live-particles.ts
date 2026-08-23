@@ -189,6 +189,7 @@ export async function main(): Promise<void> {
       Context.bytesOf<FixedArray<Particle, 64>>(particleValues),
     );
     print("inputs:written");
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       particles_WGSL,
@@ -196,6 +197,11 @@ export async function main(): Promise<void> {
       [particles_LAYOUT0],
       [particles_WORKGROUP_X, particles_WORKGROUP_Y, particles_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+      return;
+    }
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(
       device,

@@ -181,6 +181,7 @@ export async function main(): Promise<void> {
     x.write(queue, 0, Context.bytesOf<FixedArray<Item, 64>>(xValues));
     y.write(queue, 0, Context.bytesOf<FixedArray<Item, 64>>(yValues));
     print("inputs:written");
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       saxpy_WGSL,
@@ -188,6 +189,11 @@ export async function main(): Promise<void> {
       [saxpy_LAYOUT0],
       [saxpy_WORKGROUP_X, saxpy_WORKGROUP_Y, saxpy_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+      return;
+    }
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(
       device,

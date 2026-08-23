@@ -98,6 +98,7 @@ export async function main(): Promise<void> {
     const queue = device.queue();
     params.writeOne(queue, 0, Context.bytesOf<Params>(new Params(5)));
     print("inputs:written");
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       uniformReread_WGSL,
@@ -105,6 +106,11 @@ export async function main(): Promise<void> {
       [uniformReread_LAYOUT0],
       [uniformReread_WORKGROUP_X, uniformReread_WORKGROUP_Y, uniformReread_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+      return;
+    }
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(device, nativeLayout, uniformReread_LAYOUT0, [
       bufferResource(params.handle()),

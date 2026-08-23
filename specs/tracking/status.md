@@ -43,3 +43,13 @@ Every planned phase is complete. The retrospective review ran at
 MINOR 12, the contract side resolved at `09dd4be`, the code side at
 `c0ebfed`. Live at `c0ebfed`: Metal ok 27.25 s, Dawn ok 24.42 s,
 `x01`–`x12` `PASS` on both.
+
+## PI14 round (2026-08-23)
+
+Every program now pushes a `validation` error scope before its first
+creation call and pops it after the last (PI14). `x13-live-rejection`
+submits a non-uniform-barrier module as raw WGSL and passes when the
+popped error names uniform control flow. Evidence: `tools/gate.sh
+--require-backend` green, 89 s, 234 passed, 1 ignored (live). Live
+lane `tools/live.sh`, x01–x13 PASS: Metal (yawgpu) 28.59 s, Dawn
+26.11 s. Goldens unchanged.

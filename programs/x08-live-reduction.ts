@@ -132,6 +132,7 @@ export async function main(): Promise<void> {
       Context.bytesOf<ReductionCounter>(new ReductionCounter(new AtomicU32(0))),
     );
     print("inputs:written");
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       reduction_WGSL,
@@ -139,6 +140,11 @@ export async function main(): Promise<void> {
       [reduction_LAYOUT0],
       [reduction_WORKGROUP_X, reduction_WORKGROUP_Y, reduction_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+      return;
+    }
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(
       device,

@@ -157,6 +157,7 @@ export async function main(): Promise<void> {
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
     using view = target.createView();
+    device.pushErrorScope("validation");
     using pipeline = createRenderPipeline(
       device,
       shifted_WGSL,
@@ -166,6 +167,12 @@ export async function main(): Promise<void> {
       [shifted_VERTEX_LAYOUT0],
       shifted,
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
+    }
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(
       device,

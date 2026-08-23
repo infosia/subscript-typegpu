@@ -213,6 +213,7 @@ export async function main(): Promise<void> {
       usage: GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
     });
     print("inputs:written");
+    device.pushErrorScope("validation");
     using pipeline = createRenderPipeline(
       device,
       shifted_WGSL,
@@ -222,6 +223,11 @@ export async function main(): Promise<void> {
       [shifted_VERTEX_LAYOUT0],
       shifted,
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+      return;
+    }
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(
       device,

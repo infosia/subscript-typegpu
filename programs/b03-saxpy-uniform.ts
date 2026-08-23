@@ -103,6 +103,7 @@ export async function main(): Promise<void> {
       size: itemBytes,
       usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
     });
+    device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
       saxpy_WGSL,
@@ -110,6 +111,12 @@ export async function main(): Promise<void> {
       [saxpy_LAYOUT0],
       [saxpy_WORKGROUP_X, saxpy_WORKGROUP_Y, saxpy_WORKGROUP_Z],
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
+    }
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(device, nativeLayout, saxpy_LAYOUT0, [bufferResource(params), bufferResource(x), bufferResource(y)]);
     using encoder = device.createCommandEncoderDefault();

@@ -1006,6 +1006,7 @@ function createNativeBindGroupLayouts(
   return nativeLayouts;
 }
 
+/** Creates inside the caller's validation error scope; this helper does not await. */
 export function createComputePipeline(
   device: GPUDevice,
   wgsl: string,
@@ -1028,6 +1029,7 @@ export function createComputePipeline(
   return new ComputePipeline(pipeline, workgroup);
 }
 
+/** Creates inside the caller's validation error scope; this helper does not await. */
 export function createRenderPipeline(
   device: GPUDevice,
   wgsl: string,

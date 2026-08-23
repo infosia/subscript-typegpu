@@ -32,6 +32,13 @@ export async function main(): Promise<void> {
   {
     using adapter = adapterResult;
     using device = deviceResult;
+    device.pushErrorScope("validation");
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
+    }
     const queue = device.queue();
     using source = device.createBuffer({
       label: "a01-source",

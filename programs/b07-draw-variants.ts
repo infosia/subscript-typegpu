@@ -171,6 +171,7 @@ export async function main(): Promise<void> {
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
     using view = target.createView();
+    device.pushErrorScope("validation");
     using quadPipeline = createRenderPipeline(
       device,
       quad_WGSL,
@@ -189,6 +190,12 @@ export async function main(): Promise<void> {
       [tri_VERTEX_LAYOUT0],
       tri,
     );
+    const validationError = await device.popErrorScope();
+    if (validationError !== null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      return;
+    }
     using encoder = device.createCommandEncoderDefault();
     using pass = encoder.beginRenderPass({
       colorAttachments: [{
