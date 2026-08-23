@@ -85,7 +85,7 @@ function vertexStep(value: Vertex, ctx: VertexInvocation): Varyings {
 }
 
 function fragmentStep(value: Varyings, ctx: FragmentInvocation): Vec4f {
-  return new Vec4f(0.25, 0.5, 0.75, 1.0);
+  return new Vec4f(0.25, 0.6, 0.75, 1.0);
 }
 
 export const indirectCompute: ComputePipelineSpec = computePipeline<IndirectLayout>(
@@ -276,7 +276,7 @@ export async function main(): Promise<void> {
       while (x < 4) {
         const hit = inside(center(x, y), a, b, c);
         const expectedR: u8 = hit ? 64 : 0;
-        const expectedG: u8 = hit ? 128 : 0;
+        const expectedG: u8 = hit ? 153 : 0;
         const expectedB: u8 = hit ? 191 : 0;
         const o = y * 256 + x * 4;
         if (pixels[o] !== expectedR
