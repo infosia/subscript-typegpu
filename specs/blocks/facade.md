@@ -24,21 +24,36 @@ collide.
   case the return is a null instance and no other export is called.
 - **L3 — Every symbol resolves before any call.** The table is
   filled completely or not at all. A partial table never exists.
-- **L4 — One backend name in the facade.** Rev 1, 2026-08-22. The
+- **L4 — One backend name in the facade.** Rev 2, 2026-08-24. The
   facade knows webgpu.h and one companion extension: the Tier-1
   backend's instance backend-select chained struct (yawgpu,
   `YAWGPU_STYPE_INSTANCE_BACKEND_SELECT`, a `u32` backend id). It
-  knows nothing else about yawgpu, Dawn, or wgpu-native. A library
-  that does not implement the extension ignores the chain, as
-  webgpu.h specifies for an unknown `sType`.
-- **L13 — The backend request.** `subscript_typegpu_create_instance`
-  reads `SUBSCRIPT_TYPEGPU_BACKEND`. Absent means no chain: the
-  library's default (yawgpu: Noop). `metal`, `vulkan`, `gles` select
-  that backend through the L4 extension. Any other value prints one
-  stderr line with the value and the accepted set, and returns a
-  null instance. A null instance from the library after a request
-  prints one line that names the request and the library path. The
-  gate never sets the variable. The live lane sets it.
+  knows nothing else about the implementations. The loader records
+  whether the loaded library exports
+  `yawgpuDeviceCreateExternalTexture`. That marker identifies a
+  yawgpu library, and the facade sends the extension chain only
+  then.
+  Correction (Rev 1 → Rev 2): Rev 1 claimed that a library without
+  the extension ignores the chain *(docs)*. Dawn rejects an unknown
+  `sType` on the instance descriptor chain and returns a null
+  instance (measured 2026-08-23, `webgpu_dawn.dll`:
+  `Unexpected chained struct of type SType::1879048193`).
+- **L13 — The backend request.** Rev 1, 2026-08-24.
+  `subscript_typegpu_create_instance` reads
+  `SUBSCRIPT_TYPEGPU_BACKEND`. Absent means no chain and no adapter
+  filter: the library's default (yawgpu: Noop, Dawn: its platform
+  choice). The accepted values are `metal`, `vulkan`, `gles`,
+  `d3d11`, and `d3d12`, each the lower-case name of a pinned
+  `WGPUBackendType` constant (`gles` maps to `OpenGLES`). Any other
+  value prints one stderr line with the value and the accepted set,
+  and returns a null instance. When the library is yawgpu (L4
+  marker), `metal`, `vulkan`, and `gles` select the backend through
+  the L4 extension, and `d3d11` and `d3d12` print one stderr line
+  (`backend \`<value>\` is not a yawgpu backend`) and return a null
+  instance. When the library is not yawgpu, no chain is sent and the
+  request rides on L15 alone. A null instance from the library after
+  a request prints one line that names the request and the library
+  path. The gate never sets the variable. The live lane sets it.
 - **L14 — The surface family is host-only and resolved on demand.**
   Rev 0, 2026-08-23. The ten webgpu.h surface functions
   (`wgpuInstanceCreateSurface`, `wgpuSurfaceConfigure`,
@@ -53,6 +68,19 @@ collide.
   missing symbol when the backend lacks one. No surface construct
   enters `subscript-typegpu.h`, the mirror, or the symbol table.
   The window host (W-rules) is the only consumer.
+- **L15 — The adapter backend filter.** Rev 0, 2026-08-24. When
+  `SUBSCRIPT_TYPEGPU_BACKEND` holds an accepted value,
+  `subscript_typegpu_instance_request_adapter` passes a
+  `WGPURequestAdapterOptions` with every field at its `INIT` value
+  and `backendType` set to the mapped constant. When the variable is
+  absent, the call passes NULL options, unchanged. The pinned header
+  defines the field: an implementation that honors it returns no
+  adapter of another backend. Dawn honors it (measured 2026-08-23,
+  CTS `cts.exe`: `vulkan` and `d3d12` requests each returned the
+  named backend). yawgpu honors it from
+  https://github.com/infosia/yawgpu commit `13ac0b4` (rule IB5
+  there): a mismatch fails with `WGPURequestAdapterStatus_Unavailable`
+  and a message. The facade adds no post-request check.
 - **L5 — The ship tier links the same crate.** The facade builds as
   `lib` and `staticlib`. The staticlib carries `libloading` and the
   platform's dynamic loader library. No other link input exists.
