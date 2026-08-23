@@ -447,6 +447,16 @@ Differences:
 - `createTimestampPair` returns `null` when the device lacks
   `timestamp-query`. With a pair, `dispatchTimed` records two
   timestamps around the dispatch.
+- A declaration with `guarded: true` gets a generated bounds guard
+  on all three axes and one hidden uniform binding that the runtime
+  owns. `dispatchThreads` writes the thread count before the pass.
+  TypeGPU's `createGuardedComputePipeline` is the counterpart.
+- `dispatchIndirect(encoder, groups, buffer, offset)` records an
+  indirect dispatch. The argument blocks are the schemas
+  `DispatchIndirectArgs`, `DrawIndirectArgs`, and
+  `DrawIndexedIndirectArgs`, written with `Context.bytesOf`. Render
+  indirect draws are `pass.drawIndirect` and
+  `pass.drawIndexedIndirect` in the API layer.
 
 ## Workgroup variables, barriers, and atomics
 
@@ -600,6 +610,11 @@ Differences:
   `position` is the clip position.
 - `renderPipelineL` adds a layout class for bindings in both stages.
   `renderPipelineInstanced` adds an instance class.
+- `indexFormat` on the spec emits `<name>_INDEX_FORMAT`, and
+  `RenderPipeline.setIndexBuffer(pass, buffer)` sets the buffer with
+  that format. `cullMode` and `frontFace` on the spec reach the
+  pipeline descriptor. TypeGPU writes `withIndexBuffer` and
+  `primitive: { cullMode }`.
 - One color target per pipeline. Depth, stencil, and multisample
   options are not in the library.
 
@@ -687,6 +702,38 @@ There is no `tgpu.resolve`, no template with externals, and no
 `$uses`. A kernel refers to module-level constants, layout fields, and
 functions by name, and the generator emits what the call graph reaches.
 
+A WGSL shell is the escape hatch for a builtin or a construct the
+generator does not emit. The function keeps a subscript body, which
+the CPU lane runs, and a `wgslShell` declaration supplies the WGSL
+body. `wgslDeclarations` adds module-level WGSL text.
+
+```ts program=programs/b14-wgsl-shell.ts
+wgslDeclarations("const SHELL_BIAS: u32 = 7u;");
+
+function addBias(value: u32): u32 {
+  return value + 7;
+}
+
+const addBiasShell: WgslShellSpec = wgslShell<(value: u32) => u32>(
+  addBias,
+  {
+    body: "return value + SHELL_BIAS;",
+  },
+);
+```
+
+TypeGPU writes `tgpu.fn([d.u32], d.u32)\`(value) { return value + SHELL_BIAS; }\``
+with `$uses`. Differences:
+
+- The WGSL `fn` line comes from the subscript signature. The body
+  string holds statements only.
+- A lexical fence rejects `@group`, `@binding`, `var<`, `override`,
+  and the barrier builtins inside a shell body or the declarations.
+- A `naga` error inside a shell body is reported with the shell's
+  name.
+- The subscript body is a second implementation. A live program
+  compares the GPU result against it.
+
 ## Not in subscript-typegpu
 
 These TypeGPU features have no equivalent.
@@ -695,9 +742,8 @@ These TypeGPU features have no equivalent.
   `d.size`, `d.Infer`.
 - Fixed resources and the catch-all bind group: `root.createUniform`,
   `root.createReadonly`, `root.createMutable`.
-- `tgpu.fn` shells, WGSL-string function bodies, `$uses`,
-  `tgpu.resolve`, `tgpu.const`, slots, derived values, accessors.
-- `root.createGuardedComputePipeline` and default workgroup sizes.
+- `tgpu.resolve`, `tgpu.const`, slots, derived values, accessors.
+- Default workgroup sizes.
 - `buffer.clear`, `buffer.copyFrom`, `common.writeSoA`.
 - Operators on vectors, `std` as a namespace, `tsover`, and swizzles
   as properties.
@@ -722,6 +768,8 @@ These subscript-typegpu properties have no equivalent.
 - Generation-time rejections with rule ids, including the uniform
   control flow check for barriers.
 - `simulateCompute` with the `HOST_RUNNABLE` constant.
+- A WGSL shell with a host body that the CPU lane runs, and a
+  `naga` error attributed to the shell by name.
 
 ## Where to go next
 
