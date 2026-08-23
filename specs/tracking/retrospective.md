@@ -30,5 +30,11 @@ by compilation, the R34 byte path gated through the stride check,
 the C proof for every `b` program, hygiene, no residue, no local
 path.
 
-The code findings went to the coding agent as the final round.
-Result: pending.
+The code findings landed at `c0ebfed`: render kernels reach module
+constants and private variables (`b06`'s fragment alpha is a module
+constant), the tests carry no per-program name lists, `coverage.md`
+is compared, schema intent comes from the declarations, the host
+texture bodies trap for a non-zero level, regeneration from absence
+is gated, the pairing check reads the constant's origin, the
+rule-id scanner covers `docs/` and `README.md`, one export-name
+source.
