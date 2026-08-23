@@ -1,6 +1,6 @@
 # Project status
 
-Updated 2026-08-23 at `167d34e`.
+Updated 2026-08-23 at `42ecb7f`.
 
 | Phase | Status | Close |
 |---|---|---|
@@ -13,7 +13,7 @@ Updated 2026-08-23 at `167d34e`.
 | P6 ergonomics and diagnostics | COMPLETE | `4c2eff8`, 2026-08-23 |
 | P7 the CPU lane | COMPLETE | `167d34e`, 2026-08-23 |
 
-Numbers at `167d34e`: 231 tests in six executables, 28 programs
+Numbers at `42ecb7f`: 233 tests in six executables, 28 programs
 (`a01`–`a05`, `b01`–`b11`, `x01`–`x12`), 157 facade exports all
 reached, the live lane green on yawgpu Metal and on Dawn with the
 kernel bodies as the oracle for `x01`–`x04` and `x09`, the gate 86 s
@@ -38,5 +38,6 @@ integer sample types and formats, a phased `simulateCompute` for
 barrier kernels (CL2), render pipelines beyond one group (TX2).
 Every planned phase is complete. The retrospective review ran at
 `82175df` (`specs/tracking/retrospective.md`): CRITICAL 0, MAJOR 2,
-MINOR 12, the contract side resolved at `09dd4be`, the code side in
-the final round.
+MINOR 12, the contract side resolved at `09dd4be`, the code side at
+`c0ebfed`. Live at `c0ebfed`: Metal ok 27.25 s, Dawn ok 24.42 s,
+`x01`–`x12` `PASS` on both.
