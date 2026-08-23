@@ -10,8 +10,20 @@ fn root() -> PathBuf {
         .to_path_buf()
 }
 
-fn checked_example() -> hir::Module {
-    let program = root().join("examples/window-triangle/main.ts");
+fn example_programs() -> Vec<PathBuf> {
+    let directory = root().join("examples");
+    let mut programs = std::fs::read_dir(&directory)
+        .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()))
+        .filter_map(Result::ok)
+        .map(|entry| entry.path().join("main.ts"))
+        .filter(|path| path.is_file())
+        .collect::<Vec<_>>();
+    programs.sort();
+    assert!(!programs.is_empty(), "example program list is empty");
+    programs
+}
+
+fn checked_example(program: &PathBuf) -> hir::Module {
     let files = subscript_typegpu_harness::program_files(&program)
         .unwrap_or_else(|error| panic!("load {}: {error}", program.display()));
     subscript_compiler::check_program_with(&files, &CheckOptions::default())
@@ -20,10 +32,11 @@ fn checked_example() -> hir::Module {
 
 #[test]
 fn window_example_compiles_through_the_host_loader_without_a_device() {
-    let program = root().join("examples/window-triangle/main.ts");
-    let session = subscript_typegpu_harness::load_program(&program)
-        .unwrap_or_else(|error| panic!("compile {}: {error}", program.display()));
-    drop(session);
+    for program in example_programs() {
+        let session = subscript_typegpu_harness::load_program(&program)
+            .unwrap_or_else(|error| panic!("compile {}: {error}", program.display()));
+        drop(session);
+    }
 }
 
 fn type_name(module: &hir::Module, ty: &Type) -> String {
@@ -39,7 +52,6 @@ fn type_name(module: &hir::Module, ty: &Type) -> String {
 
 #[test]
 fn window_example_has_the_three_host_entry_signatures() {
-    let module = checked_example();
     let expected = [
         (
             "init",
@@ -60,35 +72,42 @@ fn window_example_has_the_three_host_entry_signatures() {
         ),
         ("shutdown", Vec::new()),
     ];
-    let entries = module
-        .functions
-        .iter()
-        .filter(|function| function.exported && function.pos.file == "main.ts")
-        .collect::<Vec<_>>();
-    assert_eq!(
-        entries.len(),
-        expected.len(),
-        "unexpected exported entry count"
-    );
-    for (name, params) in expected {
-        let function = entries
+    for program in example_programs() {
+        let module = checked_example(&program);
+        let entries = module
+            .functions
             .iter()
-            .find(|function| function.name == name)
-            .unwrap_or_else(|| panic!("missing exported {name}"));
-        if name != "init" {
-            assert!(!function.is_async, "{name} must be synchronous");
+            .filter(|function| function.exported && function.pos.file == "main.ts")
+            .collect::<Vec<_>>();
+        if entries.iter().any(|function| function.name == "main") {
+            continue;
         }
-        assert_eq!(type_name(&module, &function.ret), "void", "{name} return");
-        let actual = function
-            .params
-            .iter()
-            .map(|parameter| (parameter.name.as_str(), type_name(&module, &parameter.ty)))
-            .collect::<Vec<_>>();
-        let expected = params
-            .iter()
-            .map(|(parameter, ty)| (*parameter, (*ty).to_owned()))
-            .collect::<Vec<_>>();
-        assert_eq!(actual, expected, "{name} signature");
+        assert_eq!(
+            entries.len(),
+            expected.len(),
+            "{} exported entry count",
+            program.display(),
+        );
+        for (name, params) in &expected {
+            let function = entries
+                .iter()
+                .find(|function| function.name == *name)
+                .unwrap_or_else(|| panic!("{} missing exported {name}", program.display()));
+            if *name != "init" {
+                assert!(!function.is_async, "{name} must be synchronous");
+            }
+            assert_eq!(type_name(&module, &function.ret), "void", "{name} return");
+            let actual = function
+                .params
+                .iter()
+                .map(|parameter| (parameter.name.as_str(), type_name(&module, &parameter.ty)))
+                .collect::<Vec<_>>();
+            let wanted = params
+                .iter()
+                .map(|(parameter, ty)| (*parameter, (*ty).to_owned()))
+                .collect::<Vec<_>>();
+            assert_eq!(actual, wanted, "{} {name} signature", program.display());
+        }
     }
 }
 

@@ -611,6 +611,48 @@ windowed example runs `--frames 120` to `window:frames=120` on Metal
 and on Dawn, and the owner's visual run is recorded. Comments obey
 EX2, written or revised by the planning side. Budgets hold.
 
+### P11 — the low-cost feature gaps (interleaves with P10)
+
+The P10 survey ranked the missing features by the examples they
+unlock. P11 takes the low-difficulty half. Measured base: the API
+layer already carries `GPUQueue.writeTexture` over `u8[]`,
+`GPUStorageTextureAccess` with `read-only` and `read-write`, the
+`triangle-strip` topology, and `stripIndexFormat`. Each slice
+revises its block before implementation.
+
+Slice 1 — texture upload and strip (very low). A TypeGPU-layer
+helper writes a `Vec4f[]` or `u8[]` image into a sampled texture
+through `writeTexture` (TX Rev), with a `b` program and a live
+program that samples an uploaded gradient. One render program with
+`topology: "triangle-strip"` proves the pass-through (RN). Unlocks
+the `clouds` port and removes the strip reductions of EX7 ports.
+
+Slice 2 — pointer input (low). W2 Rev: `frame` gains the pointer
+position in pixels and a button bit set, from winit events, one
+state slot as the key (W3). Unlocks `fluid-with-atomics` unreduced,
+`stable-fluid`, the drawing examples, and `oklab`'s probe.
+
+Slice 3 — read-access storage textures (low-medium). `StorageTexture2d`
+gains a read-only and a read-write form (TX Rev), the generator
+emits `texture_storage_2d<F, read>` and `read_write`, the layout
+entry carries the access, the host bodies read. Risk named in
+advance: backend support. The slice starts with a probe program on
+yawgpu Metal and Dawn; a yawgpu gap becomes an IB-rule escalation
+like the backend request. Unlocks `slime-mold`, `game-of-life`
+(without `textureGather`), the jump-flood pair, and the
+radiance-cascades docs pair later.
+
+Slice 4 — blending (medium). `RenderPipelineSpec` gains a blend
+member the runtime passes through, and the host rasterizer blends
+the compared pixels. Unlocks `box-raytracing`, `genetic-racing`,
+`wind-map` partially. Depth, multisample, integer textures, texture
+arrays, and 3D textures stay in the deferred list with their
+dependents.
+
+Exit per slice: the block Rev, the programs and goldens on both
+tiers, the live lane on Metal and Dawn, the rejection fixtures, the
+unlocked P10 example ported, budgets recorded.
+
 ## 9. Risk register
 
 | Id | Risk | Mitigation / trigger |
