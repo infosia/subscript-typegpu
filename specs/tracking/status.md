@@ -36,5 +36,7 @@ values (P6).
 Open items carried in the blocks: RN8's multiple targets, TX1's
 integer sample types and formats, a phased `simulateCompute` for
 barrier kernels (CL2), render pipelines beyond one group (TX2).
-Every planned phase is complete. A whole-repository retrospective
-review follows.
+Every planned phase is complete. The retrospective review ran at
+`82175df` (`specs/tracking/retrospective.md`): CRITICAL 0, MAJOR 2,
+MINOR 12, the contract side resolved at `09dd4be`, the code side in
+the final round.
