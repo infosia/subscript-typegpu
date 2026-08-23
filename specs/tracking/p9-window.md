@@ -42,3 +42,13 @@ W11 Rev 1 (`--frames <n>`), F23 (derived from the yml), plan layout
 in one Codex round. The owner's first Dawn run printed no
 `window:frames` line; the `--frames` path makes the close path
 measurable without a person at the keyboard.
+
+## Owner's run (2026-08-23)
+
+Dawn (`SUBSCRIPT_TYPEGPU_BACKEND` unset, `libwebgpu_dawn.dylib`),
+`tools/window.sh examples/window-triangle/main.ts` at `938d6fd`: the
+window opened, the triangle drew, space advanced the clear color,
+resize kept the drawing, close printed `window:frames=207` and the
+host exited. An earlier run printed no `window:frames` line and its
+end was not observed. The Metal run and the `--frames` run follow
+the review fixes.
