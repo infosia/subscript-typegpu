@@ -1,6 +1,7 @@
 # Block: window (W-rules)
 
-P9 contract. Rev 0, 2026-08-23. Plan §8 P9 governs this block. The
+P9 contract. Rev 0, 2026-08-23. Rev 1 (W2, W6, W11 from the phase
+review), 2026-08-23. Plan §8 P9 governs this block. The
 facade side is `facade.md` L14 and `facade-generator.md` F23. The
 script side is the API layer (`api-layer.md`) and the TypeGPU layer.
 
@@ -16,12 +17,14 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   context object.
 - **W2 — Three entries.** The host calls three script exports:
   `init(instance: SubscriptTypegpuInstance, device:
-  SubscriptTypegpuDevice, format: GPUTextureFormatWire): void` once
+  SubscriptTypegpuDevice, format: GPUTextureFormat): void` once
   after the surface is configured, `frame(view:
   SubscriptTypegpuTextureView, width: u32, height: u32, key: u32):
   void` once per presented frame, and `shutdown(): void` once before
-  the host releases the device. `GPUTextureFormatWire` is the wire
-  enum alias of `GPUTextureFormat` in `lib/wire-enum-aliases.generated.d.ts`.
+  the host releases the device. `GPUTextureFormat` is the wire enum
+  alias in `lib/wire-enum-aliases.generated.d.ts`, and the host
+  passes the configured format's wire value (Rev 1: no second
+  alias).
   The script wraps the device with `hostOwnedGPUDevice(instance,
   device)` (a `GPUHostOwnedDevice` has neither `dispose` nor
   `destroy`) and the view with `new GPUTextureView(view)` and
@@ -55,7 +58,10 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   `subscript_typegpu_instance_process_events` and steps the session
   until no async work is pending, as the harness does for a
   program. A `frame` export is synchronous. An `init` export can be
-  `async` and is drained the same way before the first frame.
+  `async` and is drained the same way before the first frame. After
+  every entry call and every drain the host writes the script's
+  `print` output to its own stdout, so a script line is visible when
+  it is printed (Rev 1).
 - **W7 — The surface format.** The host configures the surface with
   `bgra8unorm` when the surface capabilities list it, and with the
   first listed format otherwise. `init` receives the configured
@@ -89,7 +95,10 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   `SUBSCRIPT_TYPEGPU_BACKEND` as `tools/live.sh` reads them. A
   sandboxed shell sees no adapter, so Claude runs the command with
   the sandbox disabled, as for `tools/live.sh`. The host prints
-  `window:frames=<n>` on close.
+  `window:frames=<n>` on close. An optional `--frames <n>` argument
+  (Rev 1) closes the window after `n` presented frames, so a run
+  without a person at the keyboard ends through the close path.
+  `tools/window.sh` passes its remaining arguments to the host.
 - **W12 — The example.** `examples/window-triangle/main.ts` draws
   one triangle through a TypeGPU render pipeline
   (`renderPipeline<Vertex, Varyings>`) whose clear color the space

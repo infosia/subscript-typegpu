@@ -102,7 +102,9 @@ letter with this block, so the pipelines area uses `PL`.
 
 - **F23 — Host-only rows.** Rev 0, 2026-08-23. A `[[host_only]]`
   policy row names a webgpu.h function or struct. The generator
-  emits its Rust FFI declaration and a table slot into
+  emits its Rust FFI declaration and a table slot, derived from the
+  pinned `webgpu.yml` the same way `generated.rs` derives its
+  declarations and never from literal text in the generator, into
   `crates/facade/src/surface.rs` (a generated file with its own
   regeneration gate) and emits nothing for it into the C header, the
   mirror, `lib/webgpu.ts`, or the harness symbol table. A

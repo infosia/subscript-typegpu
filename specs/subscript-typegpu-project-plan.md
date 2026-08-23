@@ -193,6 +193,9 @@ crates/typegpu-gen/        subscript-typegpu-gen: lib + bin. Deps: subscript-com
                            Dev-deps: naga, serde_json
 crates/harness/            subscript-typegpu-harness: bin + one test target. Deps: facade,
                            typegpu-gen, subscript-compiler, subscript-codegen, libc
+crates/window/             subscript-typegpu-window: the winit host (W-rules). Deps: the harness
+                           crate for the session, winit, raw-window-handle, objc2 on macOS.
+examples/window-triangle/  the windowed example, outside the program suite (W12)
 lib/                       webgpu.ts (generated), wire-enum-aliases.generated.d.ts,
                            subscript-typegpu.generated.d.ts, typegpu.ts, typegpu-types.ts
 programs/                  aNN-*.ts (API layer), bNN-*.ts (TypeGPU), .expected goldens,
