@@ -52,3 +52,15 @@ resize kept the drawing, close printed `window:frames=207` and the
 host exited. An earlier run printed no `window:frames` line and its
 end was not observed. The Metal run and the `--frames` run follow
 the review fixes.
+
+## `--frames` run 1 (2026-08-23)
+
+After the review fixes, `tools/window.sh examples/window-triangle/main.ts
+--frames 120` failed on Metal and Dawn with `window:compile: rejected
+with 13 diagnostic(s)`: `imported module ./main.typegpu is not among
+the program's files`. The host compiled the program without the
+TypeGPU support module. The W13 signature test reads the HIR with
+poisoned imports, so it could not see it. Resolution: W8 Rev 1
+(diagnostics before the one line), W13 Rev 1 (one program loader
+shared by the host and the harness, and a gate test that compiles
+the example through it).

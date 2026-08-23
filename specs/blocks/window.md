@@ -1,7 +1,8 @@
 # Block: window (W-rules)
 
 P9 contract. Rev 0, 2026-08-23. Rev 1 (W2, W6, W11 from the phase
-review), 2026-08-23. Plan §8 P9 governs this block. The
+review), 2026-08-23. Rev 2 (W8, W13 after the first `--frames` run),
+2026-08-23. Plan §8 P9 governs this block. The
 facade side is `facade.md` L14 and `facade-generator.md` F23. The
 script side is the API layer (`api-layer.md`) and the TypeGPU layer.
 
@@ -70,10 +71,12 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   equals the received format and exits through `print` and an early
   return otherwise. The host treats a script that returns from
   `init` without a pipeline as a normal run.
-- **W8 — Errors exit once.** A failure in the host (window
+- **W8 — Errors exit once.** Rev 1. A failure in the host (window
   creation, surface creation, adapter or device request, a script
   entry that fails) prints one line that names the step and exits
-  with a non-zero code. The host never prints per frame.
+  with a non-zero code. A compile failure prints the compiler's
+  diagnostics first, then the one line. The host never prints per
+  frame.
 
 ## The crate
 
@@ -109,10 +112,15 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
 
 ## Gates
 
-- **W13 — What the headless gate holds.** The regeneration gate
-  over the F23 host-only declarations, the W2 signature test over
-  the example, `cargo build --offline -p subscript-typegpu-window`,
-  and `cargo clippy --workspace`. The windowed run is never
+- **W13 — What the headless gate holds.** Rev 1. The regeneration
+  gate over the F23 host-only declarations, the W2 signature test
+  over the example, a harness test that compiles the example on the
+  dev tier through the same path the host uses (support module
+  generated in memory, every `lib/` file loaded) without a device,
+  `cargo build --offline -p subscript-typegpu-window`, and `cargo
+  clippy --workspace`. The host and the harness share one program
+  loader, so the example cannot compile in one and fail in the
+  other. The windowed run is never
   CI-required (invariant 5). The cold build row in
   `specs/tracking/build-time.md` records the increment the crate
   adds.
