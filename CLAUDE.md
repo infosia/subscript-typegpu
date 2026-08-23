@@ -324,8 +324,8 @@ Practical limits:
    against the committed golden, headless, on every test run.
 4. **WGSL is a golden.** Every kernel's emitted WGSL is committed as a
    `.wgsl` golden beside its program and validated by `naga` in the
-   generator's tests. Generated support modules are not committed.
-   The differential run compiles them in memory.
+   harness on every test run. Generated support modules are not
+   committed. The differential run compiles them in memory.
 5. **Headless-first** (invariant 5).
 6. **No panics in library code**; `Result` and `?`. The facade's
    `extern "C"` boundary is the single exception surface and never

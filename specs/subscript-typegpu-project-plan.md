@@ -191,8 +191,8 @@ crates/webgpu-gen/         subscript-typegpu-webgpu-gen: lib + bin. Deps: serde,
                            toml, weedle2, subscript-bindgen. policy.toml lives here
 crates/typegpu-gen/        subscript-typegpu-gen: lib + bin. Deps: subscript-compiler.
                            Dev-deps: naga, serde_json
-crates/harness/            subscript-typegpu-harness: bin + one test target. Deps: the three
-                           crates above, subscript-compiler, subscript-codegen
+crates/harness/            subscript-typegpu-harness: bin + one test target. Deps: facade,
+                           typegpu-gen, subscript-compiler, subscript-codegen, libc
 lib/                       webgpu.ts (generated), wire-enum-aliases.generated.d.ts,
                            subscript-typegpu.generated.d.ts, typegpu.ts, typegpu-types.ts
 programs/                  aNN-*.ts (API layer), bNN-*.ts (TypeGPU), .expected goldens,
@@ -285,12 +285,14 @@ barrier uniformity needs it. P2 carries no field it does not read.
 ### The harness
 
 One binary. One test target with modules: `differential` (every `a`
-and `b` program, both tiers, Noop), `wgsl_goldens` (every `.wgsl`
-golden equals the generator's output and validates under naga),
-`regen` (every committed generated file is byte-identical to its
-tool's output), `rejections` (every fixture under `fixtures/reject/`
-fails with its named diagnostic), `live` (`#[ignore]`, `x` programs
-on a real adapter through `ReloadSession`).
+and `b` program, both tiers, Noop, coverage counted), `wgsl_goldens`
+(every `.wgsl` golden equals the generator's output and validates
+under naga), `c_layout`, `rejections` (every fixture under
+`crates/typegpu-gen/tests/fixtures/reject/` fails with its named
+diagnostic), `traps`, `coverage`, `simulate`, `docs`, `uniformity`,
+`api`, `live` (`#[ignore]`, `x` programs on a real adapter through
+`ReloadSession`). The regeneration gates live in the generator
+crates' own tests.
 
 Ship tier: emit C, compile with the platform C compiler, link the
 facade staticlib and the subscript runtime staticlib, run. The
@@ -460,7 +462,7 @@ gate. (6) Budgets hold.
 
 Because the library has real bodies (D7), a kernel can run on the
 dev-tier JIT with its wrappers holding host data. Contract draft:
-`specs/blocks/cpu-lane.md` (CL1–CL4): `simulateCompute` loops the
+`specs/blocks/cpu-lane.md` (CL1–CL6): `simulateCompute` loops the
 invocations on the host, barrier kernels are out until a phased
 revision, the live programs take the kernel body as their oracle.
 
@@ -502,6 +504,20 @@ here with the evidence, the date, and the corrected claim.
   Corrected claim: the generator enforces uniform placement (K22 Rev
   1), and the criterion names a generator diagnostic. Evidence:
   `specs/tracking/p4-kernel-depth.md`.
+- **C2 — D4 cannot reproduce a tail-packed WGSL struct
+  (2026-08-23).** WGSL places a scalar after a `vec3` member in the
+  vector's tail (`{ p: vec3f; x: f32 }` is 16 bytes). R33 only raises
+  an alignment, so the C layout puts `x` at 16 and SC9 rejects the
+  schema. D4 stands for every schema whose members start at their
+  natural WGSL offsets, and the limitation is the rule: an author
+  reorders or pads such a schema. Evidence: the retrospective
+  review at `82175df`.
+- **C3 — A spec revision a tracking entry cites must exist
+  (2026-08-23).** Four closes cited a revision that had not landed
+  in the block (P1 exit criteria, PI8 Rev 1, PI9 Rev 1, PI8 Rev 2),
+  because a failed text replacement went unnoticed. Rule: before a
+  tracking entry cites `<rule> Rev <n>`, the block carries that
+  marker. Evidence: the retrospective review at `82175df`.
 
 ## 11. Open questions for the owner
 

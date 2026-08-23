@@ -59,17 +59,22 @@ this block. Kernels are `kernel.md`. The runtime classes live in
 
 ## Generated artifacts
 
-- **PI8 — The support module exports constants only.** Rev 1,
-  2026-08-22. For each declaration `<name>` the generator emits
-  `<name>_WGSL: string`, `<name>_ENTRY: string`, three `u32`
-  constants `<name>_WORKGROUP_X`, `_Y`, `_Z`, and, per layout class
-  of the declaration, `<name>_LAYOUT<g>: BindGroupLayoutSpec` (a
-  library `@Descriptor` with an entries array of `{ binding,
-  visibility, kind, minBindingSize }`, every size from the layout
-  engine, a type the engine cannot size is a diagnostic). Schema
-  constants per SC11 continue. No generated type and no generated
-  function exists. A typed per-field resources record is a P6
-  ergonomics item.
+- **PI8 — The support module's exports.** Rev 2, 2026-08-23. For
+  each declaration `<name>` the generator emits `<name>_WGSL:
+  string`, `<name>_ENTRY: string`, three `u32` constants
+  `<name>_WORKGROUP_X`, `_Y`, `_Z`, `<name>_HOST_RUNNABLE: boolean`
+  (CL2), and, per layout class of the declaration,
+  `<name>_LAYOUT<g>: BindGroupLayoutSpec` (a library `@Descriptor`
+  with an entries array of `{ binding, visibility, kind,
+  minBindingSize }`, every size from the layout engine, a type the
+  engine cannot size is a diagnostic). Per layout class `L` it
+  emits `@Descriptor class LResources` and the factories
+  `createLResources(...)` and `create<Name>BindGroup<g>(device,
+  pipeline, resources)` (EG1). Schema constants per SC11 continue.
+  The discovery check (SC1a Rev 1) poisons every generated name. Rev
+  0 and Rev 1 of this rule allowed constants only; the record of
+  those revisions is `specs/tracking/p2-kernels.md` and
+  `p6-ergonomics.md`.
 - **PI9 — The runtime class.** `lib/typegpu.ts` exports
   `createComputePipeline(device, wgsl, entry, layouts:
   BindGroupLayoutSpec[], workgroup: FixedArray<u32, 3>):
@@ -97,11 +102,10 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   constants by name, and the WGSL line count. Noop executes no
   shader, so a `b` program never prints a result buffer.
 - **PI12 — Live programs compute.** An `x` program writes input
-  data, dispatches on a real adapter, reads back, compares with a
-  host computation, and prints `PASS`. Until R34 lands the input
-  bytes are built with `Math.f32ToBits` in the program, and the
-  output is decoded the same way. After R34 the program uses
-  `Context.bytesOf` and `Context.fromBytes`.
+  data through `Context.bytesOf` (BF7), dispatches on a real
+  adapter, reads back through `Context.fromBytes`, compares with a
+  host computation (`simulateCompute` where CL3 applies), and prints
+  `PASS`.
 
 ## Rejections
 

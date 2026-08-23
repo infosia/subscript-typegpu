@@ -2,7 +2,7 @@
 
 Status: **COMPLETE 2026-08-23.** Opened 2026-08-23 by the owner's
 decision. Closed at `167d34e`.
-Plan §8 P7. Contract: `specs/blocks/cpu-lane.md` (CL1–CL4).
+Plan §8 P7. Contract: `specs/blocks/cpu-lane.md` (CL1–CL6).
 
 ## Slice 1 — `simulateCompute`, the host-runnable constant, the oracles
 

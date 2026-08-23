@@ -81,8 +81,9 @@ does not say otherwise. Schemas are `schema.md`.
 ## Emission
 
 - **RN9 — One module, two entries.** The render pipeline's module
-  holds the structs, the bindings, the helpers, `@vertex fn <vert>`,
-  and `@fragment fn <frag>`, in that order (K14). The kernels that
+  holds the structs, the module constants and private variables the
+  two kernels reach (K19, K20), the bindings, the helpers, `@vertex
+  fn <vert>`, and `@fragment fn <frag>`, in that order (K14). The kernels that
   reach a binding decide its visibility: vertex, fragment, or both.
   A binding no kernel reaches is a diagnostic. `enable f16;` depends
   on the types this module references. The golden is

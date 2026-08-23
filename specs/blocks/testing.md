@@ -101,10 +101,12 @@ principles" govern this block.
   differential test's wall time. An unknown argument is an error, not
   a silent default.
 - **T15 — Live is not the gate.** `tools/live.sh` runs `x` programs
-  on a real adapter. It requires `SUBSCRIPT_TYPEGPU_BACKEND` in
-  `{metal, vulkan}` and `SUBSCRIPT_TYPEGPU_BACKEND_LIB`, and on macOS
-  with `metal` it refuses a library that does not link
-  `Metal.framework` (`otool -L`). It runs one `#[ignore]` harness
+  on a real adapter. It requires `SUBSCRIPT_TYPEGPU_BACKEND` in the
+  L13 set (`metal`, `vulkan`, `gles`) or `default` (no backend
+  request, for a library that ignores the yawgpu extension) and
+  `SUBSCRIPT_TYPEGPU_BACKEND_LIB`, and on macOS with `metal` it
+  refuses a library that does not link `Metal.framework`
+  (`otool -L`). It runs one `#[ignore]` harness
   test, `live::every_x_program_passes_on_a_real_adapter`, with
   `--ignored --exact --nocapture`. That test runs each `x` program
   on the dev tier through `ReloadSession` in the test's own process

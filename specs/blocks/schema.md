@@ -23,9 +23,9 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
   declarations, and the imported names from it, computes layouts
   from its own type tree, generates, and lets the harness check the
   complete set. The generator never lowers a discovery HIR and never
-  calls subscript's layout on it. No stub module exists. The one
-  text access left reads a source line to name the construct in a
-  relabelled checker diagnostic. An imported name that no schema or
+  calls subscript's layout on it. No stub module exists, and the
+  generator never reads the program text (PI13 Rev 1). An imported
+  name that no schema or
   pipeline produces is an SC3 diagnostic when its class has an
   illegal field, and an SC1 diagnostic ("not a schema") otherwise.
 - **SC2 — Declaration order is layout order.** The generator never
