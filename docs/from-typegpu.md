@@ -207,8 +207,17 @@ padding included. `Context.bytesInto<T>` writes them into an existing
     );
 ```
 
-A read goes through a mappable buffer, the same way as in the WebGPU
-JavaScript API. `Context.fromBytes<T>` rebuilds the value.
+`read` creates the staging buffer, copies, maps, and returns the
+bytes. `Context.fromBytes<T>` rebuilds the value.
+
+```ts program=programs/b12-readback.ts
+    const bytes: u8[] = await buffer.read(device, 0, 4);
+    const decoded: FixedArray<Particle, 4> = Context.fromBytes<FixedArray<Particle, 4>>(bytes, 0);
+```
+
+The explicit path through a mappable buffer, the same as in the
+WebGPU JavaScript API, stays for a caller that owns the readback
+buffer.
 
 ```ts program=programs/x08-live-reduction.ts
     const mapped: boolean = await readback.handle().mapAsync(
@@ -225,11 +234,13 @@ JavaScript API. `Context.fromBytes<T>` rebuilds the value.
 
 Differences:
 
-- There is no `buffer.read()` that creates a staging buffer. The program
-  creates the readback buffer, records the copy, maps, and reads.
+- `read(device, elementIndex, elementCount)` and `readOne` return the
+  bytes, not a decoded value. A failed map traps. TypeGPU's `read()`
+  returns the decoded JavaScript value.
 - `Buffer<T>` has `write`, `writeOne`, `patch` (one field of one
-  element), and `copyTo`. It has no `$usage`. The usage flags are
-  constructor arguments.
+  element), `copyTo`, `read`, and `readOne`. It has no `$usage`. The
+  usage flags are constructor arguments, and a `read` on a buffer
+  without `COPY_SRC` traps.
 - The bytes come from the value's storage. There is no conversion
   step and no `d.InferInput`.
 - A `FixedArray<T, N>` value also has bytes. `b06-render` writes three
@@ -687,8 +698,7 @@ These TypeGPU features have no equivalent.
 - `tgpu.fn` shells, WGSL-string function bodies, `$uses`,
   `tgpu.resolve`, `tgpu.const`, slots, derived values, accessors.
 - `root.createGuardedComputePipeline` and default workgroup sizes.
-- `buffer.read()` with an automatic staging buffer, `buffer.clear`,
-  `buffer.copyFrom`, `common.writeSoA`.
+- `buffer.clear`, `buffer.copyFrom`, `common.writeSoA`.
 - Operators on vectors, `std` as a namespace, `tsover`, swizzles as
   properties, and the derivative builtins `dpdx`, `dpdy`, `fwidth`.
 - Integer and depth textures, texture dimensions other than 2D, sampler
