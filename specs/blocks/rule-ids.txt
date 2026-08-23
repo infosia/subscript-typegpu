@@ -20,6 +20,7 @@ BF6
 BF7
 BF8
 BF9
+BF9 Rev 1
 C1
 C2
 C3

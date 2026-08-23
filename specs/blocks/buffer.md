@@ -1,6 +1,7 @@
 # Block: buffer (BF-rules)
 
 P1 slice 2 contract. Rev 0, 2026-08-22. Rev 1 (BF9–BF11), 2026-08-23.
+Rev 2 (BF9 Rev 1, the R36 pin `ac9436f`), 2026-08-23.
 Plan §3 D4 and §4 govern
 this block. The byte path is subscript R34 at `bb9dadc`
 (stdlib.md §18 there): `Context.bytesOf<T>`, `bytesInto<T>`,
@@ -41,18 +42,22 @@ this block. The byte path is subscript R34 at `bb9dadc`
 
 ## Reading through a staging buffer (P8)
 
-- **BF9 — `read` owns the staging buffer.** `Buffer<T>` gains
-  `async read(device: GPUDevice, elementIndex: u32, elementCount:
-  u32): Promise<u8[] | null>`. The method creates a staging buffer
-  of `elementCount * elementSize` bytes with `MAP_READ + COPY_DST`,
-  records `copyTo` into a fresh command encoder, submits on
-  `device.queue()`, awaits `mapAsync(READ)`, copies the bytes out
-  with `readBuffer`, unmaps, disposes the staging buffer, and
-  returns the bytes. It returns `null` when `mapAsync` returns
-  `false`, after it disposes the staging buffer. `readOne` gains the
-  same form: `async readOne(device, elementIndex): Promise<u8[] |
-  null>`. The caller decodes with `Context.fromBytes<T>`. BF3's
-  explicit path stays for a caller that owns the readback buffer.
+- **BF9 — `read` owns the staging buffer.** Rev 1, 2026-08-23.
+  `Buffer<T>` gains `async read(device: GPUDevice, elementIndex:
+  u32, elementCount: u32): Promise<u8[]>` (subscript R36 at
+  `ac9436f` admits an `async` method on a generic class). The
+  method creates a staging buffer of `elementCount * elementSize`
+  bytes with `MAP_READ + COPY_DST`, records `copyTo` into a fresh
+  command encoder, submits on `device.queue()`, awaits
+  `mapAsync(READ)`, copies the bytes out with `readBuffer`, unmaps,
+  disposes the staging buffer, and returns the bytes. When
+  `mapAsync` returns `false`, the method disposes the staging buffer
+  and traps with `BF9`, the method, and the three numbers, because a
+  failed map is a device-level failure and a nullable array is not
+  in the language. `readOne` gains the same form: `async
+  readOne(device, elementIndex): Promise<u8[]>`. The caller decodes
+  with `Context.fromBytes<T>`. BF3's explicit path stays for a
+  caller that owns the readback buffer.
 - **BF10 — The usage is known.** `createBuffer<T>` stores the usage
   it receives. `read` traps with `BF10`, the method, and the usage
   value when `COPY_SRC` is absent, before it creates the staging

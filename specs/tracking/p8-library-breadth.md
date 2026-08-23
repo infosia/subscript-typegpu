@@ -46,3 +46,10 @@ Evidence: `tools/gate.sh --require-backend` green, 235 passed, 137 s
 under load (see `build-time.md`). `tools/live.sh` x01–x14 PASS:
 Metal (yawgpu) 40.57 s, Dawn 37.12 s. The budget check for the
 program gate (120 s) is open until an idle re-measurement.
+
+## R36 landed (2026-08-23)
+
+subscript `ac9436f` (contract `4652964`, compiler.md §64) admits an
+`async` method on a generic class and a generic `async` function.
+The workspace re-pins to `ac9436f`. BF9 Rev 1: the return type is
+`Promise<u8[]>`, and a failed map traps with `BF9`. Step 1 proceeds.
