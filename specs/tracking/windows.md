@@ -94,3 +94,25 @@ The port at `2d592b7` on the reference machine (Apple M2, macOS):
 `SUBSCRIPT_TYPEGPU_BACKEND_LIB` value with `SUBSCRIPT_TYPEGPU_BACKEND=metal`
 runs `x01-live-vecadd` to `PASS` on the ship tier. The `cfg(unix)`
 branches are unchanged in behaviour.
+
+## Re-check at c4ff8a7 (2026-08-23)
+
+The tree gained P8 slice 2 and P9 after the port. This run measures the
+port again on windows-msvc.
+
+Machine: Windows 11, `x86_64-pc-windows-msvc`, rustc 1.95.0, Git Bash.
+Backend: a yawgpu Windows release build with the default Noop backend.
+
+`cargo build --offline --workspace --tests` compiles every crate.
+`crates/window` compiles with it. `cargo fmt --all -- --check` and
+`cargo clippy --offline --workspace -- -D warnings` exit 0.
+
+`tools/gate.sh --require-backend` exits 0 and prints `gate: green` with
+zero pending. The run has 243 passed and 1 ignored in six executables,
+and takes 188 s. This number is not a reference-machine measurement.
+
+The tree holds 244 test functions. Every one runs here, so windows-msvc
+skips no test. `specs/tracking/p9-window.md` records 246 passed at this
+tree. That count needs a reference-machine re-check.
+
+The port needed no new source change. W1 to W4 hold.
