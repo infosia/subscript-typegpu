@@ -85,3 +85,12 @@ changes only the path text inside a load-failure message.
 
 `crates/webgpu-gen/tests/fixtures/mini.generated.rs.expected` follows the
 emitter change, because the fixture snapshots the emitted loader.
+
+## Reference-machine check
+
+The port at `2d592b7` on the reference machine (Apple M2, macOS):
+`tools/gate.sh --require-backend` green, 93 s, 234 passed, 1 ignored.
+`tools/live.sh` on Metal (yawgpu): x01–x13 PASS, 28.51 s. A relative
+`SUBSCRIPT_TYPEGPU_BACKEND_LIB` value with `SUBSCRIPT_TYPEGPU_BACKEND=metal`
+runs `x01-live-vecadd` to `PASS` on the ship tier. The `cfg(unix)`
+branches are unchanged in behaviour.
