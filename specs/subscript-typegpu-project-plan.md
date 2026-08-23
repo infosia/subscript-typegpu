@@ -516,6 +516,39 @@ mismatch is recorded red. (4) K28 and BF10 fixtures are red. (5)
 in" lists state the new surface, and the quote gate is green. (6)
 Budgets hold, measured and recorded.
 
+### P8 — library breadth, slice 2 (shells, guarded dispatch, indirect, index format, cull)
+
+The proof of concept carried five generator features that slice 1
+did not: WGSL shells with raw declarations, guarded dispatch through
+a hidden binding, indirect dispatch and draw wrappers, an index
+format on the render entry, and a cull-mode golden. Slice 2 builds
+each for this library's shapes. Contracts: `kernel.md` Rev 7
+(K29–K31), `pipeline.md` Rev 5 (PI15–PI18), `render.md` Rev 3
+(RN18–RN19, RN16 Rev 1).
+
+Design differences from the proof of concept, stated once: a shell's
+subscript body is the host implementation and the CPU lane runs it
+(the proof of concept required a dead `return`); a `naga` error
+inside a shell is attributed by name through recorded line spans;
+the guard covers three axes and rides the layout spec as a `guard`
+entry, so the runtime owns the hidden buffer without a generated
+class; render indirect draws stay in the API layer; the indirect
+argument blocks are `@CStruct` schemas.
+
+Programs: `b14-wgsl-shell`, `b15-guarded-dispatch`, `b16-indirect`,
+`b17-index-cull`, `x15-live-shell` (GPU shell result against the
+host body through `simulateCompute`), `x16-live-guarded` (no author
+guard, thread count below the workgroup multiple, sentinel slots
+untouched), `x17-live-indirect` (dispatch and draw arguments from
+`PI17` schemas), `x18-live-cull`.
+
+Exit: (1) the four `b` goldens are byte-identical on both tiers and
+their `.wgsl` goldens validate. (2) `x15`–`x18` print `PASS` on
+Metal and on Dawn. (3) K28 Rev 1, PI18, and RN16 Rev 1 fixtures are
+red, including one `naga` error attributed to a shell by name. (4)
+`docs/from-typegpu.md` states the new surface, and the quote gate is
+green. (5) Budgets hold per §7.
+
 ## 9. Risk register
 
 | Id | Risk | Mitigation / trigger |

@@ -114,3 +114,14 @@ The workspace re-pins subscript to `f99d4cb` (tracking commits after
 P8 slice 1 COMPLETE 2026-08-23. Open for a later slice: derivatives,
 pack/unpack, `Vec*i.abs` at the `i32` minimum (K25 states the
 domain).
+
+# Slice 2 — shells, guarded dispatch, indirect, index format, cull
+
+Contracts 2026-08-23: `kernel.md` Rev 7 (K29–K31), `pipeline.md`
+Rev 5 (PI15–PI18), `render.md` Rev 3 (RN18–RN19, RN16 Rev 1), plan
+§8 P8 slice 2. Reference: the proof of concept's K31/K31a/K31b/A31
+(shells), A29 (guarded), A28 (indirect), V12/V13/V16/V17 (index,
+cull). Its measured lessons kept: the shell signature comes from the
+typed source function, never from a second declaration; a
+reordering of indices does not change an image under `cullMode:
+"none"`; a cull test first reads the index buffer back.

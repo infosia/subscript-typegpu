@@ -1,6 +1,7 @@
 # Block: pipeline (PI-rules)
 
-P2 contract. Rev 0, 2026-08-22. Plan §3 D1, D3, D10 and §4 govern
+P2 contract. Rev 0, 2026-08-22. Rev 5 (PI15–PI18 guarded dispatch,
+indirect), 2026-08-23. Plan §3 D1, D3, D10 and §4 govern
 this block. Kernels are `kernel.md`. The runtime classes live in
 `lib/typegpu.ts`.
 
@@ -106,6 +107,51 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   adapter, reads back through `Context.fromBytes`, compares with a
   host computation (`simulateCompute` where CL3 applies), and prints
   `PASS`.
+
+## Guarded dispatch and indirect (P8 slice 2)
+
+- **PI15 — A guarded declaration owns one hidden binding.**
+  `ComputePipelineSpec` gains `guarded?: boolean = false`. For a
+  guarded declaration the generator emits the kernel body inside
+  `if (gid.x < guard.x && gid.y < guard.y && gid.z < guard.z) {
+  ... }` where `gid` is the global invocation id and `guard` is a
+  hidden `var<uniform> <name>_guard: vec3<u32>` at the last layout's
+  group and the highest binding index plus one. The hidden binding
+  appears in `<name>_LAYOUT<g>` as an entry of `kind: "guard"` and
+  in no resources class (EG1). `createComputePipeline` creates a
+  16-byte `UNIFORM + COPY_DST` buffer for every `guard` entry it
+  finds and disposes it in `dispose()`. `createBindGroup` and the
+  typed factories append the guard buffer for a `guard` entry, so
+  the author's resource list is unchanged. `dispatchThreads(encoder,
+  groups, x, y, z)` writes `[x, y, z]` to the guard buffer through
+  `device.queue()` before it records the pass. `dispatch` writes the
+  workgroup count times the workgroup size. An author's own guard
+  stays: the generator never rewrites a statement. On the host,
+  `simulateComputeThreads` skips every invocation whose global id
+  is outside `[x, y, z]` for a guarded spec, and `simulateCompute`
+  runs every invocation of every workgroup. A `guarded` value that
+  is not a literal is a diagnostic.
+- **PI16 — Indirect dispatch.** `ComputePipeline` gains
+  `dispatchIndirect(encoder, groups, buffer: GPUBuffer, offset:
+  u64)`, which records `dispatchWorkgroupsIndirect`. On a guarded
+  pipeline `dispatchIndirect` traps with `PI16`, because the guard
+  count is not known to the host. Render indirect draws stay with
+  the API layer (RN11): `pass.drawIndirect` and
+  `pass.drawIndexedIndirect` exist in `lib/webgpu.ts`.
+- **PI17 — The indirect argument schemas.** `lib/typegpu-types.ts`
+  exports `@CStruct class DispatchIndirectArgs { x: u32; y: u32; z:
+  u32 }`, `DrawIndirectArgs { vertexCount; instanceCount;
+  firstVertex; firstInstance: u32 }`, and `DrawIndexedIndirectArgs {
+  indexCount; instanceCount; firstIndex: u32; baseVertex: i32;
+  firstInstance: u32 }`, with the byte layouts WebGPU fixes (12, 16,
+  and 20 bytes). A program writes them with `Context.bytesOf` into a
+  buffer with `INDIRECT` usage. The layout engine sizes them like
+  any schema, and `b16-indirect` prints the three sizes by value.
+- **PI18 — The slice 2 rejections.** A non-literal `guarded`, a
+  `dispatchIndirect` on a guarded pipeline (PI16 trap, `t`-style),
+  and a guarded declaration whose last layout has no free binding
+  index below the device limit is not checked (the backend reports
+  it through PI14). Each with a fixture and one diagnostic.
 
 ## Backend rejections
 

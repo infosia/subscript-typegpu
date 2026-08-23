@@ -3,7 +3,8 @@
 P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
 2026-08-22. Rev 2 (K18–K24), 2026-08-23. Rev 3 (K18, K19, K22),
 2026-08-23. Rev 4 (K14 shadowing), 2026-08-23. Rev 5 (K10, K25–K28),
-2026-08-23. Rev 6 (K25 Rev 1 argument order, K27 count), 2026-08-23. Plan §3 D2, D3, D7, D9 and §4
+2026-08-23. Rev 6 (K25 Rev 1 argument order, K27 count), 2026-08-23. Rev 7
+(K29–K31 WGSL shells), 2026-08-23. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -284,13 +285,61 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `vec4<f32>(s)`, with `i32` and `u32` for the other families. The factories join
   the K9 `v3f` family. A swizzle is never an assignment target:
   `v.xy() = ...` is not subscript.
-- **K28 — The P8 rejections.** A `Vec*b` field in a schema (SC5), a
+- **K28 — The P8 rejections.** Rev 1 adds the slice 2 set: a
+  shell with a non-literal body, a shell whose function is a kernel,
+  a fence token in a body (`@group`), unbalanced braces, a second
+  `wgslDeclarations` call, a shell name that collides with a schema,
+  and a `naga` error inside a shell body attributed by name. Rev 0: A `Vec*b` field in a schema (SC5), a
   `Vec*b` in a binding wrapper (PI5), a K25 method on a `Vec*h`
   (the checker, because SC8 declares no arithmetic), and a method
   of a vector class that has no table row (K10, through a scratch
   class edit recorded and reverted). Each with a fixture and one
   diagnostic, except the checker case, whose fixture asserts the
   checker's diagnostic.
+
+## WGSL shells (P8 slice 2)
+
+- **K29 — A WGSL shell is a source function with two bodies.** A
+  module-level declaration `export const addBias: WgslShellSpec =
+  wgslShell(addBiasFn, { body: "return input + SHELL_BIAS;" })`
+  marks the module-level function `addBiasFn` as a shell.
+  `wgslShell` is a library function in `lib/typegpu.ts` with a real
+  body that returns the spec. The generator finds every module-level
+  `wgslShell` call (as PI1 finds `computePipeline`), reads the
+  function from the `FuncRef` argument and the WGSL statements from
+  the literal `body`. A shell is a helper under K2: value-type
+  parameters, a value-type or `void` return, no layout class, no
+  `ComputeInvocation`. The generator writes the WGSL `fn` line from
+  the function's typed signature (K4 types, K12 spellings) and
+  inserts the `body` statements, indented, as the function body. It
+  never walks the function's subscript body. The subscript body is
+  the host implementation: the CPU lane runs it (CL1), and a live
+  program compares the GPU result against it. A kernel or a helper
+  calls a shell by its name. A shell with no caller in any kernel's
+  call graph is not emitted. A non-literal `body`, a non-`FuncRef`
+  function, a declaration inside a function, and a shell whose
+  function is a kernel (PI1 names it) are diagnostics.
+- **K30 — Raw declarations and the fence.** A module-level
+  `wgslDeclarations("const SHELL_BIAS: u32 = 7u;")` call adds WGSL
+  text above the generated declarations of every WGSL module of the
+  program. A program has at most one such call. Every shell body
+  and the declaration text pass one lexical fence before emission:
+  the generator tokenizes with WGSL's blankspace set and rejects the
+  identifiers `override`, `workgroupBarrier`, `storageBarrier`,
+  `textureBarrier`, the attribute pairs `@group` and `@binding`, the
+  sequence `var<`, and a body whose braces do not balance. A shell
+  or declaration name equal to a generated declaration (a schema, a
+  binding, a kernel, a constant) is a diagnostic. The fence is
+  lexical and nothing more. `naga` validates the composed module
+  (K15).
+- **K31 — A `naga` error inside a shell is attributed.** The emitter
+  records the line span of every shell body and of the declaration
+  text inside the emitted module. When `naga` reports an error on a
+  line inside a span, the harness prefixes the diagnostic with the
+  shell name (`shell addBias:`) or `declarations:`. A line outside
+  every span stays a generator defect (K15). The emitted module
+  order is: declarations, schema structs, shells, bindings, module
+  variables, the kernel.
 
 ## Diagnostics
 

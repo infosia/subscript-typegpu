@@ -1,6 +1,7 @@
 # Block: render (RN-rules)
 
-P3 contract. Rev 0, 2026-08-22. Plan §8 P3 governs this block.
+P3 contract. Rev 0, 2026-08-22. Rev 3 (RN18–RN19 index format,
+cull), 2026-08-23. Plan §8 P3 governs this block.
 Kernels are `kernel.md` (K-rules) and apply to vertex and fragment
 kernels. Pipelines are `pipeline.md` (PI-rules) where this block
 does not say otherwise. Schemas are `schema.md`.
@@ -138,9 +139,34 @@ does not say otherwise. Schemas are `schema.md`.
   and tints it through the storage buffer, compared with the host
   rasterizer.
 
+## Index format and cull (P8 slice 2)
+
+- **RN18 — The index format is a spec member.** `RenderPipelineSpec`
+  gains `indexFormat?: GPUIndexFormat = "undefined"`. The generator
+  emits `<name>_INDEX_FORMAT: GPUIndexFormat` when the literal names
+  a format. `RenderPipeline` gains `setIndexBuffer(pass, buffer:
+  GPUBuffer)`, which sets the buffer with the spec's format, offset
+  0, and the buffer's full size. On a pipeline whose spec has no
+  format the method traps with `RN18`. `pass.setIndexBuffer` and
+  `pass.drawIndexed` stay available (RN11). `b07-draw-variants`
+  moves to the spec form and prints `quad_INDEX_FORMAT` by name.
+- **RN19 — Cull mode is proven live.** `x18-live-cull` draws one
+  triangle twice with `cullMode: "back"` and `frontFace: "ccw"`:
+  once with the indices `0, 1, 2` and once with `0, 2, 1`. Before
+  the second draw the program reads the index buffer back and
+  asserts it holds `0, 2, 1`, because a dropped write also yields
+  an empty image. The host rasterizer (RN14) gains the same cull
+  rule: it computes the signed area in clip space and drops a
+  triangle whose winding the spec culls. The program compares both
+  images with the host rasterizer and prints `PASS`. `b17-index-cull`
+  prints the `_INDEX_FORMAT` constant and the spec's `cullMode` and
+  `frontFace` by name on both tiers.
+
 ## Rejections
 
 - **RN16 — Each rejection is a named diagnostic with a red fixture.**
+  Rev 1 adds: `setIndexBuffer` on a pipeline without an index format
+  (RN18 trap, `t`-style) and a non-literal `indexFormat`.
   Rev 1, 2026-08-23. The generator's set: a vertex schema field
   outside RN5, a varyings class without `position: Vec4f`, a varying
   field outside RN7, a vertex kernel that writes any storage binding
