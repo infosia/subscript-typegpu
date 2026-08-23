@@ -53,3 +53,16 @@ popped error names uniform control flow. Evidence: `tools/gate.sh
 --require-backend` green, 89 s, 234 passed, 1 ignored (live). Live
 lane `tools/live.sh`, x01–x13 PASS: Metal (yawgpu) 28.59 s, Dawn
 26.11 s. Goldens unchanged.
+
+## P8 — library breadth, slice 1 (2026-08-23)
+
+`Buffer<T>.read` and `readOne` own the staging buffer (BF9 Rev 1,
+on subscript R36 at `ac9436f`), BF10 usage traps, componentwise
+vector builtins (K25 Rev 1), `Vec*b` with comparisons and `select`
+(K26), in-order swizzle methods and `From`/`Splat` factories (K27).
+Programs `b12-readback`, `b13-vector-builtins`,
+`x14-live-vector-builtins`. Phase review: 1 CRITICAL (`smoothstep`
+argument order, shared by host body and emission) / 3 MAJOR / 14
+MINOR, all closed. Evidence: gate green 235 passed 114 s; live
+x01–x14 PASS on Metal 35.55 s and Dawn 32.88 s. Record:
+`specs/tracking/p8-library-breadth.md`.

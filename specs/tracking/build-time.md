@@ -36,6 +36,7 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-23 | P8 slice 1 steps 2–3 (K25–K27, b13, x14), measured under load: `syspolicyd` 107 %, `XprotectService` 60 %, a concurrent subscript `cargo test`; re-measure at the P8 close | 46 s | 0 s | 178 s | 137 s | 6 |
 | 2026-08-23 | Re-pin subscript `ac9436f` (R36), load average 3.6 | — | — | — | 117 s | 6 |
 | 2026-08-23 | P8 slice 1 step 1 (`Buffer<T>.read`, b12), load average 6.2 during the run | 45 s | 0 s | 131 s | 132 s | 6 |
+| 2026-08-23 | P8 review fixes, load average 2.9 | 45 s | 0 s | 117 s | 114 s | 6 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate

@@ -178,17 +178,8 @@ export async function main(): Promise<void> {
     gpu.dispose();
     return;
   }
-  {
-    using adapter = adapterResult;
-    using device = deviceResult;
-    device.pushErrorScope("validation");
-    const validationError = await device.popErrorScope();
-    if (validationError !== null) {
-      print("pipeline:invalid");
-      print("FAIL");
-      return;
-    }
-  }
+  deviceResult.dispose();
+  adapterResult.dispose();
   gpu.dispose();
   print(`Params size=${Params_SIZE} align=${Params_ALIGN} dt=${Params_OFFSET_dt} count=${Params_OFFSET_count}`);
   print(`Particle size=${Particle_SIZE} align=${Particle_ALIGN} pos=${Particle_OFFSET_pos} vel=${Particle_OFFSET_vel} stride=${Particle_STRIDE}`);

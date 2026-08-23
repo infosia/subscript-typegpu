@@ -69,3 +69,45 @@ at load average 6.2 (the owner's subscript work shares the machine).
 2026-08-23), the rows under load stand as recorded and do not block
 the close. The per-module measurement found no module that doubled
 against HEAD with the diff applied.
+
+## Phase review (2026-08-23)
+
+Fresh no-context review (Opus) of `1a3af20..43c6269`: 1 CRITICAL,
+3 MAJOR, 14 MINOR. CRITICAL: `smoothstep` emitted and computed with
+the receiver as WGSL's `low` edge. MAJOR: `step` the same, the
+host-line count assertion relaxed with a program-name special case,
+the budget rows under load. Cause of the CRITICAL: K25 Rev 0 said
+"receiver as the first argument" for every builtin, and host body
+and emission shared the error, so the `x14` comparison could not
+see it. Resolutions: K25 Rev 1 (argument order follows the WGSL
+signature, order-sensitive inputs in the gate program, one hand
+check recorded here), K27 six factories, K10 Rev 1 wording, PI14
+Rev 1, BF9 bound check, BF10 on every write path, plan §7 budget
+reading, plan P8 item 2 and exit (1). Code fixes in one Codex
+round, all 18 findings closed.
+
+Hand check of the order-sensitive golden values against the WGSL
+specification (`b13-vector-builtins.expected`):
+
+| Method | Inputs | Golden | WGSL definition |
+|---|---|---|---|
+| `step` | x `[-1,.25,.75,2]`, edge `[0,.5,1,3]` | `[0,0,0,0]` | `x >= edge ? 1 : 0`; reversed order gives `[1,1,1,1]` |
+| `smoothstep` | x `[.25,.5,.75,1]`, low 0, high 1 | `[.15625,.5,.84375,1]` | `t*t*(3-2t)`, `t = (x-low)/(high-low)` |
+| `mix` | x `[1,2,3,4]`, y `[5,6,7,8]`, a `.25` | `[2,3,4,5]` | `x*(1-a) + y*a` |
+| `clamp` | x `[-2,.5,2,8]`, low `[0,1,2,3]`, high `[1,2,3,4]` | `[0,1,2,4]` | `min(max(x, low), high)` |
+| `refract` | I `[1,0,0,0]`, N `[0,1,0,0]`, eta `.5` | `[.5,-.8660254,0,0]` | `k = 1 - eta²(1 - dot(N,I)²) = .75`; `eta*I - (eta*dot + sqrt(k))*N` |
+| `faceForward` | e1 `[1,2,3,4]`, e2 `[1,0,0,0]`, e3 `[-1,0,0,0]` | `[1,2,3,4]` | `dot(e2,e3) < 0 ? e1 : -e1` |
+| `select` | f `[1,7,3,9]`, t `[0,8,2,10]`, mask `[F,T,F,T]` | `[1,8,3,10]` | `mask ? t : f` per component |
+
+All seven agree.
+
+Evidence at the close: `tools/gate.sh --require-backend` green, 235
+passed, 114 s at load average 2.9. `tools/live.sh` x01–x14 PASS:
+Metal (yawgpu) 35.55 s, Dawn 32.88 s. `.wgsl` goldens for `b13` and
+`x14` regenerated with the corrected order and validated by `naga`.
+
+## Close
+
+P8 slice 1 COMPLETE 2026-08-23. Open for a later slice: derivatives,
+pack/unpack, `Vec*i.abs` at the `i32` minimum (K25 states the
+domain).

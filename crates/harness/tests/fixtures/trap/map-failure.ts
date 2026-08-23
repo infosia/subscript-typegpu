@@ -2,6 +2,7 @@
 // purpose: prove that Buffer.read traps when the backend refuses the one-byte staging map
 // exercises: BF9
 // questions: none
+// precondition: the backend refuses the one-byte map
 // expected-rule: BF9
 
 import { Buffer, createBuffer } from "./typegpu";

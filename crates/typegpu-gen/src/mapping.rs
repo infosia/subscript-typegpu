@@ -709,6 +709,18 @@ mod tests {
             method("Vec3f", "reflect"),
             Some(MethodEmission::Builtin("reflect"))
         );
+        assert_eq!(
+            method("Vec3f", "step"),
+            Some(MethodEmission::BuiltinReceiverLast("step"))
+        );
+        assert_eq!(
+            method("Vec3f", "smoothstep"),
+            Some(MethodEmission::BuiltinReceiverLast("smoothstep"))
+        );
+        assert_eq!(
+            method("AtomicU32", "exchange"),
+            Some(MethodEmission::Atomic("atomicExchange"))
+        );
         assert_eq!(method("Vec3h", "abs"), None);
     }
 

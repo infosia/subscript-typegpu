@@ -1,6 +1,6 @@
 // program: a04-errors
 // purpose: cover adapter capabilities, device reports, labels, and error scopes
-// exercises: EG4, G1-G4, H2-H3
+// exercises: EG4, G1-G4, H2-H3, PI14
 // questions: none
 
 import { gpu, GPUAdapter, GPUDevice, GPUError } from "./webgpu";
@@ -34,6 +34,10 @@ export async function main(): Promise<void> {
     print("feature:checked");
 
     device.pushErrorScope("validation");
+    using shader = device.createShaderModule({
+      label: "a04-valid-shader",
+      code: "@compute @workgroup_size(1) fn main() {}",
+    });
     const scoped: GPUError | null = await device.popErrorScope();
     device.nextUncapturedError();
     device.deviceLostInfo();
