@@ -1,7 +1,7 @@
 # Block: pipeline (PI-rules)
 
 P2 contract. Rev 0, 2026-08-22. Rev 5 (PI15–PI18 guarded dispatch,
-indirect), 2026-08-23. Plan §3 D1, D3, D10 and §4 govern
+indirect), 2026-08-23. Rev 6 (PI15 Rev 1, PI18 Rev 1), 2026-08-23. Plan §3 D1, D3, D10 and §4 govern
 this block. Kernels are `kernel.md`. The runtime classes live in
 `lib/typegpu.ts`.
 
@@ -110,23 +110,34 @@ this block. Kernels are `kernel.md`. The runtime classes live in
 
 ## Guarded dispatch and indirect (P8 slice 2)
 
-- **PI15 — A guarded declaration owns one hidden binding.**
-  `ComputePipelineSpec` gains `guarded?: boolean = false`. For a
-  guarded declaration the generator emits the kernel body inside
+- **PI15 — A guarded declaration owns one hidden binding.** Rev 1,
+  2026-08-23. `ComputePipelineSpec` gains `guarded?: boolean =
+  false`, on the one-layout form `computePipeline<L>` only: `guarded`
+  on `computePipeline2`, `3`, or `4` is a diagnostic. For a guarded
+  declaration the generator emits the kernel body inside
   `if (gid.x < guard.x && gid.y < guard.y && gid.z < guard.z) {
   ... }` where `gid` is the global invocation id and `guard` is a
   hidden `var<uniform> <name>_guard: vec3<u32>` at the last layout's
-  group and the highest binding index plus one. The hidden binding
+  group and the highest binding index plus one. That `if` is
+  non-uniform control flow, so a guarded kernel whose call graph
+  reaches `workgroupBarrier` or `storageBarrier` is a diagnostic
+  (PI15): the guard and a barrier do not combine. The hidden binding
   appears in `<name>_LAYOUT<g>` as an entry of `kind: "guard"` and
   in no resources class (EG1). `createComputePipeline` creates a
   16-byte `UNIFORM + COPY_DST` buffer for every `guard` entry it
   finds and disposes it in `dispose()`. `createBindGroup` and the
   typed factories append the guard buffer for a `guard` entry, so
   the author's resource list is unchanged. `dispatchThreads(encoder,
-  groups, x, y, z)` writes `[x, y, z]` to the guard buffer through
-  `device.queue()` before it records the pass. `dispatch` writes the
-  workgroup count times the workgroup size. An author's own guard
-  stays: the generator never rewrites a statement. On the host,
+  groups, x, y, z)` writes `[x, y, z, 0]` to the guard buffer through
+  `device.queue()` before it records the pass. `dispatch` and
+  `dispatchTimed` write the workgroup count times the workgroup
+  size. The write is a queue operation and the pass is a recorded
+  command, so one command encoder carries at most one guarded
+  dispatch of one pipeline: the pipeline remembers the encoder of
+  its last guard write and traps with `PI15`, the method, and the
+  counts when a second guarded dispatch names the same encoder. A
+  new encoder clears the memory. An author's own guard stays: the
+  generator never rewrites a statement. On the host,
   `simulateComputeThreads` skips every invocation whose global id
   is outside `[x, y, z]` for a guarded spec, and `simulateCompute`
   runs every invocation of every workgroup. A `guarded` value that
@@ -147,11 +158,14 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   and 20 bytes). A program writes them with `Context.bytesOf` into a
   buffer with `INDIRECT` usage. The layout engine sizes them like
   any schema, and `b16-indirect` prints the three sizes by value.
-- **PI18 — The slice 2 rejections.** A non-literal `guarded`, a
-  `dispatchIndirect` on a guarded pipeline (PI16 trap, `t`-style),
-  and a guarded declaration whose last layout has no free binding
-  index below the device limit is not checked (the backend reports
-  it through PI14). Each with a fixture and one diagnostic.
+- **PI18 — The slice 2 rejections.** Rev 1. A non-literal
+  `guarded`, a guarded kernel that reaches a barrier (PI15), `guarded`
+  on a multi-layout form (PI15), a second guarded dispatch into one
+  encoder (PI15 trap, `t`-style), a `dispatchIndirect` on a guarded
+  pipeline (PI16 trap, `t`-style). A guarded declaration whose last
+  layout has no free binding index below the device limit is not
+  checked (the backend reports it through PI14). Each with a fixture
+  and one diagnostic.
 
 ## Backend rejections
 
