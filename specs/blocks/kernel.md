@@ -2,7 +2,8 @@
 
 P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
 2026-08-22. Rev 2 (K18–K24), 2026-08-23. Rev 3 (K18, K19, K22),
-2026-08-23. Rev 4 (K14 shadowing), 2026-08-23. Plan §3 D2, D3, D7, D9 and §4
+2026-08-23. Rev 4 (K14 shadowing), 2026-08-23. Rev 5 (K10, K25–K28),
+2026-08-23. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -70,14 +71,19 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   expression is a diagnostic: a template string, an array literal,
   a lambda, `await`, `yield`, a `Math` call outside K11, a
   `JSON`/`Date`/`RegExp` call, `Length` of a `T[]`.
-- **K10 — Library methods map to WGSL.** The generator carries one
-  table from (receiver type, method) to an emission: `Vec*f.add` →
-  `a + b`, `sub` → `-`, `mul` → `*` (componentwise), `scale` → `v *
-  s`, `dot` → `dot(a, b)`, `cross` → `cross(a, b)`, `length` →
-  `length(a)`, `normalize` → `normalize(a)`, `Mat*.mul` → `a * b`,
-  `mulVec` → `m * v`, `transpose` → `transpose(m)`. Integer vectors
-  map the same operators. The table is the one place a method gets
-  GPU meaning. A method outside the table is a diagnostic.
+- **K10 — Library methods map to WGSL.** Rev 1. The generator
+  carries one table from (receiver type, method) to an emission:
+  `Vec*f.add` → `a + b`, `sub` → `-`, `mul` → `*` (componentwise),
+  `scale` → `v * s`, `dot` → `dot(a, b)`, `cross` → `cross(a, b)`,
+  `length` → `length(a)`, `normalize` → `normalize(a)`, `Mat*.mul` →
+  `a * b`, `mulVec` → `m * v`, `transpose` → `transpose(m)`. Integer
+  vectors map the same operators. K25, K26, and K27 add rows. The
+  table is the one place a method gets GPU meaning. A method outside
+  the table is a diagnostic. A harness test reads the method set of
+  every vector and matrix class in `lib/typegpu-types.ts` from the
+  HIR and asserts that the table has a row for each method and no
+  row for a method that does not exist.
+
 - **K11 — Scalar builtins.** `Math.abs`, `min`, `max`, `floor`,
   `ceil`, `sqrt`, `pow`, `exp`, `log`, `sin`, `cos`, `tan`, `fround`
   map to the WGSL builtin of the same name (`fround` to nothing: the
@@ -221,6 +227,57 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `return` before a barrier, a barrier inside an `if` on a builtin,
   a barrier inside a loop whose condition reads a binding. Each with
   a fixture and one diagnostic.
+
+## Vector builtins (P8)
+
+- **K25 — Componentwise builtins.** `Vec2f`, `Vec3f`, and `Vec4f`
+  gain the methods `abs()`, `floor()`, `ceil()`, `fract()`,
+  `sqrt()`, `exp()`, `log()`, `sin()`, `cos()`, `tan()`, `sign()`,
+  `min(other)`, `max(other)`, `clamp(low, high)`, `pow(other)`,
+  `mix(other, amount: f32)`, `step(edge)`, `smoothstep(low, high)`,
+  `distance(other): f32`, `reflect(normal)`, `refract(normal, eta:
+  f32)`, and `faceForward(incident, reference)`. `Vec*i` gain
+  `abs()`, `min(other)`, `max(other)`, and `clamp(low, high)`.
+  `Vec*u` gain `min(other)`, `max(other)`, and `clamp(low, high)`.
+  Each maps to the WGSL builtin of the same name with the receiver
+  as the first argument. Each has a real host body over the scalar
+  operation, so the CPU lane runs it. The host bodies use `Math`
+  members from K11 and the scalar free functions, never a second
+  formula.
+- **K26 — Comparisons, bool vectors, `select`.** `lib/typegpu-types.ts`
+  adds `Vec2b`, `Vec3b`, and `Vec4b` with `boolean` fields `x`, `y`,
+  `z`, `w`, the methods `any(): boolean`, `all(): boolean`, and
+  `not()`. They are value classes, not schemas: a `Vec*b` field in a
+  `@CStruct` class is an SC5 diagnostic, because WGSL gives `bool`
+  no host-shareable layout. Every float and integer vector gains
+  `lt(other)`, `le(other)`, `gt(other)`, `ge(other)`, `eq(other)`,
+  and `ne(other)`, each returning the `Vec*b` of the same width,
+  and `select(other, mask: Vec*b)`, which takes this vector where
+  the mask is `false` and `other` where it is `true`. Emission:
+  `a < b`, `a <= b`, `a > b`, `a >= b`, `a == b`, `a != b`,
+  `any(v)`, `all(v)`, `!v`, `select(a, b, mask)`. A scalar select
+  is the conditional `?:` of K9 and gets no function.
+- **K27 — Swizzles and factories.** Every float and integer vector
+  gains the in-order swizzle methods: on a `Vec3*`, `xy()`, `xz()`,
+  `yz()`; on a `Vec4*`, `xy()`, `xz()`, `xw()`, `yz()`, `yw()`,
+  `zw()`, `xyz()`, `xyw()`, `xzw()`, `yzw()`. Each returns a new
+  vector and emits `v.xy` and family. A swizzle outside this set is
+  not a method, so subscript's checker rejects it before the
+  generator runs. `lib/typegpu-types.ts` adds the factories
+  `v3fFrom2(v: Vec2f, z: f32)`, `v4fFrom2(v: Vec2f, z: f32, w:
+  f32)`, `v4fFrom3(v: Vec3f, w: f32)`, `v2fSplat(s: f32)`,
+  `v3fSplat(s)`, `v4fSplat(s)`, and the same seven shapes for the
+  `i` and `u` families. They emit `vec3<f32>(v, z)`, `vec4<f32>(v,
+  z, w)`, `vec4<f32>(v, w)`, and `vec3<f32>(s)`. The factories join
+  the K9 `v3f` family. A swizzle is never an assignment target:
+  `v.xy() = ...` is not subscript.
+- **K28 — The P8 rejections.** A `Vec*b` field in a schema (SC5), a
+  `Vec*b` in a binding wrapper (PI5), a K25 method on a `Vec*h`
+  (the checker, because SC8 declares no arithmetic), and a method
+  of a vector class that has no table row (K10, through a scratch
+  class edit recorded and reverted). Each with a fixture and one
+  diagnostic, except the checker case, whose fixture asserts the
+  checker's diagnostic.
 
 ## Diagnostics
 

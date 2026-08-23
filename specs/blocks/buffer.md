@@ -1,6 +1,7 @@
 # Block: buffer (BF-rules)
 
-P1 slice 2 contract. Rev 0, 2026-08-22. Plan §3 D4 and §4 govern
+P1 slice 2 contract. Rev 0, 2026-08-22. Rev 1 (BF9–BF11), 2026-08-23.
+Plan §3 D4 and §4 govern
 this block. The byte path is subscript R34 at `bb9dadc`
 (stdlib.md §18 there): `Context.bytesOf<T>`, `bytesInto<T>`,
 `fromBytes<T>`, with every padding byte zero.
@@ -37,6 +38,31 @@ this block. The byte path is subscript R34 at `bb9dadc`
   `X_STRIDE` (LY5), so `count` elements occupy `count * X_STRIDE`
   bytes and element `i` starts at `i * X_STRIDE`. A `Buffer<Vec3f>`
   uses `Vec3f_STRIDE` (16), never `Vec3f_SIZE` (12).
+
+## Reading through a staging buffer (P8)
+
+- **BF9 — `read` owns the staging buffer.** `Buffer<T>` gains
+  `async read(device: GPUDevice, elementIndex: u32, elementCount:
+  u32): Promise<u8[] | null>`. The method creates a staging buffer
+  of `elementCount * elementSize` bytes with `MAP_READ + COPY_DST`,
+  records `copyTo` into a fresh command encoder, submits on
+  `device.queue()`, awaits `mapAsync(READ)`, copies the bytes out
+  with `readBuffer`, unmaps, disposes the staging buffer, and
+  returns the bytes. It returns `null` when `mapAsync` returns
+  `false`, after it disposes the staging buffer. `readOne` gains the
+  same form: `async readOne(device, elementIndex): Promise<u8[] |
+  null>`. The caller decodes with `Context.fromBytes<T>`. BF3's
+  explicit path stays for a caller that owns the readback buffer.
+- **BF10 — The usage is known.** `createBuffer<T>` stores the usage
+  it receives. `read` traps with `BF10`, the method, and the usage
+  value when `COPY_SRC` is absent, before it creates the staging
+  buffer. `write` traps the same way when `COPY_DST` is absent.
+- **BF11 — `read` is a gate program and the live path.** `b12-readback`
+  writes a `FixedArray<Particle, 4>`, reads it back through `read`
+  on Noop, decodes with `fromBytes`, and prints `roundtrip:match`
+  after a host comparison, plus `readOne` on element 2 by value.
+  From P8 on, a new `x` program reads its result through `read`.
+  The `x` programs that exist keep their explicit path.
 
 ## Programs
 

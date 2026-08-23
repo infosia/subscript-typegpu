@@ -471,6 +471,42 @@ and print `PASS` on Metal. One `b` program's host golden is
 committed and compared on both tiers. `CL2` has a fixture. Budgets
 hold. The lane is a gate module, not a new executable.
 
+### P8 — library breadth, slice 1 (readback, vector builtins, swizzles)
+
+The plan's phases are executed. P8 starts the breadth work that
+`docs/from-typegpu.md` lists under "Not in subscript-typegpu", in
+the order a TypeGPU user meets the gap. Slice 1 is three items.
+Contracts: `buffer.md` Rev 1 (BF9–BF11) and `kernel.md` Rev 5
+(K10 Rev 1, K25–K28).
+
+1. `Buffer<T>.read` and `readOne` own the staging buffer (BF9,
+   BF10). `b12-readback` is the gate program.
+2. Componentwise vector builtins, comparisons with `Vec*b`, and
+   `select` (K25, K26). `b13-vector-builtins` runs every new method
+   once on the host through `simulateCompute` and prints one `host:`
+   line per method family by value.
+3. In-order swizzles and the `From`/`Splat` factories (K27).
+   `b13` covers them.
+
+`x14-live-vector-builtins` dispatches one kernel that applies every
+K25–K27 method to inputs with exact `f32` results where the WGSL
+builtin is exact (`abs`, `floor`, `ceil`, `fract`, `sign`, `min`,
+`max`, `clamp`, `step`, `select`, the comparisons, the swizzles, the
+factories) and compares byte-exactly against `simulateCompute`. The
+transcendental methods (`sqrt`, `exp`, `log`, `sin`, `cos`, `tan`,
+`pow`, `mix`, `smoothstep`, `distance`, `normalize`-based `reflect`,
+`refract`, `faceForward`) compare within a relative tolerance of
+`2^-16`, stated in the program header. `x14` reads its result
+through `read` (BF11).
+
+Exit: (1) `b12` and `b13` goldens are byte-identical on both tiers,
+and their `.wgsl` goldens validate. (2) `x14` prints `PASS` on Metal
+and on Dawn. (3) The K10 Rev 1 table test exists and a scratch
+mismatch is recorded red. (4) K28 and BF10 fixtures are red. (5)
+`docs/from-typegpu.md` "Vector math", "Buffers", and the two "Not
+in" lists state the new surface, and the quote gate is green. (6)
+Budgets hold, measured and recorded.
+
 ## 9. Risk register
 
 | Id | Risk | Mitigation / trigger |
