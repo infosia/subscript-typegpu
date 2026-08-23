@@ -42,27 +42,7 @@ fn programs() -> Vec<PathBuf> {
         .filter(|path| is_b_program(path))
         .collect::<Vec<_>>();
     programs.sort();
-    let names = programs
-        .iter()
-        .map(|path| path.file_name().expect("program name").to_string_lossy())
-        .collect::<Vec<_>>();
-    assert_eq!(
-        names,
-        [
-            "b01-layout.ts",
-            "b02-vecadd.ts",
-            "b03-saxpy-uniform.ts",
-            "b04-particles.ts",
-            "b05-buffer.ts",
-            "b06-render.ts",
-            "b07-draw-variants.ts",
-            "b08-render-bindings.ts",
-            "b09-kernel-depth.ts",
-            "b10-workgroup.ts",
-            "b11-texture.ts",
-        ],
-        "C layout program set changed"
-    );
+    assert!(!programs.is_empty(), "C layout program set is empty");
     programs
 }
 

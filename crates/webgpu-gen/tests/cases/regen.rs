@@ -12,15 +12,6 @@ const INPUTS: [&str; 4] = [
     "crates/webgpu-gen/policy.toml",
 ];
 
-const OUTPUTS: [&str; 6] = [
-    "crates/facade/subscript-typegpu.h",
-    "crates/facade/src/generated.rs",
-    "lib/subscript-typegpu.generated.d.ts",
-    "lib/wire-enum-aliases.generated.d.ts",
-    "lib/webgpu.ts",
-    "crates/harness/src/native_symbols.generated.rs",
-];
-
 fn repository_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
@@ -78,7 +69,7 @@ fn regeneration() -> &'static Regeneration {
     static REGENERATION: OnceLock<Regeneration> = OnceLock::new();
     REGENERATION.get_or_init(|| {
         let scratch = ScratchRoot::new();
-        for relative in INPUTS.into_iter().chain(OUTPUTS) {
+        for relative in INPUTS {
             scratch.copy_from_repository(relative);
         }
         let output = Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-webgpu-gen"))

@@ -6,6 +6,6 @@ position.shaderLocation=0
 color.offset=16
 color.format=float32x3
 color.shaderLocation=1
-tri_WGSL_LINES=20
+tri_WGSL_LINES=22
 render:submitted
 PASS

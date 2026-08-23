@@ -55,6 +55,9 @@ fn cited_ids(line: &str) -> Vec<&str> {
             start += 1;
             continue;
         }
+        if bytes.get(cursor).is_some_and(u8::is_ascii_lowercase) {
+            cursor += 1;
+        }
         if bytes.get(cursor..cursor + 5) == Some(b" Rev ")
             && bytes.get(cursor + 5).is_some_and(u8::is_ascii_digit)
         {
@@ -100,6 +103,8 @@ fn every_cited_rule_id_resolves() {
     collect_files(&root.join("lib"), &mut files);
     collect_files(&root.join("programs"), &mut files);
     collect_files(&root.join("tools"), &mut files);
+    collect_files(&root.join("docs"), &mut files);
+    files.push(root.join("README.md"));
     files.push(root.join("crates/webgpu-gen/policy.toml"));
     files.extend([
         root.join("crates/facade/src/runtime.rs"),

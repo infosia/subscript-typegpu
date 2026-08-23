@@ -119,6 +119,40 @@ fn b06_render_fragment_module_validates_with_naga() {
 }
 
 #[test]
+fn render_kernels_emit_reached_module_constants_and_private_variables() {
+    let generated = generate(
+        r#"
+import { FragmentInvocation, privateVar, PrivateVar, renderPipeline, RenderPipelineSpec, VertexInvocation } from "./typegpu";
+import { Vec2f, Vec4f } from "./typegpu-types";
+@CStruct class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
+@CStruct class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
+const vertexShift: f32 = 0.25;
+const fragmentAlpha: PrivateVar<f32> = privateVar<f32>(0.75);
+function vert(value: Vertex, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(value.position.x + vertexShift, value.position.y, 0.0, 1.0)); }
+function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { return new Vec4f(1.0, 0.0, 0.0, fragmentAlpha.get()); }
+export const pipeline: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    for expected in [
+        "const vertexShift: f32 = 0.25f;",
+        "var<private> fragmentAlpha: f32 = 0.75f;",
+        "value.position.x + vertexShift",
+        "fragmentAlpha",
+    ] {
+        assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
+    }
+    let structures = wgsl.find("struct Varyings").expect("varyings struct");
+    let globals = wgsl.find("const vertexShift").expect("module constant");
+    let vertex = wgsl.find("@vertex").expect("vertex entry");
+    assert!(
+        structures < globals && globals < vertex,
+        "K14 order:\n{wgsl}"
+    );
+    validate(wgsl);
+}
+
+#[test]
 fn render_binding_visibility_follows_each_kernel_reach() {
     let generated = generate(
         r#"

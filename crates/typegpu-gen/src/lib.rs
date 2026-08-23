@@ -139,74 +139,34 @@ fn schema_name(export: &str) -> Option<&str> {
         .map(|(name, _)| name)
 }
 
-fn intended_schemas(support: Option<&SupportImport>) -> BTreeSet<String> {
+fn intended_schemas(
+    support: Option<&SupportImport>,
+    pipeline_declarations: &BTreeSet<String>,
+) -> BTreeSet<String> {
     support
         .into_iter()
         .flat_map(|support| &support.names)
         .filter_map(|name| schema_name(name))
-        .filter(|name| name.starts_with(|ch: char| ch.is_ascii_uppercase()))
+        .filter(|name| !pipeline_declarations.contains(*name))
         .map(str::to_owned)
         .collect()
 }
 
-fn generated_export_names(
-    schemas: &[schema::Schema],
-    pipelines: &[pipeline::Pipeline],
-    render_pipelines: &[render::RenderPipeline],
-) -> BTreeSet<String> {
-    let mut names = BTreeSet::new();
-    for schema in schemas {
-        names.extend([
-            format!("{}_SIZE", schema.name),
-            format!("{}_ALIGN", schema.name),
-            format!("{}_STRIDE", schema.name),
-            format!("{}_WGSL", schema.name),
-        ]);
-        emit::layout_export_names(&schema.name, &schema.tree, &mut names);
-    }
-    for pipeline in pipelines {
-        names.extend([
-            format!("{}_WGSL", pipeline.declaration),
-            format!("{}_ENTRY", pipeline.declaration),
-            format!("{}_WORKGROUP_X", pipeline.declaration),
-            format!("{}_WORKGROUP_Y", pipeline.declaration),
-            format!("{}_WORKGROUP_Z", pipeline.declaration),
-            format!("{}_HOST_RUNNABLE", pipeline.declaration),
-        ]);
-        for layout in &pipeline.layouts {
-            names.insert(format!("{}_LAYOUT{}", pipeline.declaration, layout.group));
-            names.insert(format!("{}Resources", layout.name));
-            names.insert(format!("create{}Resources", layout.name));
-            names.insert(emit::bind_group_factory_name(
-                &pipeline.declaration,
-                layout.group,
-            ));
-        }
-    }
-    for pipeline in render_pipelines {
-        names.extend([
-            format!("{}_WGSL", pipeline.declaration),
-            format!("{}_VERTEX_ENTRY", pipeline.declaration),
-            format!("{}_FRAGMENT_ENTRY", pipeline.declaration),
-            format!("{}_TARGET_FORMAT", pipeline.declaration),
-        ]);
-        for layout in &pipeline.layouts {
-            names.insert(format!("{}_LAYOUT{}", pipeline.declaration, layout.group));
-            names.insert(format!("{}Resources", layout.name));
-            names.insert(format!("create{}Resources", layout.name));
-            names.insert(emit::bind_group_factory_name(
-                &pipeline.declaration,
-                layout.group,
-            ));
-        }
-        for buffer in &pipeline.vertex_buffers {
-            names.insert(format!(
-                "{}_VERTEX_LAYOUT{}",
-                pipeline.declaration, buffer.slot
-            ));
-        }
-    }
-    names
+fn support_export_names(source: &str) -> BTreeSet<&str> {
+    source
+        .lines()
+        .filter_map(|line| {
+            ["export const ", "export function ", "export class "]
+                .into_iter()
+                .find_map(|prefix| line.strip_prefix(prefix))
+        })
+        .map(|tail| {
+            tail.split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_'))
+                .next()
+                .unwrap_or("")
+        })
+        .filter(|name| !name.is_empty())
+        .collect()
 }
 
 /// Checks source files and generates schema support.
@@ -218,9 +178,18 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     let options = discovery_options(files)?;
     let module = subscript_compiler::check_program_with(files, &options)?;
     let support = support_import(&module)?;
-    let mut intended = intended_schemas(support.as_ref());
     let pipeline_definitions = pipeline::discover(&module)?;
     let render_definitions = render::discover(&module)?;
+    let pipeline_declarations = pipeline_definitions
+        .iter()
+        .map(|pipeline| pipeline.declaration.clone())
+        .chain(
+            render_definitions
+                .iter()
+                .map(|pipeline| pipeline.declaration.clone()),
+        )
+        .collect::<BTreeSet<_>>();
+    let mut intended = intended_schemas(support.as_ref(), &pipeline_declarations);
     intended.extend(pipeline::schema_names(&module, &pipeline_definitions));
     intended.extend(render::schema_names(&render_definitions));
     for pipeline in &pipeline_definitions {
@@ -246,26 +215,6 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
             ),
             pipeline.pos.clone(),
         )]);
-    }
-    if let Some(support) = &support {
-        let exports = generated_export_names(&schemas, &pipeline_definitions, &render_definitions);
-        let missing = support
-            .names
-            .iter()
-            .filter(|name| !exports.contains(*name))
-            .collect::<Vec<_>>();
-        if !missing.is_empty() {
-            return Err(missing
-                .into_iter()
-                .map(|name| {
-                    diagnostic(
-                        "SC1",
-                        format!("imported `{name}` is not a schema or pipeline fact"),
-                        support.pos.clone(),
-                    )
-                })
-                .collect());
-        }
     }
     let wgsl_structs = schemas
         .iter()
@@ -343,6 +292,26 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         &render_texts,
     )
     .map_err(|diagnostic| vec![diagnostic])?;
+    if let Some(support) = &support {
+        let exports = support_export_names(&support_module);
+        let missing = support
+            .names
+            .iter()
+            .filter(|name| !exports.contains(name.as_str()))
+            .collect::<Vec<_>>();
+        if !missing.is_empty() {
+            return Err(missing
+                .into_iter()
+                .map(|name| {
+                    diagnostic(
+                        "SC1",
+                        format!("imported `{name}` is not a schema or pipeline fact"),
+                        support.pos.clone(),
+                    )
+                })
+                .collect());
+        }
+    }
     let layouts = schemas
         .iter()
         .map(|schema| GeneratedLayout {

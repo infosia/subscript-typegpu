@@ -213,34 +213,6 @@ fn emit_nested_offsets(
     }
 }
 
-pub(crate) fn layout_export_names(
-    schema_name: &str,
-    tree: &TypeTree,
-    names: &mut BTreeSet<String>,
-) {
-    fn visit(schema_name: &str, prefix: &str, tree: &TypeTree, names: &mut BTreeSet<String>) {
-        let TypeTree::Struct(structure) = tree else {
-            return;
-        };
-        for member in &structure.members {
-            let path = if prefix.is_empty() {
-                member.name.clone()
-            } else {
-                format!("{prefix}_{}", member.name)
-            };
-            names.insert(format!("{schema_name}_OFFSET_{path}"));
-            match &member.ty {
-                TypeTree::Struct(_) => visit(schema_name, &path, &member.ty, names),
-                TypeTree::Array(_, _) => {
-                    names.insert(format!("{schema_name}_STRIDE_{path}"));
-                }
-                _ => {}
-            }
-        }
-    }
-    visit(schema_name, "", tree, names);
-}
-
 fn binding_size(
     module: &Module,
     schemas: &[Schema],

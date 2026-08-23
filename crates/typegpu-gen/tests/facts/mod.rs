@@ -1,5 +1,23 @@
 use subscript_compiler::SourceFile;
 
+use crate::support;
+
+fn generate_with_library(name: &str, source: &str) -> subscript_typegpu_gen::Generated {
+    let mut files = support::b01_files();
+    files.pop();
+    files.push(SourceFile::new(name, source));
+    subscript_typegpu_gen::generate(&files).unwrap_or_else(|diagnostics| {
+        panic!(
+            "generation failed: {}",
+            diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.message.as_str())
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
+    })
+}
+
 #[test]
 fn nested_offsets_and_array_strides_have_unambiguous_names() {
     let source = r#"
@@ -95,4 +113,29 @@ class Bad {
             assert!(messages.contains("not a schema"), "{file}:\n{messages}");
         }
     }
+}
+
+#[test]
+fn support_import_intent_uses_declarations_instead_of_name_case() {
+    let lowercase_schema = generate_with_library(
+        "lowercase.ts",
+        r#"
+import { lower_SIZE } from "./lowercase.typegpu";
+@CStruct class lower { value: u32; constructor(value: u32) { this.value = value; } }
+"#,
+    );
+    assert!(lowercase_schema.support_module.contains("lower_SIZE"));
+
+    let uppercase_pipeline = generate_with_library(
+        "uppercase.ts",
+        r#"
+import { UPPER_WGSL } from "./uppercase.typegpu";
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
+class Layout { output!: MutStorage<u32>; }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.output.set(0, 1); }
+export const UPPER: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "UPPER", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    assert!(uppercase_pipeline.support_module.contains("UPPER_WGSL"));
+    assert!(uppercase_pipeline.layouts.is_empty());
 }

@@ -1,6 +1,6 @@
 // program: a03-encoders
 // purpose: cover asynchronous pipelines, render extras, bundles, indirect calls, and debug labels
-// exercises: EG4, PL3-PL4, E4, RN11-RN15
+// exercises: EG4, PL2-PL4, E1, E4
 // questions: none
 
 import {

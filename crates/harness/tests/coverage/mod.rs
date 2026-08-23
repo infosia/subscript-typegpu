@@ -47,7 +47,7 @@ fn render_coverage(total: usize, reached: usize, unreached: &BTreeSet<String>) -
 }
 
 #[test]
-fn dev_corpus_writes_sorted_facade_coverage() {
+fn dev_corpus_matches_committed_facade_coverage() {
     if !crate::differential::backend_is_available() {
         return;
     }
@@ -77,8 +77,19 @@ fn dev_corpus_writes_sorted_facade_coverage() {
     let unreached = all.difference(&reached).cloned().collect::<BTreeSet<_>>();
     let markdown = render_coverage(all.len(), reached.len(), &unreached);
     let path = root.join("specs/tracking/coverage.md");
-    std::fs::write(&path, markdown)
-        .unwrap_or_else(|error| panic!("write {}: {error}", path.display()));
+    let committed = std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+    if committed != markdown {
+        if std::env::var("UPDATE_COVERAGE").as_deref() == Ok("1") {
+            std::fs::write(&path, &markdown)
+                .unwrap_or_else(|error| panic!("write {}: {error}", path.display()));
+        } else {
+            panic!(
+                "{} differs; run the gate with UPDATE_COVERAGE=1 to regenerate coverage.md",
+                path.display(),
+            );
+        }
+    }
     assert!(
         unreached.is_empty(),
         "unreached facade exports:\n{}",

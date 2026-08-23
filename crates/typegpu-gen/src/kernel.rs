@@ -390,6 +390,23 @@ fn kernel_globals(module: &Module, kernel: &Function) -> Result<Vec<KernelGlobal
     Ok(globals)
 }
 
+fn render_kernel_globals(
+    module: &Module,
+    kernels: [&Function; 2],
+) -> Result<Vec<KernelGlobal>, Diagnostic> {
+    let mut reached = BTreeMap::new();
+    for kernel in kernels {
+        for global in kernel_globals(module, kernel)? {
+            reached.insert(global.name.clone(), global);
+        }
+    }
+    Ok(module
+        .globals
+        .iter()
+        .filter_map(|global| reached.remove(&global.name))
+        .collect())
+}
+
 fn expression_blocks_host(module: &Module, expression: &Expr) -> bool {
     match &expression.kind {
         ExprKind::Unary { operand, .. }
@@ -3785,6 +3802,21 @@ pub(crate) fn referenced_render_schema_names(
             collect_schema_stmt(module, stmt, &mut seen, &mut out);
         }
     }
+    let vertex = function(module, &pipeline.vertex_entry).ok_or_else(|| {
+        generator_diagnostic(
+            "the vertex kernel disappeared from typed HIR",
+            pipeline.pos.clone(),
+        )
+    })?;
+    let fragment = function(module, &pipeline.fragment_entry).ok_or_else(|| {
+        generator_diagnostic(
+            "the fragment kernel disappeared from typed HIR",
+            pipeline.pos.clone(),
+        )
+    })?;
+    for global in render_kernel_globals(module, [vertex, fragment])? {
+        collect_schema_type(module, &global.ty, &mut seen, &mut out);
+    }
     let interface_names = pipeline
         .vertex_buffers
         .iter()
@@ -3860,6 +3892,7 @@ fn render_helpers(
     module: &Module,
     pipeline: &RenderPipeline,
     kernels: [&Function; 2],
+    globals: &[KernelGlobal],
     module_names: &BTreeSet<String>,
 ) -> Result<String, Diagnostic> {
     let mut names = Vec::new();
@@ -3903,7 +3936,7 @@ fn render_helpers(
             }
             let _ = wgsl_type(module, &param.ty, &param.pos)?;
         }
-        let mut emitter = Emitter::helper(module, helper, &[], module_names);
+        let mut emitter = Emitter::helper(module, helper, globals, module_names);
         let params = helper
             .params
             .iter()
@@ -3944,6 +3977,7 @@ pub(crate) fn emit_render(
     let fragment = function(module, &pipeline.fragment_entry).ok_or_else(|| {
         generator_diagnostic("fragment kernel disappeared from HIR", pipeline.pos.clone())
     })?;
+    let globals = render_kernel_globals(module, [vertex, fragment])?;
     let mut helper_names = Vec::new();
     let mut seen_helpers = BTreeSet::new();
     for kernel in [vertex, fragment] {
@@ -3956,7 +3990,7 @@ pub(crate) fn emit_render(
     let mut module_names = module_scope_names(
         structs,
         &pipeline.layouts,
-        &[],
+        &globals,
         &helper_names,
         &[&pipeline.vertex_entry, &pipeline.fragment_entry],
     );
@@ -3969,7 +4003,7 @@ pub(crate) fn emit_render(
         vertex,
         layout_count + vertex_value_count,
         InvocationKind::Vertex,
-        &[],
+        &globals,
         &module_names,
     );
     let mut fragment_emitter = Emitter::entry(
@@ -3978,7 +4012,7 @@ pub(crate) fn emit_render(
         fragment,
         layout_count + 1,
         InvocationKind::Fragment,
-        &[],
+        &globals,
         &module_names,
     );
     let mut vertex_body = String::new();
@@ -4017,6 +4051,7 @@ pub(crate) fn emit_render(
         out.push('\n');
     }
     out.push_str(&render_interface_structs(module, pipeline)?);
+    out.push_str(&emit_kernel_globals(module, &globals)?);
     for layout in &pipeline.layouts {
         for binding in &layout.bindings {
             out.push_str(&binding_declaration(module, layout.group, binding)?);
@@ -4029,6 +4064,7 @@ pub(crate) fn emit_render(
         module,
         pipeline,
         [vertex, fragment],
+        &globals,
         &module_names,
     )?);
 

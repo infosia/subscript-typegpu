@@ -51,6 +51,8 @@ class Varyings {
   }
 }
 
+const FRAGMENT_ALPHA: f32 = 1.0;
+
 function vert(value: Vertex, ctx: VertexInvocation): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -59,7 +61,7 @@ function vert(value: Vertex, ctx: VertexInvocation): Varyings {
 }
 
 function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
-  return new Vec4f(input.color.x, input.color.y, input.color.z, 1.0);
+  return new Vec4f(input.color.x, input.color.y, input.color.z, FRAGMENT_ALPHA);
 }
 
 export const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, {

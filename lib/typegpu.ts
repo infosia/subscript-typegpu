@@ -47,7 +47,10 @@ export class Texture2d<T> {
   }
 
   load(coords: Vec2i, level: u32): Vec4f {
-    if (level !== 0 || coords.x < 0 || coords.y < 0
+    if (level !== 0) {
+      authorTrap("TX3", "load", `level=${level} is not supported`);
+    }
+    if (coords.x < 0 || coords.y < 0
       || (coords.x as u32) >= this.width || (coords.y as u32) >= this.height) {
       return new Vec4f(0.0, 0.0, 0.0, 0.0);
     }
@@ -59,7 +62,10 @@ export class Texture2d<T> {
     if (!sampler.isNearest()) {
       authorTrap("TX3", "sampleLevel", "filterMode is not nearest");
     }
-    if (this.width === 0 || this.height === 0 || level !== 0.0) {
+    if (level !== 0.0) {
+      authorTrap("TX3", "sampleLevel", `level=${level} is not supported`);
+    }
+    if (this.width === 0 || this.height === 0) {
       return new Vec4f(0.0, 0.0, 0.0, 0.0);
     }
     let x: i32 = Math.floor((uv.x * (this.width as f32)) as f64) as i32;

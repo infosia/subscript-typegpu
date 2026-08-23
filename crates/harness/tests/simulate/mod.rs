@@ -141,6 +141,24 @@ fn assert_pair(
         failures.push(format!(
             "{call} passes `{constant}`, expected `{expected}` for kernel `{kernel}`"
         ));
+        return;
+    }
+    let support_file = format!(
+        "{}.typegpu.ts",
+        program
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .expect("UTF-8 program stem"),
+    );
+    let Some(global) = module.globals.iter().find(|global| global.name == expected) else {
+        failures.push(format!("{call} cannot resolve Global `{expected}`"));
+        return;
+    };
+    if global.pos.file != support_file {
+        failures.push(format!(
+            "{call} resolves `{expected}` from {}, expected {support_file}",
+            global.pos.file,
+        ));
     }
 }
 
@@ -151,6 +169,7 @@ fn visit_expr(
     generated: &Generated,
     expression: &Expr,
     failures: &mut Vec<String>,
+    simulation_calls: &mut usize,
 ) {
     if expression.pos.file == program_name {
         if let ExprKind::Call {
@@ -158,6 +177,9 @@ fn visit_expr(
             args,
         } = &expression.kind
         {
+            if is_library_simulation(module, callee) {
+                *simulation_calls += 1;
+            }
             assert_pair(
                 program, module, generated, expression, callee, args, failures,
             );
@@ -165,7 +187,15 @@ fn visit_expr(
     }
     macro_rules! visit {
         ($child:expr) => {
-            visit_expr(program, program_name, module, generated, $child, failures)
+            visit_expr(
+                program,
+                program_name,
+                module,
+                generated,
+                $child,
+                failures,
+                simulation_calls,
+            )
         };
     }
     match &expression.kind {
@@ -219,9 +249,15 @@ fn visit_expr(
                 }
             }
         }
-        ExprKind::Lambda { body, .. } => {
-            visit_statements(program, program_name, module, generated, body, failures)
-        }
+        ExprKind::Lambda { body, .. } => visit_statements(
+            program,
+            program_name,
+            module,
+            generated,
+            body,
+            failures,
+            simulation_calls,
+        ),
         ExprKind::Yield(value) => {
             if let Some(value) = value {
                 visit!(value);
@@ -251,10 +287,19 @@ fn visit_statements(
     generated: &Generated,
     statements: &[Stmt],
     failures: &mut Vec<String>,
+    simulation_calls: &mut usize,
 ) {
     macro_rules! visit {
         ($child:expr) => {
-            visit_expr(program, program_name, module, generated, $child, failures)
+            visit_expr(
+                program,
+                program_name,
+                module,
+                generated,
+                $child,
+                failures,
+                simulation_calls,
+            )
         };
     }
     for statement in statements {
@@ -269,14 +314,38 @@ fn visit_statements(
                 cond, then, els, ..
             } => {
                 visit!(cond);
-                visit_statements(program, program_name, module, generated, then, failures);
+                visit_statements(
+                    program,
+                    program_name,
+                    module,
+                    generated,
+                    then,
+                    failures,
+                    simulation_calls,
+                );
                 if let Some(els) = els {
-                    visit_statements(program, program_name, module, generated, els, failures);
+                    visit_statements(
+                        program,
+                        program_name,
+                        module,
+                        generated,
+                        els,
+                        failures,
+                        simulation_calls,
+                    );
                 }
             }
             Stmt::While { cond, body, .. } => {
                 visit!(cond);
-                visit_statements(program, program_name, module, generated, body, failures);
+                visit_statements(
+                    program,
+                    program_name,
+                    module,
+                    generated,
+                    body,
+                    failures,
+                    simulation_calls,
+                );
             }
             Stmt::For {
                 init,
@@ -293,6 +362,7 @@ fn visit_statements(
                         generated,
                         std::slice::from_ref(init.as_ref()),
                         failures,
+                        simulation_calls,
                     );
                 }
                 if let Some(cond) = cond {
@@ -301,11 +371,27 @@ fn visit_statements(
                 if let Some(step) = step {
                     visit!(step);
                 }
-                visit_statements(program, program_name, module, generated, body, failures);
+                visit_statements(
+                    program,
+                    program_name,
+                    module,
+                    generated,
+                    body,
+                    failures,
+                    simulation_calls,
+                );
             }
             Stmt::ForOf { subject, body, .. } => {
                 visit!(subject);
-                visit_statements(program, program_name, module, generated, body, failures);
+                visit_statements(
+                    program,
+                    program_name,
+                    module,
+                    generated,
+                    body,
+                    failures,
+                    simulation_calls,
+                );
             }
             Stmt::Switch { disc, cases, .. } => {
                 visit!(disc);
@@ -320,19 +406,26 @@ fn visit_statements(
                         generated,
                         &case.body,
                         failures,
+                        simulation_calls,
                     );
                 }
             }
-            Stmt::Block(body) => {
-                visit_statements(program, program_name, module, generated, body, failures)
-            }
+            Stmt::Block(body) => visit_statements(
+                program,
+                program_name,
+                module,
+                generated,
+                body,
+                failures,
+                simulation_calls,
+            ),
             Stmt::Break(_) | Stmt::Continue(_) => {}
             _ => {}
         }
     }
 }
 
-fn pairing_failures(program: &Path) -> Vec<String> {
+fn pairing_failures(program: &Path) -> (Vec<String>, usize) {
     let files = subscript_typegpu_harness::program_files(program)
         .unwrap_or_else(|error| panic!("load {}: {error}", program.display()));
     let generated = subscript_typegpu_gen::generate(&files)
@@ -344,6 +437,7 @@ fn pairing_failures(program: &Path) -> Vec<String> {
         .and_then(|name| name.to_str())
         .expect("UTF-8 program name");
     let mut failures = Vec::new();
+    let mut simulation_calls = 0;
     for global in &module.globals {
         visit_expr(
             program,
@@ -352,6 +446,7 @@ fn pairing_failures(program: &Path) -> Vec<String> {
             &generated,
             &global.init,
             &mut failures,
+            &mut simulation_calls,
         );
     }
     for function in &module.functions {
@@ -362,6 +457,7 @@ fn pairing_failures(program: &Path) -> Vec<String> {
             &generated,
             &function.body,
             &mut failures,
+            &mut simulation_calls,
         );
     }
     for class in &module.classes {
@@ -373,6 +469,7 @@ fn pairing_failures(program: &Path) -> Vec<String> {
                 &generated,
                 &constructor.body,
                 &mut failures,
+                &mut simulation_calls,
             );
         }
         for method in &class.methods {
@@ -383,6 +480,7 @@ fn pairing_failures(program: &Path) -> Vec<String> {
                 &generated,
                 &method.body,
                 &mut failures,
+                &mut simulation_calls,
             );
         }
     }
@@ -393,16 +491,36 @@ fn pairing_failures(program: &Path) -> Vec<String> {
         &generated,
         &module.top_level,
         &mut failures,
+        &mut simulation_calls,
     );
-    failures
+    (failures, simulation_calls)
 }
 
 #[test]
 fn every_simulation_call_uses_its_generated_pipeline_pair() {
-    let failures = programs()
-        .iter()
-        .flat_map(|program| pairing_failures(program))
-        .collect::<Vec<_>>();
+    let mut failures = Vec::new();
+    for program in programs() {
+        let (program_failures, simulation_calls) = pairing_failures(&program);
+        failures.extend(program_failures);
+        let name = program
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("UTF-8 program name");
+        if matches!(
+            name,
+            "x01-live-vecadd.ts"
+                | "x02-live-saxpy.ts"
+                | "x03-live-particles.ts"
+                | "x04-live-control-flow.ts"
+                | "x09-live-switch.ts"
+        ) && simulation_calls == 0
+        {
+            failures.push(format!(
+                "{} has no simulateCompute* call required by CL3",
+                program.display(),
+            ));
+        }
+    }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
