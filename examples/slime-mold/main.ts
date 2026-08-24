@@ -5,10 +5,10 @@
 // and decay 0.985.
 // TypeGPU runs 200000 agents over a canvas-sized texture pair, and one deposit adds 1.0 to
 // a cell. This port fixes 4096 agents, a 128-square trail, and deposit 0.2.
-// TypeGPU also turns an agent at random after both side samples beat the forward sample.
-// At the border, TypeGPU clamps the position, reflects the angle, and adds a jitter.
-// This port drops both behaviors. The agent turns toward the stronger side only, and the
-// trail wraps into a torus.
+// TypeGPU seeds agents in a disc and points them toward its center. This port derives
+// full-grid positions and full-circle headings from a deterministic 16-bit LCG.
+// The same LCG selects a turn when both sides win or all samples tie at zero. At the border,
+// this port wraps the trail instead of the TypeGPU clamp, reflection, and jitter.
 // Ported from TypeGPU's slime-mold example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -38,6 +38,10 @@ import {
   Vec2i,
   Vec4f,
 } from "./typegpu-types";
+import {
+  randF32,
+  randSeed,
+} from "./typegpu-noise";
 import {
   GPUBindGroup,
   GPUBuffer,
@@ -88,10 +92,12 @@ class Vertex {
 class Agent {
   position: Vec2f;
   heading: f32;
+  lcgState: u32;
 
-  constructor(position: Vec2f, heading: f32) {
+  constructor(position: Vec2f, heading: f32, lcgState: u32) {
     this.position = position;
     this.heading = heading;
+    this.lcgState = lcgState;
   }
 }
 
@@ -157,10 +163,21 @@ function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
   const right: f32 = res.sense.load(
     senseTrailCell(agent.position, agent.heading - SENSOR_ANGLE),
   ).x;
-  if (left > forward && left > right) {
-    agent.heading += TURN_SPEED;
-  } else if (right > forward && right > left) {
+  if (
+    (left > forward && right > forward)
+    || (forward === 0.0 && left === 0.0 && right === 0.0)
+  ) {
+    const random = randF32(agent.lcgState);
+    agent.lcgState = random.x as u32;
+    if ((agent.lcgState & 1) === 0) {
+      agent.heading += TURN_SPEED;
+    } else {
+      agent.heading -= TURN_SPEED;
+    }
+  } else if (right > left && right >= forward) {
     agent.heading -= TURN_SPEED;
+  } else if (left > right && left >= forward) {
+    agent.heading += TURN_SPEED;
   }
   const stepAngles = new Vec2f(agent.heading, agent.heading);
   agent.position.x = wrapTrail(
@@ -360,19 +377,28 @@ export function init(
     new Vertex(new Vec2f(-1.0, 1.0)),
     new Vertex(new Vec2f(1.0, 1.0)),
   ];
-  // The agents start on a ring around the trail center and face along that ring.
-  // TypeGPU seeds random positions in a disc on the GPU and points each agent at the center.
-  // A fixed ring keeps every run identical, because this port has no random source.
+  // Each agent index seeds the LCG. Three samples set the full-grid position and
+  // full-circle heading. The stored state continues the deterministic sequence.
   const agentBytes: u8[] = [];
   let agentIndex: u32 = 0;
   while (agentIndex < AGENT_COUNT) {
-    const heading: f32 = (agentIndex as f32) * TAU / (AGENT_COUNT as f32);
-    const radius: f32 = 10.0 + ((agentIndex % 29) as f32) * 0.12;
+    let lcgState: u32 = randSeed(agentIndex);
+    let sample = randF32(lcgState);
+    lcgState = sample.x as u32;
+    const x: f32 = sample.y * (TRAIL_SIZE as f32);
+    sample = randF32(lcgState);
+    lcgState = sample.x as u32;
+    const y: f32 = sample.y * (TRAIL_SIZE as f32);
+    sample = randF32(lcgState);
+    lcgState = sample.x as u32;
+    const heading: f32 = sample.y * TAU;
     const position = new Vec2f(
-      (TRAIL_SIZE as f32) * 0.5 + (Math.cos(heading as f64) as f32) * radius,
-      (TRAIL_SIZE as f32) * 0.5 + (Math.sin(heading as f64) as f32) * radius,
+      x,
+      y,
     );
-    const bytes: u8[] = Context.bytesOf<Agent>(new Agent(position, heading + 1.5707963));
+    const bytes: u8[] = Context.bytesOf<Agent>(
+      new Agent(position, heading, lcgState),
+    );
     let byteIndex: i32 = 0;
     while (byteIndex < bytes.length) {
       agentBytes.push(bytes[byteIndex]);

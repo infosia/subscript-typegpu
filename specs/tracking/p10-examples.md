@@ -322,3 +322,12 @@ deterministic per run while the symmetry breaks.
 The owner ran `game-of-life` for 2929 frames: the glider, the
 pointer drawing, and the `0` clear work as intended. The slime-mold
 re-check follows the symmetry fix.
+
+## slime-mold symmetry fix (2026-08-24)
+
+The agents seed over the whole grid and the full circle from the
+noise module's LCG by index, and the kernel breaks a sensing tie
+with the agent's stored LCG low bit, deterministically. The header
+and seeding comments follow the new shape. Gate green, 251 passed,
+218 s. The smoke run prints `window:frames=30`, read before this
+commit. The owner's re-check decides the visual pass.
