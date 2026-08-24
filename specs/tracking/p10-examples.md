@@ -358,3 +358,13 @@ The owner sees green dots that fill the screen: 4096 agents over a
 0.985 decay gives an equilibrium of 3.3 — every cell saturates. The
 fix computes the equilibrium down to about 0.31: a 256-square trail
 and a 0.96 decay, with the agent count and the deposit unchanged.
+
+## slime-mold collapses to one line (2026-08-24)
+
+After the saturation fix the agents funnel into one straight line.
+Cause: the stochastic turn fires only on an exact floating-point
+tie, which stops once the trail is nonzero, so the pure
+follow-the-strongest rule feeds back into a single dominant path.
+The standard model keeps a continuous heading jitter. Fix: every
+frame each agent advances its LCG and adds a centered jitter of
+0.3 radians peak to peak to its heading, before the sensing turn.
