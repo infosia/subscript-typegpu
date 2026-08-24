@@ -104,3 +104,14 @@ ping-pongs a blur over two dispatches against the host lane.
 
 Evidence: gate green, 250 passed, 205 s. Live x01–x21 PASS: Metal
 (yawgpu) 62.71 s, Dawn 58.56 s. Remaining slices: blending (4).
+
+## Slice 4 first live run (2026-08-24)
+
+`x22-live-blend` failed at `x=41 y=35 expected=15,46,138,153
+got=48,54,142,255`, byte-identical on Metal and Dawn. The GPUs
+agree with each other and carry the both-triangles alpha
+(`one`/`one` saturates at 255), so the host oracle is wrong: its
+local edge test misses the second triangle at a pixel center on or
+near an edge. The fix moves the coordinates so every pixel center
+keeps a margin from every edge, the practice of the other live
+render programs. The blending code itself is not implicated.
