@@ -87,8 +87,11 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   `winit`, `raw-window-handle`, and on macOS the `objc2`,
   `objc2-app-kit`, and `objc2-quartz-core` crates, each pinned by
   exact version in the workspace manifest. macOS attaches a
-  `CAMetalLayer` to the `NSView`, Windows passes the `HWND` and
-  `HINSTANCE`. `create_surface` is the only platform-conditional
+  `CAMetalLayer` to the `NSView` and sets the layer's color space
+  to sRGB (Rev 1): an unset layer is interpreted in the display's
+  native gamut, while a browser color-matches canvas content as
+  sRGB, measured as a visible saturation difference. Windows passes
+  the `HWND` and `HINSTANCE`. `create_surface` is the only platform-conditional
   code. On another platform the binary prints one line and exits
   with a non-zero code. The crate has no cargo feature.
 - **W10 — The dev tier runs in process.** The host runs the script
