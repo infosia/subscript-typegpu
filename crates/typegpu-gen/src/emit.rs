@@ -27,7 +27,7 @@ fn resource_type(kind: BindingKind) -> &'static str {
         | BindingKind::Storage
         | BindingKind::MutStorage
         | BindingKind::Guard => "GPUBuffer",
-        BindingKind::Texture(_) | BindingKind::StorageTexture(_) => "GPUTextureView",
+        BindingKind::Texture(_) | BindingKind::StorageTexture(_, _) => "GPUTextureView",
         BindingKind::Sampler => "GPUSampler",
     }
 }
@@ -38,7 +38,7 @@ fn resource_factory(kind: BindingKind) -> &'static str {
         | BindingKind::Storage
         | BindingKind::MutStorage
         | BindingKind::Guard => "bufferResource",
-        BindingKind::Texture(_) | BindingKind::StorageTexture(_) => "textureResource",
+        BindingKind::Texture(_) | BindingKind::StorageTexture(_, _) => "textureResource",
         BindingKind::Sampler => "samplerResource",
     }
 }
@@ -288,8 +288,12 @@ fn emit_binding_entry(
         BindingKind::Texture(sample) => {
             format!("minBindingSize: 0, sampleType: \"{}\"", sample.webgpu(),)
         }
-        BindingKind::StorageTexture(format) => {
-            format!("minBindingSize: 0, format: \"{}\"", format.webgpu(),)
+        BindingKind::StorageTexture(format, access) => {
+            format!(
+                "minBindingSize: 0, format: \"{}\", access: \"{}\"",
+                format.webgpu(),
+                access.webgpu(),
+            )
         }
         BindingKind::Sampler => "minBindingSize: 0, samplerType: \"filtering\"".to_owned(),
     };

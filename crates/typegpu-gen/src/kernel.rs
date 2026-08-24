@@ -8,7 +8,7 @@ use subscript_compiler::hir::{
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 use crate::mapping::{self, MethodEmission};
-use crate::pipeline::{library_class, BindingKind, Pipeline};
+use crate::pipeline::{library_class, BindingKind, Pipeline, StorageTextureAccess};
 use crate::render::RenderPipeline;
 use crate::schema::Schema;
 
@@ -696,8 +696,12 @@ fn binding_declaration(
         BindingKind::Texture(sample) => {
             format!("var {name}: texture_2d<{}>;", sample.wgsl())
         }
-        BindingKind::StorageTexture(format) => {
-            format!("var {name}: texture_storage_2d<{}, write>;", format.wgsl())
+        BindingKind::StorageTexture(format, access) => {
+            format!(
+                "var {name}: texture_storage_2d<{}, {}>;",
+                format.wgsl(),
+                access.wgsl(),
+            )
         }
         BindingKind::Sampler => format!("var {name}: sampler;"),
     };
@@ -2159,8 +2163,31 @@ impl<'a> Emitter<'a> {
                                 expr.pos.clone(),
                             ));
                         }
-                        (BindingKind::StorageTexture(_), "store", [coords, value]) => {
+                        (BindingKind::StorageTexture(_, access), "dimensions", [])
+                            if access.can_read() =>
+                        {
+                            format!("textureDimensions({})", binding.name)
+                        }
+                        (BindingKind::StorageTexture(_, access), "load", [coords])
+                            if access.can_read() =>
+                        {
+                            format!("textureLoad({}, {coords})", binding.name)
+                        }
+                        (BindingKind::StorageTexture(_, access), "store", [coords, value])
+                            if access.can_write() =>
+                        {
                             format!("textureStore({}, {coords}, {value})", binding.name)
+                        }
+                        (
+                            BindingKind::StorageTexture(_, StorageTextureAccess::Write),
+                            "load",
+                            _,
+                        ) => {
+                            return Err(diagnostic(
+                                "TX11",
+                                "load is not legal on a write-only storage texture",
+                                expr.pos.clone(),
+                            ));
                         }
                         _ => {
                             return Err(generator_diagnostic(

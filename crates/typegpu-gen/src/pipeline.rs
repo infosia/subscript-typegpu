@@ -11,7 +11,7 @@ pub(crate) enum BindingKind {
     Storage,
     MutStorage,
     Texture(TextureSampleType),
-    StorageTexture(StorageTextureFormat),
+    StorageTexture(StorageTextureFormat, StorageTextureAccess),
     Sampler,
     Guard,
 }
@@ -43,6 +43,39 @@ pub(crate) enum StorageTextureFormat {
     Rgba32float,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StorageTextureAccess {
+    Write,
+    Read,
+    ReadWrite,
+}
+
+impl StorageTextureAccess {
+    pub(crate) fn wgsl(self) -> &'static str {
+        match self {
+            Self::Write => "write",
+            Self::Read => "read",
+            Self::ReadWrite => "read_write",
+        }
+    }
+
+    pub(crate) fn webgpu(self) -> &'static str {
+        match self {
+            Self::Write => "write-only",
+            Self::Read => "read-only",
+            Self::ReadWrite => "read-write",
+        }
+    }
+
+    pub(crate) fn can_read(self) -> bool {
+        matches!(self, Self::Read | Self::ReadWrite)
+    }
+
+    pub(crate) fn can_write(self) -> bool {
+        matches!(self, Self::Write | Self::ReadWrite)
+    }
+}
+
 impl StorageTextureFormat {
     pub(crate) fn wgsl(self) -> &'static str {
         match self {
@@ -65,7 +98,7 @@ impl BindingKind {
             Self::Storage => "storage, read",
             Self::MutStorage => "storage, read_write",
             Self::Guard => "uniform",
-            Self::Texture(_) | Self::StorageTexture(_) | Self::Sampler => "",
+            Self::Texture(_) | Self::StorageTexture(_, _) | Self::Sampler => "",
         }
     }
 
@@ -75,7 +108,7 @@ impl BindingKind {
             Self::Storage => "read-only-storage",
             Self::MutStorage => "storage",
             Self::Texture(_) => "texture",
-            Self::StorageTexture(_) => "storageTexture",
+            Self::StorageTexture(_, _) => "storageTexture",
             Self::Sampler => "sampler",
             Self::Guard => "guard",
         }
@@ -202,7 +235,17 @@ fn wrapper(
             BindingKind::Texture(TextureSampleType::Float),
             Type::F32,
         )));
-    } else if class.name.starts_with("StorageTexture2d<") {
+    } else if class.name.starts_with("StorageTexture2d<")
+        || class.name.starts_with("ReadStorageTexture2d<")
+        || class.name.starts_with("ReadWriteStorageTexture2d<")
+    {
+        let access = if class.name.starts_with("ReadWriteStorageTexture2d<") {
+            StorageTextureAccess::ReadWrite
+        } else if class.name.starts_with("ReadStorageTexture2d<") {
+            StorageTextureAccess::Read
+        } else {
+            StorageTextureAccess::Write
+        };
         let Some(formats) = class.fields.iter().find(|field| field.name == "formats") else {
             return Err(generator_diagnostic(
                 "library StorageTexture2d lost its format marker field",
@@ -230,7 +273,7 @@ fn wrapper(
             ));
         };
         return Ok(Some((
-            BindingKind::StorageTexture(format),
+            BindingKind::StorageTexture(format, access),
             (**item).clone(),
         )));
     } else if class.name == "Sampler" {

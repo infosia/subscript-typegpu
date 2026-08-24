@@ -226,6 +226,11 @@ export class StorageTexture2d<F> {
     this.height = height;
   }
 
+  load(coords: Vec2i): Vec4f {
+    authorTrap("TX11", "StorageTexture2d.load", "access=write-only");
+    return new Vec4f(0.0, 0.0, 0.0, 0.0);
+  }
+
   store(coords: Vec2i, value: Vec4f): void {
     if (coords.x < 0 || coords.y < 0
       || (coords.x as u32) >= this.width || (coords.y as u32) >= this.height) {
@@ -237,6 +242,75 @@ export class StorageTexture2d<F> {
     } else {
       this.values[pixel] = value;
     }
+  }
+}
+
+export class ReadStorageTexture2d<F> {
+  private values: Vec4f[];
+  // The generator reads this zero-length marker to recover F from the typed HIR.
+  private formats: F[];
+  private width: u32;
+  private height: u32;
+
+  constructor(values: Vec4f[], width: u32, height: u32) {
+    this.values = values;
+    this.formats = [];
+    this.width = width;
+    this.height = height;
+  }
+
+  load(coords: Vec2i): Vec4f {
+    if (coords.x < 0 || coords.y < 0
+      || (coords.x as u32) >= this.width || (coords.y as u32) >= this.height) {
+      return new Vec4f(0.0, 0.0, 0.0, 0.0);
+    }
+    const pixel: i32 = ((coords.y as u32) * this.width + (coords.x as u32)) as i32;
+    return this.values[pixel];
+  }
+
+  dimensions(): Vec2u {
+    return new Vec2u(this.width, this.height);
+  }
+}
+
+export class ReadWriteStorageTexture2d<F> {
+  private values: Vec4f[];
+  // The generator reads this zero-length marker to recover F from the typed HIR.
+  private formats: F[];
+  private width: u32;
+  private height: u32;
+
+  constructor(values: Vec4f[], width: u32, height: u32) {
+    this.values = values;
+    this.formats = [];
+    this.width = width;
+    this.height = height;
+  }
+
+  load(coords: Vec2i): Vec4f {
+    if (coords.x < 0 || coords.y < 0
+      || (coords.x as u32) >= this.width || (coords.y as u32) >= this.height) {
+      return new Vec4f(0.0, 0.0, 0.0, 0.0);
+    }
+    const pixel: i32 = ((coords.y as u32) * this.width + (coords.x as u32)) as i32;
+    return this.values[pixel];
+  }
+
+  store(coords: Vec2i, value: Vec4f): void {
+    if (coords.x < 0 || coords.y < 0
+      || (coords.x as u32) >= this.width || (coords.y as u32) >= this.height) {
+      return;
+    }
+    const pixel: i32 = ((coords.y as u32) * this.width + (coords.x as u32)) as i32;
+    if (pixel === this.values.length) {
+      this.values.push(value);
+    } else {
+      this.values[pixel] = value;
+    }
+  }
+
+  dimensions(): Vec2u {
+    return new Vec2u(this.width, this.height);
   }
 }
 
@@ -940,6 +1014,7 @@ export class BindGroupLayoutEntrySpec {
   minBindingSize!: u64;
   sampleType?: GPUTextureSampleType = "float";
   format?: GPUTextureFormat;
+  access?: GPUStorageTextureAccess = "write-only";
   samplerType?: GPUSamplerBindingType = "filtering";
 }
 
@@ -1297,7 +1372,7 @@ function nativeBindGroupLayoutEntries(
           entries.push({
             binding: source.binding,
             visibility: source.visibility,
-            storageTexture: { access: "write-only", format: source.format, viewDimension: "2d" },
+            storageTexture: { access: source.access, format: source.format, viewDimension: "2d" },
           });
         } else {
           authorTrap("TX5", "storageTexture", `binding=${source.binding} has no format`);

@@ -92,3 +92,15 @@ the left button is down with the keys kept.
 Evidence: gate green, 249 passed, 196 s. Smoke runs `triangle`,
 `fluid-double-buffering`, `boids` print `window:frames=30` on
 Metal, read before this commit.
+
+## Slice 3 (2026-08-24)
+
+Landed: `ReadStorageTexture2d<F>` and `ReadWriteStorageTexture2d<F>`
+with host bodies, the `read`/`read_write` emission and layout
+access, the bind-group path, and the TX11 diagnostic for a `load`
+on the write-only wrapper (red recorded). `b20-read-storage` prints
+the kinds and access by name on both tiers; `x21-live-read-storage`
+ping-pongs a blur over two dispatches against the host lane.
+
+Evidence: gate green, 250 passed, 205 s. Live x01–x21 PASS: Metal
+(yawgpu) 62.71 s, Dawn 58.56 s. Remaining slices: blending (4).

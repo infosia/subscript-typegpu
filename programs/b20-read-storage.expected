@@ -1,0 +1,7 @@
+source.kind=storageTexture
+source.access=read-only
+target.kind=storageTexture
+target.access=read-write
+readStorage_WGSL_LINES=15
+host:out=1,4
+PASS

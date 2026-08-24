@@ -52,6 +52,7 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-24 | P10 slice 3 (clouds, strip de-reductions) | 49 s | 0 s | 197 s | 197 s | 7 |
 | 2026-08-24 | P11 slice 2 (pointer input) | 48 s | 0 s | 196 s | 196 s | 7 |
 | 2026-08-24 | P10 slice 4 (fluid-with-atomics) | 49 s | 0 s | 197 s | 197 s | 7 |
+| 2026-08-24 | P11 slice 3 (read-access storage textures) | 47 s | 1 s | 209 s | 205 s | 7 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate
