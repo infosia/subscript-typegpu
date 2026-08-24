@@ -5,7 +5,8 @@ P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
 2026-08-23. Rev 4 (K14 shadowing), 2026-08-23. Rev 5 (K10, K25–K28),
 2026-08-23. Rev 6 (K25 Rev 1 argument order, K27 count), 2026-08-23. Rev 7
 (K29–K31 WGSL shells), 2026-08-23. Rev 8 (K14 Rev 5 one order),
-2026-08-23. Rev 9 (K19 Rev 4 FixedArray constants), 2026-08-24. Plan §3 D2, D3, D7, D9 and §4
+2026-08-23. Rev 9 (K19 Rev 4 FixedArray constants), 2026-08-24. Rev 10 (K14
+Rev 6 literal suffixes), 2026-08-24. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -103,7 +104,7 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 
 ## Emission
 
-- **K14 — The emitted WGSL is deterministic.** Rev 5. Declaration
+- **K14 — The emitted WGSL is deterministic.** Rev 6. Declaration
   order, the same for every module: `enable` directives, the raw
   declarations text (K30) when the program has one, the schema
   structs the module references in first-use order, shells (K29) in
@@ -113,7 +114,13 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   function. Rev 4 and earlier placed module variables before the
   bindings. Rev 5 moved them after, so one order serves a module
   with and without shells, and every `.wgsl` golden was regenerated
-  under it. Identifiers keep
+  under it. Every emitted integer literal carries its
+  WGSL suffix, `u` for `u32` and `i` for `i32` (Rev 6): an
+  unsuffixed literal concretizes as an abstract `i32`, `naga`
+  accepted `2147483648` in a `u32` context and Tint refused it with
+  `value cannot be represented as 'i32'` (measured 2026-08-24, the
+  atomic fluid example on Metal and recorded in
+  `specs/tracking/p10-examples.md`). Identifiers keep
   their subscript names. A name that collides with a WGSL reserved
   word or a builtin function or type gets a `_` suffix, through one
   function applied to every identifier the emitter writes: struct

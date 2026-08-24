@@ -230,3 +230,13 @@ and the impossible checks left both files. Gate green, 250 passed,
 still prints `FAIL validation shader.wgsl:31:38 error: value cannot
 be represented as 'i32'` on Metal — the failure is in the committed
 module, not the round's working tree. Diagnosis follows.
+
+## The i32 diagnosis (2026-08-24)
+
+`WALL_LEVEL: u32 = 2147483648` (2^31). The emitter writes integer
+literals without a WGSL suffix, an unsuffixed literal is an
+abstract int that concretizes as `i32`, and 2^31 does not fit:
+Tint refuses the module, `naga` infers `u32` from the context and
+accepts it. The same acceptance gap as the K22 barrier case. K14
+Rev 6: every emitted integer literal carries its suffix. Every
+`.wgsl` golden regenerates under the rule.
