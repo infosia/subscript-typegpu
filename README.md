@@ -1,42 +1,41 @@
 # subscript-typegpu
 
-subscript-typegpu rebuilds three ideas of
-[TypeGPU](https://github.com/software-mansion/TypeGPU) for
-[subscript](https://github.com/infosia/subscript). It is not TypeGPU,
-and it is not a port of TypeGPU. It is a new library for a statically
-typed language without a JavaScript runtime. The three ideas:
+subscript-typegpu brings GPU programming to
+[subscript](https://github.com/infosia/subscript) programs. It
+rebuilds three ideas of
+[TypeGPU](https://github.com/software-mansion/TypeGPU) for a
+statically typed language without a JavaScript runtime:
 
 - typed data schemas with automatic memory layout,
 - GPU kernels written in subscript,
 - typed bindings between the two.
 
-TypeGPU does this work at run time. subscript-typegpu does it before
-the program runs: a generator reads the typed program, computes every
-memory layout, and emits the WGSL. The program then runs on a JIT tier
-or compiles to C, over the webgpu.h implementation that
-`SUBSCRIPT_TYPEGPU_BACKEND_LIB` names.
+It is not TypeGPU, and it is not a port of TypeGPU. TypeGPU builds
+schemas and generates WGSL while your program runs. Here a
+generator reads your typed program first, computes every memory
+layout, and writes the WGSL and the layout constants your code
+imports. Your program then runs on a development JIT or compiles to
+C, over any webgpu.h implementation you point it at — no browser
+involved.
 
-The project has two script layers and one Rust facade:
+The library has two layers:
 
-- `lib/webgpu.ts` is the WebGPU API layer. It follows the WebGPU
-  JavaScript API in names and shape.
-- `lib/typegpu.ts` is the TypeGPU layer: binding wrappers, pipelines,
-  buffers, and textures. `lib/typegpu-types.ts` holds the vector and
-  matrix classes. A schema is a `@CStruct` class in the program itself.
-- `crates/facade` loads one webgpu.h implementation at run time.
+- `lib/webgpu.ts` follows the WebGPU JavaScript API in names and
+  shape: devices, buffers, textures, encoders, passes.
+- `lib/typegpu.ts` is the TypeGPU-shaped layer on top: schemas,
+  typed bindings, pipelines, and kernels that are plain functions.
 
 ## A first look
 
-This section follows `programs/b22-first-program.ts`: a counter
-that the GPU increments. Each block is a quote from that program.
+A counter that the GPU increments, from
+`programs/b22-first-program.ts`.
 [docs/first-gpu-program.md](docs/first-gpu-program.md) walks the
 whole program step by step.
 
 A kernel is a plain function, and a module-level `computePipeline`
-declaration marks it. The generator finds the declaration, walks
-the typed code, and emits the WGSL and the layout constants before
-the program runs. TypeGPU marks the same function with `'use gpu'`
-and generates its WGSL at run time.
+declaration marks it. The generator finds the declaration and
+writes the WGSL for you. TypeGPU marks the same function with
+`'use gpu'` and generates its WGSL at run time.
 
 ```ts program=programs/b22-first-program.ts
 function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
@@ -78,11 +77,11 @@ class CounterLayout {
 }
 ```
 
-The generator emits the sizes and offsets as constants —
-`State_STRIDE`, `State_OFFSET_incrementBy` — so the host writes the
-buffer with `Context.bytesOf<State>(value)` and patches one field
-without a hand-written byte count. Reading back is explicit: a copy
-through a staging buffer, then `Context.fromBytes`.
+You never count bytes by hand: the generator emits the sizes and
+offsets as constants — `State_STRIDE`,
+`State_OFFSET_incrementBy` — and `Context.bytesOf<State>(value)`
+turns a typed value into the bytes a buffer takes. Reading back is
+explicit: a copy through a staging buffer, then `Context.fromBytes`.
 
 ```ts program=programs/b22-first-program.ts
     const readbackBytes: u8[] = await stateBuffer.readOne(device, 0);
@@ -90,105 +89,111 @@ through a staging buffer, then `Context.fromBytes`.
     print(`readback:counter=${readback.counter} incrementBy=${readback.incrementBy}`);
 ```
 
-The same kernel body runs on the host through `simulateCompute`,
-one invocation at a time, so the arithmetic is proven on every test
-run with no device. The program passes both compilation tiers — the
-JIT and the emitted C — with byte-identical output.
+The same kernel body also runs on the CPU through
+`simulateCompute`, so you can test kernel logic with no GPU at
+hand. One program serves development and shipping: the JIT runs it
+as is, and the C tier compiles it with your platform's C compiler —
+with identical results.
 
 ## How this differs from TypeGPU
 
 | | TypeGPU | subscript-typegpu |
 |---|---|---|
 | Schema | `d.struct({ ... })`, a run-time value | `@CStruct class`, a declaration |
-| Memory layout | computed at run time | computed by the generator, emitted as constants |
-| WGSL | generated at run time from a compacted AST | generated before the program runs and committed to the repository |
+| Memory layout | computed at run time | computed ahead of time, importable as constants |
+| WGSL | generated at run time from a compacted AST | generated ahead of time — the emitted WGSL sits next to your program as a readable file |
 | Kernel marker | `'use gpu'` directive and a build plugin | `computePipeline<L>(fn, spec)` declaration |
 | Buffer data | JavaScript values converted by the library | `Context.bytesOf<T>(value)`, the bytes of the value |
 | Lifetime | garbage collection | `using` and `dispose()` |
 | Errors | exceptions | `null` and `false` returns, error scopes, and traps that name a rule |
-| Execution | a JavaScript runtime with WebGPU | a JIT tier and a C tier over a webgpu.h library loaded at run time |
+| Execution | a JavaScript runtime with WebGPU | a JIT for development and a C tier for shipping, over a webgpu.h library loaded at run time |
 
 There is no source compatibility between the two. A TypeGPU program
 does not compile as a subscript program. The concepts carry over.
 Most names do not.
+[docs/from-typegpu.md](docs/from-typegpu.md) compares the two
+libraries topic by topic, with code from both sides.
 
-## Environment variables
+## Running a program
 
-`SUBSCRIPT_TYPEGPU_BACKEND_LIB` must name the backend shared library for backend-required gates and device runs.
+Two environment variables select the GPU backend:
 
-`SUBSCRIPT_TYPEGPU_BACKEND` selects the adapter backend. The accepted values are `metal`, `vulkan`, `gles`, `d3d11`, and `d3d12`.
+- `SUBSCRIPT_TYPEGPU_BACKEND_LIB` names the webgpu.h shared library
+  to load — for example a [yawgpu](https://github.com/infosia/yawgpu)
+  or Dawn build.
+- `SUBSCRIPT_TYPEGPU_BACKEND` picks the adapter backend: `metal`,
+  `vulkan`, `gles`, `d3d11`, or `d3d12`. Leave it unset for the
+  library's default.
 
-If `SUBSCRIPT_TYPEGPU_BACKEND` is absent, the library selects its default. The yawgpu default is Noop. The gate never sets this variable.
-
-`tools/live.sh` and `tools/window.sh` also accept `default`. This value sends no backend request.
-
-On Windows, place `vulkan-1.dll` and `d3dcompiler_47.dll` beside `webgpu_dawn.dll`. Dawn loads them from the library directory, not from `System32`. A missing library fails with `DynamicLib.Open: ... Windows Error: 87`.
-
-`SUBSCRIPT_TYPEGPU_UPSTREAM_DIR` names a TypeGPU checkout for the optional layout-vector tool, which records TypeGPU's computed memory layouts as reference values for the layout tests.
-
-## Commands
-
-Run the standard gate:
+Run a headless program:
 
 ```sh
-tools/gate.sh
+tools/example.sh examples/matrix-multiplication/main.ts
 ```
 
-Run the gate with a required backend:
+Run a windowed program (opens a window; add `--frames <n>` to close
+it after `n` frames):
 
 ```sh
+tools/window.sh examples/boids/main.ts
+```
+
+A windowed program exports three functions the host calls: `init`
+once, `frame` once per displayed frame (with the size, one key
+scalar, and the pointer), and `shutdown` once.
+
+## Examples
+
+`examples/` holds twenty programs ported from TypeGPU's example
+set — boids, a grid fluid, slime mold, Conway's life, ray marching,
+clouds, and more. Each file states what it shows and where it
+differs from the TypeGPU original.
+
+## Documents
+
+- [docs/first-gpu-program.md](docs/first-gpu-program.md) builds the smallest compute program: a GPU counter from buffer creation to readback.
+- [docs/tutorial.md](docs/tutorial.md) walks `programs/b04-particles.ts` from the schema to the dispatch.
+- [docs/from-typegpu.md](docs/from-typegpu.md) compares TypeGPU with this library, topic by topic.
+
+## Development
+
+This section is for working on the library itself.
+
+Commands:
+
+```sh
+tools/gate.sh              # the full test suite, headless
 tools/gate.sh --require-backend
+tools/regen.sh             # regenerate all generated files
 ```
 
-Regenerate all committed generator outputs:
-
-```sh
-tools/regen.sh
-```
-
-CAUTION: Run the live lane only with a real adapter. The command executes every `x` program.
+CAUTION: Run the live lane only with a real adapter. The command executes every `x` program on the device.
 
 ```sh
 tools/live.sh
 ```
 
-CAUTION: Run the window host only with a real adapter and a display. The command opens a window.
-
-```sh
-tools/window.sh examples/window-triangle/main.ts
-```
-
-`tools/window.sh` reads the same two environment variables as `tools/live.sh`. The host owns the window, the surface, the instance, the device, and the event loop, and calls three exports on the script: `init(instance, device, format)` once, `frame(view, width, height, key)` once per frame, and `shutdown()` once. `--frames <n>` closes the window after `n` frames. On close the host prints `window:frames=<n>`.
-
 All Cargo commands in these tools use offline mode.
+`SUBSCRIPT_TYPEGPU_UPSTREAM_DIR` names a TypeGPU checkout for the
+layout-vector tool, which records TypeGPU's computed memory layouts
+as reference values for the layout tests.
 
-## Programs
+Test programs live in `programs/` — `a` programs cover the WebGPU
+API layer, `b` programs cover the generated TypeGPU modules on both
+compilation tiers, and `x` programs run on a real device. Each has
+an `.expected` file holding the output both tiers must reproduce
+exactly, and each generated pipeline has its emitted `.wgsl` beside
+it.
 
-Programs use a letter, a two-digit number, and a short name.
-
-- `a` programs test the WebGPU API and ergonomics.
-- `b` programs test generated TypeGPU modules on both gate tiers.
-- `x` programs test live device results against host expectations.
-
-Each gate program has an `.expected` file with the same stem: the committed reference output that both tiers must reproduce byte for byte. Each generated pipeline has a committed `.wgsl` file with the same stem, which a test regenerates and validates on every run.
-
-`simulateCompute` runs a host-runnable kernel through its script body and wrapper storage. `simulateComputeThreads` uses the same thread counts as `dispatchThreads`.
-
-## Repository layout
+Repository layout:
 
 - `crates/facade` contains the generated C ABI facade and its loader.
 - `crates/webgpu-gen` contains the facade and WebGPU API generator.
 - `crates/typegpu-gen` contains the schema, layout, and WGSL generator.
 - `crates/harness` contains the dev, ship, coverage, documentation, and live test lanes.
 - `crates/window` contains the window host.
-- `examples` contains the window example, outside the program suite.
+- `examples` contains the ported examples, outside the test suite.
 - `lib` contains the script libraries and generated ambient files.
-- `programs` contains the gate and live programs with their committed reference outputs.
+- `programs` contains the test programs with their expected outputs.
 - `specs` contains the contracts and tracking records.
-- `tools` contains regeneration, gate, hygiene, live, and window commands.
-
-## Documents
-
-- [docs/first-gpu-program.md](docs/first-gpu-program.md) builds the smallest compute program: a GPU counter from buffer creation to readback.
-- [docs/tutorial.md](docs/tutorial.md) walks `programs/b04-particles.ts` from the schema to the dispatch.
-- [docs/from-typegpu.md](docs/from-typegpu.md) compares TypeGPU with this library, topic by topic, with code from both sides.
+- `tools` contains the commands above.
