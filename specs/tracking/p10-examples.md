@@ -331,3 +331,14 @@ with the agent's stored LCG low bit, deterministically. The header
 and seeding comments follow the new shape. Gate green, 251 passed,
 218 s. The smoke run prints `window:frames=30`, read before this
 commit. The owner's re-check decides the visual pass.
+
+## The third acceptance gap (2026-08-24)
+
+The reseeded slime-mold fails at `shader.wgsl:48:12 error: mixing
+'&&' and '||' requires parenthesis`: Tint requires parentheses
+around a mixed logical chain and `naga` does not. The smoke run
+before `cdcd275` printed the FAIL line, and the check read only the
+last two output lines, so the commit landed red on the window path
+(the gate stayed green — it never runs the window). Two records:
+the emitter parenthesizes mixed chains (K14), and a smoke check
+greps for `FAIL` explicitly.

@@ -6,7 +6,8 @@ P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
 2026-08-23. Rev 6 (K25 Rev 1 argument order, K27 count), 2026-08-23. Rev 7
 (K29–K31 WGSL shells), 2026-08-23. Rev 8 (K14 Rev 5 one order),
 2026-08-23. Rev 9 (K19 Rev 4 FixedArray constants), 2026-08-24. Rev 10 (K14
-Rev 6 literal suffixes), 2026-08-24. Plan §3 D2, D3, D7, D9 and §4
+Rev 6 literal suffixes), 2026-08-24. Rev 11 (K14 Rev 6 logic
+parentheses), 2026-08-24. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -124,7 +125,10 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   minimum as `(-2147483647i - 1i)`, because WGSL reads
   `-2147483648i` as negation of a literal above the maximum, `naga`
   accepted it, and Tint refused it (the same example, the second
-  measurement). Identifiers keep
+  measurement). The emitter parenthesizes every mixed `&&` and
+  `||` chain, because Tint requires the parentheses and `naga` does
+  not (`mixing '&&' and '||' requires parenthesis`, the slime-mold
+  tie condition, the third measurement). Identifiers keep
   their subscript names. A name that collides with a WGSL reserved
   word or a builtin function or type gets a `_` suffix, through one
   function applied to every identifier the emitter writes: struct
