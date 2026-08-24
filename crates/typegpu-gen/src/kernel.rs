@@ -762,7 +762,8 @@ fn binary_precedence(op: BinOp) -> u8 {
 }
 
 fn binary_operand(value: &Snippet, parent: u8, right: bool) -> String {
-    if value.precedence < parent || (right && value.precedence == parent) {
+    let mixed_logical = matches!((parent, value.precedence), (1, 2) | (2, 1));
+    if mixed_logical || value.precedence < parent || (right && value.precedence == parent) {
         format!("({})", value.text)
     } else {
         value.text.clone()

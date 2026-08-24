@@ -684,6 +684,30 @@ export const precedencePipeline: ComputePipelineSpec = computePipeline<Layout>(p
 }
 
 #[test]
+fn mixed_logical_chains_parenthesize_each_operator_group() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
+class Layout { values!: MutStorage<u32>; }
+function logical(res: Layout, ctx: ComputeInvocation): void {
+  const a: boolean = ctx.localId.x < 1;
+  const b: boolean = ctx.localId.x < 2;
+  const c: boolean = ctx.localId.x < 3;
+  const d: boolean = ctx.localId.x < 4;
+  if (a && b || c && d) {
+    res.values[0] = 1;
+  }
+}
+
+export const logicalPipeline: ComputePipelineSpec = computePipeline<Layout>(logical, { name: "logicalPipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    let expected = "if ((a && b) || (c && d)) {";
+    assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
+}
+
+#[test]
 fn every_k10_and_k11_mapping_reaches_the_emitter() {
     let generated = generate(
         r#"

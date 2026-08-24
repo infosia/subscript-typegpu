@@ -57,6 +57,7 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-24 | P10 slice 5 (slime-mold, game-of-life) | 49 s | 0 s | 206 s | 203 s | 7 |
 | 2026-08-24 | P11 slice 4 (blending) and the slice 5 fix round | 49 s | 0 s | 215 s | 216 s | 7 |
 | 2026-08-24 | slime-mold symmetry fix | 48 s | 1 s | 222 s | 218 s | 7 |
+| 2026-08-24 | Emitter parenthesizes mixed logical chains | 49 s | 0 s | 216 s | 213 s | 7 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate

@@ -342,3 +342,11 @@ last two output lines, so the commit landed red on the window path
 (the gate stayed green — it never runs the window). Two records:
 the emitter parenthesizes mixed chains (K14), and a smoke check
 greps for `FAIL` explicitly.
+
+## The parentheses fix (2026-08-24)
+
+The emitter parenthesizes mixed `&&`/`||` chains (no committed
+golden carried one, so none changed), with the regression red then
+green. Gate green, 252 passed, 213 s. The slime-mold smoke prints
+`window:frames=30` with zero `FAIL` lines, checked by an explicit
+grep before this commit.
