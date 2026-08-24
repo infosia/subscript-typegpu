@@ -27,148 +27,73 @@ The project has two script layers and one Rust facade:
 
 ## A first look
 
-This section follows `programs/b04-particles.ts`. Each block is a
-quote from that program. The sentence after each block names the
-TypeGPU counterpart. `docs/from-typegpu.md` holds the full comparison.
+This section follows `programs/b22-first-program.ts`: a counter
+that the GPU increments. Each block is a quote from that program.
+[docs/first-gpu-program.md](docs/first-gpu-program.md) walks the
+whole program step by step.
 
-A schema is a class with the `@CStruct` decorator.
+A kernel is a plain function, and a module-level `computePipeline`
+declaration marks it. The generator finds the declaration, walks
+the typed code, and emits the WGSL and the layout constants before
+the program runs. TypeGPU marks the same function with `'use gpu'`
+and generates its WGSL at run time.
 
-```ts program=programs/b04-particles.ts
+```ts program=programs/b22-first-program.ts
+function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
+  const state: State = res.state.get(0);
+  state.counter += state.incrementBy;
+  res.state.set(0, state);
+}
+
+export const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
+  incrementCounter,
+  {
+    name: "firstProgram",
+    workgroupSize: [1, 1, 1],
+  },
+);
+```
+
+The kernel's state lives in a buffer. A `@CStruct` class shapes the
+bytes, and a layout class names the bindings of one bind group.
+TypeGPU writes `d.struct({ ... })` and `root.createMutable(...)`
+for the same two roles.
+
+```ts program=programs/b22-first-program.ts
 @CStruct
-class Particle {
-  pos: Vec3f;
-  vel: Vec3f;
+class State {
+  counter: u32;
+  incrementBy: u32;
 
-  constructor(pos: Vec3f, vel: Vec3f) {
-    this.pos = pos;
-    this.vel = vel;
+  constructor(counter: u32, incrementBy: u32) {
+    this.counter = counter;
+    this.incrementBy = incrementBy;
   }
 }
 ```
 
-TypeGPU writes `d.struct({ pos: d.vec3f, vel: d.vec3f })`, a value
-that exists at run time. Here the class is the schema, and the
-generator computes its memory layout before the program runs.
-
-A bind group layout is a class whose fields are binding wrappers. The
-binding index is the field order. `MutStorage<Particle>` binds a
-read-write `array<Particle>`.
-
-```ts program=programs/b04-particles.ts
-class ParticleLayout {
-  params!: Uniform<SimParams>;
-  particles!: MutStorage<Particle>;
+```ts program=programs/b22-first-program.ts
+class CounterLayout {
+  state!: MutStorage<State>;
 }
 ```
 
-TypeGPU passes the same shape as an object to its `bindGroupLayout`
-function: `{ params: { uniform: SimParams }, particles: { storage:
-d.arrayOf(Particle), access: 'mutable' } }`.
+The generator emits the sizes and offsets as constants —
+`State_STRIDE`, `State_OFFSET_incrementBy` — so the host writes the
+buffer with `Context.bytesOf<State>(value)` and patches one field
+without a hand-written byte count. Reading back is explicit: a copy
+through a staging buffer, then `Context.fromBytes`.
 
-A kernel is a plain function. Its leading parameters are the bind
-group layout classes, one per bind group, and its last parameter
-carries the invocation builtins.
-
-```ts program=programs/b04-particles.ts
-function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
-  const settings: SimParams = res.params.get();
-  const i: u32 = ctx.globalId.x;
-  if (i < settings.count) {
-    res.particles.set(i, integrate(res.particles.get(i), settings.dt));
-  }
-}
-
-export const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
-  name: "particles",
-  workgroupSize: [64, 1, 1],
-});
+```ts program=programs/b22-first-program.ts
+    const readbackBytes: u8[] = await stateBuffer.readOne(device, 0);
+    const readback: State = Context.fromBytes<State>(readbackBytes, 0);
+    print(`readback:counter=${readback.counter} incrementBy=${readback.incrementBy}`);
 ```
 
-TypeGPU marks a kernel with the `'use gpu'` directive and a build
-plugin extracts its AST. Here the `computePipeline` declaration marks
-the kernel, and the generator walks the typed call graph from it.
-`integrate` is a second plain function that the kernel calls.
-
-The generator emits a support module with the schema sizes, the bind
-group layout specs, the WGSL, the entry point, the workgroup size, and
-typed factories. The program imports them.
-
-```ts program=programs/b04-particles.ts
-import {
-  Particle_SIZE,
-  ParticleLayoutResources,
-  SimParams_SIZE,
-  createParticleLayoutResources,
-  createParticlesBindGroup0,
-  particles_ENTRY,
-  particles_HOST_RUNNABLE,
-  particles_LAYOUT0,
-  particles_WGSL,
-  particles_WORKGROUP_X,
-  particles_WORKGROUP_Y,
-  particles_WORKGROUP_Z,
-} from "./b04-particles.typegpu";
-```
-
-TypeGPU has no such module. `d.sizeOf(Particle)` and the WGSL string
-are computed when a program asks for them.
-
-The host side creates the pipeline inside a validation error scope,
-builds the bind group from the typed factory, and dispatches.
-
-```ts program=programs/b04-particles.ts
-    device.pushErrorScope("validation");
-    using pipeline = createComputePipeline(
-      device,
-      particles_WGSL,
-      particles_ENTRY,
-      [particles_LAYOUT0],
-      [particles_WORKGROUP_X, particles_WORKGROUP_Y, particles_WORKGROUP_Z],
-    );
-    const validationError = await device.popErrorScope();
-    if (validationError !== null) {
-      print("pipeline:invalid");
-      print("FAIL");
-      return;
-    }
-    const resources: ParticleLayoutResources = createParticleLayoutResources(
-      params,
-      particlesBuffer,
-    );
-    using bindGroup = createParticlesBindGroup0(device, pipeline, resources);
-    using encoder = device.createCommandEncoderDefault();
-    pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
-    using command = encoder.finishDefault();
-    device.queue().submit([command]);
-```
-
-TypeGPU writes `root.createComputePipeline({ compute })` and
-`.with(bindGroup).dispatchWorkgroups(n)`, and creates the WebGPU
-pipeline on first use. Here every handle is explicit: `using` releases
-it at the block end, and a rejected shader is a visible failure.
-
-A host-runnable kernel also runs on the CPU with host-side binding
-values. The generator decides host-runnability and emits it as the
-`_HOST_RUNNABLE` constant.
-
-```ts program=programs/b04-particles.ts
-    const hostLayout = new ParticleLayout();
-    hostLayout.params = new Uniform<SimParams>(new SimParams(2.0, 1));
-    hostLayout.particles = new MutStorage<Particle>([
-      new Particle(new Vec3f(1.0, 2.0, 3.0), new Vec3f(0.5, 0.0, 0.0)),
-    ]);
-    simulateCompute<ParticleLayout>(
-      particleKernel,
-      hostLayout,
-      particles,
-      [1, 1, 1],
-      particles_HOST_RUNNABLE,
-    );
-```
-
-A TypeGPU `'use gpu'` function is also a JavaScript function. Here
-`simulateCompute` calls the kernel once per invocation, and the live
-programs `x01`–`x04` and `x09` compare the GPU result against it.
+The same kernel body runs on the host through `simulateCompute`,
+one invocation at a time, so the arithmetic is proven on every test
+run with no device. The program passes both compilation tiers — the
+JIT and the emitted C — with byte-identical output.
 
 ## How this differs from TypeGPU
 
@@ -176,7 +101,7 @@ programs `x01`–`x04` and `x09` compare the GPU result against it.
 |---|---|---|
 | Schema | `d.struct({ ... })`, a run-time value | `@CStruct class`, a declaration |
 | Memory layout | computed at run time | computed by the generator, emitted as constants |
-| WGSL | generated at run time from a compacted AST | generated before the program runs, committed as a golden |
+| WGSL | generated at run time from a compacted AST | generated before the program runs, committed, and compared byte for byte by the tests |
 | Kernel marker | `'use gpu'` directive and a build plugin | `computePipeline<L>(fn, spec)` declaration |
 | Buffer data | JavaScript values converted by the library | `Context.bytesOf<T>(value)`, the bytes of the value |
 | Lifetime | garbage collection | `using` and `dispose()` |
@@ -199,7 +124,7 @@ If `SUBSCRIPT_TYPEGPU_BACKEND` is absent, the library selects its default. The y
 
 On Windows, place `vulkan-1.dll` and `d3dcompiler_47.dll` beside `webgpu_dawn.dll`. Dawn loads them from the library directory, not from `System32`. A missing library fails with `DynamicLib.Open: ... Windows Error: 87`.
 
-`SUBSCRIPT_TYPEGPU_UPSTREAM_DIR` names a TypeGPU checkout for the optional golden-vector tool.
+`SUBSCRIPT_TYPEGPU_UPSTREAM_DIR` names a TypeGPU checkout for the optional layout-vector tool, which records TypeGPU's computed memory layouts as reference values for the layout tests.
 
 ## Commands
 
@@ -245,7 +170,7 @@ Programs use a letter, a two-digit number, and a short name.
 - `b` programs test generated TypeGPU modules on both gate tiers.
 - `x` programs test live device results against host expectations.
 
-Each gate program has an `.expected` file with the same stem. Generated pipelines have `.wgsl` files with the same stem.
+Each gate program has an `.expected` file with the same stem: the committed reference output that both tiers must reproduce byte for byte. Each generated pipeline has a committed `.wgsl` file with the same stem, which a test regenerates and validates on every run.
 
 `simulateCompute` runs a host-runnable kernel through its script body and wrapper storage. `simulateComputeThreads` uses the same thread counts as `dispatchThreads`.
 
@@ -258,7 +183,7 @@ Each gate program has an `.expected` file with the same stem. Generated pipeline
 - `crates/window` contains the window host.
 - `examples` contains the window example, outside the program suite.
 - `lib` contains the script libraries and generated ambient files.
-- `programs` contains gate and live programs with their goldens.
+- `programs` contains the gate and live programs with their committed reference outputs.
 - `specs` contains the contracts and tracking records.
 - `tools` contains regeneration, gate, hygiene, live, and window commands.
 
