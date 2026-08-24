@@ -547,7 +547,14 @@ Differences:
 - The sampled texture type is `Texture2d<f32>` only. Integer textures
   and other dimensions are not in the library.
 - The storage texture format is a type argument: `Rgba8unorm`,
-  `Rgba16float`, `R32float`, or `Rgba32float`.
+  `Rgba16float`, `R32float`, or `Rgba32float`. `StorageTexture2d` is
+  write-only; `ReadStorageTexture2d` and `ReadWriteStorageTexture2d`
+  carry the `read` and `read_write` access. TypeGPU writes the access
+  in the bind group layout entry.
+- `writeTexturePixels(queue, texture, pixels, width, height)` uploads
+  a `Vec4f[]` image with a fixed encode table, and `writeTextureBytes`
+  is the raw form. TypeGPU uploads through `copyExternalImageToTexture`
+  or its own write helpers.
 - Every wrapper method has a host body over a `Vec4f[]` image with a
   width and a height. The host `Sampler` implements `nearest`
   filtering only.
@@ -612,9 +619,10 @@ Differences:
   `renderPipelineInstanced` adds an instance class.
 - `indexFormat` on the spec emits `<name>_INDEX_FORMAT`, and
   `RenderPipeline.setIndexBuffer(pass, buffer)` sets the buffer with
-  that format. `cullMode` and `frontFace` on the spec reach the
+  that format. `cullMode`, `frontFace`, `topology` (the
+  `triangle-strip` form included), and `blend` on the spec reach the
   pipeline descriptor. TypeGPU writes `withIndexBuffer` and
-  `primitive: { cullMode }`.
+  `primitive: { cullMode }` and puts the blend on the target.
 - One color target per pipeline. Depth, stencil, and multisample
   options are not in the library.
 
@@ -752,7 +760,8 @@ These TypeGPU features have no equivalent.
 - Integer and depth textures, texture dimensions other than 2D, sampler
   filters other than `nearest` on the host.
 - Render pipelines with multiple color targets, depth-stencil, or
-  multisample.
+  multisample. Blending covers the `src-alpha` over and additive
+  pairs in the host rasterizer; other factors run on the GPU only.
 - `unplugin-typegpu`, `tgpu-gen`, and the browser.
 
 ## Not in TypeGPU
@@ -772,8 +781,10 @@ These subscript-typegpu properties have no equivalent.
   `naga` error attributed to the shell by name.
 - A window host outside the browser: `tools/window.sh` runs a
   script that exports `init`, `frame`, and `shutdown`, and the host
-  owns the window, the surface, and the loop. TypeGPU draws into a
-  canvas through `GPUCanvasContext`.
+  owns the window, the surface, and the loop. `frame` carries the
+  size, one key scalar, the pointer position, and the button bits.
+  TypeGPU draws into a canvas through `GPUCanvasContext` and reads
+  DOM events.
 
 ## Where to go next
 
