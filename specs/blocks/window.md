@@ -2,7 +2,7 @@
 
 P9 contract. Rev 0, 2026-08-23. Rev 1 (W2, W6, W11 from the phase
 review), 2026-08-23. Rev 2 (W8, W13 after the first `--frames` run),
-2026-08-23. Plan §8 P9 governs this block. The
+2026-08-23. Rev 3 (W8 Rev 2 exiting path, W9 Rev 1 sRGB), 2026-08-24. Plan §8 P9 governs this block. The
 facade side is `facade.md` L14 and `facade-generator.md` F23. The
 script side is the API layer (`api-layer.md`) and the TypeGPU layer.
 
@@ -76,7 +76,10 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   entry that fails) prints one line that names the step and exits
   with a non-zero code. A compile failure prints the compiler's
   diagnostics first, then the one line. The host never prints per
-  frame.
+  frame. Rev 2: the `window:frames=<n>` line and the
+  shutdown sequence run on the event loop's exiting path, so an
+  application quit (macOS Cmd+Q) reports like a close (measured: a
+  Cmd+Q run printed nothing).
 
 ## The crate
 
