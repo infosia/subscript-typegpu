@@ -1,7 +1,9 @@
 // example: game-of-life
 // Advances a texture-backed Conway grid and accepts pointer drawing and keyboard clearing.
-// This port keeps the naive 128-square strategy and drops the workgroup-tiled strategy,
-// the bit-packed strategy, and the upstream size selector.
+// This port keeps the naive strategy at a fixed 128-square grid. It drops the workgroup-tiled
+// strategy, the bit-packed strategy, the size selector, the zoom view, and the pause controls.
+// One glider replaces the upstream random seed, and a fixed square brush replaces the
+// upstream brush radius, brush modes, and stroke line.
 // Ported from TypeGPU's game-of-life example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -109,6 +111,8 @@ class LifeRenderLayout {
   generation!: ReadStorageTexture2d<R32float>;
 }
 
+// One invocation counts the eight neighbors and writes the next state of one cell.
+// TypeGPU counts an out-of-range neighbor as dead. This port wraps the grid into a torus.
 function lifeStepKernel(res: LifeStepLayout, ctx: ComputeInvocation): void {
   const x: i32 = ctx.globalId.x as i32;
   const y: i32 = ctx.globalId.y as i32;
@@ -136,6 +140,9 @@ function lifeStepKernel(res: LifeStepLayout, ctx: ComputeInvocation): void {
   res.next.store(new Vec2i(x, y), new Vec4f(next, 0.0, 0.0, 1.0));
 }
 
+// The edit pass runs over the whole grid and applies the current pointer or key action.
+// TypeGPU draws a capsule between two pointer samples with a radius and a mode control.
+// This port draws a fixed square around one pointer sample and only sets cells alive.
 function lifeEditKernel(res: LifeEditLayout, ctx: ComputeInvocation): void {
   const params: EditParams = res.edit.get();
   const cell = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);
@@ -219,6 +226,8 @@ let activeViewA: GPUTextureView | null = null;
 let activeViewB: GPUTextureView | null = null;
 let frameCount: u32 = 0;
 
+// TypeGPU seeds the grid at random. This port writes one glider, so a reader sees the
+// same motion on every run.
 function gliderSeed(): Vec4f[] {
   const pixels: Vec4f[] = [];
   const center: u32 = GRID_SIZE / 2;
@@ -414,6 +423,8 @@ export function frame(
   if (renderB === null) return;
   if (vertices === null) return;
   if (editParams === null) return;
+  // The host passes the key as a Unicode scalar, and 48 is the `0` key.
+  // Grid row 0 sits at the bottom of the surface, so the pointer Y is flipped.
   let editMode: u32 = EDIT_NONE;
   let editPoint = new Vec2f(0.0, 0.0);
   if (key === 48) {
@@ -431,6 +442,8 @@ export function frame(
     0,
     Context.bytesOf<EditParams>(new EditParams(editPoint, editMode)),
   );
+  // The frame parity picks the step source and target. The edit pass and the render pass
+  // both use the step target, so an edit lands on the grid the frame displays.
   const readsA: boolean = frameCount % 2 === 0;
   const stepGroup: GPUBindGroup = readsA ? stepAB : stepBA;
   const editGroup: GPUBindGroup = readsA ? editB : editA;
