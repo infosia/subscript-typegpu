@@ -296,3 +296,10 @@ helper returns the wrapped cell). game-of-life drops the impossible
 check and writes the edit uniform on edit frames only. Both frames
 guard through one sentinel. Gate green, live x01–x22 PASS both
 backends, both smokes read before this commit.
+
+## A precision on the slice 5 fix record (2026-08-24)
+
+"No read-modify-write race" above holds for the pass pair. Two
+agents that land in one cell in one dispatch still overwrite one
+deposit, the same last-write-wins shape the upstream has, so it is
+not a port divergence.

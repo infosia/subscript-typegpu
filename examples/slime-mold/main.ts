@@ -1,7 +1,14 @@
 // example: slime-mold
 // Moves trail-sensing agents and diffuses their deposits through a swapped texture pair.
-// This port fixes 4096 agents, a 128-square trail, sensor distance 5, sensor angle 0.5,
-// turn 0.32, step 1, deposit 0.2, and decay 0.985 in place of the upstream sliders.
+// TypeGPU exposes move speed, sensor angle, sensor distance, turn speed, and evaporation
+// rate as sliders. This port fixes step 1, sensor angle 0.5, sensor distance 5, turn 0.32,
+// and decay 0.985.
+// TypeGPU runs 200000 agents over a canvas-sized texture pair, and one deposit adds 1.0 to
+// a cell. This port fixes 4096 agents, a 128-square trail, and deposit 0.2.
+// TypeGPU also turns an agent at random after both side samples beat the forward sample.
+// At the border, TypeGPU clamps the position, reflects the angle, and adds a jitter.
+// This port drops both behaviors. The agent turns toward the stronger side only, and the
+// trail wraps into a torus.
 // Ported from TypeGPU's slime-mold example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -121,7 +128,12 @@ function wrapTrail(value: f32): f32 {
   return wrapped;
 }
 
+// The helper returns the trail cell one sensor step along the angle, wrapped into the grid.
+// A texture wrapper cannot be a helper parameter under K5, so the caller loads the cell.
+// TypeGPU's sense helper reads the texture itself and returns the summed sample.
 function senseTrailCell(position: Vec2f, angle: f32): Vec2i {
+  // One vector carries the angle twice, so `cos()` and `sin()` reach the WGSL builtins.
+  // A scalar `Math.sin` needs an `f64` cast, and K12 rejects that cast.
   const angles = new Vec2f(angle, angle);
   const x: f32 = wrapTrail(
     position.x + angles.cos().x * SENSOR_DISTANCE,
@@ -132,6 +144,7 @@ function senseTrailCell(position: Vec2f, angle: f32): Vec2i {
   return new Vec2i(x as i32, y as i32);
 }
 
+// One invocation senses three cells, turns the agent, moves it, and deposits a trail mark.
 function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.x;
   const agent: Agent = res.agents.get(index);
@@ -162,6 +175,9 @@ function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
   res.trail.store(cell, new Vec4f(previous + DEPOSIT_AMOUNT, 0.0, 0.0, 1.0));
 }
 
+// Each cell blends itself with its four wrapped neighbors. The five weights sum to one,
+// so a flat trail keeps its value. TypeGPU averages a 3x3 window and subtracts the
+// evaporation rate, and this port multiplies by a decay factor instead.
 function diffuseTrail(res: SlimeDiffuseLayout, ctx: ComputeInvocation): void {
   const x: i32 = ctx.globalId.x as i32;
   const y: i32 = ctx.globalId.y as i32;
@@ -181,6 +197,8 @@ function diffuseTrail(res: SlimeDiffuseLayout, ctx: ComputeInvocation): void {
   res.target.store(new Vec2i(x, y), new Vec4f(value, 0.0, 0.0, 1.0));
 }
 
+// The vertex buffer carries the four corners of a full-screen strip.
+// TypeGPU emits one oversized triangle from the vertex index and binds no vertex buffer.
 function slimeVertex(
   res: SlimeRenderLayout,
   value: Vertex,
@@ -192,6 +210,9 @@ function slimeVertex(
   );
 }
 
+// The fragment loads one trail cell and maps the amount through a fixed color ramp.
+// TypeGPU samples a filtered rgba8unorm texture, so its trail is smooth between cells.
+// A storage texture takes no sampler, so this port reads the nearest cell.
 function slimeFragment(
   res: SlimeRenderLayout,
   input: Varyings,
@@ -339,6 +360,9 @@ export function init(
     new Vertex(new Vec2f(-1.0, 1.0)),
     new Vertex(new Vec2f(1.0, 1.0)),
   ];
+  // The agents start on a ring around the trail center and face along that ring.
+  // TypeGPU seeds random positions in a disc on the GPU and points each agent at the center.
+  // A fixed ring keeps every run identical, because this port has no random source.
   const agentBytes: u8[] = [];
   let agentIndex: u32 = 0;
   while (agentIndex < AGENT_COUNT) {
