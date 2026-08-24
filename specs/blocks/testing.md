@@ -127,3 +127,16 @@ principles" govern this block.
 - **T17 — Pin.** `rust-toolchain.toml` pins channel `1.95.0` with
   `rustfmt` and `clippy`. The tree is rustfmt-canonical under that
   pin.
+
+- **T18 — Program loops run on one bounded worker pool.** Rev 0,
+  2026-08-24. Every harness module that iterates the program set
+  (the differential suite, the determinism pass, the C layout
+  probes, the coverage run, the simulate pairing) runs its
+  per-program work on one shared bounded pool. The bound is 4 on
+  the reference machine (Apple M2, 16 GB: parallel ship-tier C
+  compiles and JIT sessions are memory-bound like builds). Failures
+  collect and report sorted by program name, so the output is
+  deterministic under any schedule. The suite lock and the
+  one-executable rule stay. The owner's standing decision: the
+  iteration loop's speed is a design input, and a change that
+  serializes a program loop again is a regression.
