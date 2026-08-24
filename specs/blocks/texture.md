@@ -75,3 +75,27 @@ Kernels are `kernel.md`, pipelines `pipeline.md`, render `render.md`.
   layout class (TX2), a resource kind mismatch (TX4, a trap). Each
   with a fixture. A diagnostic cites the rule in parentheses, never
   TX8.
+
+## Upload (P11 slice 1)
+
+- **TX9 — The upload helpers.** Rev 0, 2026-08-24. `lib/typegpu.ts`
+  exports `writeTexturePixels(queue: GPUQueue, texture: GPUTexture,
+  pixels: Vec4f[], width: u32, height: u32)` for the float formats
+  (each component converted to the texture's format by the encode
+  table this rule fixes: `rgba8unorm` scales to a byte with
+  round-half-away-from-zero, the float formats pass bits through)
+  and `writeTextureBytes(queue, texture, bytes: u8[], bytesPerRow:
+  u32, width, height)` as the raw form. Both call the API layer's
+  `writeTexture` with a full-extent single-mip destination. A
+  `bytesPerRow` below the WebGPU 256-byte row alignment for a
+  multi-row write traps with `TX9` and the numbers. The host
+  `Texture2d` constructor path stays: `writeTexturePixels` and the
+  host image hold the same values, so a live program uploads once
+  and compares a sampled result against the host body.
+- **TX10 — The gate and live programs.** `b18-texture-upload`
+  writes a procedural gradient through both helpers, prints the
+  first and last encoded bytes by value, and runs the kernel's host
+  lane. `x19-live-texture-upload` uploads the gradient, samples it
+  on the GPU, and compares against `simulateCompute` with the same
+  host pixels. A `t`-style fixture reaches the TX9 row-alignment
+  trap.

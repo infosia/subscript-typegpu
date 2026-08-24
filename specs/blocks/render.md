@@ -168,6 +168,15 @@ does not say otherwise. Schemas are `schema.md`.
   prints the `_INDEX_FORMAT` constant and the spec's `cullMode` and
   `frontFace` by name on both tiers.
 
+- **RN20 — The strip topology is proven.** Rev 0, 2026-08-24.
+  `RenderPipelineSpec.topology` already reaches the pipeline
+  descriptor (RN12). `b19-strip` declares `topology:
+  "triangle-strip"`, draws four vertices as two triangles, prints
+  the spec's topology by name, and `x20-live-strip` compares the
+  strip image against the host rasterizer, whose triangle list for
+  a strip of `n` vertices is the `n - 2` triangles with the even-odd
+  winding flip. `stripIndexFormat` stays with the API layer.
+
 ## Rejections
 
 - **RN16 — Each rejection is a named diagnostic with a red fixture.**

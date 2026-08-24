@@ -44,3 +44,12 @@ The tier-2 report landed in yawgpu: `a3b1db0` gates
 `shaderStorageImageExtendedFormats`. The slice 3 caveat on tier-2
 formats reduces to `hasFeature("texture-formats-tier2")`, which now
 reflects the device on both backends.
+
+## Slice 1 contract (2026-08-24)
+
+`texture.md` TX9 (the two upload helpers over the API layer's
+`writeTexture`, the encode table, the row-alignment trap) and TX10
+(`b18-texture-upload`, `x19-live-texture-upload`), `render.md` RN20
+(`b19-strip`, `x20-live-strip`, the host rasterizer's strip
+expansion with the even-odd winding flip). Unblocks the `clouds`
+port and the strip reductions.
