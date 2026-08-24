@@ -143,3 +143,22 @@ Evidence: gate green, 249 passed, 177 s. `prng-cpu-gpu` prints
 samples). The four windowed ports print `window:frames=60` on
 Metal, and `ray-marching` also on Dawn. The owner's visual runs and
 the comment review are the open items for the slice close.
+
+## Slice 2 visual runs and close (2026-08-24)
+
+The owner ran the four windowed ports on Metal: `ray-marching`
+(171 frames after one run that ended without the frames line —
+Cmd+Q bypasses `CloseRequested`, recorded below), `caustics` (278),
+`smoky-triangle` (313), `vaporrave` (574). Verdict: all four look
+as intended. The owner sees color differences against the upstream
+browser examples. Expected part: the ports commit their own
+palettes, and this `perlin3d` is the classic algorithm, not
+upstream's seeded gradients (the headers state both). Open part,
+recorded for the host round: the macOS layer sets no color space,
+so the display interprets the pixels in its native gamut, while a
+browser color-matches canvas content as sRGB. Two host items queue
+for the next window round: the layer's sRGB color space (W9), and
+the frames line on the `exiting` path so Cmd+Q reports like a close
+(W8).
+
+P10 slice 2 COMPLETE 2026-08-24.
