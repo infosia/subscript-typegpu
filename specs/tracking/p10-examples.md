@@ -395,3 +395,11 @@ organizes the field into stripes instead of a network. The fix
 replaces the noise module's PRNG with a 32-bit xorshift (13, 17, 5)
 over a Wang-hash seed, the same shape on host and GPU, with the
 `prng-cpu-gpu` differential unchanged in role.
+
+## The PRNG return shape (2026-08-24)
+
+A 32-bit xorshift state does not fit an exact `f32` lane (24-bit
+mantissa), so `randF32` returns a `@CStruct` value `{ state: u32;
+value: f32 }` instead of a `Vec2f`. A helper that returns a schema
+value class is a legal K2 return, and the state stays exact on both
+sides.
