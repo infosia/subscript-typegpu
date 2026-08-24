@@ -622,7 +622,11 @@ pub(crate) fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String,
             ))
         }
         Type::FixedArray(item, length) => {
-            format!("array<{}, {length}>", wgsl_type(module, item, pos)?)
+            format!(
+                "array<{}, {}>",
+                wgsl_type(module, item, pos)?,
+                crate::wgsl_u32_literal(length)
+            )
         }
         Type::Class(id) => {
             let class = &module.classes[id.0];
@@ -706,8 +710,9 @@ fn binding_declaration(
         BindingKind::Sampler => format!("var {name}: sampler;"),
     };
     Ok(format!(
-        "@group({group}) @binding({}) {declaration}\n",
-        binding.index,
+        "@group({}) @binding({}) {declaration}\n",
+        crate::wgsl_u32_literal(group),
+        crate::wgsl_u32_literal(binding.index),
     ))
 }
 
@@ -766,8 +771,8 @@ fn binary_operand(value: &Snippet, parent: u8, right: bool) -> String {
 
 fn literal(expr: &Expr) -> Result<String, Diagnostic> {
     match (&expr.kind, &expr.ty) {
-        (ExprKind::Int(value), Type::U32) => Ok(format!("{value}u")),
-        (ExprKind::Int(value), Type::I32) => Ok(format!("{value}i")),
+        (ExprKind::Int(value), Type::U32) => Ok(crate::wgsl_u32_literal(value)),
+        (ExprKind::Int(value), Type::I32) => Ok(crate::wgsl_i32_literal(value)),
         (ExprKind::Float(value), Type::F32) => Ok(f32_literal(*value)),
         (ExprKind::Float(_), Type::F64) => Err(diagnostic(
             "K5",
@@ -823,12 +828,12 @@ impl FoldedConstant {
             Self::Bool(value) => Snippet::atom(value.to_string()),
             Self::I32(value) => {
                 if *value < 0 {
-                    Snippet::new(format!("{value}i"), 9)
+                    Snippet::new(crate::wgsl_i32_literal(value), 9)
                 } else {
-                    Snippet::atom(format!("{value}i"))
+                    Snippet::atom(crate::wgsl_i32_literal(value))
                 }
             }
-            Self::U32(value) => Snippet::atom(format!("{value}u")),
+            Self::U32(value) => Snippet::atom(crate::wgsl_u32_literal(value)),
             Self::F32(value) => {
                 let mut text = value.to_string();
                 if !text.contains('.') && !text.contains('e') && !text.contains('E') {
@@ -1314,7 +1319,10 @@ fn emit_kernel_globals(module: &Module, globals: &[KernelGlobal]) -> Result<Stri
                     ));
                 }
                 let ty = wgsl_type(module, &global.ty, &global.pos)?;
-                out.push_str(&format!("var<workgroup> {name}: array<{ty}, {length}>;\n"));
+                out.push_str(&format!(
+                    "var<workgroup> {name}: array<{ty}, {}>;\n",
+                    crate::wgsl_u32_literal(length)
+                ));
             }
         }
     }
@@ -4043,7 +4051,9 @@ pub(crate) fn emit(
     .collect::<Vec<_>>();
     out.push_str(&format!(
         "@compute @workgroup_size({}, {}, {})\n",
-        pipeline.workgroup[0], pipeline.workgroup[1], pipeline.workgroup[2]
+        crate::wgsl_u32_literal(pipeline.workgroup[0]),
+        crate::wgsl_u32_literal(pipeline.workgroup[1]),
+        crate::wgsl_u32_literal(pipeline.workgroup[2])
     ));
     out.push_str(&format!(
         "fn {}({}) {{\n",
@@ -4149,7 +4159,7 @@ fn render_interface_structs(
         for (field, attribute) in class.fields.iter().zip(&buffer.attributes) {
             out.push_str(&format!(
                 "  @location({}) {}: {},\n",
-                attribute.location,
+                crate::wgsl_u32_literal(attribute.location),
                 mapping::ident(&field.name),
                 wgsl_type(module, &field.ty, &field.pos)?
             ));
@@ -4166,10 +4176,13 @@ fn render_interface_structs(
         } else if varying.flat {
             format!(
                 "@location({}) @interpolate(flat)",
-                varying.location.unwrap_or(0)
+                crate::wgsl_u32_literal(varying.location.unwrap_or(0))
             )
         } else {
-            format!("@location({})", varying.location.unwrap_or(0))
+            format!(
+                "@location({})",
+                crate::wgsl_u32_literal(varying.location.unwrap_or(0))
+            )
         };
         out.push_str(&format!(
             "  {attribute} {}: {},\n",
@@ -4424,7 +4437,7 @@ pub(crate) fn emit_render(
             .map(str::to_owned),
     );
     out.push_str("@fragment\n");
-    let fragment_result = "@location(0) vec4<f32>";
+    let fragment_result = "@location(0u) vec4<f32>";
     out.push_str(&format!(
         "fn {}({}) -> {fragment_result} {{\n",
         mapping::ident(&pipeline.fragment_entry),

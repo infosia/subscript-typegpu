@@ -2,11 +2,11 @@ struct Item {
   value: f32,
 }
 
-@group(0) @binding(0) var<storage, read> a: array<Item>;
-@group(0) @binding(1) var<storage, read> b: array<Item>;
-@group(0) @binding(2) var<storage, read_write> out: array<Item>;
+@group(0u) @binding(0u) var<storage, read> a: array<Item>;
+@group(0u) @binding(1u) var<storage, read> b: array<Item>;
+@group(0u) @binding(2u) var<storage, read_write> out: array<Item>;
 
-@compute @workgroup_size(64, 1, 1)
+@compute @workgroup_size(64u, 1u, 1u)
 fn vecAddKernel(@builtin(global_invocation_id) globalId: vec3<u32>) {
   let i = globalId.x;
   if (i < arrayLength(&out)) {

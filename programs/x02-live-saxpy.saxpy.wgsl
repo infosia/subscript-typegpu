@@ -7,11 +7,11 @@ struct Item {
   value: f32,
 }
 
-@group(0) @binding(0) var<uniform> params: SaxpyParams;
-@group(0) @binding(1) var<storage, read> x: array<Item>;
-@group(0) @binding(2) var<storage, read_write> y: array<Item>;
+@group(0u) @binding(0u) var<uniform> params: SaxpyParams;
+@group(0u) @binding(1u) var<storage, read> x: array<Item>;
+@group(0u) @binding(2u) var<storage, read_write> y: array<Item>;
 
-@compute @workgroup_size(64, 1, 1)
+@compute @workgroup_size(64u, 1u, 1u)
 fn saxpyKernel(@builtin(global_invocation_id) globalId: vec3<u32>) {
   var settings = params;
   let i = globalId.x;

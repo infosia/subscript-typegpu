@@ -48,10 +48,10 @@ export const pipeline: ComputePipelineSpec = computePipeline2<Textures, Settings
     );
     let wgsl = &generated.pipelines[0].1;
     for expected in [
-        "@group(0) @binding(0) var source: texture_2d<f32>;",
-        "@group(0) @binding(1) var nearest: sampler;",
+        "@group(0u) @binding(0u) var source: texture_2d<f32>;",
+        "@group(0u) @binding(1u) var nearest: sampler;",
         "texture_storage_2d<rgba8unorm, write>",
-        "@group(1) @binding(0) var<uniform>",
+        "@group(1u) @binding(0u) var<uniform>",
         "textureDimensions(source)",
         "textureLoad(source, vec2<i32>(0i, 0i), 0u)",
         "textureSampleLevel(source, nearest",

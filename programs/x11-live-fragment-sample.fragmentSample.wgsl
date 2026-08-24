@@ -1,15 +1,15 @@
 struct FragmentVertex {
-  @location(0) position: vec2<f32>,
-  @location(1) uv: vec2<f32>,
+  @location(0u) position: vec2<f32>,
+  @location(1u) uv: vec2<f32>,
 }
 
 struct FragmentVarying {
   @builtin(position) position: vec4<f32>,
-  @location(0) uv: vec2<f32>,
+  @location(0u) uv: vec2<f32>,
 }
 
-@group(0) @binding(0) var source: texture_2d<f32>;
-@group(0) @binding(1) var nearest: sampler;
+@group(0u) @binding(0u) var source: texture_2d<f32>;
+@group(0u) @binding(1u) var nearest: sampler;
 
 @vertex
 fn fragmentVertex(value: FragmentVertex) -> FragmentVarying {
@@ -17,6 +17,6 @@ fn fragmentVertex(value: FragmentVertex) -> FragmentVarying {
 }
 
 @fragment
-fn fragmentColor(input: FragmentVarying) -> @location(0) vec4<f32> {
+fn fragmentColor(input: FragmentVarying) -> @location(0u) vec4<f32> {
   return textureSample(source, nearest, input.uv);
 }

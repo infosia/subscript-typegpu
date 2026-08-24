@@ -8,8 +8,8 @@ struct Particle {
   vel: vec3<f32>,
 }
 
-@group(0) @binding(0) var<uniform> params: SimParams;
-@group(0) @binding(1) var<storage, read_write> particles: array<Particle>;
+@group(0u) @binding(0u) var<uniform> params: SimParams;
+@group(0u) @binding(1u) var<storage, read_write> particles: array<Particle>;
 
 fn integrate(particle: Particle, dt: f32) -> Particle {
   let speed = length(particle.vel);
@@ -20,7 +20,7 @@ fn integrate(particle: Particle, dt: f32) -> Particle {
   return particle;
 }
 
-@compute @workgroup_size(64, 1, 1)
+@compute @workgroup_size(64u, 1u, 1u)
 fn particleKernel(@builtin(global_invocation_id) globalId: vec3<u32>) {
   var settings = params;
   let i = globalId.x;

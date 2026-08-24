@@ -383,7 +383,7 @@ export const variablePipeline: ComputePipelineSpec = computePipeline<Layout>(var
     for expected in [
         "var<private> privateState: Initial = Initial(BASE);",
         "var<workgroup> sharedValue: u32;",
-        "var<workgroup> sharedValues: array<u32, 4>;",
+        "var<workgroup> sharedValues: array<u32, 4u>;",
         "@builtin(global_invocation_id) globalId: vec3<u32>",
         "@builtin(local_invocation_id) localId: vec3<u32>",
         "@builtin(workgroup_id) workgroupId: vec3<u32>",
@@ -437,6 +437,23 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { n
     assert!(wgsl.contains("const SUM: u32 = 14u;"));
     assert!(wgsl.contains("const NEXT: u32 = 15u;"));
     assert!(wgsl.contains("const SCALE: f32 = 3.75f;"));
+    validate(wgsl);
+}
+
+#[test]
+fn k14_suffixes_a_folded_u32_above_i32_max() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
+@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+class Layout { output!: MutStorage<Item>; }
+const LARGE: u32 = 2147483647 + 1;
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[ctx.globalId.x] = new Item(LARGE); }
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(wgsl.contains("const LARGE: u32 = 2147483648u;"));
     validate(wgsl);
 }
 
@@ -573,8 +590,8 @@ export const grouped: ComputePipelineSpec = computePipeline2<First, Second>(grou
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
-    assert!(wgsl.contains("@group(0) @binding(0) var<uniform> params: vec4<f32>;"));
-    assert!(wgsl.contains("@group(1) @binding(0) var<storage, read> values: array<vec4<f32>>;"));
+    assert!(wgsl.contains("@group(0u) @binding(0u) var<uniform> params: vec4<f32>;"));
+    assert!(wgsl.contains("@group(1u) @binding(0u) var<storage, read> values: array<vec4<f32>>;"));
     assert!(
         generated
             .support_module
@@ -783,7 +800,7 @@ export const controlPipeline: ComputePipelineSpec = computePipeline<Layout>(cont
         .expect("for condition prelude exists");
     assert!(for_loop > wgsl.find("var j = 0u;").expect("for initializer"));
     let for_of_prelude = wgsl
-        .find("var _g_conditional_4: array<f32, 2>;")
+        .find("var _g_conditional_4: array<f32, 2u>;")
         .expect("for-of subject prelude exists");
     let for_of = wgsl
         .find("for (var _g_value_index")
@@ -865,7 +882,7 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { n
     );
     let wgsl = &generated.pipelines[0].1;
     assert!(
-        wgsl.contains("@group(0) @binding(1) var<uniform> pipeline_guard: vec3<u32>;"),
+        wgsl.contains("@group(0u) @binding(1u) var<uniform> pipeline_guard: vec3<u32>;"),
         "{wgsl}"
     );
     assert!(

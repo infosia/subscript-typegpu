@@ -1,8 +1,8 @@
-@group(0) @binding(0) var source: texture_2d<f32>;
-@group(0) @binding(1) var nearest: sampler;
-@group(0) @binding(2) var target_: texture_storage_2d<rgba8unorm, write>;
+@group(0u) @binding(0u) var source: texture_2d<f32>;
+@group(0u) @binding(1u) var nearest: sampler;
+@group(0u) @binding(2u) var target_: texture_storage_2d<rgba8unorm, write>;
 
-@compute @workgroup_size(4, 4, 1)
+@compute @workgroup_size(4u, 4u, 1u)
 fn textureCopyKernel(@builtin(global_invocation_id) globalId: vec3<u32>) {
   if (globalId.x >= 4u || globalId.y >= 4u) {
     return;

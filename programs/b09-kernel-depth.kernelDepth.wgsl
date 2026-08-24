@@ -2,12 +2,12 @@ struct DepthItem {
   value: u32,
 }
 
-@group(0) @binding(0) var<storage, read_write> output: array<DepthItem>;
+@group(0u) @binding(0u) var<storage, read_write> output: array<DepthItem>;
 
 const ITERATIONS: u32 = 4u;
 const INCREMENTS: vec2<u32> = vec2<u32>(2u, 3u);
 
-@compute @workgroup_size(8, 1, 1)
+@compute @workgroup_size(8u, 1u, 1u)
 fn depthKernel(@builtin(global_invocation_id) globalId: vec3<u32>, @builtin(local_invocation_index) localIndex: u32) {
   var iteration = 0u;
   var value = localIndex;

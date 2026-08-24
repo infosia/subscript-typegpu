@@ -2,10 +2,10 @@ struct Item {
   value: f32,
 }
 
-@group(0) @binding(0) var<storage, read> input: array<Item>;
-@group(0) @binding(1) var<storage, read_write> output: array<Item>;
+@group(0u) @binding(0u) var<storage, read> input: array<Item>;
+@group(0u) @binding(1u) var<storage, read_write> output: array<Item>;
 
-@compute @workgroup_size(1, 1, 1)
+@compute @workgroup_size(1u, 1u, 1u)
 fn controlFlowKernel() {
   var index = 0u;
   var total = 0.0f;

@@ -16,6 +16,14 @@ use subscript_compiler::{CheckOptions, Diagnostic, Pos, RuleCode, SourceFile};
 
 use crate::layout::{Layout, TypeTree};
 
+pub(crate) fn wgsl_u32_literal(value: impl std::fmt::Display) -> String {
+    format!("{value}u")
+}
+
+pub(crate) fn wgsl_i32_literal(value: impl std::fmt::Display) -> String {
+    format!("{value}i")
+}
+
 pub(crate) fn base_name(name: &str) -> &str {
     name.split('<').next().unwrap_or(name)
 }

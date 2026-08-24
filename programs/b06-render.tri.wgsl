@@ -1,11 +1,11 @@
 struct Vertex {
-  @location(0) position: vec2<f32>,
-  @location(1) color: vec3<f32>,
+  @location(0u) position: vec2<f32>,
+  @location(1u) color: vec3<f32>,
 }
 
 struct Varyings {
   @builtin(position) position: vec4<f32>,
-  @location(0) color: vec3<f32>,
+  @location(0u) color: vec3<f32>,
 }
 
 const FRAGMENT_ALPHA: f32 = 1.0f;
@@ -16,6 +16,6 @@ fn vert(value: Vertex) -> Varyings {
 }
 
 @fragment
-fn frag(input: Varyings) -> @location(0) vec4<f32> {
+fn frag(input: Varyings) -> @location(0u) vec4<f32> {
   return vec4<f32>(input.color.x, input.color.y, input.color.z, FRAGMENT_ALPHA);
 }

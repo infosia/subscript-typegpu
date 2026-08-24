@@ -3,12 +3,12 @@ struct SampleParams {
   height: u32,
 }
 
-@group(0) @binding(0) var source: texture_2d<f32>;
-@group(0) @binding(1) var nearest: sampler;
-@group(0) @binding(2) var target_: texture_storage_2d<rgba8unorm, write>;
-@group(1) @binding(0) var<uniform> params: SampleParams;
+@group(0u) @binding(0u) var source: texture_2d<f32>;
+@group(0u) @binding(1u) var nearest: sampler;
+@group(0u) @binding(2u) var target_: texture_storage_2d<rgba8unorm, write>;
+@group(1u) @binding(0u) var<uniform> params: SampleParams;
 
-@compute @workgroup_size(4, 4, 1)
+@compute @workgroup_size(4u, 4u, 1u)
 fn textureKernel(@builtin(global_invocation_id) globalId: vec3<u32>) {
   var params_ = params;
   if (globalId.x >= params_.width || globalId.y >= params_.height) {

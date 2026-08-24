@@ -240,3 +240,15 @@ Tint refuses the module, `naga` infers `u32` from the context and
 accepts it. The same acceptance gap as the K22 barrier case. K14
 Rev 6: every emitted integer literal carries its suffix. Every
 `.wgsl` golden regenerates under the rule.
+
+## K14 Rev 6 landed; the fluid failure persists (2026-08-24)
+
+Every emitted integer literal carries its suffix, 40 goldens
+regenerated and validated, the 2^31 fold test red then green. Gate
+green, 251 passed, 203 s. Live x01–x21 PASS on Metal (62.49 s) and
+Dawn (57.97 s). `fluid-with-atomics` still fails at
+`shader.wgsl:31:38` with the same message, so the unsuffixed
+literal was not this failure's cause: the suspect is a `u32` value
+at or above 2^31 crossing into an `i32` constant context in one of
+the example's four modules. The next round dumps the emitted
+modules and fixes the site.

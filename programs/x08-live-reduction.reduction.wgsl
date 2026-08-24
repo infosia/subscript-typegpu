@@ -6,12 +6,12 @@ struct ReductionCounter {
   total: atomic<u32>,
 }
 
-@group(0) @binding(0) var<storage, read> input: array<ReductionValue>;
-@group(0) @binding(1) var<storage, read_write> output: array<ReductionCounter>;
+@group(0u) @binding(0u) var<storage, read> input: array<ReductionValue>;
+@group(0u) @binding(1u) var<storage, read_write> output: array<ReductionCounter>;
 
-var<workgroup> partials: array<f32, 256>;
+var<workgroup> partials: array<f32, 256u>;
 
-@compute @workgroup_size(256, 1, 1)
+@compute @workgroup_size(256u, 1u, 1u)
 fn reductionKernel(@builtin(global_invocation_id) globalId: vec3<u32>, @builtin(local_invocation_index) localIndex: u32) {
   let global = globalId.x;
   let local = localIndex;

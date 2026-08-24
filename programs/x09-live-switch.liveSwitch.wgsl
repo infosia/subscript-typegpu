@@ -2,9 +2,9 @@ struct SwitchValue {
   value: u32,
 }
 
-@group(0) @binding(0) var<storage, read_write> output: array<SwitchValue>;
+@group(0u) @binding(0u) var<storage, read_write> output: array<SwitchValue>;
 
-@compute @workgroup_size(16, 1, 1)
+@compute @workgroup_size(16u, 1u, 1u)
 fn liveSwitchKernel(@builtin(global_invocation_id) globalId: vec3<u32>) {
   let mode = globalId.x % 4u;
   var iteration = 0u;

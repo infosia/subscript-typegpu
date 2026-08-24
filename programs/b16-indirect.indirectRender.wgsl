@@ -1,5 +1,5 @@
 struct Vertex {
-  @location(0) position: vec2<f32>,
+  @location(0u) position: vec2<f32>,
 }
 
 struct Varyings {
@@ -12,6 +12,6 @@ fn vertexStep(value: Vertex) -> Varyings {
 }
 
 @fragment
-fn fragmentStep(value: Varyings) -> @location(0) vec4<f32> {
+fn fragmentStep(value: Varyings) -> @location(0u) vec4<f32> {
   return vec4<f32>(1.0f, 0.5f, 0.0f, 1.0f);
 }

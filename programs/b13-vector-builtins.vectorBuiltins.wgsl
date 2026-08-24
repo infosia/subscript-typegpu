@@ -35,8 +35,8 @@ struct VectorOutput {
   orderSelect: vec4<f32>,
 }
 
-@group(0) @binding(0) var<storage, read> input: array<VectorInput>;
-@group(0) @binding(1) var<storage, read_write> output: array<VectorOutput>;
+@group(0u) @binding(0u) var<storage, read> input: array<VectorInput>;
+@group(0u) @binding(1u) var<storage, read_write> output: array<VectorOutput>;
 
 fn coverFloat2(a: vec2<f32>, b: vec2<f32>, low: vec2<f32>, high: vec2<f32>) -> vec2<f32> {
   var lt = a < b;
@@ -184,7 +184,7 @@ fn coverUnsigned4(a: vec4<u32>, b: vec4<u32>) -> vec4<u32> {
   return min(a, b) + max(a, b) + clamp(a, vec4<u32>(1u, 2u, 3u, 4u), vec4<u32>(8u, 9u, 10u, 11u)) + select(a, b, inverted) + vec4<u32>(marker, marker, marker, marker);
 }
 
-@compute @workgroup_size(1, 1, 1)
+@compute @workgroup_size(1u, 1u, 1u)
 fn vectorKernel() {
   var input_ = input[0u];
   var a = input_.floatA;

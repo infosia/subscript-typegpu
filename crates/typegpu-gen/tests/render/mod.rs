@@ -47,11 +47,11 @@ export const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, fr
     );
     let wgsl = &generated.pipelines[0].1;
     for expected in [
-        "@location(0) position: vec2<f32>",
-        "@location(1) color: vec3<f32>",
+        "@location(0u) position: vec2<f32>",
+        "@location(1u) color: vec3<f32>",
         "@builtin(position) position: vec4<f32>",
         "@vertex\nfn vert(value: Vertex) -> Varyings",
-        "@fragment\nfn frag(input: Varyings) -> @location(0) vec4<f32>",
+        "@fragment\nfn frag(input: Varyings) -> @location(0u) vec4<f32>",
     ] {
         assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
     }
@@ -88,8 +88,8 @@ export const instanced: RenderPipelineSpec = renderPipelineInstanced<Vertex, Ins
     );
     let wgsl = &generated.pipelines[0].1;
     for expected in [
-        "@location(1) offset: vec2<f32>",
-        "@location(0) @interpolate(flat) id: vec2<u32>",
+        "@location(1u) offset: vec2<f32>",
+        "@location(0u) @interpolate(flat) id: vec2<u32>",
         "@builtin(vertex_index) vertexIndex: u32",
         "@builtin(instance_index) instanceIndex: u32",
         "@builtin(front_facing) frontFacing: bool",

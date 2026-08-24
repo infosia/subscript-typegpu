@@ -143,7 +143,11 @@ fn wgsl_type(tree: &TypeTree) -> String {
         TypeTree::Matrix(matrix) => format!("mat{}x{}<f32>", matrix.columns, matrix.rows),
         TypeTree::Atomic(scalar) => format!("atomic<{}>", scalar.wgsl()),
         TypeTree::Array(element, length) => {
-            format!("array<{}, {length}>", wgsl_type(element))
+            format!(
+                "array<{}, {}>",
+                wgsl_type(element),
+                crate::wgsl_u32_literal(length)
+            )
         }
         TypeTree::Struct(structure) => crate::mapping::ident(&structure.name),
     }

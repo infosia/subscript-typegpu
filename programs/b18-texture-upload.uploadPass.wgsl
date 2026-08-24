@@ -1,11 +1,11 @@
-@group(0) @binding(0) var source: texture_2d<f32>;
-@group(0) @binding(1) var nearest: sampler;
-@group(0) @binding(2) var<storage, read_write> output: array<vec4<f32>>;
+@group(0u) @binding(0u) var source: texture_2d<f32>;
+@group(0u) @binding(1u) var nearest: sampler;
+@group(0u) @binding(2u) var<storage, read_write> output: array<vec4<f32>>;
 
 const WIDTH: u32 = 64u;
 const HEIGHT: u32 = 2u;
 
-@compute @workgroup_size(8, 1, 1)
+@compute @workgroup_size(8u, 1u, 1u)
 fn uploadKernel(@builtin(global_invocation_id) globalId: vec3<u32>) {
   if (globalId.x >= WIDTH || globalId.y >= HEIGHT) {
     return;
