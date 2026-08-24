@@ -35,6 +35,34 @@ fn assert_trap(fixture: &Path, expected: &str) {
     );
 }
 
+fn assert_accept_export(fixture: &Path, export: &str) {
+    let files = subscript_typegpu_harness::program_files(fixture)
+        .unwrap_or_else(|error| panic!("load {}: {error}", fixture.display()));
+    let libraries = [subscript_typegpu_harness::facade_library()];
+    let mut session = ReloadSession::new_with_native_libraries(&files, &libraries)
+        .unwrap_or_else(|error| panic!("compile {} dev: {error}", fixture.display()));
+    let mut trapped = session.call_export(export).is_err();
+    while !trapped && session.async_pending() != 0 {
+        trapped = session.async_step().is_err();
+    }
+    assert!(
+        !trapped,
+        "{} export `{export}` unexpectedly trapped with output:\n{}",
+        fixture.display(),
+        String::from_utf8_lossy(&session.take_output()),
+    );
+}
+
+#[test]
+fn guarded_dispatch_accepts_fresh_encoder_each_frame() {
+    if !super::differential::backend_is_available() {
+        return;
+    }
+    let fixture =
+        repository_root().join("crates/harness/tests/fixtures/trap/guarded-second-dispatch.ts");
+    assert_accept_export(&fixture, "accept");
+}
+
 #[test]
 fn runtime_traps_are_named_and_numbered() {
     if !super::differential::backend_is_available() {

@@ -90,14 +90,15 @@ function tunnelBands(point: Vec2f, time: f32): Vec3f {
     const ring: f32 = 0.045 / ((Math.abs(wave as f64) as f32) + 0.07);
     const spoke: f32 = 0.35
       + 0.65 * (Math.cos((angle * 7.0 + depth * 2.0) as f64) as f32);
+    const visibleSpoke: f32 = Math.max(spoke as f64, 0.0) as f32;
     const fade: f32 = 1.0 / (1.0 + (layer as f32) * 0.32);
-    color = color.add(new Vec3f(0.22, 0.05, 0.48).scale(ring * spoke * fade));
+    color = color.add(new Vec3f(0.22, 0.05, 0.48).scale(ring * visibleSpoke * fade));
     layer += 1;
   }
   return new Vec3f(
-    Math.tanh((color.x * 0.09) as f64) as f32,
-    Math.tanh((color.y * 0.09) as f64) as f32,
-    Math.tanh((color.z * 0.09) as f64) as f32,
+    Math.tanh((color.x * 2.0) as f64) as f32,
+    Math.tanh((color.y * 2.0) as f64) as f32,
+    Math.tanh((color.z * 2.0) as f64) as f32,
   );
 }
 
@@ -106,7 +107,7 @@ function tunnelBands(point: Vec2f, time: f32): Vec3f {
 const tunnelBandsGpu: WgslShellSpec = wgslShell<(point: Vec2f, time: f32) => Vec3f>(
   tunnelBands,
   {
-    body: "let radius = length(point); let angle = atan2(point.y, point.x); var color = vec3f(0.0); for (var layer = 0u; layer < 12u; layer = layer + 1u) { let depth = f32(layer) * 0.21 + time * 0.35; let ring = 0.045 / (abs(sin(radius * 11.0 - depth * 3.0)) + 0.07); let spoke = 0.35 + 0.65 * cos(angle * 7.0 + depth * 2.0); let fade = 1.0 / (1.0 + f32(layer) * 0.32); color = color + vec3f(0.22, 0.05, 0.48) * ring * spoke * fade; } return tanh(color * 0.09);",
+    body: "let radius = length(point); let angle = atan2(point.y, point.x); var color = vec3f(0.0); for (var layer = 0u; layer < 12u; layer = layer + 1u) { let depth = f32(layer) * 0.21 + time * 0.35; let ring = 0.045 / (abs(sin(radius * 11.0 - depth * 3.0)) + 0.07); let spoke = 0.35 + 0.65 * cos(angle * 7.0 + depth * 2.0); let visibleSpoke = max(spoke, 0.0); let fade = 1.0 / (1.0 + f32(layer) * 0.32); color = color + vec3f(0.22, 0.05, 0.48) * ring * visibleSpoke * fade; } return tanh(color * 2.0);",
   },
 );
 

@@ -924,7 +924,7 @@ export class ComputePipeline {
   ): void {
     if (!this.guarded) return;
     if (this.guardEncoder !== null) {
-      if (this.guardEncoder.commandEncoder === encoder.commandEncoder) {
+      if (this.guardEncoder === encoder) {
         authorTrap("PI15", method, `x=${x} y=${y} z=${z}`);
         return;
       }

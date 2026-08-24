@@ -91,3 +91,14 @@ comparison to wrapper identity). The xor black screen is the
 tone-map: the shell peaks at 0.03 at scale 0.09; with the spoke
 clamped at zero and scale 2.0 the numeric peak is 0.53 and the mean
 0.20 (computed over a radius-angle grid). A fix round carries both.
+
+## Round 4 (2026-08-24)
+
+`writeGuard` compares the encoder wrapper by reference (PI15 Rev 2):
+the two-frames-two-encoders accept check passes and the
+double-dispatch fixture stays red. The xor tunnel clamps the spoke
+at zero and tone-maps at 2.0 in both shell bodies. Evidence: gate
+green 248 passed 172 s; `boids`, `xor-dev-centrifuge-2`, `confetti`,
+`fluid-double-buffering` each print `window:frames=60` on Metal.
+The owner's visual re-check of xor is the open item for the slice 1
+close.

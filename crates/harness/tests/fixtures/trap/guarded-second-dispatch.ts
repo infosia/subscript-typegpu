@@ -16,7 +16,7 @@ import {
   GPUShaderStage,
 } from "./webgpu";
 
-export async function main(): Promise<void> {
+async function run(doubleDispatch: boolean): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
   if (adapterResult === null) {
     print("FAIL adapter");
@@ -43,9 +43,23 @@ export async function main(): Promise<void> {
     [layout],
     [1, 1, 1],
   );
-  using firstEncoder = device.createCommandEncoderDefault();
-  pipeline.dispatch(firstEncoder, [], 1, 1, 1);
-  using secondEncoder = device.createCommandEncoderDefault();
-  pipeline.dispatch(secondEncoder, [], 1, 1, 1);
-  pipeline.dispatch(secondEncoder, [], 2, 1, 1);
+  {
+    using firstEncoder = device.createCommandEncoderDefault();
+    pipeline.dispatch(firstEncoder, [], 1, 1, 1);
+  }
+  {
+    using secondEncoder = device.createCommandEncoderDefault();
+    pipeline.dispatch(secondEncoder, [], 1, 1, 1);
+    if (doubleDispatch) {
+      pipeline.dispatch(secondEncoder, [], 2, 1, 1);
+    }
+  }
+}
+
+export async function accept(): Promise<void> {
+  await run(false);
+}
+
+export async function main(): Promise<void> {
+  await run(true);
 }
