@@ -78,3 +78,16 @@ tone-map keeps the color near 0.1, or the frame uniform does not
 reach the shader (an aspect of zero makes the uv NaN). The round-3
 K29 fix gives the shell one shared formula, so the host lane can
 evaluate it and split the two causes.
+
+## Round 3 verification (2026-08-24)
+
+Gate green, 247 passed, 172 s. Live x01–x18 PASS on the updated
+yawgpu (`feed066`, Metal 51.70 s) and Dawn (47.82 s). `triangle`,
+`confetti`, and `fluid-double-buffering` run under `--frames`.
+`boids` trapped `PI15 ComputePipeline.dispatchThreads x=96 y=1 z=1`
+on a fresh per-frame encoder: `writeGuard` compared raw handles and
+the allocator reused a disposed address (PI15 Rev 2 fixes the
+comparison to wrapper identity). The xor black screen is the
+tone-map: the shell peaks at 0.03 at scale 0.09; with the spoke
+clamped at zero and scale 2.0 the numeric peak is 0.53 and the mean
+0.20 (computed over a radius-angle grid). A fix round carries both.

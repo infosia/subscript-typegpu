@@ -1,7 +1,8 @@
 # Block: pipeline (PI-rules)
 
 P2 contract. Rev 0, 2026-08-22. Rev 5 (PI15–PI18 guarded dispatch,
-indirect), 2026-08-23. Rev 6 (PI15 Rev 1, PI18 Rev 1), 2026-08-23. Plan §3 D1, D3, D10 and §4 govern
+indirect), 2026-08-23. Rev 6 (PI15 Rev 1, PI18 Rev 1), 2026-08-23. Rev 7 (PI15 Rev 2
+wrapper identity), 2026-08-24. Plan §3 D1, D3, D10 and §4 govern
 this block. Kernels are `kernel.md`. The runtime classes live in
 `lib/typegpu.ts`.
 
@@ -133,10 +134,14 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   `dispatchTimed` write the workgroup count times the workgroup
   size. The write is a queue operation and the pass is a recorded
   command, so one command encoder carries at most one guarded
-  dispatch of one pipeline: the pipeline remembers the encoder of
-  its last guard write and traps with `PI15`, the method, and the
-  counts when a second guarded dispatch names the same encoder. A
-  new encoder clears the memory. An author's own guard stays: the
+  dispatch of one pipeline: the pipeline remembers the encoder
+  wrapper of its last guard write and traps with `PI15`, the method,
+  and the counts when a second guarded dispatch passes the same
+  wrapper. The comparison is wrapper reference identity, never the
+  raw handle: the allocator reuses a disposed handle's address, so a
+  handle comparison trapped a fresh per-frame encoder (measured
+  2026-08-24, the boids example). A different wrapper clears the
+  memory. An author's own guard stays: the
   generator never rewrites a statement. On the host,
   `simulateComputeThreads` skips every invocation whose global id
   is outside `[x, y, z]` for a guarded spec, and `simulateCompute`
