@@ -4,11 +4,13 @@
 #[rustfmt::skip]
 pub mod native_symbols_generated;
 
+use std::collections::VecDeque;
 use std::ffi::OsStr;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 use subscript_codegen::{run_c_aot_with_native_libraries, NativeLibrary, RunError};
 use subscript_compiler::SourceFile;
@@ -25,6 +27,78 @@ fn repository_root() -> PathBuf {
     root.pop();
     root.pop();
     root
+}
+
+const PROGRAM_WORKER_COUNT: usize = 4;
+static PROGRAM_POOL_LOCK: Mutex<()> = Mutex::new(());
+
+fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+    if let Some(message) = payload.downcast_ref::<&'static str>() {
+        return (*message).to_owned();
+    }
+    "program worker panicked without a string message".to_owned()
+}
+
+/// Runs per-program work on the shared four-worker pool.
+#[doc(hidden)]
+pub fn run_program_pool<R, F>(mut programs: Vec<PathBuf>, task: F) -> Vec<(PathBuf, R)>
+where
+    R: Send,
+    F: Fn(&Path) -> R + Sync,
+{
+    let _pool = PROGRAM_POOL_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    programs.sort();
+    let worker_count = PROGRAM_WORKER_COUNT.min(programs.len());
+    let queue = Mutex::new(VecDeque::from(programs));
+    let outcomes = Mutex::new(Vec::<(PathBuf, Result<R, String>)>::new());
+    std::thread::scope(|scope| {
+        for _ in 0..worker_count {
+            scope.spawn(|| loop {
+                let program = queue
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .pop_front();
+                let Some(program) = program else { break };
+                let outcome =
+                    catch_unwind(AssertUnwindSafe(|| task(&program))).map_err(panic_message);
+                outcomes
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .push((program, outcome));
+            });
+        }
+    });
+    let mut outcomes = outcomes
+        .into_inner()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    outcomes.sort_by(|left, right| left.0.cmp(&right.0));
+    let failures = outcomes
+        .iter()
+        .filter_map(|(program, outcome)| {
+            outcome.as_ref().err().map(|error| {
+                let name = program
+                    .file_name()
+                    .and_then(OsStr::to_str)
+                    .unwrap_or("<program>");
+                format!("{name}: {error}")
+            })
+        })
+        .collect::<Vec<_>>();
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+    outcomes
+        .into_iter()
+        .map(|(program, outcome)| {
+            let value = outcome.unwrap_or_else(|error| {
+                panic!("program pool omitted the reported failure: {error}")
+            });
+            (program, value)
+        })
+        .collect()
 }
 
 /// A failure to prepare or compile a development program.

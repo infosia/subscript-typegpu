@@ -183,26 +183,24 @@ fn run_ship(program: &Path) -> Vec<u8> {
 fn run_suite() -> Vec<ProgramOutput> {
     let programs = programs();
     assert!(!programs.is_empty(), "differential program list is empty");
-    programs
-        .into_iter()
-        .map(|program| {
-            let (dev, coverage) = run_dev_with_coverage(&program);
-            let generated = subscript_typegpu_gen::generate(
-                &subscript_typegpu_harness::program_files(&program)
-                    .unwrap_or_else(|error| panic!("load {}: {error}", program.display())),
-            )
-            .unwrap_or_else(|diagnostics| {
-                panic!("generate {}: {diagnostics:?}", program.display())
-            });
-            ProgramOutput {
-                dev,
-                ship: run_ship(&program),
-                coverage,
-                generated,
-                program,
-            }
-        })
-        .collect()
+    subscript_typegpu_harness::run_program_pool(programs, |program| {
+        let (dev, coverage) = run_dev_with_coverage(program);
+        let generated = subscript_typegpu_gen::generate(
+            &subscript_typegpu_harness::program_files(program)
+                .unwrap_or_else(|error| panic!("load {}: {error}", program.display())),
+        )
+        .unwrap_or_else(|diagnostics| panic!("generate {}: {diagnostics:?}", program.display()));
+        ProgramOutput {
+            dev,
+            ship: run_ship(program),
+            coverage,
+            generated,
+            program: program.to_path_buf(),
+        }
+    })
+    .into_iter()
+    .map(|(_, output)| output)
+    .collect()
 }
 
 pub(crate) fn first_outputs() -> &'static [ProgramOutput] {
@@ -251,13 +249,10 @@ fn every_program_is_deterministic_across_repeated_runs() {
                 expected.program, actual.program,
                 "suite program order changed"
             );
-            assert_eq!(
-                expected.coverage,
-                actual.coverage,
-                "{} dev coverage changed",
-                actual.program.display(),
-            );
+            let coverage = (expected.coverage != actual.coverage)
+                .then(|| format!("{} dev coverage changed", actual.program.display()));
             [
+                coverage,
                 difference(
                     &actual.program,
                     "dev determinism",

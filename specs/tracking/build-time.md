@@ -58,6 +58,7 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-24 | P11 slice 4 (blending) and the slice 5 fix round | 49 s | 0 s | 215 s | 216 s | 7 |
 | 2026-08-24 | slime-mold symmetry fix | 48 s | 1 s | 222 s | 218 s | 7 |
 | 2026-08-24 | Emitter parenthesizes mixed logical chains | 49 s | 0 s | 216 s | 213 s | 7 |
+| 2026-08-24 | T18 bounded worker pool: differential 154.5 s → 43.2 s, coverage 112.3 s → 33.9 s, simulate 95.1 s → 26.6 s, c_layout 31.1 s → 10.5 s; full gate 214 s → 106 s | 49 s | 0 s | — | 106 s | 7 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate

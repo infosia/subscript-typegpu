@@ -368,3 +368,18 @@ follow-the-strongest rule feeds back into a single dominant path.
 The standard model keeps a continuous heading jitter. Fix: every
 frame each agent advances its LCG and adds a centered jitter of
 0.3 radians peak to peak to its heading, before the sensing turn.
+
+## T18 and the jitter fix landed (2026-08-24)
+
+T18: one shared 4-worker pool moves the differential, determinism,
+C layout, coverage, and simulate program loops off the serial path.
+Module times: differential 154.5 s to 43.2 s, coverage 112.3 s to
+33.9 s, simulate 95.1 s to 26.6 s, c_layout 31.1 s to 10.5 s. The
+full gate falls from 214 s to 106 s (Codex's single run under the
+new cadence). The live lanes pass once on Metal (65.49 s) and Dawn
+(61.56 s) over the reworked runners.
+
+slime-mold: every frame adds a centered LCG heading jitter of 0.3
+radians peak to peak before the sensing turn, the header updated.
+The smoke shows zero FAIL lines. The owner's re-check decides the
+visual pass.

@@ -302,17 +302,17 @@ fn compile_probe(
 
 #[test]
 fn engine_c_layouts_match_subscript_codegen_for_every_b_program() {
-    for program in programs() {
-        let (generated, module) = checked(&program);
-        assert_language_layouts(&program, &generated, &module);
-    }
+    subscript_typegpu_harness::run_program_pool(programs(), |program| {
+        let (generated, module) = checked(program);
+        assert_language_layouts(program, &generated, &module);
+    });
 }
 
 #[test]
 fn emitted_c_layouts_match_the_engine_for_every_b_program() {
-    for program in programs() {
-        let (generated, module) = checked(&program);
-        let actual = compile_probe(&program, &generated, &module);
+    subscript_typegpu_harness::run_program_pool(programs(), |program| {
+        let (generated, module) = checked(program);
+        let actual = compile_probe(program, &generated, &module);
         for expected in &generated.layouts {
             let layout = actual.get(&expected.name).unwrap_or_else(|| {
                 panic!(
@@ -355,5 +355,5 @@ fn emitted_c_layouts_match_the_engine_for_every_b_program() {
             "{}: C probe schema count",
             program.display()
         );
-    }
+    });
 }

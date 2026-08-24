@@ -7,8 +7,9 @@
 // a cell. This port fixes 4096 agents, a 256-square trail, and deposit 0.2.
 // TypeGPU seeds agents in a disc and points them toward its center. This port derives
 // full-grid positions and full-circle headings from a deterministic 16-bit LCG.
-// The same LCG selects a turn when both sides win or all samples tie at zero. At the border,
-// this port wraps the trail instead of the TypeGPU clamp, reflection, and jitter.
+// The same LCG adds centered heading jitter in [-0.15, 0.15) radians each frame.
+// It also selects a turn when both sides win or all samples tie at zero. At the border, this
+// port wraps the trail instead of the TypeGPU clamp, reflection, and jitter.
 // Ported from TypeGPU's slime-mold example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -154,6 +155,9 @@ function senseTrailCell(position: Vec2f, angle: f32): Vec2i {
 function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.x;
   const agent: Agent = res.agents.get(index);
+  const jitter = randF32(agent.lcgState);
+  agent.lcgState = jitter.x as u32;
+  agent.heading += (jitter.y - 0.5) * 0.3;
   const forward: f32 = res.sense.load(
     senseTrailCell(agent.position, agent.heading),
   ).x;

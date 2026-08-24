@@ -62,8 +62,9 @@ fn dev_corpus_matches_committed_facade_coverage() {
         !live_programs.is_empty(),
         "live coverage program list is empty"
     );
-    for program in live_programs {
-        let (_, coverage) = crate::differential::run_dev_with_coverage(&program);
+    for (_, coverage) in subscript_typegpu_harness::run_program_pool(live_programs, |program| {
+        crate::differential::run_dev_with_coverage(program).1
+    }) {
         reached.extend(coverage);
     }
     let all = subscript_typegpu_harness::native_symbols_generated::facade_export_names()

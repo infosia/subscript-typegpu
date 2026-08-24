@@ -498,10 +498,8 @@ fn pairing_failures(program: &Path) -> (Vec<String>, usize) {
 
 #[test]
 fn every_simulation_call_uses_its_generated_pipeline_pair() {
-    let mut failures = Vec::new();
-    for program in programs() {
-        let (program_failures, simulation_calls) = pairing_failures(&program);
-        failures.extend(program_failures);
+    let failures = subscript_typegpu_harness::run_program_pool(programs(), |program| {
+        let (mut failures, simulation_calls) = pairing_failures(program);
         let name = program
             .file_name()
             .and_then(|name| name.to_str())
@@ -520,7 +518,11 @@ fn every_simulation_call_uses_its_generated_pipeline_pair() {
                 program.display(),
             ));
         }
-    }
+        failures
+    })
+    .into_iter()
+    .flat_map(|(_, failures)| failures)
+    .collect::<Vec<_>>();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
