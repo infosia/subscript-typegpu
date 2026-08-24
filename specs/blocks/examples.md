@@ -1,6 +1,7 @@
 # Block: examples (EX-rules)
 
-P10 contract. Rev 0, 2026-08-24. Plan §8 P10 governs this block.
+P10 contract. Rev 0, 2026-08-24. Rev 1 (EX2 header exemption),
+2026-08-24. Plan §8 P10 governs this block.
 The window host is `window.md` (W-rules). The example set is the
 plan's P10 list.
 
@@ -22,7 +23,9 @@ plan's P10 list.
   differs from TypeGPU, one comment states the difference in one or
   two sentences at the point of divergence. A comment never
   explains subscript syntax, never repeats the code in words, and
-  never exceeds three lines.
+  never exceeds three lines. The header block is exempt from the
+  line cap: it carries the name, the purpose, the reductions, and
+  the citation (Rev 1).
 - **EX3 — Examples use the public layers only.** The API layer, the
   TypeGPU layer, and `typegpu-types`. No facade name, no mirror
   name, no `Context.suspend` (the layers own the polling). The

@@ -1,6 +1,7 @@
 // example: fluid-with-atomics
-// Moves water through an atomic grid and paints water, walls, or erasure with a pointer brush.
-// Keys 1, 2, and 0 replace the upstream water, wall, and erase tool buttons.
+// Moves water down and sideways through one atomic grid under a pointer brush.
+// TypeGPU picks the brush from a select and erases with a right click. This port maps keys 1, 2,
+// and 0 to water, wall, and erase, and drops the source, drain, pressure, and upward flow rules.
 // Ported from TypeGPU's fluid-with-atomics example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -120,7 +121,9 @@ function minU32(left: u32, right: u32): u32 {
   return left < right ? left : right;
 }
 
-// Each invocation owns one source cell. Atomic operations protect every destination update.
+// Each invocation owns one source cell. Gravity runs first, and one transfer toward the lower
+// side neighbor follows it. TypeGPU runs a separate brush pass over two buffers, and this port
+// folds the brush in and updates one atomic buffer in place.
 // Gravity runs first, and one transfer toward the lower side neighbor follows it.
 function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void {
   const x: u32 = ctx.globalId.x;
@@ -194,7 +197,8 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
   }
 }
 
-// The upstream renderer selects strip corners from the vertex index.
+// TypeGPU draws one full-screen triangle and picks its three corners from the vertex index.
+// This port draws a four-corner strip from a typed vertex buffer.
 // This port stores the four corners in a typed vertex buffer.
 function atomicFluidVertex(
   res: AtomicFluidRenderLayout,

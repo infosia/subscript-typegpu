@@ -101,7 +101,7 @@ function updateBoids(res: BoidLayout, ctx: ComputeInvocation): void {
   let separationX: f32 = 0.0;
   let separationY: f32 = 0.0;
   let neighbors: u32 = 0;
-  // Upstream gives each rule its own radius and sums raw offsets for separation.
+  // TypeGPU gives each rule its own radius and sums raw offsets for separation.
   // This port uses one perception radius and weights separation by inverse square distance.
   for (let otherIndex: u32 = 0; otherIndex < BOID_COUNT; otherIndex += 1) {
     if (otherIndex !== index) {

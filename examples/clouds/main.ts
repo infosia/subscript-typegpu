@@ -1,7 +1,7 @@
 // example: clouds
-// Marches layered cloud density from a CPU-filled Perlin noise texture.
-// The upstream scale, density, and speed sliders are fixed at 2.6, 1.35, and 0.018.
-// This port uses six density layers and derives time from the frame count.
+// Layers a Perlin noise texture into drifting cloud cover over a sky gradient.
+// TypeGPU exposes one quality select and ray marches a noise volume. This port drops the
+// three-octave fbm, the sun light, and the sun glow, and accumulates six fixed noise layers.
 // Ported from TypeGPU's clouds example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -95,6 +95,8 @@ class CloudLayout {
   frame!: Uniform<CloudFrame>;
 }
 
+// TypeGPU draws one full-screen triangle and picks its three corners from the vertex index.
+// This port stores the three corners in a typed vertex buffer.
 function cloudVertex(
   res: CloudLayout,
   value: Vertex,
@@ -106,6 +108,8 @@ function cloudVertex(
   );
 }
 
+// TypeGPU marches a ray through a noise volume and lights each sample from the sun.
+// This port samples one texture at six depths and blends the result into the sky gradient.
 function cloudFragment(
   res: CloudLayout,
   input: Varyings,

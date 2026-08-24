@@ -105,7 +105,7 @@ class FluidRenderLayout {
   cells!: Storage<FluidCell>;
 }
 
-// Upstream advances the grid with one compute pass per step. This port splits the step into
+// TypeGPU advances the grid with one compute pass per step. This port splits the step into
 // three passes that alternate source and target. The obstacle pass writes the render state.
 function flowKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   const x: u32 = ctx.globalId.x;
@@ -157,7 +157,7 @@ function obstacleKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   res.target.set(index, cell);
 }
 
-// Upstream selects the four full-screen strip corners from the vertex index.
+// TypeGPU selects the four full-screen strip corners from the vertex index.
 // This port stores the same corners in a typed vertex buffer.
 function fluidVertex(
   res: FluidRenderLayout,

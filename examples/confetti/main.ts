@@ -87,7 +87,7 @@ class ParticleLayout {
 }
 
 // One storage buffer becomes the instance stream after this pass completes.
-// Upstream adds a seeded sine offset to the position and never wraps.
+// TypeGPU adds a seeded sine offset to the position and never wraps.
 // This port applies constant gravity, a spin, and a wrap to the top edge.
 function updateParticles(res: ParticleLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.x;
@@ -106,7 +106,7 @@ function updateParticles(res: ParticleLayout, ctx: ComputeInvocation): void {
   res.particles.set(index, particle);
 }
 
-// Upstream rotates the card by a fixed per-particle angle and corrects for the canvas aspect ratio.
+// TypeGPU rotates the card by a fixed per-particle angle and corrects for the canvas aspect ratio.
 // This port animates the angle in compute and applies no aspect correction.
 function confettiVertex(
   value: Vertex,
@@ -135,7 +135,7 @@ function confettiFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return input.color;
 }
 
-// Upstream uses a guarded pipeline. This port keeps the guard and dispatches the exact
+// TypeGPU uses a guarded pipeline. This port keeps the guard and dispatches the exact
 // particle thread count through `dispatchThreads`.
 export const confettiUpdate: ComputePipelineSpec = computePipeline<ParticleLayout>(
   updateParticles,
