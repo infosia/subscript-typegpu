@@ -790,6 +790,7 @@ fn f32_literal(value: f64) -> String {
 fn constant_type(module: &Module, ty: &Type) -> bool {
     match ty {
         Type::F32 | Type::I32 | Type::U32 | Type::Bool => true,
+        Type::FixedArray(item, _) => constant_type(module, item),
         Type::Class(id) => {
             let class = &module.classes[id.0];
             class.pos.file == "typegpu-types.ts"
@@ -1062,6 +1063,13 @@ fn fold_constant_expr(
                     .collect::<Result<Vec<_>, _>>()?,
             })
         }
+        ExprKind::ArrayLit(args) => Ok(FoldedConstant::Construct {
+            constructor: wgsl_type(module, &expr.ty, &expr.pos)?,
+            args: args
+                .iter()
+                .map(|arg| fold_constant_expr(module, globals, cache, visiting, arg))
+                .collect::<Result<Vec<_>, _>>()?,
+        }),
         _ => Err(diagnostic(
             "K19",
             "module constant initializer is not evaluable",

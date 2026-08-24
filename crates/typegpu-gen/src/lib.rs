@@ -111,6 +111,8 @@ fn is_library_file(name: &str) -> bool {
         "webgpu.ts"
             | "typegpu-types.ts"
             | "typegpu.ts"
+            | "typegpu-noise.ts"
+            | "typegpu-sdf.ts"
             | "subscript-typegpu.generated.d.ts"
             | "wire-enum-aliases.generated.d.ts"
     )

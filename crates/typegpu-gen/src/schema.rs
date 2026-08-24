@@ -30,7 +30,10 @@ pub(crate) fn is_bool_vector(module: &Module, ty: &Type) -> bool {
 }
 
 fn is_library_file(file: &str) -> bool {
-    matches!(file, "webgpu.ts" | "typegpu-types.ts" | "typegpu.ts")
+    matches!(
+        file,
+        "webgpu.ts" | "typegpu-types.ts" | "typegpu.ts" | "typegpu-noise.ts" | "typegpu-sdf.ts"
+    )
 }
 
 fn is_indirect_schema(class: &ClassDef) -> bool {
