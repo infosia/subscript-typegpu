@@ -1,5 +1,6 @@
 // example: fluid-double-buffering
 // Simulates a three-pass grid fluid whose obstacle moves horizontally from the A and D key scalar.
+// The upstream source and wall sliders become fixed values, and this port uses a 32 by 32 grid.
 // Ported from TypeGPU's fluid-double-buffering example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -104,7 +105,8 @@ class FluidRenderLayout {
   cells!: Storage<FluidCell>;
 }
 
-// Three passes alternate source and target. The obstacle pass writes the render state.
+// Upstream advances the grid with one compute pass per step. This port splits the step into
+// three passes that alternate source and target. The obstacle pass writes the render state.
 function flowKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   const x: u32 = ctx.globalId.x;
   const y: u32 = ctx.globalId.y;
@@ -157,6 +159,8 @@ function obstacleKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   res.target.set(index, cell);
 }
 
+// Upstream draws a four-vertex triangle strip that the vertex index selects.
+// This port draws one full-screen triangle from a vertex buffer.
 function fluidVertex(
   res: FluidRenderLayout,
   value: Vertex,
@@ -457,7 +461,7 @@ export function frame(
     Context.bytesOf<FluidParams>(new FluidParams(obstacleX, frameCount as f32 / 60.0)),
   );
   const even: boolean = frameCount % 2 === 1;
-  // The next frame reverses all buffer roles and preserves the three-pass sequence.
+  // Each pass reads what the pass before it wrote. The next frame reverses every role.
   const flowGroup: GPUBindGroup = even ? flowAB : flowBA;
   const evaporateGroup: GPUBindGroup = even ? evaporateBA : evaporateAB;
   const obstacleGroup: GPUBindGroup = even ? obstacleAB : obstacleBA;

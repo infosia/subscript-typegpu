@@ -1,5 +1,6 @@
 // example: boids
 // Updates a three-rule flock in double-buffered storage and draws velocity-oriented instances.
+// This port uses one fixed rule preset with 96 boids and drops the upstream preset and color controls.
 // Ported from TypeGPU's boids example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -43,6 +44,7 @@ import {
   boidUpdate_WGSL,
 } from "./main.typegpu";
 
+// These weights replace the upstream preset buttons with one committed preset.
 const BOID_COUNT: u32 = 96;
 const PERCEPTION_SQUARED: f32 = 0.10;
 const COHESION_WEIGHT: f32 = 0.0018;
@@ -97,6 +99,8 @@ function updateBoids(res: BoidLayout, ctx: ComputeInvocation): void {
   let separationX: f32 = 0.0;
   let separationY: f32 = 0.0;
   let neighbors: u32 = 0;
+  // Upstream gives each rule its own radius and sums raw offsets for separation.
+  // This port uses one perception radius and weights separation by inverse square distance.
   for (let otherIndex: u32 = 0; otherIndex < BOID_COUNT; otherIndex += 1) {
     if (otherIndex !== index) {
       const other: Boid = res.previous.get(otherIndex);
@@ -137,6 +141,8 @@ function updateBoids(res: BoidLayout, ctx: ComputeInvocation): void {
   res.next.set(index, boid);
 }
 
+// The rotation matches upstream. Upstream colors each triangle from a palette uniform
+// and the heading angle, and this port derives the color from speed.
 function boidVertex(value: Vertex, boid: Boid, ctx: VertexInvocation): Varyings {
   const speed: f32 = boid.velocity.length();
   let directionX: f32 = 0.0;
@@ -158,7 +164,6 @@ function boidFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return input.color;
 }
 
-// These three-rule weights replace the upstream interactive controls with one committed preset.
 export const boidUpdate: ComputePipelineSpec = computePipeline<BoidLayout>(updateBoids, {
   name: "boidUpdate",
   workgroupSize: [64, 1, 1],
@@ -255,6 +260,8 @@ export function init(
     return;
   }
   using computeBindLayout = computePipeline.bindGroupLayout(0);
+  // The guard buffer carries the dispatched thread count. It gives the kernel the bound
+  // that TypeGPU's createGuardedComputePipeline applies for the caller.
   const guard = computePipeline.guardBuffer(0);
   if (guard === null) {
     renderPipeline.dispose();

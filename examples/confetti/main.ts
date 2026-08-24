@@ -1,5 +1,6 @@
 // example: confetti
 // Advances colored particles in compute and draws them as instanced cards.
+// This port starts from a fixed layout of 64 particles and drops the upstream randomize button.
 // Ported from TypeGPU's confetti example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -84,6 +85,8 @@ class ParticleLayout {
 }
 
 // One storage buffer becomes the instance stream after this pass completes.
+// Upstream adds a seeded sine offset to the position and never wraps.
+// This port applies constant gravity, a spin, and a wrap to the top edge.
 function updateParticles(res: ParticleLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.x;
   const particle: Particle = res.particles.get(index);
@@ -101,6 +104,8 @@ function updateParticles(res: ParticleLayout, ctx: ComputeInvocation): void {
   res.particles.set(index, particle);
 }
 
+// Upstream rotates the card by a fixed per-particle angle and corrects for the canvas aspect ratio.
+// This port animates the angle in compute and applies no aspect correction.
 function confettiVertex(
   value: Vertex,
   particle: Particle,
@@ -127,6 +132,8 @@ function confettiFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return input.color;
 }
 
+// Upstream uses a guarded pipeline. The particle count here is a whole number of workgroups,
+// so this pipeline dispatches workgroups directly and needs no guard.
 export const confettiUpdate: ComputePipelineSpec = computePipeline<ParticleLayout>(
   updateParticles,
   { name: "confettiUpdate", workgroupSize: [64, 1, 1] },
@@ -156,6 +163,8 @@ export function init(
   }
   const hostDevice = hostOwnedGPUDevice(instance, device);
   // Two triangles form one card, and each Particle supplies one instance record.
+  // Upstream draws a four-vertex triangle strip with no vertex buffer.
+  // This port draws six triangle-list vertices from one vertex buffer.
   const vertices: FixedArray<Vertex, 6> = [
     new Vertex(new Vec2f(-0.012, -0.022)),
     new Vertex(new Vec2f(0.012, -0.022)),
@@ -164,7 +173,6 @@ export function init(
     new Vertex(new Vec2f(0.012, -0.022)),
     new Vertex(new Vec2f(0.012, 0.022)),
   ];
-  // Upstream uses a four-vertex triangle strip. This port uses six triangle-list vertices.
   const vertexBuffer = hostDevice.createBuffer({
     label: "confetti-vertices",
     size: (Vertex_STRIDE * 6) as u64,
