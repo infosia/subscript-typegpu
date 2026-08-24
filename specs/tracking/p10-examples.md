@@ -316,3 +316,9 @@ seeding and a random turn. The fix seeds positions and headings
 from the noise module's LCG over the whole grid and gives each
 agent an LCG state for the tie-breaking turn, so the behavior stays
 deterministic per run while the symmetry breaks.
+
+## game-of-life visual pass (2026-08-24, Metal)
+
+The owner ran `game-of-life` for 2929 frames: the glider, the
+pointer drawing, and the `0` clear work as intended. The slime-mold
+re-check follows the symmetry fix.
