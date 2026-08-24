@@ -23,7 +23,7 @@ in the named program.
 | Schema | `d.struct({ ... })`, a run-time object | `@CStruct class`, a compile-time declaration |
 | Layout | computed at run time, `d.sizeOf(T)` | computed by the generator, `T_SIZE` and `T_STRIDE` constants |
 | Kernel | a function with `'use gpu'` | a plain function named by `computePipeline<L>(fn, spec)` |
-| WGSL | generated at run time from a compacted AST | generated before the program runs, committed as a `.wgsl` golden |
+| WGSL | generated at run time from a compacted AST | generated before the program runs — a readable `.wgsl` file beside your program |
 | Bindings | `tgpu.bindGroupLayout({ ... })`, access by `layout.$.name` | a layout class with buffer, texture, and sampler binding fields |
 | Buffer data | JavaScript objects, converted by TypeGPU | `Context.bytesOf<T>(value)`, the bytes of the value |
 | Async | `Promise` | `await` over host-stepped futures |
@@ -66,7 +66,7 @@ export async function main(): Promise<void> {
 Differences:
 
 - `gpu` is an exported constant. There is no `navigator`.
-- `await` yields to the harness through `Context.suspend()`. There is no
+- `await` yields to the host runtime through `Context.suspend()`. There is no
   JavaScript promise object and no callback. The API layer polls the
   facade's futures in a loop and yields at each poll.
 - The adapter and the device are handles with `dispose()`. A program
@@ -150,9 +150,9 @@ Differences:
 
 - `T_SIZE` is the struct size. `T_STRIDE` is the array stride. Both
   are integer constants in generated code.
-- The support module is not committed. The harness command
-  `subscript-typegpu-harness dev <program>` or `ship <program>` generates
-  it in memory before the program runs.
+- The support module is not a file you keep. The runner —
+  `subscript-typegpu-harness dev <program>` or `ship <program>` —
+  generates it in memory before the program runs.
 - The generator computes the C layout and the WGSL layout of every
   schema and rejects a difference (rule `SC9`). A test compiles a C
   probe and compares the real C layout with the generator's, for
@@ -701,10 +701,11 @@ const resolved = tgpu.resolve([createSmallBoid, createBigBoid]);
 
 subscript-typegpu generates one WGSL module per pipeline declaration
 before the program runs. The support module holds it as
-`<name>_WGSL`, and the repository commits it as
-`programs/<program>.<pipeline>.wgsl`, one file per pipeline
-declaration. A test regenerates every WGSL module and compares bytes.
-`naga` validates every WGSL module on every test run.
+`<name>_WGSL`, and it is also written beside the program as
+`programs/<program>.<pipeline>.wgsl` — one readable file per
+pipeline declaration, so you can open the exact WGSL your kernel
+became. The file always matches what runs: it is regenerated and
+validated whenever the program changes.
 
 There is no `tgpu.resolve`, no template with externals, and no
 `$uses`. A kernel refers to module-level constants, layout fields, and
@@ -768,12 +769,12 @@ These TypeGPU features have no equivalent.
 
 These subscript-typegpu properties have no equivalent.
 
-- A ship tier: the program compiles to C and links against the facade.
-  Every program runs under both tiers with byte-identical output.
+- A C build for shipping: the program compiles with your platform's
+  C compiler and reproduces the JIT's output exactly.
 - A C layout equal to the WGSL layout, and `Context.bytesOf<T>`.
-- Committed WGSL goldens validated by `naga` on every test run.
+- The emitted WGSL as a readable file beside the program.
 - A backend chosen at run time through `SUBSCRIPT_TYPEGPU_BACKEND_LIB`,
-  with headless gates over a Noop backend.
+  including a headless no-op backend for machines without a GPU.
 - Generation-time rejections with rule ids, including the uniform
   control flow check for barriers.
 - `simulateCompute` with the `HOST_RUNNABLE` constant.

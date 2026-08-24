@@ -170,11 +170,10 @@ typed value.
 
 TypeGPU spells the same three steps `buffer.patch(...)`,
 `buffer.read()`, and schema-driven deserialization. One difference
-matters when this program runs as a gate test: the headless gate
-substrate executes copies but no shaders, so the committed output
-records `counter=0`. A live device records the two increments. The
-host lane below proves the arithmetic on every test run, device or
-not.
+matters on a backend that executes no shaders, such as yawgpu's
+Noop: the copies run, the kernel does not, and the readback shows
+`counter=0`. A real device shows the two increments. The host lane
+below checks the arithmetic anywhere, device or not.
 
 ## Why a plain variable cannot hold GPU state
 
@@ -193,8 +192,7 @@ export const badProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
 
 A kernel becomes GPU code, and GPU code has no access to host
 memory. The generator rejects a kernel that reads a mutable global.
-The `K19` diagnostic names the global, and a committed red fixture
-holds the rejection. State the GPU can write lives in a buffer
+The `K19` diagnostic names the global. State the GPU can write lives in a buffer
 behind a `MutStorage` binding, and the host reads it back as bytes.
 
 ## The kernel also runs on the host
@@ -226,9 +224,8 @@ proven without a device.
     print(`host:counter=${hostLayout.state.get(0).counter}`);
 ```
 
-Two increments — 10, then 25 — leave the host counter at 35. The
-gate compares that line against the committed golden on both
-compilation tiers.
+Two increments — 10, then 25 — leave the host counter at 35, on
+the JIT and on the C build alike.
 
 ## Where to go next
 
