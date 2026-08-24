@@ -93,3 +93,9 @@ window, and the commit landed before the smoke run's result was
 read. Two records: the fix types the pointer with an opaque
 `CGColorSpace` and `RefEncode`; and a window-host change is
 committed only after a `--frames` smoke run passes.
+
+## The exiting path confirmed (2026-08-24)
+
+The owner closed `examples/triangle/main.ts` with Cmd+Q at `4778cd0`
+and the host printed `window:frames=167` with exit 0. W8 Rev 2 and
+W9 Rev 1 are complete.
