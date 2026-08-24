@@ -57,6 +57,7 @@ const CLOUD_DENSITY: f32 = 1.35;
 const CLOUD_SPEED: f32 = 0.018;
 const CLOUD_THRESHOLD: f32 = 0.43;
 const LAYER_COUNT: u32 = 6;
+const CLOUD_TIME_PERIOD: u32 = 4096;
 
 @CStruct
 class Vertex {
@@ -131,7 +132,6 @@ function cloudFragment(
     const sampled: f32 = res.noise.sampleLevel(res.linear, sampleUv, 0.0).x;
     let layerDensity: f32 = (sampled - CLOUD_THRESHOLD) * CLOUD_DENSITY;
     if (layerDensity < 0.0) layerDensity = 0.0;
-    if (layerDensity > 1.0) layerDensity = 1.0;
     density += layerDensity * visibility * 0.42;
     visibility *= 1.0 - layerDensity * 0.18;
   }
@@ -154,13 +154,17 @@ function makeNoisePixels(): Vec4f[] {
   const pixels: Vec4f[] = [];
   for (let y: u32 = 0; y < NOISE_SIZE; y += 1) {
     for (let x: u32 = 0; x < NOISE_SIZE; x += 1) {
-      let value: f32 = perlin3d(new Vec3f(
-        ((x as f32) / (NOISE_SIZE as f32)) * 4.0,
-        ((y as f32) / (NOISE_SIZE as f32)) * 4.0,
-        1.75,
-      )) * 0.5 + 0.5;
-      if (value < 0.0) value = 0.0;
-      if (value > 1.0) value = 1.0;
+      const blendX: f32 = (x as f32) / (NOISE_SIZE as f32);
+      const blendY: f32 = (y as f32) / (NOISE_SIZE as f32);
+      const domainX: f32 = blendX * 4.0;
+      const domainY: f32 = blendY * 4.0;
+      const nearY: f32 = perlin3d(new Vec3f(domainX, domainY, 1.75))
+        * (1.0 - blendX)
+        + perlin3d(new Vec3f(domainX - 4.0, domainY, 1.75)) * blendX;
+      const farY: f32 = perlin3d(new Vec3f(domainX, domainY - 4.0, 1.75))
+        * (1.0 - blendX)
+        + perlin3d(new Vec3f(domainX - 4.0, domainY - 4.0, 1.75)) * blendX;
+      const value: f32 = (nearY * (1.0 - blendY) + farY * blendY) * 0.5 + 0.5;
       pixels.push(new Vec4f(value, value, value, 1.0));
     }
   }
@@ -281,7 +285,7 @@ export function frame(
   if (group === null) return;
   if (vertices === null) return;
   if (frameBuffer === null) return;
-  frameCount += 1;
+  frameCount = (frameCount + 1) % CLOUD_TIME_PERIOD;
   using queue = device.queue();
   queue.writeBuffer(
     frameBuffer,

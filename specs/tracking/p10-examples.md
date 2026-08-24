@@ -218,3 +218,15 @@ round's working tree, so whether the committed WGSL carries the
 defect is open until the round lands. If the committed module does,
 the lesson is that `naga` accepted a literal Tint refuses, and the
 generator gains a rule.
+
+## Fix round (2026-08-24)
+
+Landed: the atomic fluid moves to a read-only current buffer plus a
+cleared atomic delta buffer with a finalize pass and a swap, the
+brush protects walls, the stroke clears on button release, the
+tileable four-sample torus blend and the wrapped time in clouds,
+and the impossible checks left both files. Gate green, 250 passed,
+203 s. Smoke: clouds prints `window:frames=30`; `fluid-with-atomics`
+still prints `FAIL validation shader.wgsl:31:38 error: value cannot
+be represented as 'i32'` on Metal — the failure is in the committed
+module, not the round's working tree. Diagnosis follows.

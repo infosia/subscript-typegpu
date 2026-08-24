@@ -1,5 +1,5 @@
 // example: fluid-with-atomics
-// Moves water down and sideways through one atomic grid under a pointer brush.
+// Moves water down and sideways through two storage grids that swap roles under a pointer brush.
 // TypeGPU picks the brush from a select and erases with a right click. This port maps keys 1, 2,
 // and 0 to water, wall, and erase, and drops the source, drain, pressure, and upward flow rules.
 // Ported from TypeGPU's fluid-with-atomics example (https://github.com/software-mansion/TypeGPU).
@@ -12,6 +12,7 @@ import {
   MutStorage,
   RenderPipeline,
   RenderPipelineSpec,
+  Storage,
   Uniform,
   VertexInvocation,
   bufferResource,
@@ -22,6 +23,7 @@ import {
   renderPipelineL,
 } from "./typegpu";
 import {
+  AtomicI32,
   AtomicU32,
   Vec2f,
   Vec4f,
@@ -41,9 +43,15 @@ import {
   BrushParams_SIZE,
   Vertex_STRIDE,
   WaterCell_STRIDE,
+  atomicBrush_ENTRY,
+  atomicBrush_LAYOUT0,
+  atomicBrush_WGSL,
   atomicFlow_ENTRY,
   atomicFlow_LAYOUT0,
   atomicFlow_WGSL,
+  atomicFinalize_ENTRY,
+  atomicFinalize_LAYOUT0,
+  atomicFinalize_WGSL,
   atomicFluidRender_FRAGMENT_ENTRY,
   atomicFluidRender_LAYOUT0,
   atomicFluidRender_TARGET_FORMAT,
@@ -83,6 +91,24 @@ class WaterCell {
 }
 
 @CStruct
+class WaterLevel {
+  level: u32;
+
+  constructor(level: u32) {
+    this.level = level;
+  }
+}
+
+@CStruct
+class WaterDelta {
+  level: AtomicI32;
+
+  constructor(level: AtomicI32) {
+    this.level = level;
+  }
+}
+
+@CStruct
 class BrushParams {
   previous: Vec2f;
   current: Vec2f;
@@ -109,6 +135,16 @@ class Varyings {
 }
 
 class AtomicFluidLayout {
+  current!: Storage<WaterLevel>;
+  next!: MutStorage<WaterDelta>;
+}
+
+class AtomicFinalizeLayout {
+  current!: Storage<WaterLevel>;
+  next!: MutStorage<WaterDelta>;
+}
+
+class AtomicBrushLayout {
   cells!: MutStorage<WaterCell>;
   brush!: Uniform<BrushParams>;
 }
@@ -121,49 +157,26 @@ function minU32(left: u32, right: u32): u32 {
   return left < right ? left : right;
 }
 
-// Each invocation owns one source cell. Gravity runs first, and one transfer toward the lower
-// side neighbor follows it. TypeGPU runs a separate brush pass over two buffers, and this port
-// folds the brush in and updates one atomic buffer in place.
-// Gravity runs first, and one transfer toward the lower side neighbor follows it.
+// Each invocation reads current and atomically accumulates signed changes in the cleared next buffer.
+// A finalize pass clamps next, the brush follows, and the frame swaps the buffer roles.
 function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void {
   const x: u32 = ctx.globalId.x;
   const y: u32 = ctx.globalId.y;
   const index: u32 = y * GRID_SIZE + x;
-  const brush: BrushParams = res.brush.get();
-  if (brush.active !== 0) {
-    const point = new Vec2f(x as f32, y as f32);
-    if (sdLine(point, brush.previous, brush.current) <= BRUSH_RADIUS) {
-      if (brush.mode === BRUSH_WALL) {
-        res.cells[index].level.store(WALL_LEVEL);
-        return;
-      }
-      if (brush.mode === BRUSH_ERASE) {
-        res.cells[index].level.store(0);
-        return;
-      }
-      const brushLevel: u32 = res.cells[index].level.load();
-      if (brushLevel >= WALL_LEVEL) {
-        res.cells[index].level.store(BRUSH_WATER);
-      } else if (brushLevel < MAX_WATER) {
-        res.cells[index].level.add(minU32(BRUSH_WATER, MAX_WATER - brushLevel));
-      }
-    }
-  }
-
-  let level: u32 = res.cells[index].level.load();
+  let level: u32 = res.current.get(index).level;
   if (level === 0 || level >= WALL_LEVEL) return;
 
   if (y > 0) {
     const belowIndex: u32 = index - GRID_SIZE;
-    const belowLevel: u32 = res.cells[belowIndex].level.load();
+    const belowLevel: u32 = res.current.get(belowIndex).level;
     if (belowLevel < MAX_WATER) {
       const gravity: u32 = minU32(
         level,
         minU32(MAX_WATER - belowLevel, GRAVITY_STEP),
       );
       if (gravity > 0) {
-        res.cells[index].level.sub(gravity);
-        res.cells[belowIndex].level.add(gravity);
+        res.next[index].level.sub(gravity as i32);
+        res.next[belowIndex].level.add(gravity as i32);
         level -= gravity;
       }
     }
@@ -174,7 +187,7 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
   let targetLevel: u32 = level;
   if (x > 0) {
     const leftIndex: u32 = index - 1;
-    const leftLevel: u32 = res.cells[leftIndex].level.load();
+    const leftLevel: u32 = res.current.get(leftIndex).level;
     if (leftLevel < targetLevel) {
       targetIndex = leftIndex;
       targetLevel = leftLevel;
@@ -182,18 +195,52 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
   }
   if (x + 1 < GRID_SIZE) {
     const rightIndex: u32 = index + 1;
-    const rightLevel: u32 = res.cells[rightIndex].level.load();
+    const rightLevel: u32 = res.current.get(rightIndex).level;
     if (rightLevel < targetLevel) {
       targetIndex = rightIndex;
       targetLevel = rightLevel;
     }
   }
-  if (targetIndex !== index && targetLevel < WALL_LEVEL && level > targetLevel + 1) {
+  if (targetIndex !== index && level > targetLevel + 1) {
     const sideways: u32 = minU32((level - targetLevel) / 4, SIDE_STEP);
     if (sideways > 0) {
-      res.cells[index].level.sub(sideways);
-      res.cells[targetIndex].level.add(sideways);
+      res.next[index].level.sub(sideways as i32);
+      res.next[targetIndex].level.add(sideways as i32);
     }
+  }
+}
+
+function atomicFinalizeKernel(res: AtomicFinalizeLayout, ctx: ComputeInvocation): void {
+  const index: u32 = ctx.globalId.y * GRID_SIZE + ctx.globalId.x;
+  const current: u32 = res.current.get(index).level;
+  if (current >= WALL_LEVEL) {
+    res.next[index].level.store(-2147483648);
+    return;
+  }
+  const changed: i32 = (current as i32) + res.next[index].level.load();
+  const positive: u32 = changed > 0 ? changed as u32 : 0;
+  res.next[index].level.store(minU32(positive, MAX_WATER) as i32);
+}
+
+function atomicBrushKernel(res: AtomicBrushLayout, ctx: ComputeInvocation): void {
+  const x: u32 = ctx.globalId.x;
+  const y: u32 = ctx.globalId.y;
+  const index: u32 = y * GRID_SIZE + x;
+  const brush: BrushParams = res.brush.get();
+  if (brush.active === 0) return;
+  const point = new Vec2f(x as f32, y as f32);
+  if (sdLine(point, brush.previous, brush.current) > BRUSH_RADIUS) return;
+  if (brush.mode === BRUSH_WALL) {
+    res.cells[index].level.store(WALL_LEVEL);
+    return;
+  }
+  if (brush.mode === BRUSH_ERASE) {
+    res.cells[index].level.store(0);
+    return;
+  }
+  const brushLevel: u32 = res.cells[index].level.load();
+  if (brushLevel < WALL_LEVEL && brushLevel < MAX_WATER) {
+    res.cells[index].level.add(minU32(BRUSH_WATER, MAX_WATER - brushLevel));
   }
 }
 
@@ -239,6 +286,16 @@ export const atomicFlow: ComputePipelineSpec = computePipeline<AtomicFluidLayout
   { name: "atomicFlow", workgroupSize: [8, 8, 1] },
 );
 
+export const atomicFinalize: ComputePipelineSpec = computePipeline<AtomicFinalizeLayout>(
+  atomicFinalizeKernel,
+  { name: "atomicFinalize", workgroupSize: [8, 8, 1] },
+);
+
+export const atomicBrush: ComputePipelineSpec = computePipeline<AtomicBrushLayout>(
+  atomicBrushKernel,
+  { name: "atomicBrush", workgroupSize: [8, 8, 1] },
+);
+
 export const atomicFluidRender: RenderPipelineSpec = renderPipelineL<
   AtomicFluidRenderLayout,
   Vertex,
@@ -250,15 +307,25 @@ export const atomicFluidRender: RenderPipelineSpec = renderPipelineL<
 
 let activeDevice: GPUHostOwnedDevice | null = null;
 let activeFlow: ComputePipeline | null = null;
+let activeFinalize: ComputePipeline | null = null;
+let activeBrushPipeline: ComputePipeline | null = null;
 let activeRender: RenderPipeline | null = null;
-let activeFlowGroup: GPUBindGroup | null = null;
-let activeRenderGroup: GPUBindGroup | null = null;
+let activeFlowGroupAB: GPUBindGroup | null = null;
+let activeFlowGroupBA: GPUBindGroup | null = null;
+let activeFinalizeGroupAB: GPUBindGroup | null = null;
+let activeFinalizeGroupBA: GPUBindGroup | null = null;
+let activeBrushGroupA: GPUBindGroup | null = null;
+let activeBrushGroupB: GPUBindGroup | null = null;
+let activeRenderGroupA: GPUBindGroup | null = null;
+let activeRenderGroupB: GPUBindGroup | null = null;
 let activeVertices: GPUBuffer | null = null;
-let activeCells: GPUBuffer | null = null;
+let activeCellsA: GPUBuffer | null = null;
+let activeCellsB: GPUBuffer | null = null;
 let activeBrush: GPUBuffer | null = null;
 let brushMode: u32 = BRUSH_WATER_MODE;
 let previousPointerX: f32 = -1.0;
 let previousPointerY: f32 = -1.0;
+let frameCount: u32 = 0;
 
 export function init(
   instance: SubscriptTypegpuInstance,
@@ -281,8 +348,13 @@ export function init(
     size: (Vertex_STRIDE * 4) as u64,
     usage: GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
-  const cells = hostDevice.createBuffer({
-    label: "atomic-fluid-cells",
+  const cellsA = hostDevice.createBuffer({
+    label: "atomic-fluid-cells-a",
+    size: (WaterCell_STRIDE * CELL_COUNT) as u64,
+    usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
+  });
+  const cellsB = hostDevice.createBuffer({
+    label: "atomic-fluid-cells-b",
     size: (WaterCell_STRIDE * CELL_COUNT) as u64,
     usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
   });
@@ -317,7 +389,8 @@ export function init(
   }
   using queue = hostDevice.queue();
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 4>>(vertexValues));
-  queue.writeBuffer(cells, 0, initialCells);
+  queue.writeBuffer(cellsA, 0, initialCells);
+  queue.writeBuffer(cellsB, 0, initialCells);
   const idlePoint = new Vec2f(0.0, 0.0);
   queue.writeBuffer(
     brush,
@@ -335,6 +408,20 @@ export function init(
     [atomicFlow_LAYOUT0],
     [8, 8, 1],
   );
+  const finalizePipeline = createComputePipelineHost(
+    hostDevice,
+    atomicFinalize_WGSL,
+    atomicFinalize_ENTRY,
+    [atomicFinalize_LAYOUT0],
+    [8, 8, 1],
+  );
+  const brushPipeline = createComputePipelineHost(
+    hostDevice,
+    atomicBrush_WGSL,
+    atomicBrush_ENTRY,
+    [atomicBrush_LAYOUT0],
+    [8, 8, 1],
+  );
   const renderPipeline = createRenderPipelineHost(
     hostDevice,
     atomicFluidRender_WGSL,
@@ -347,35 +434,85 @@ export function init(
   const validationError = hostDevice.popErrorScope();
   if (validationError !== null) {
     renderPipeline.dispose();
+    brushPipeline.dispose();
+    finalizePipeline.dispose();
     flowPipeline.dispose();
     brush.dispose();
-    cells.dispose();
+    cellsB.dispose();
+    cellsA.dispose();
     vertices.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
 
   using flowLayout = flowPipeline.bindGroupLayout(0);
+  using finalizeLayout = finalizePipeline.bindGroupLayout(0);
+  using brushLayout = brushPipeline.bindGroupLayout(0);
   using renderLayout = renderPipeline.bindGroupLayout(0);
-  const flowGroup = createBindGroupHost(
+  const flowGroupAB = createBindGroupHost(
     hostDevice,
     flowLayout,
     atomicFlow_LAYOUT0,
-    [bufferResource(cells), bufferResource(brush)],
+    [bufferResource(cellsA), bufferResource(cellsB)],
   );
-  const renderGroup = createBindGroupHost(
+  const flowGroupBA = createBindGroupHost(
+    hostDevice,
+    flowLayout,
+    atomicFlow_LAYOUT0,
+    [bufferResource(cellsB), bufferResource(cellsA)],
+  );
+  const finalizeGroupAB = createBindGroupHost(
+    hostDevice,
+    finalizeLayout,
+    atomicFinalize_LAYOUT0,
+    [bufferResource(cellsA), bufferResource(cellsB)],
+  );
+  const finalizeGroupBA = createBindGroupHost(
+    hostDevice,
+    finalizeLayout,
+    atomicFinalize_LAYOUT0,
+    [bufferResource(cellsB), bufferResource(cellsA)],
+  );
+  const brushGroupA = createBindGroupHost(
+    hostDevice,
+    brushLayout,
+    atomicBrush_LAYOUT0,
+    [bufferResource(cellsA), bufferResource(brush)],
+  );
+  const brushGroupB = createBindGroupHost(
+    hostDevice,
+    brushLayout,
+    atomicBrush_LAYOUT0,
+    [bufferResource(cellsB), bufferResource(brush)],
+  );
+  const renderGroupA = createBindGroupHost(
     hostDevice,
     renderLayout,
     atomicFluidRender_LAYOUT0,
-    [bufferResource(cells)],
+    [bufferResource(cellsA)],
+  );
+  const renderGroupB = createBindGroupHost(
+    hostDevice,
+    renderLayout,
+    atomicFluidRender_LAYOUT0,
+    [bufferResource(cellsB)],
   );
   activeDevice = hostDevice;
   activeFlow = flowPipeline;
+  activeFinalize = finalizePipeline;
+  activeBrushPipeline = brushPipeline;
   activeRender = renderPipeline;
-  activeFlowGroup = flowGroup;
-  activeRenderGroup = renderGroup;
+  activeFlowGroupAB = flowGroupAB;
+  activeFlowGroupBA = flowGroupBA;
+  activeFinalizeGroupAB = finalizeGroupAB;
+  activeFinalizeGroupBA = finalizeGroupBA;
+  activeBrushGroupA = brushGroupA;
+  activeBrushGroupB = brushGroupB;
+  activeRenderGroupA = renderGroupA;
+  activeRenderGroupB = renderGroupB;
   activeVertices = vertices;
-  activeCells = cells;
+  activeCellsA = cellsA;
+  activeCellsB = cellsB;
   activeBrush = brush;
 }
 
@@ -390,17 +527,37 @@ export function frame(
 ): void {
   const device = activeDevice;
   const flowPipeline = activeFlow;
+  const finalizePipeline = activeFinalize;
+  const brushPipeline = activeBrushPipeline;
   const renderPipeline = activeRender;
-  const flowGroup = activeFlowGroup;
-  const renderGroup = activeRenderGroup;
+  const flowGroupAB = activeFlowGroupAB;
+  const flowGroupBA = activeFlowGroupBA;
+  const finalizeGroupAB = activeFinalizeGroupAB;
+  const finalizeGroupBA = activeFinalizeGroupBA;
+  const brushGroupA = activeBrushGroupA;
+  const brushGroupB = activeBrushGroupB;
+  const renderGroupA = activeRenderGroupA;
+  const renderGroupB = activeRenderGroupB;
   const vertices = activeVertices;
+  const cellsA = activeCellsA;
+  const cellsB = activeCellsB;
   const brush = activeBrush;
   if (device === null) return;
   if (flowPipeline === null) return;
+  if (finalizePipeline === null) return;
+  if (brushPipeline === null) return;
   if (renderPipeline === null) return;
-  if (flowGroup === null) return;
-  if (renderGroup === null) return;
+  if (flowGroupAB === null) return;
+  if (flowGroupBA === null) return;
+  if (finalizeGroupAB === null) return;
+  if (finalizeGroupBA === null) return;
+  if (brushGroupA === null) return;
+  if (brushGroupB === null) return;
+  if (renderGroupA === null) return;
+  if (renderGroupB === null) return;
   if (vertices === null) return;
+  if (cellsA === null) return;
+  if (cellsB === null) return;
   if (brush === null) return;
 
   if (key === 49) brushMode = BRUSH_WATER_MODE;
@@ -412,7 +569,12 @@ export function frame(
   let previousX: f32 = 0.0;
   let previousY: f32 = 0.0;
   let brushActive: u32 = 0;
-  if (pointerX >= 0.0 && pointerY >= 0.0) {
+  const primaryDown: boolean = (buttons & 1) !== 0;
+  if (!primaryDown) {
+    previousPointerX = -1.0;
+    previousPointerY = -1.0;
+  }
+  if (primaryDown && pointerX >= 0.0 && pointerY >= 0.0) {
     const gridMax: f32 = (GRID_SIZE - 1) as f32;
     currentX = (pointerX / (width as f32)) * gridMax;
     // Surface y grows down, while the rendered grid y grows up.
@@ -426,10 +588,18 @@ export function frame(
     if (previousX === currentX && previousY === currentY) {
       previousX = currentX > 0.001 ? currentX - 0.001 : currentX + 0.001;
     }
-    if ((buttons & 1) !== 0) brushActive = 1;
+    brushActive = 1;
     previousPointerX = currentX;
     previousPointerY = currentY;
   }
+
+  const useAB: boolean = frameCount % 2 === 0;
+  const nextCells: GPUBuffer = useAB ? cellsB : cellsA;
+  const flowGroup: GPUBindGroup = useAB ? flowGroupAB : flowGroupBA;
+  const finalizeGroup: GPUBindGroup = useAB ? finalizeGroupAB : finalizeGroupBA;
+  const brushGroup: GPUBindGroup = useAB ? brushGroupB : brushGroupA;
+  const renderGroup: GPUBindGroup = useAB ? renderGroupB : renderGroupA;
+  frameCount += 1;
 
   using queue = device.queue();
   queue.writeBuffer(
@@ -443,7 +613,10 @@ export function frame(
     )),
   );
   using encoder = device.createCommandEncoderDefault();
+  encoder.clearBuffer(nextCells, 0, (WaterCell_STRIDE * CELL_COUNT) as u64);
   flowPipeline.dispatch(encoder, [flowGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
+  finalizePipeline.dispatch(encoder, [finalizeGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
+  brushPipeline.dispatch(encoder, [brushGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
   const target = new GPUTextureView(view);
   using renderPass = encoder.beginRenderPass({
     colorAttachments: [{
@@ -463,19 +636,37 @@ export function frame(
 }
 
 export function shutdown(): void {
-  if (activeRenderGroup !== null) activeRenderGroup.dispose();
-  if (activeFlowGroup !== null) activeFlowGroup.dispose();
+  if (activeRenderGroupB !== null) activeRenderGroupB.dispose();
+  if (activeRenderGroupA !== null) activeRenderGroupA.dispose();
+  if (activeBrushGroupB !== null) activeBrushGroupB.dispose();
+  if (activeBrushGroupA !== null) activeBrushGroupA.dispose();
+  if (activeFinalizeGroupBA !== null) activeFinalizeGroupBA.dispose();
+  if (activeFinalizeGroupAB !== null) activeFinalizeGroupAB.dispose();
+  if (activeFlowGroupBA !== null) activeFlowGroupBA.dispose();
+  if (activeFlowGroupAB !== null) activeFlowGroupAB.dispose();
   if (activeBrush !== null) activeBrush.dispose();
-  if (activeCells !== null) activeCells.dispose();
+  if (activeCellsB !== null) activeCellsB.dispose();
+  if (activeCellsA !== null) activeCellsA.dispose();
   if (activeVertices !== null) activeVertices.dispose();
   if (activeRender !== null) activeRender.dispose();
+  if (activeBrushPipeline !== null) activeBrushPipeline.dispose();
+  if (activeFinalize !== null) activeFinalize.dispose();
   if (activeFlow !== null) activeFlow.dispose();
-  activeRenderGroup = null;
-  activeFlowGroup = null;
+  activeRenderGroupB = null;
+  activeRenderGroupA = null;
+  activeBrushGroupB = null;
+  activeBrushGroupA = null;
+  activeFinalizeGroupBA = null;
+  activeFinalizeGroupAB = null;
+  activeFlowGroupBA = null;
+  activeFlowGroupAB = null;
   activeBrush = null;
-  activeCells = null;
+  activeCellsB = null;
+  activeCellsA = null;
   activeVertices = null;
   activeRender = null;
+  activeBrushPipeline = null;
+  activeFinalize = null;
   activeFlow = null;
   activeDevice = null;
 }
