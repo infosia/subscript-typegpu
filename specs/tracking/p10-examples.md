@@ -350,3 +350,11 @@ golden carried one, so none changed), with the regression red then
 green. Gate green, 252 passed, 213 s. The slime-mold smoke prints
 `window:frames=30` with zero `FAIL` lines, checked by an explicit
 grep before this commit.
+
+## slime-mold saturates (2026-08-24)
+
+The owner sees green dots that fill the screen: 4096 agents over a
+128-square grid deposit an average 0.05 per cell per frame, and the
+0.985 decay gives an equilibrium of 3.3 — every cell saturates. The
+fix computes the equilibrium down to about 0.31: a 256-square trail
+and a 0.96 decay, with the agent count and the deposit unchanged.
