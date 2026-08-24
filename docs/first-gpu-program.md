@@ -1,17 +1,17 @@
 # Your first GPU program
 
-A compute kernel runs an ordinary calculation on the GPU, in
-parallel, with no triangle in sight. This page builds the smallest
-useful one: a counter that the GPU increments. Every code block is
-a quote from `programs/b22-first-program.ts`, and a test checks the
-quotes against the program.
+A compute kernel runs an ordinary calculation on the GPU, without
+any graphics. This page builds the smallest useful one: a counter
+that the GPU increments. Every code block that names the program is
+a quote from `programs/b22-first-program.ts`, and a test checks
+those quotes against the program.
 
-A GPU function needs more ceremony than a host function: the code
-compiles for a different processor, the memory is allocated ahead,
-and handles cross between the two sides. TypeGPU performs that
-ceremony at run time. This library performs it before the program
-runs: a generator reads the typed program and emits the WGSL and
-the layout constants the host code imports.
+A GPU function needs more steps than a host function: handles cross
+between two processors, the memory is allocated ahead, and the code
+compiles for the device. TypeGPU resolves the WGSL, the layouts,
+and the pipeline at run time. This library does that work before
+the program runs: a generator reads the typed program and emits the
+WGSL and the layout constants the host code imports.
 
 ## The smallest kernel
 
@@ -36,10 +36,11 @@ export const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
 ```
 
 TypeGPU writes `root.createGuardedComputePipeline(() => { 'use gpu';
-... })` and extracts the function with a build plugin. Here the
-declaration is the marker, and the generator emits one WGSL module
-and a support module `./b22-first-program.typegpu` with the entry
-name, the workgroup size, and the layout constants.
+... })`, and its build plugin parses the marked body ahead of time
+into a compact AST. Here the declaration is the marker. The
+generator emits one WGSL module and a support module
+`./b22-first-program.typegpu`. That module holds the entry name,
+the workgroup size, and the layout constants.
 
 ## State lives in a buffer, and a schema shapes it
 
@@ -57,6 +58,7 @@ class State {
     this.counter = counter;
     this.incrementBy = incrementBy;
   }
+}
 ```
 
 ```ts program=programs/b22-first-program.ts
@@ -68,7 +70,7 @@ class CounterLayout {
 TypeGPU builds the same shapes at run time with `d.struct({ ... })`
 and `root.createMutable(...)`. Here the generator computes the
 layout before the program runs and emits it as constants:
-`State_STRIDE` is the schema's stride, and
+`State_STRIDE` is the schema's array stride, and
 `State_OFFSET_incrementBy` is one field's byte offset. No byte
 count is written by hand.
 
@@ -82,8 +84,8 @@ count is written by hand.
     );
 ```
 
-The initial value crosses as the bytes of a typed value, padding
-included:
+The initial value crosses as the schema's bytes, at the schema's
+own offsets:
 
 ```ts program=programs/b22-first-program.ts
     const initialState = new State(0, 10);
@@ -97,9 +99,10 @@ included:
 ## Run it
 
 The pipeline builds from the generated WGSL and layout constants,
-inside a validation error scope, so a rejected shader is a visible
-failure instead of a silent zero. The typed factory builds the bind
-group, and one dispatch runs one invocation.
+inside a validation error scope. A rejected shader prints
+`pipeline:invalid` and ends the program. The typed factory builds
+the bind group, and one dispatch runs one invocation — a larger
+dispatch adds invocations without any other change.
 
 ```ts program=programs/b22-first-program.ts
     device.pushErrorScope("validation");
@@ -179,18 +182,22 @@ not.
 let counter: u32 = 0;
 
 function badKernel(res: CounterLayout, ctx: ComputeInvocation): void {
-  counter += 1;
+  res.state.set(0, new State(counter, 1));
 }
+
+export const badProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
+  badKernel,
+  { name: "badProgram", workgroupSize: [1, 1, 1] },
+);
 ```
 
-The kernel compiles for the GPU, so it cannot close over host
-memory. The generator rejects a kernel that reads a mutable global
-with a `K19` diagnostic that names the global, and a committed red
-fixture holds that rejection. State the GPU can write lives in a
-buffer behind a `MutStorage` binding, and the host reads it back as
-bytes.
+A kernel becomes GPU code, and GPU code has no access to host
+memory. The generator rejects a kernel that reads a mutable global.
+The `K19` diagnostic names the global, and a committed red fixture
+holds the rejection. State the GPU can write lives in a buffer
+behind a `MutStorage` binding, and the host reads it back as bytes.
 
-## The kernel also runs on the CPU
+## The kernel also runs on the host
 
 The same function body is host code. `simulateCompute` runs it over
 host-side bindings, one invocation at a time, so the arithmetic is
@@ -219,15 +226,15 @@ proven without a device.
     print(`host:counter=${hostLayout.state.get(0).counter}`);
 ```
 
-Two increments — 10, then 25 — leave the host counter at 35, and
-the gate compares that line against the committed golden on both
+Two increments — 10, then 25 — leave the host counter at 35. The
+gate compares that line against the committed golden on both
 compilation tiers.
 
 ## Where to go next
 
 - `docs/tutorial.md` builds a particle pipeline with vectors and a
   larger schema.
-- `docs/from-typegpu.md` maps every TypeGPU concept to this
-  library, topic by topic.
+- `docs/from-typegpu.md` compares TypeGPU with this library, topic
+  by topic.
 - `examples/` holds twenty ported TypeGPU examples, headless and
   windowed.
