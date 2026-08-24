@@ -10,6 +10,7 @@ import {
   Uniform,
   VertexInvocation,
   WgslShellSpec,
+  createRenderPipelineHost,
   renderPipelineL,
   wgslShell,
 } from "./typegpu";
@@ -23,7 +24,6 @@ import {
   GPUBuffer,
   GPUBufferUsage,
   GPUHostOwnedDevice,
-  GPURenderPipeline,
   GPUTextureView,
   hostOwnedGPUDevice,
 } from "./webgpu";
@@ -49,10 +49,12 @@ class Vertex {
 
 @CStruct
 class FrameData {
-  values: Vec4f;
+  time: f32;
+  aspect: f32;
 
   constructor(time: f32, aspect: f32) {
-    this.values = new Vec4f(time, aspect, 0.0, 0.0);
+    this.time = time;
+    this.aspect = aspect;
   }
 }
 
@@ -78,8 +80,25 @@ class TunnelLayout {
 // and the CPU lane runs it.
 function tunnelBands(point: Vec2f, time: f32): Vec3f {
   const radius: f32 = point.length();
-  const pulse: f32 = 0.5 + 0.5 * (Math.sin((radius * 8.0 + time) as f64) as f32);
-  return new Vec3f(pulse * 0.25, pulse * 0.08, pulse * 0.55);
+  // The host body uses Math.atan2 because the typed kernel method table has no scalar mapping.
+  const angle: f32 = Math.atan2(point.y as f64, point.x as f64) as f32;
+  let color = new Vec3f(0.0, 0.0, 0.0);
+  let layer: u32 = 0;
+  while (layer < 12) {
+    const depth: f32 = (layer as f32) * 0.21 + time * 0.35;
+    const wave: f32 = Math.sin((radius * 11.0 - depth * 3.0) as f64) as f32;
+    const ring: f32 = 0.045 / ((Math.abs(wave as f64) as f32) + 0.07);
+    const spoke: f32 = 0.35
+      + 0.65 * (Math.cos((angle * 7.0 + depth * 2.0) as f64) as f32);
+    const fade: f32 = 1.0 / (1.0 + (layer as f32) * 0.32);
+    color = color.add(new Vec3f(0.22, 0.05, 0.48).scale(ring * spoke * fade));
+    layer += 1;
+  }
+  return new Vec3f(
+    Math.tanh((color.x * 0.09) as f64) as f32,
+    Math.tanh((color.y * 0.09) as f64) as f32,
+    Math.tanh((color.z * 0.09) as f64) as f32,
+  );
 }
 
 // K11 maps no `atan2`, so the ring angle needs a WGSL shell. TypeGPU marches a 3D
@@ -111,10 +130,10 @@ function tunnelFragment(
 ): Vec4f {
   const frame: FrameData = res.frame.get();
   const centered = new Vec2f(
-    (input.uv.x * 2.0 - 1.0) * frame.values.y,
+    (input.uv.x * 2.0 - 1.0) * frame.aspect,
     input.uv.y * 2.0 - 1.0,
   );
-  const color: Vec3f = tunnelBands(centered, frame.values.x);
+  const color: Vec3f = tunnelBands(centered, frame.time);
   return new Vec4f(color.x, color.y, color.z, 1.0);
 }
 
@@ -160,52 +179,24 @@ export function init(
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>(values));
   queue.writeBuffer(frameBuffer, 0, Context.bytesOf<FrameData>(new FrameData(0.0, 1.0)));
   hostDevice.pushErrorScope("validation");
-  using shader = hostDevice.createShaderModule({ code: tunnel_WGSL });
-  using bindLayout = hostDevice.createBindGroupLayout({
-    entries: [{
-      binding: tunnel_LAYOUT0.entries[0].binding,
-      visibility: tunnel_LAYOUT0.entries[0].visibility,
-      buffer: {
-        type: "uniform",
-        minBindingSize: tunnel_LAYOUT0.entries[0].minBindingSize,
-      },
-    }],
-  });
-  using layout = hostDevice.createPipelineLayout({ bindGroupLayouts: [bindLayout] });
-  const nativePipeline: GPURenderPipeline = hostDevice.createRenderPipeline({
-    layout,
-    vertex: {
-      module: shader,
-      entryPoint: tunnel_VERTEX_ENTRY,
-      buffers: [{
-        arrayStride: tunnel_VERTEX_LAYOUT0.arrayStride,
-        stepMode: tunnel_VERTEX_LAYOUT0.stepMode,
-        attributes: [{
-          format: tunnel_VERTEX_LAYOUT0.attributes[0].format,
-          offset: tunnel_VERTEX_LAYOUT0.attributes[0].offset,
-          shaderLocation: tunnel_VERTEX_LAYOUT0.attributes[0].shaderLocation,
-        }],
-      }],
-    },
-    primitive: {
-      topology: tunnel.topology,
-      cullMode: tunnel.cullMode,
-      frontFace: tunnel.frontFace,
-    },
-    fragment: {
-      module: shader,
-      entryPoint: tunnel_FRAGMENT_ENTRY,
-      targets: [{ format: tunnel_TARGET_FORMAT }],
-    },
-  });
+  const createdPipeline = createRenderPipelineHost(
+    hostDevice,
+    tunnel_WGSL,
+    tunnel_VERTEX_ENTRY,
+    tunnel_FRAGMENT_ENTRY,
+    [tunnel_LAYOUT0],
+    [tunnel_VERTEX_LAYOUT0],
+    tunnel,
+  );
   const validationError = hostDevice.popErrorScope();
   if (validationError !== null) {
-    nativePipeline.dispose();
+    createdPipeline.dispose();
     frameBuffer.dispose();
     vertices.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
+  using bindLayout = createdPipeline.bindGroupLayout(0);
   const group = hostDevice.createBindGroup({
     layout: bindLayout,
     entries: [{
@@ -218,7 +209,7 @@ export function init(
   activeVertices = vertices;
   activeFrameBuffer = frameBuffer;
   activeGroup = group;
-  activePipeline = new RenderPipeline(nativePipeline, "undefined");
+  activePipeline = createdPipeline;
 }
 
 export function frame(

@@ -9,14 +9,19 @@ import {
   GPUBuffer,
   GPUCommandEncoder,
   GPUComputePipeline,
+  GPUComputePipelineDescriptor,
   GPUDevice,
+  GPUHostOwnedDevice,
+  GPUPipelineLayout,
   GPUQuerySet,
   GPUQueue,
   GPURenderPassEncoder,
   GPURenderPipeline,
+  GPURenderPipelineDescriptor,
   GPUSampler,
   GPUSamplerDescriptor,
   GPUShaderStage,
+  GPUShaderModule,
   GPUBufferUsage,
   GPUMapMode,
   GPUTextureView,
@@ -871,7 +876,7 @@ export class BindGroupLayoutSpec {
 
 export class ComputePipeline {
   private pipeline: GPUComputePipeline;
-  private device: GPUDevice | null;
+  private guardQueue: GPUQueue | null;
   private workgroup: FixedArray<u32, 3>;
   private guarded: boolean;
   private guardGroups: u32[];
@@ -881,13 +886,13 @@ export class ComputePipeline {
   constructor(
     pipeline: GPUComputePipeline,
     workgroup: FixedArray<u32, 3>,
-    device: GPUDevice | null = null,
+    guardQueue: GPUQueue | null = null,
     guarded: boolean = false,
     guardGroups: u32[] = [],
     guardBuffers: GPUBuffer[] = [],
   ) {
     this.pipeline = pipeline;
-    this.device = device;
+    this.guardQueue = guardQueue;
     this.workgroup = workgroup;
     this.guarded = guarded;
     this.guardGroups = guardGroups;
@@ -924,16 +929,15 @@ export class ComputePipeline {
         return;
       }
     }
-    if (this.device === null) {
-      authorTrap("PI15", "ComputePipeline.guard", "device=missing");
+    if (this.guardQueue === null) {
+      authorTrap("PI15", "ComputePipeline.guard", "queue=missing");
       return;
     }
     this.guardEncoder = encoder;
     const bytes: u8[] = Context.bytesOf<FixedArray<u32, 4>>([x, y, z, 0]);
-    using queue = this.device.queue();
     let index: i32 = 0;
     while (index < this.guardBuffers.length) {
-      queue.writeBuffer(this.guardBuffers[index], 0, bytes);
+      this.guardQueue.writeBuffer(this.guardBuffers[index], 0, bytes);
       index = index + 1;
     }
   }
@@ -1049,6 +1053,10 @@ export class ComputePipeline {
       this.guardBuffers[index].dispose();
       index = index + 1;
     }
+    if (this.guardQueue !== null) {
+      this.guardQueue.dispose();
+      this.guardQueue = null;
+    }
     this.pipeline.dispose();
   }
 
@@ -1157,11 +1165,10 @@ export class RenderPipeline {
   }
 }
 
-function createNativeBindGroupLayouts(
-  device: GPUDevice,
+function nativeBindGroupLayoutEntries(
   layouts: BindGroupLayoutSpec[],
-): GPUBindGroupLayout[] {
-  const nativeLayouts: GPUBindGroupLayout[] = [];
+): GPUBindGroupLayoutEntry[][] {
+  const groups: GPUBindGroupLayoutEntry[][] = [];
   let group: i32 = 0;
   while (group < layouts.length) {
     const entries: GPUBindGroupLayoutEntry[] = [];
@@ -1213,10 +1220,122 @@ function createNativeBindGroupLayouts(
       }
       binding = binding + 1;
     }
-    nativeLayouts.push(device.createBindGroupLayout({ entries }));
+    groups.push(entries);
+    group = group + 1;
+  }
+  return groups;
+}
+
+function createNativeBindGroupLayouts(
+  device: GPUDevice,
+  entries: GPUBindGroupLayoutEntry[][],
+): GPUBindGroupLayout[] {
+  const nativeLayouts: GPUBindGroupLayout[] = [];
+  let group: i32 = 0;
+  while (group < entries.length) {
+    nativeLayouts.push(device.createBindGroupLayout({ entries: entries[group] }));
     group = group + 1;
   }
   return nativeLayouts;
+}
+
+function createNativeBindGroupLayoutsHost(
+  device: GPUHostOwnedDevice,
+  entries: GPUBindGroupLayoutEntry[][],
+): GPUBindGroupLayout[] {
+  const nativeLayouts: GPUBindGroupLayout[] = [];
+  let group: i32 = 0;
+  while (group < entries.length) {
+    nativeLayouts.push(device.createBindGroupLayout({ entries: entries[group] }));
+    group = group + 1;
+  }
+  return nativeLayouts;
+}
+
+function computePipelineDescriptor(
+  shader: GPUShaderModule,
+  layout: GPUPipelineLayout,
+  entry: string,
+): GPUComputePipelineDescriptor {
+  return {
+    layout,
+    compute: { module: shader, entryPoint: entry },
+  };
+}
+
+function nativeVertexBufferLayouts(
+  vertexLayouts: VertexBufferLayoutSpec[],
+): GPUVertexBufferLayout[] {
+  const nativeVertexLayouts: GPUVertexBufferLayout[] = [];
+  let slot: i32 = 0;
+  while (slot < vertexLayouts.length) {
+    const attributes: GPUVertexAttribute[] = [];
+    let attribute: i32 = 0;
+    while (attribute < vertexLayouts[slot].attributes.length) {
+      const source: VertexAttributeSpec = vertexLayouts[slot].attributes[attribute];
+      attributes.push({
+        format: source.format,
+        offset: source.offset,
+        shaderLocation: source.shaderLocation,
+      });
+      attribute = attribute + 1;
+    }
+    nativeVertexLayouts.push({
+      arrayStride: vertexLayouts[slot].arrayStride,
+      stepMode: vertexLayouts[slot].stepMode,
+      attributes,
+    });
+    slot = slot + 1;
+  }
+  return nativeVertexLayouts;
+}
+
+function renderPipelineDescriptor(
+  shader: GPUShaderModule,
+  layout: GPUPipelineLayout,
+  vertexEntry: string,
+  fragmentEntry: string,
+  vertexLayouts: GPUVertexBufferLayout[],
+  spec: RenderPipelineSpec,
+): GPURenderPipelineDescriptor {
+  return {
+    layout,
+    vertex: { module: shader, entryPoint: vertexEntry, buffers: vertexLayouts },
+    primitive: {
+      topology: spec.topology,
+      cullMode: spec.cullMode,
+      frontFace: spec.frontFace,
+    },
+    fragment: {
+      module: shader,
+      entryPoint: fragmentEntry,
+      targets: [{ format: spec.format }],
+    },
+  };
+}
+
+function finishComputePipeline(
+  pipeline: GPUComputePipeline,
+  workgroup: FixedArray<u32, 3>,
+  guardGroups: u32[],
+  guardBuffers: GPUBuffer[],
+  guardQueue: GPUQueue | null,
+): ComputePipeline {
+  return new ComputePipeline(
+    pipeline,
+    workgroup,
+    guardQueue,
+    guardBuffers.length > 0,
+    guardGroups,
+    guardBuffers,
+  );
+}
+
+function finishRenderPipeline(
+  pipeline: GPURenderPipeline,
+  spec: RenderPipelineSpec,
+): RenderPipeline {
+  return new RenderPipeline(pipeline, spec.indexFormat);
 }
 
 /** Creates inside the caller's validation error scope; this helper does not await. */
@@ -1245,25 +1364,69 @@ export function createComputePipeline(
     }
     guardGroup = guardGroup + 1;
   }
-  const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayouts(device, layouts);
+  const layoutEntries: GPUBindGroupLayoutEntry[][] = nativeBindGroupLayoutEntries(layouts);
+  const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayouts(device, layoutEntries);
   using shader = device.createShaderModule({ code: wgsl });
   using layout = device.createPipelineLayout({ bindGroupLayouts: nativeLayouts });
-  const pipeline = device.createComputePipeline({
-    layout,
-    compute: { module: shader, entryPoint: entry },
-  });
+  const pipeline = device.createComputePipeline(computePipelineDescriptor(shader, layout, entry));
   let group: i32 = 0;
   while (group < nativeLayouts.length) {
     nativeLayouts[group].dispose();
     group = group + 1;
   }
-  return new ComputePipeline(
+  const guardQueue: GPUQueue | null = guardBuffers.length > 0 ? device.queue() : null;
+  return finishComputePipeline(
     pipeline,
     workgroup,
-    device,
-    guardBuffers.length > 0,
     guardGroups,
     guardBuffers,
+    guardQueue,
+  );
+}
+
+/** Creates inside the caller's validation error scope; this helper does not await. */
+export function createComputePipelineHost(
+  device: GPUHostOwnedDevice,
+  wgsl: string,
+  entry: string,
+  layouts: BindGroupLayoutSpec[],
+  workgroup: FixedArray<u32, 3>,
+): ComputePipeline {
+  const guardGroups: u32[] = [];
+  const guardBuffers: GPUBuffer[] = [];
+  let guardGroup: i32 = 0;
+  while (guardGroup < layouts.length) {
+    let guardEntry: i32 = 0;
+    while (guardEntry < layouts[guardGroup].entries.length) {
+      if (layouts[guardGroup].entries[guardEntry].kind === "guard") {
+        guardGroups.push(guardGroup as u32);
+        guardBuffers.push(device.createBuffer({
+          label: "typegpu-dispatch-guard",
+          size: 16,
+          usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
+        }));
+      }
+      guardEntry = guardEntry + 1;
+    }
+    guardGroup = guardGroup + 1;
+  }
+  const layoutEntries: GPUBindGroupLayoutEntry[][] = nativeBindGroupLayoutEntries(layouts);
+  const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayoutsHost(device, layoutEntries);
+  using shader = device.createShaderModule({ code: wgsl });
+  using layout = device.createPipelineLayout({ bindGroupLayouts: nativeLayouts });
+  const pipeline = device.createComputePipeline(computePipelineDescriptor(shader, layout, entry));
+  let group: i32 = 0;
+  while (group < nativeLayouts.length) {
+    nativeLayouts[group].dispose();
+    group = group + 1;
+  }
+  const guardQueue: GPUQueue | null = guardBuffers.length > 0 ? device.queue() : null;
+  return finishComputePipeline(
+    pipeline,
+    workgroup,
+    guardGroups,
+    guardBuffers,
+    guardQueue,
   );
 }
 
@@ -1277,51 +1440,57 @@ export function createRenderPipeline(
   vertexLayouts: VertexBufferLayoutSpec[],
   spec: RenderPipelineSpec,
 ): RenderPipeline {
-  const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayouts(device, layouts);
+  const layoutEntries: GPUBindGroupLayoutEntry[][] = nativeBindGroupLayoutEntries(layouts);
+  const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayouts(device, layoutEntries);
   let group: i32 = 0;
-  const nativeVertexLayouts: GPUVertexBufferLayout[] = [];
-  let slot: i32 = 0;
-  while (slot < vertexLayouts.length) {
-    const attributes: GPUVertexAttribute[] = [];
-    let attribute: i32 = 0;
-    while (attribute < vertexLayouts[slot].attributes.length) {
-      const source: VertexAttributeSpec = vertexLayouts[slot].attributes[attribute];
-      attributes.push({
-        format: source.format,
-        offset: source.offset,
-        shaderLocation: source.shaderLocation,
-      });
-      attribute = attribute + 1;
-    }
-    nativeVertexLayouts.push({
-      arrayStride: vertexLayouts[slot].arrayStride,
-      stepMode: vertexLayouts[slot].stepMode,
-      attributes,
-    });
-    slot = slot + 1;
-  }
+  const nativeVertexLayouts: GPUVertexBufferLayout[] = nativeVertexBufferLayouts(vertexLayouts);
   using shader = device.createShaderModule({ code: wgsl });
   using layout = device.createPipelineLayout({ bindGroupLayouts: nativeLayouts });
-  const pipeline = device.createRenderPipeline({
+  const pipeline = device.createRenderPipeline(renderPipelineDescriptor(
+    shader,
     layout,
-    vertex: { module: shader, entryPoint: vertexEntry, buffers: nativeVertexLayouts },
-    primitive: {
-      topology: spec.topology,
-      cullMode: spec.cullMode,
-      frontFace: spec.frontFace,
-    },
-    fragment: {
-      module: shader,
-      entryPoint: fragmentEntry,
-      targets: [{ format: spec.format }],
-    },
-  });
+    vertexEntry,
+    fragmentEntry,
+    nativeVertexLayouts,
+    spec,
+  ));
   group = 0;
   while (group < nativeLayouts.length) {
     nativeLayouts[group].dispose();
     group = group + 1;
   }
-  return new RenderPipeline(pipeline, spec.indexFormat);
+  return finishRenderPipeline(pipeline, spec);
+}
+
+/** Creates inside the caller's validation error scope; this helper does not await. */
+export function createRenderPipelineHost(
+  device: GPUHostOwnedDevice,
+  wgsl: string,
+  vertexEntry: string,
+  fragmentEntry: string,
+  layouts: BindGroupLayoutSpec[],
+  vertexLayouts: VertexBufferLayoutSpec[],
+  spec: RenderPipelineSpec,
+): RenderPipeline {
+  const layoutEntries: GPUBindGroupLayoutEntry[][] = nativeBindGroupLayoutEntries(layouts);
+  const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayoutsHost(device, layoutEntries);
+  const nativeVertexLayouts: GPUVertexBufferLayout[] = nativeVertexBufferLayouts(vertexLayouts);
+  using shader = device.createShaderModule({ code: wgsl });
+  using layout = device.createPipelineLayout({ bindGroupLayouts: nativeLayouts });
+  const pipeline = device.createRenderPipeline(renderPipelineDescriptor(
+    shader,
+    layout,
+    vertexEntry,
+    fragmentEntry,
+    nativeVertexLayouts,
+    spec,
+  ));
+  let group: i32 = 0;
+  while (group < nativeLayouts.length) {
+    nativeLayouts[group].dispose();
+    group = group + 1;
+  }
+  return finishRenderPipeline(pipeline, spec);
 }
 
 export const COMPUTE_VISIBILITY: u64 = GPUShaderStage.COMPUTE;

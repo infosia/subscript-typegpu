@@ -60,33 +60,29 @@ class CounterLayout {
   counter!: MutStorage<Counter>;
 }
 
-function count1dKernel(res: CounterLayout, ctx: ComputeInvocation): void {
+function countKernel(res: CounterLayout, ctx: ComputeInvocation): void {
   res.counter[0].value.add(1);
 }
 
-function count2dKernel(res: CounterLayout, ctx: ComputeInvocation): void {
-  res.counter[0].value.add(1);
-}
-
-function count3dKernel(res: CounterLayout, ctx: ComputeInvocation): void {
-  res.counter[0].value.add(1);
-}
+const DISPATCH_1D: FixedArray<u32, 3> = [13, 1, 1];
+const DISPATCH_2D: FixedArray<u32, 3> = [7, 5, 1];
+const DISPATCH_3D: FixedArray<u32, 3> = [5, 3, 3];
 
 // `guarded: true` makes the generator wrap the kernel body in a global-id bounds
 // check. TypeGPU adds the same check inside `createGuardedComputePipeline`.
-export const count1d: ComputePipelineSpec = computePipeline<CounterLayout>(count1dKernel, {
+export const count1d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
   name: "count1d",
   workgroupSize: [8, 1, 1],
   guarded: true,
 });
 
-export const count2d: ComputePipelineSpec = computePipeline<CounterLayout>(count2dKernel, {
+export const count2d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
   name: "count2d",
   workgroupSize: [4, 4, 1],
   guarded: true,
 });
 
-export const count3d: ComputePipelineSpec = computePipeline<CounterLayout>(count3dKernel, {
+export const count3d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
   name: "count3d",
   workgroupSize: [4, 2, 2],
   guarded: true,
@@ -183,9 +179,27 @@ export async function main(): Promise<void> {
       using encoder = device.createCommandEncoderDefault();
       // No workgroup size divides these counts, so the guard drops the extra invocations.
       // `dispatchThreads` writes the counts into the guard buffer before it records the pass.
-      firstPipeline.dispatchThreads(encoder, [firstGroup], 13, 1, 1);
-      secondPipeline.dispatchThreads(encoder, [secondGroup], 7, 5, 1);
-      thirdPipeline.dispatchThreads(encoder, [thirdGroup], 5, 3, 3);
+      firstPipeline.dispatchThreads(
+        encoder,
+        [firstGroup],
+        DISPATCH_1D[0],
+        DISPATCH_1D[1],
+        DISPATCH_1D[2],
+      );
+      secondPipeline.dispatchThreads(
+        encoder,
+        [secondGroup],
+        DISPATCH_2D[0],
+        DISPATCH_2D[1],
+        DISPATCH_2D[2],
+      );
+      thirdPipeline.dispatchThreads(
+        encoder,
+        [thirdGroup],
+        DISPATCH_3D[0],
+        DISPATCH_3D[1],
+        DISPATCH_3D[2],
+      );
       using command = encoder.finishDefault();
       queue.submit([command]);
 
@@ -202,7 +216,11 @@ export async function main(): Promise<void> {
       // Noop validates the guarded pipelines but leaves each counter zeroed.
       if (a === 0 && b === 0 && c === 0) {
         state = "noop";
-      } else if (a === 13 && b === 35 && c === 45) {
+      } else if (
+        a === DISPATCH_1D[0] * DISPATCH_1D[1] * DISPATCH_1D[2]
+        && b === DISPATCH_2D[0] * DISPATCH_2D[1] * DISPATCH_2D[2]
+        && c === DISPATCH_3D[0] * DISPATCH_3D[1] * DISPATCH_3D[2]
+      ) {
         state = "pass";
       }
     }

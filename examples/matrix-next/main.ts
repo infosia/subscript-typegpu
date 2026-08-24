@@ -97,7 +97,6 @@ function tiledKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
     total += leftTile[ctx.localId.y * 4 + inner]
       * rightTile[inner * 4 + ctx.localId.x];
   }
-  workgroupBarrier();
   res.product[0].body[(ctx.globalId.y * 4 + ctx.globalId.x) as i32] = total;
 }
 
@@ -271,8 +270,8 @@ export async function main(): Promise<void> {
         1,
         naive_HOST_RUNNABLE,
       );
-      const naiveBytes: u8[] = await naiveOutput.read(device, 0, 1);
-      const tiledBytes: u8[] = await tiledOutput.read(device, 0, 1);
+      const naiveBytes: u8[] = await naiveOutput.readOne(device, 0);
+      const tiledBytes: u8[] = await tiledOutput.readOne(device, 0);
       const naiveActual: Matrix = Context.fromBytes<Matrix>(naiveBytes, 0);
       const tiledActual: Matrix = Context.fromBytes<Matrix>(tiledBytes, 0);
       const expected: Matrix = host.product.get(0);

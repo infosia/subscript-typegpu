@@ -7,6 +7,7 @@ import {
   FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
+  createRenderPipelineHost,
   VertexInvocation,
   renderPipeline,
 } from "./typegpu";
@@ -18,14 +19,12 @@ import {
   GPUBuffer,
   GPUBufferUsage,
   GPUHostOwnedDevice,
-  GPURenderPipeline,
   GPUTextureView,
   hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   Vertex_STRIDE,
   square_FRAGMENT_ENTRY,
-  square_INDEX_FORMAT,
   square_TARGET_FORMAT,
   square_VERTEX_ENTRY,
   square_VERTEX_LAYOUT0,
@@ -79,7 +78,6 @@ let activeDevice: GPUHostOwnedDevice | null = null;
 let activePipeline: RenderPipeline | null = null;
 let activeVertices: GPUBuffer | null = null;
 let activeIndices: GPUBuffer | null = null;
-let frameCount: u32 = 0;
 
 export function init(
   instance: SubscriptTypegpuInstance,
@@ -114,44 +112,18 @@ export function init(
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 4>>(values));
   queue.writeBuffer(indexBuffer, 0, Context.bytesOf<FixedArray<u16, 6>>(indices));
   hostDevice.pushErrorScope("validation");
-  using shader = hostDevice.createShaderModule({ code: square_WGSL });
-  using layout = hostDevice.createPipelineLayout({ bindGroupLayouts: [] });
-  const nativePipeline: GPURenderPipeline = hostDevice.createRenderPipeline({
-    layout,
-    vertex: {
-      module: shader,
-      entryPoint: square_VERTEX_ENTRY,
-      buffers: [{
-        arrayStride: square_VERTEX_LAYOUT0.arrayStride,
-        stepMode: square_VERTEX_LAYOUT0.stepMode,
-        attributes: [
-          {
-            format: square_VERTEX_LAYOUT0.attributes[0].format,
-            offset: square_VERTEX_LAYOUT0.attributes[0].offset,
-            shaderLocation: square_VERTEX_LAYOUT0.attributes[0].shaderLocation,
-          },
-          {
-            format: square_VERTEX_LAYOUT0.attributes[1].format,
-            offset: square_VERTEX_LAYOUT0.attributes[1].offset,
-            shaderLocation: square_VERTEX_LAYOUT0.attributes[1].shaderLocation,
-          },
-        ],
-      }],
-    },
-    primitive: {
-      topology: square.topology,
-      cullMode: square.cullMode,
-      frontFace: square.frontFace,
-    },
-    fragment: {
-      module: shader,
-      entryPoint: square_FRAGMENT_ENTRY,
-      targets: [{ format: square_TARGET_FORMAT }],
-    },
-  });
+  const createdPipeline = createRenderPipelineHost(
+    hostDevice,
+    square_WGSL,
+    square_VERTEX_ENTRY,
+    square_FRAGMENT_ENTRY,
+    [],
+    [square_VERTEX_LAYOUT0],
+    square,
+  );
   const validationError = hostDevice.popErrorScope();
   if (validationError !== null) {
-    nativePipeline.dispose();
+    createdPipeline.dispose();
     indexBuffer.dispose();
     vertices.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
@@ -160,7 +132,7 @@ export function init(
   activeDevice = hostDevice;
   activeVertices = vertices;
   activeIndices = indexBuffer;
-  activePipeline = new RenderPipeline(nativePipeline, square_INDEX_FORMAT);
+  activePipeline = createdPipeline;
 }
 
 export function frame(
@@ -185,7 +157,6 @@ export function frame(
   if (indices === null) {
     return;
   }
-  frameCount += 1;
   const target = new GPUTextureView(view);
   using encoder = device.createCommandEncoderDefault();
   using pass = encoder.beginRenderPass({

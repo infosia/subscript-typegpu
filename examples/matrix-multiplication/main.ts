@@ -60,7 +60,6 @@ class MatrixLayout {
 function multiplyKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
   const left: Matrix = res.left.get(0);
   const right: Matrix = res.right.get(0);
-  const output: Matrix = res.product.get(0);
   for (let row: u32 = 0; row < left.size.x; row += 1) {
     for (let column: u32 = 0; column < right.size.y; column += 1) {
       let total: f32 = 0.0;
@@ -68,10 +67,9 @@ function multiplyKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
         total += left.body[(row * left.size.y + inner) as i32]
           * right.body[(inner * right.size.y + column) as i32];
       }
-      output.body[(row * right.size.y + column) as i32] = total;
+      res.product[0].body[(row * right.size.y + column) as i32] = total;
     }
   }
-  res.product.set(0, output);
 }
 
 export const multiply: ComputePipelineSpec = computePipeline<MatrixLayout>(
@@ -221,7 +219,7 @@ export async function main(): Promise<void> {
       );
       // The read copies into a staging buffer and awaits the map. TypeGPU's `buffer.read`
       // hides the same two steps.
-      const bytes: u8[] = await product.read(device, 0, 1);
+      const bytes: u8[] = await product.readOne(device, 0);
       const actual: Matrix = Context.fromBytes<Matrix>(bytes, 0);
       const expected: Matrix = host.product.get(0);
       print(`product:first=${actual.body[0]} last=${actual.body[15]}`);

@@ -7,6 +7,7 @@ import {
   FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
+  createRenderPipelineHost,
   VertexInvocation,
   renderPipeline,
 } from "./typegpu";
@@ -18,7 +19,6 @@ import {
   GPUBuffer,
   GPUBufferUsage,
   GPUHostOwnedDevice,
-  GPURenderPipeline,
   GPUTextureView,
   hostOwnedGPUDevice,
 } from "./webgpu";
@@ -82,7 +82,6 @@ export const tiles: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
 let activeDevice: GPUHostOwnedDevice | null = null;
 let activePipeline: RenderPipeline | null = null;
 let activeVertices: GPUBuffer | null = null;
-let frameCount: u32 = 0;
 
 export function init(
   instance: SubscriptTypegpuInstance,
@@ -110,44 +109,25 @@ export function init(
   // entry names and the generated vertex layout. TypeGPU's `root.createRenderPipeline`
   // covers the same step.
   hostDevice.pushErrorScope("validation");
-  using shader = hostDevice.createShaderModule({ code: tiles_WGSL });
-  using layout = hostDevice.createPipelineLayout({ bindGroupLayouts: [] });
-  const nativePipeline: GPURenderPipeline = hostDevice.createRenderPipeline({
-    layout,
-    vertex: {
-      module: shader,
-      entryPoint: tiles_VERTEX_ENTRY,
-      buffers: [{
-        arrayStride: tiles_VERTEX_LAYOUT0.arrayStride,
-        stepMode: tiles_VERTEX_LAYOUT0.stepMode,
-        attributes: [{
-          format: tiles_VERTEX_LAYOUT0.attributes[0].format,
-          offset: tiles_VERTEX_LAYOUT0.attributes[0].offset,
-          shaderLocation: tiles_VERTEX_LAYOUT0.attributes[0].shaderLocation,
-        }],
-      }],
-    },
-    primitive: {
-      topology: tiles.topology,
-      cullMode: tiles.cullMode,
-      frontFace: tiles.frontFace,
-    },
-    fragment: {
-      module: shader,
-      entryPoint: tiles_FRAGMENT_ENTRY,
-      targets: [{ format: tiles_TARGET_FORMAT }],
-    },
-  });
+  const createdPipeline = createRenderPipelineHost(
+    hostDevice,
+    tiles_WGSL,
+    tiles_VERTEX_ENTRY,
+    tiles_FRAGMENT_ENTRY,
+    [],
+    [tiles_VERTEX_LAYOUT0],
+    tiles,
+  );
   const validationError = hostDevice.popErrorScope();
   if (validationError !== null) {
-    nativePipeline.dispose();
+    createdPipeline.dispose();
     vertices.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
   activeDevice = hostDevice;
   activeVertices = vertices;
-  activePipeline = new RenderPipeline(nativePipeline, "undefined");
+  activePipeline = createdPipeline;
 }
 
 export function frame(
@@ -168,7 +148,6 @@ export function frame(
   if (vertices === null) {
     return;
   }
-  frameCount += 1;
   const target = new GPUTextureView(view);
   using encoder = device.createCommandEncoderDefault();
   using pass = encoder.beginRenderPass({

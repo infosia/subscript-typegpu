@@ -4,13 +4,17 @@
 
 import {
   ComputeInvocation,
+  ComputePipeline,
   ComputePipelineSpec,
   FragmentInvocation,
   MutStorage,
   RenderPipelineSpec,
+  RenderPipeline,
   Storage,
   VertexInvocation,
   computePipeline,
+  createComputePipelineHost,
+  createRenderPipelineHost,
   renderPipelineInstanced,
 } from "./typegpu";
 import {
@@ -21,9 +25,7 @@ import {
   GPUBindGroup,
   GPUBuffer,
   GPUBufferUsage,
-  GPUComputePipeline,
   GPUHostOwnedDevice,
-  GPURenderPipeline,
   GPUTextureView,
   hostOwnedGPUDevice,
 } from "./webgpu";
@@ -170,14 +172,13 @@ export const boidRender: RenderPipelineSpec = renderPipelineInstanced<
 >(boidVertex, boidFragment, { format: "bgra8unorm" });
 
 let activeDevice: GPUHostOwnedDevice | null = null;
-let activeCompute: GPUComputePipeline | null = null;
-let activeRender: GPURenderPipeline | null = null;
+let activeCompute: ComputePipeline | null = null;
+let activeRender: RenderPipeline | null = null;
 let activeGroupAB: GPUBindGroup | null = null;
 let activeGroupBA: GPUBindGroup | null = null;
 let activeVertices: GPUBuffer | null = null;
 let activeBoidsA: GPUBuffer | null = null;
 let activeBoidsB: GPUBuffer | null = null;
-let activeGuard: GPUBuffer | null = null;
 let frameCount: u32 = 0;
 
 export function init(
@@ -210,18 +211,8 @@ export function init(
     size: (Boid_STRIDE * BOID_COUNT) as u64,
     usage: GPUBufferUsage.STORAGE + GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
-  const guard = hostDevice.createBuffer({
-    label: "boids-dispatch-guard",
-    size: 16,
-    usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
-  });
   using queue = hostDevice.queue();
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>(vertexValues));
-  queue.writeBuffer(
-    guard,
-    0,
-    Context.bytesOf<FixedArray<u32, 4>>([BOID_COUNT, 1, 1, 0]),
-  );
   for (let index: u32 = 0; index < BOID_COUNT; index += 1) {
     const column: f32 = (index % 12) as f32;
     const row: f32 = (index / 12) as f32;
@@ -236,92 +227,42 @@ export function init(
     queue.writeBuffer(boidsB, offset, bytes);
   }
 
-  using computeBindLayout = hostDevice.createBindGroupLayout({
-    entries: [
-      {
-        binding: boidUpdate_LAYOUT0.entries[0].binding,
-        visibility: boidUpdate_LAYOUT0.entries[0].visibility,
-        buffer: {
-          type: "read-only-storage",
-          minBindingSize: boidUpdate_LAYOUT0.entries[0].minBindingSize,
-        },
-      },
-      {
-        binding: boidUpdate_LAYOUT0.entries[1].binding,
-        visibility: boidUpdate_LAYOUT0.entries[1].visibility,
-        buffer: {
-          type: "storage",
-          minBindingSize: boidUpdate_LAYOUT0.entries[1].minBindingSize,
-        },
-      },
-      {
-        binding: boidUpdate_LAYOUT0.entries[2].binding,
-        visibility: boidUpdate_LAYOUT0.entries[2].visibility,
-        buffer: {
-          type: "uniform",
-          minBindingSize: boidUpdate_LAYOUT0.entries[2].minBindingSize,
-        },
-      },
-    ],
-  });
-  using computeLayout = hostDevice.createPipelineLayout({ bindGroupLayouts: [computeBindLayout] });
-  using renderLayout = hostDevice.createPipelineLayout({ bindGroupLayouts: [] });
   hostDevice.pushErrorScope("validation");
-  using computeShader = hostDevice.createShaderModule({ code: boidUpdate_WGSL });
-  const computePipeline = hostDevice.createComputePipeline({
-    layout: computeLayout,
-    compute: { module: computeShader, entryPoint: boidUpdate_ENTRY },
-  });
-  using renderShader = hostDevice.createShaderModule({ code: boidRender_WGSL });
-  const renderPipeline = hostDevice.createRenderPipeline({
-    layout: renderLayout,
-    vertex: {
-      module: renderShader,
-      entryPoint: boidRender_VERTEX_ENTRY,
-      buffers: [
-        {
-          arrayStride: boidRender_VERTEX_LAYOUT0.arrayStride,
-          stepMode: boidRender_VERTEX_LAYOUT0.stepMode,
-          attributes: [{
-            format: boidRender_VERTEX_LAYOUT0.attributes[0].format,
-            offset: boidRender_VERTEX_LAYOUT0.attributes[0].offset,
-            shaderLocation: boidRender_VERTEX_LAYOUT0.attributes[0].shaderLocation,
-          }],
-        },
-        {
-          arrayStride: boidRender_VERTEX_LAYOUT1.arrayStride,
-          stepMode: boidRender_VERTEX_LAYOUT1.stepMode,
-          attributes: [
-            {
-              format: boidRender_VERTEX_LAYOUT1.attributes[0].format,
-              offset: boidRender_VERTEX_LAYOUT1.attributes[0].offset,
-              shaderLocation: boidRender_VERTEX_LAYOUT1.attributes[0].shaderLocation,
-            },
-            {
-              format: boidRender_VERTEX_LAYOUT1.attributes[1].format,
-              offset: boidRender_VERTEX_LAYOUT1.attributes[1].offset,
-              shaderLocation: boidRender_VERTEX_LAYOUT1.attributes[1].shaderLocation,
-            },
-          ],
-        },
-      ],
-    },
-    primitive: { topology: boidRender.topology },
-    fragment: {
-      module: renderShader,
-      entryPoint: boidRender_FRAGMENT_ENTRY,
-      targets: [{ format: boidRender_TARGET_FORMAT }],
-    },
-  });
+  const computePipeline = createComputePipelineHost(
+    hostDevice,
+    boidUpdate_WGSL,
+    boidUpdate_ENTRY,
+    [boidUpdate_LAYOUT0],
+    [64, 1, 1],
+  );
+  const renderPipeline = createRenderPipelineHost(
+    hostDevice,
+    boidRender_WGSL,
+    boidRender_VERTEX_ENTRY,
+    boidRender_FRAGMENT_ENTRY,
+    [],
+    [boidRender_VERTEX_LAYOUT0, boidRender_VERTEX_LAYOUT1],
+    boidRender,
+  );
   const validationError = hostDevice.popErrorScope();
   if (validationError !== null) {
     renderPipeline.dispose();
     computePipeline.dispose();
-    guard.dispose();
     boidsB.dispose();
     boidsA.dispose();
     vertices.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
+    return;
+  }
+  using computeBindLayout = computePipeline.bindGroupLayout(0);
+  const guard = computePipeline.guardBuffer(0);
+  if (guard === null) {
+    renderPipeline.dispose();
+    computePipeline.dispose();
+    boidsB.dispose();
+    boidsA.dispose();
+    vertices.dispose();
+    print("FAIL guard missing");
     return;
   }
   const groupAB = hostDevice.createBindGroup({
@@ -348,7 +289,6 @@ export function init(
   activeVertices = vertices;
   activeBoidsA = boidsA;
   activeBoidsB = boidsB;
-  activeGuard = guard;
 }
 
 export function frame(
@@ -379,11 +319,7 @@ export function frame(
   const instanceBuffer: GPUBuffer = useAB ? boidsB : boidsA;
   frameCount += 1;
   using encoder = device.createCommandEncoderDefault();
-  using computePass = encoder.beginComputePassDefault();
-  computePass.setPipeline(computePipeline);
-  computePass.setBindGroup(0, computeGroup);
-  computePass.dispatchWorkgroups((BOID_COUNT + 63) / 64, 1, 1);
-  computePass.end();
+  computePipeline.dispatchThreads(encoder, [computeGroup], BOID_COUNT, 1, 1);
   const target = new GPUTextureView(view);
   using renderPass = encoder.beginRenderPass({
     colorAttachments: [{
@@ -395,9 +331,7 @@ export function frame(
   });
   renderPass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   renderPass.setScissorRect(0, 0, width, height);
-  renderPass.setPipeline(renderPipeline);
-  renderPass.setVertexBuffer(0, vertices, 0, vertices.size());
-  renderPass.setVertexBuffer(1, instanceBuffer, 0, instanceBuffer.size());
+  renderPipeline.bind(renderPass, [], [vertices, instanceBuffer]);
   renderPass.draw(3, BOID_COUNT);
   renderPass.end();
   using command = encoder.finishDefault();
@@ -408,7 +342,6 @@ export function frame(
 export function shutdown(): void {
   if (activeGroupBA !== null) activeGroupBA.dispose();
   if (activeGroupAB !== null) activeGroupAB.dispose();
-  if (activeGuard !== null) activeGuard.dispose();
   if (activeBoidsB !== null) activeBoidsB.dispose();
   if (activeBoidsA !== null) activeBoidsA.dispose();
   if (activeVertices !== null) activeVertices.dispose();
@@ -416,7 +349,6 @@ export function shutdown(): void {
   if (activeCompute !== null) activeCompute.dispose();
   activeGroupBA = null;
   activeGroupAB = null;
-  activeGuard = null;
   activeBoidsB = null;
   activeBoidsA = null;
   activeVertices = null;

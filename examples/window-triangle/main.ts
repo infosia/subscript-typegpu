@@ -7,6 +7,7 @@ import {
   FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
+  createRenderPipelineHost,
   renderPipeline,
   VertexInvocation,
 } from "./typegpu";
@@ -18,7 +19,6 @@ import {
   GPUBuffer,
   GPUBufferUsage,
   GPUHostOwnedDevice,
-  GPURenderPipeline,
   GPUTextureView,
   hostOwnedGPUDevice,
 } from "./webgpu";
@@ -93,44 +93,25 @@ export function init(
     Context.bytesOf<FixedArray<Vertex, 3>>(values),
   );
   deviceWrapper.pushErrorScope("validation");
-  using shader = deviceWrapper.createShaderModule({ code: tri_WGSL });
-  using layout = deviceWrapper.createPipelineLayout({ bindGroupLayouts: [] });
-  const nativePipeline: GPURenderPipeline = deviceWrapper.createRenderPipeline({
-    layout,
-    vertex: {
-      module: shader,
-      entryPoint: tri_VERTEX_ENTRY,
-      buffers: [{
-        arrayStride: tri_VERTEX_LAYOUT0.arrayStride,
-        stepMode: tri_VERTEX_LAYOUT0.stepMode,
-        attributes: [{
-          format: tri_VERTEX_LAYOUT0.attributes[0].format,
-          offset: tri_VERTEX_LAYOUT0.attributes[0].offset,
-          shaderLocation: tri_VERTEX_LAYOUT0.attributes[0].shaderLocation,
-        }],
-      }],
-    },
-    primitive: {
-      topology: tri.topology,
-      cullMode: tri.cullMode,
-      frontFace: tri.frontFace,
-    },
-    fragment: {
-      module: shader,
-      entryPoint: tri_FRAGMENT_ENTRY,
-      targets: [{ format: tri_TARGET_FORMAT }],
-    },
-  });
+  const createdPipeline = createRenderPipelineHost(
+    deviceWrapper,
+    tri_WGSL,
+    tri_VERTEX_ENTRY,
+    tri_FRAGMENT_ENTRY,
+    [],
+    [tri_VERTEX_LAYOUT0],
+    tri,
+  );
   const validationError = deviceWrapper.popErrorScope();
   if (validationError !== null) {
-    nativePipeline.dispose();
+    createdPipeline.dispose();
     vertices.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
   ownedDevice = deviceWrapper;
   vertexBuffer = vertices;
-  pipeline = new RenderPipeline(nativePipeline, "undefined");
+  pipeline = createdPipeline;
 }
 
 export function frame(

@@ -4,14 +4,18 @@
 
 import {
   ComputeInvocation,
+  ComputePipeline,
   ComputePipelineSpec,
   FragmentInvocation,
   MutStorage,
   RenderPipelineSpec,
+  RenderPipeline,
   Storage,
   Uniform,
   VertexInvocation,
   computePipeline,
+  createComputePipelineHost,
+  createRenderPipelineHost,
   renderPipelineL,
 } from "./typegpu";
 import {
@@ -22,9 +26,7 @@ import {
   GPUBindGroup,
   GPUBuffer,
   GPUBufferUsage,
-  GPUComputePipeline,
   GPUHostOwnedDevice,
-  GPURenderPipeline,
   GPUTextureView,
   hostOwnedGPUDevice,
 } from "./webgpu";
@@ -33,6 +35,7 @@ import {
   FluidParams_SIZE,
   Vertex_STRIDE,
   evaporate_ENTRY,
+  evaporate_LAYOUT0,
   evaporate_WGSL,
   flow_ENTRY,
   flow_LAYOUT0,
@@ -44,6 +47,7 @@ import {
   fluidRender_VERTEX_LAYOUT0,
   fluidRender_WGSL,
   obstacle_ENTRY,
+  obstacle_LAYOUT0,
   obstacle_WGSL,
 } from "./main.typegpu";
 
@@ -204,12 +208,16 @@ export const fluidRender: RenderPipelineSpec = renderPipelineL<
 >(fluidVertex, fluidFragment, { format: "bgra8unorm" });
 
 let activeDevice: GPUHostOwnedDevice | null = null;
-let activeFlow: GPUComputePipeline | null = null;
-let activeEvaporate: GPUComputePipeline | null = null;
-let activeObstacle: GPUComputePipeline | null = null;
-let activeRender: GPURenderPipeline | null = null;
-let activeComputeAB: GPUBindGroup | null = null;
-let activeComputeBA: GPUBindGroup | null = null;
+let activeFlow: ComputePipeline | null = null;
+let activeEvaporate: ComputePipeline | null = null;
+let activeObstacle: ComputePipeline | null = null;
+let activeRender: RenderPipeline | null = null;
+let activeFlowAB: GPUBindGroup | null = null;
+let activeFlowBA: GPUBindGroup | null = null;
+let activeEvaporateAB: GPUBindGroup | null = null;
+let activeEvaporateBA: GPUBindGroup | null = null;
+let activeObstacleAB: GPUBindGroup | null = null;
+let activeObstacleBA: GPUBindGroup | null = null;
 let activeRenderA: GPUBindGroup | null = null;
 let activeRenderB: GPUBindGroup | null = null;
 let activeVertices: GPUBuffer | null = null;
@@ -269,76 +277,37 @@ export function init(
     queue.writeBuffer(cellsB, offset, bytes);
   }
 
-  using computeBindLayout = hostDevice.createBindGroupLayout({
-    entries: [
-      {
-        binding: flow_LAYOUT0.entries[0].binding,
-        visibility: flow_LAYOUT0.entries[0].visibility,
-        buffer: { type: "read-only-storage", minBindingSize: flow_LAYOUT0.entries[0].minBindingSize },
-      },
-      {
-        binding: flow_LAYOUT0.entries[1].binding,
-        visibility: flow_LAYOUT0.entries[1].visibility,
-        buffer: { type: "storage", minBindingSize: flow_LAYOUT0.entries[1].minBindingSize },
-      },
-      {
-        binding: flow_LAYOUT0.entries[2].binding,
-        visibility: flow_LAYOUT0.entries[2].visibility,
-        buffer: { type: "uniform", minBindingSize: flow_LAYOUT0.entries[2].minBindingSize },
-      },
-    ],
-  });
-  using renderBindLayout = hostDevice.createBindGroupLayout({
-    entries: [{
-      binding: fluidRender_LAYOUT0.entries[0].binding,
-      visibility: fluidRender_LAYOUT0.entries[0].visibility,
-      buffer: {
-        type: "read-only-storage",
-        minBindingSize: fluidRender_LAYOUT0.entries[0].minBindingSize,
-      },
-    }],
-  });
-  using computeLayout = hostDevice.createPipelineLayout({ bindGroupLayouts: [computeBindLayout] });
-  using renderLayout = hostDevice.createPipelineLayout({ bindGroupLayouts: [renderBindLayout] });
   hostDevice.pushErrorScope("validation");
-  using flowShader = hostDevice.createShaderModule({ code: flow_WGSL });
-  const flowPipeline = hostDevice.createComputePipeline({
-    layout: computeLayout,
-    compute: { module: flowShader, entryPoint: flow_ENTRY },
-  });
-  using evaporateShader = hostDevice.createShaderModule({ code: evaporate_WGSL });
-  const evaporatePipeline = hostDevice.createComputePipeline({
-    layout: computeLayout,
-    compute: { module: evaporateShader, entryPoint: evaporate_ENTRY },
-  });
-  using obstacleShader = hostDevice.createShaderModule({ code: obstacle_WGSL });
-  const obstaclePipeline = hostDevice.createComputePipeline({
-    layout: computeLayout,
-    compute: { module: obstacleShader, entryPoint: obstacle_ENTRY },
-  });
-  using renderShader = hostDevice.createShaderModule({ code: fluidRender_WGSL });
-  const renderPipeline = hostDevice.createRenderPipeline({
-    layout: renderLayout,
-    vertex: {
-      module: renderShader,
-      entryPoint: fluidRender_VERTEX_ENTRY,
-      buffers: [{
-        arrayStride: fluidRender_VERTEX_LAYOUT0.arrayStride,
-        stepMode: fluidRender_VERTEX_LAYOUT0.stepMode,
-        attributes: [{
-          format: fluidRender_VERTEX_LAYOUT0.attributes[0].format,
-          offset: fluidRender_VERTEX_LAYOUT0.attributes[0].offset,
-          shaderLocation: fluidRender_VERTEX_LAYOUT0.attributes[0].shaderLocation,
-        }],
-      }],
-    },
-    primitive: { topology: fluidRender.topology },
-    fragment: {
-      module: renderShader,
-      entryPoint: fluidRender_FRAGMENT_ENTRY,
-      targets: [{ format: fluidRender_TARGET_FORMAT }],
-    },
-  });
+  const flowPipeline = createComputePipelineHost(
+    hostDevice,
+    flow_WGSL,
+    flow_ENTRY,
+    [flow_LAYOUT0],
+    [8, 8, 1],
+  );
+  const evaporatePipeline = createComputePipelineHost(
+    hostDevice,
+    evaporate_WGSL,
+    evaporate_ENTRY,
+    [evaporate_LAYOUT0],
+    [8, 8, 1],
+  );
+  const obstaclePipeline = createComputePipelineHost(
+    hostDevice,
+    obstacle_WGSL,
+    obstacle_ENTRY,
+    [obstacle_LAYOUT0],
+    [8, 8, 1],
+  );
+  const renderPipeline = createRenderPipelineHost(
+    hostDevice,
+    fluidRender_WGSL,
+    fluidRender_VERTEX_ENTRY,
+    fluidRender_FRAGMENT_ENTRY,
+    [fluidRender_LAYOUT0],
+    [fluidRender_VERTEX_LAYOUT0],
+    fluidRender,
+  );
   const validationError = hostDevice.popErrorScope();
   if (validationError !== null) {
     renderPipeline.dispose();
@@ -352,20 +321,56 @@ export function init(
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
-  const computeAB = hostDevice.createBindGroup({
-    layout: computeBindLayout,
+  using flowBindLayout = flowPipeline.bindGroupLayout(0);
+  using evaporateBindLayout = evaporatePipeline.bindGroupLayout(0);
+  using obstacleBindLayout = obstaclePipeline.bindGroupLayout(0);
+  using renderBindLayout = renderPipeline.bindGroupLayout(0);
+  const flowAB = hostDevice.createBindGroup({
+    layout: flowBindLayout,
     entries: [
       { binding: flow_LAYOUT0.entries[0].binding, buffer: cellsA, size: cellsA.size() },
       { binding: flow_LAYOUT0.entries[1].binding, buffer: cellsB, size: cellsB.size() },
       { binding: flow_LAYOUT0.entries[2].binding, buffer: params, size: FluidParams_SIZE as u64 },
     ],
   });
-  const computeBA = hostDevice.createBindGroup({
-    layout: computeBindLayout,
+  const flowBA = hostDevice.createBindGroup({
+    layout: flowBindLayout,
     entries: [
       { binding: flow_LAYOUT0.entries[0].binding, buffer: cellsB, size: cellsB.size() },
       { binding: flow_LAYOUT0.entries[1].binding, buffer: cellsA, size: cellsA.size() },
       { binding: flow_LAYOUT0.entries[2].binding, buffer: params, size: FluidParams_SIZE as u64 },
+    ],
+  });
+  const evaporateAB = hostDevice.createBindGroup({
+    layout: evaporateBindLayout,
+    entries: [
+      { binding: evaporate_LAYOUT0.entries[0].binding, buffer: cellsA, size: cellsA.size() },
+      { binding: evaporate_LAYOUT0.entries[1].binding, buffer: cellsB, size: cellsB.size() },
+      { binding: evaporate_LAYOUT0.entries[2].binding, buffer: params, size: FluidParams_SIZE as u64 },
+    ],
+  });
+  const evaporateBA = hostDevice.createBindGroup({
+    layout: evaporateBindLayout,
+    entries: [
+      { binding: evaporate_LAYOUT0.entries[0].binding, buffer: cellsB, size: cellsB.size() },
+      { binding: evaporate_LAYOUT0.entries[1].binding, buffer: cellsA, size: cellsA.size() },
+      { binding: evaporate_LAYOUT0.entries[2].binding, buffer: params, size: FluidParams_SIZE as u64 },
+    ],
+  });
+  const obstacleAB = hostDevice.createBindGroup({
+    layout: obstacleBindLayout,
+    entries: [
+      { binding: obstacle_LAYOUT0.entries[0].binding, buffer: cellsA, size: cellsA.size() },
+      { binding: obstacle_LAYOUT0.entries[1].binding, buffer: cellsB, size: cellsB.size() },
+      { binding: obstacle_LAYOUT0.entries[2].binding, buffer: params, size: FluidParams_SIZE as u64 },
+    ],
+  });
+  const obstacleBA = hostDevice.createBindGroup({
+    layout: obstacleBindLayout,
+    entries: [
+      { binding: obstacle_LAYOUT0.entries[0].binding, buffer: cellsB, size: cellsB.size() },
+      { binding: obstacle_LAYOUT0.entries[1].binding, buffer: cellsA, size: cellsA.size() },
+      { binding: obstacle_LAYOUT0.entries[2].binding, buffer: params, size: FluidParams_SIZE as u64 },
     ],
   });
   const renderA = hostDevice.createBindGroup({
@@ -389,8 +394,12 @@ export function init(
   activeEvaporate = evaporatePipeline;
   activeObstacle = obstaclePipeline;
   activeRender = renderPipeline;
-  activeComputeAB = computeAB;
-  activeComputeBA = computeBA;
+  activeFlowAB = flowAB;
+  activeFlowBA = flowBA;
+  activeEvaporateAB = evaporateAB;
+  activeEvaporateBA = evaporateBA;
+  activeObstacleAB = obstacleAB;
+  activeObstacleBA = obstacleBA;
   activeRenderA = renderA;
   activeRenderB = renderB;
   activeVertices = vertices;
@@ -410,8 +419,12 @@ export function frame(
   const evaporatePipeline = activeEvaporate;
   const obstaclePipeline = activeObstacle;
   const renderPipeline = activeRender;
-  const computeAB = activeComputeAB;
-  const computeBA = activeComputeBA;
+  const flowAB = activeFlowAB;
+  const flowBA = activeFlowBA;
+  const evaporateAB = activeEvaporateAB;
+  const evaporateBA = activeEvaporateBA;
+  const obstacleAB = activeObstacleAB;
+  const obstacleBA = activeObstacleBA;
   const renderA = activeRenderA;
   const renderB = activeRenderB;
   const vertices = activeVertices;
@@ -421,8 +434,12 @@ export function frame(
   if (evaporatePipeline === null) return;
   if (obstaclePipeline === null) return;
   if (renderPipeline === null) return;
-  if (computeAB === null) return;
-  if (computeBA === null) return;
+  if (flowAB === null) return;
+  if (flowBA === null) return;
+  if (evaporateAB === null) return;
+  if (evaporateBA === null) return;
+  if (obstacleAB === null) return;
+  if (obstacleBA === null) return;
   if (renderA === null) return;
   if (renderB === null) return;
   if (vertices === null) return;
@@ -441,26 +458,14 @@ export function frame(
   );
   const even: boolean = frameCount % 2 === 1;
   // The next frame reverses all buffer roles and preserves the three-pass sequence.
-  const firstGroup: GPUBindGroup = even ? computeAB : computeBA;
-  const secondGroup: GPUBindGroup = even ? computeBA : computeAB;
-  const finalGroup: GPUBindGroup = firstGroup;
+  const flowGroup: GPUBindGroup = even ? flowAB : flowBA;
+  const evaporateGroup: GPUBindGroup = even ? evaporateBA : evaporateAB;
+  const obstacleGroup: GPUBindGroup = even ? obstacleAB : obstacleBA;
   const displayGroup: GPUBindGroup = even ? renderB : renderA;
   using encoder = device.createCommandEncoderDefault();
-  using flowPass = encoder.beginComputePassDefault();
-  flowPass.setPipeline(flowPipeline);
-  flowPass.setBindGroup(0, firstGroup);
-  flowPass.dispatchWorkgroups(GRID_SIZE / 8, GRID_SIZE / 8, 1);
-  flowPass.end();
-  using evaporatePass = encoder.beginComputePassDefault();
-  evaporatePass.setPipeline(evaporatePipeline);
-  evaporatePass.setBindGroup(0, secondGroup);
-  evaporatePass.dispatchWorkgroups(GRID_SIZE / 8, GRID_SIZE / 8, 1);
-  evaporatePass.end();
-  using obstaclePass = encoder.beginComputePassDefault();
-  obstaclePass.setPipeline(obstaclePipeline);
-  obstaclePass.setBindGroup(0, finalGroup);
-  obstaclePass.dispatchWorkgroups(GRID_SIZE / 8, GRID_SIZE / 8, 1);
-  obstaclePass.end();
+  flowPipeline.dispatch(encoder, [flowGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
+  evaporatePipeline.dispatch(encoder, [evaporateGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
+  obstaclePipeline.dispatch(encoder, [obstacleGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
   const target = new GPUTextureView(view);
   using renderPass = encoder.beginRenderPass({
     colorAttachments: [{
@@ -472,9 +477,7 @@ export function frame(
   });
   renderPass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   renderPass.setScissorRect(0, 0, width, height);
-  renderPass.setPipeline(renderPipeline);
-  renderPass.setBindGroup(0, displayGroup);
-  renderPass.setVertexBuffer(0, vertices, 0, vertices.size());
+  renderPipeline.bind(renderPass, [displayGroup], [vertices]);
   renderPass.draw(3);
   renderPass.end();
   using command = encoder.finishDefault();
@@ -484,8 +487,12 @@ export function frame(
 export function shutdown(): void {
   if (activeRenderB !== null) activeRenderB.dispose();
   if (activeRenderA !== null) activeRenderA.dispose();
-  if (activeComputeBA !== null) activeComputeBA.dispose();
-  if (activeComputeAB !== null) activeComputeAB.dispose();
+  if (activeObstacleBA !== null) activeObstacleBA.dispose();
+  if (activeObstacleAB !== null) activeObstacleAB.dispose();
+  if (activeEvaporateBA !== null) activeEvaporateBA.dispose();
+  if (activeEvaporateAB !== null) activeEvaporateAB.dispose();
+  if (activeFlowBA !== null) activeFlowBA.dispose();
+  if (activeFlowAB !== null) activeFlowAB.dispose();
   if (activeParams !== null) activeParams.dispose();
   if (activeCellsB !== null) activeCellsB.dispose();
   if (activeCellsA !== null) activeCellsA.dispose();
@@ -496,8 +503,12 @@ export function shutdown(): void {
   if (activeFlow !== null) activeFlow.dispose();
   activeRenderB = null;
   activeRenderA = null;
-  activeComputeBA = null;
-  activeComputeAB = null;
+  activeObstacleBA = null;
+  activeObstacleAB = null;
+  activeEvaporateBA = null;
+  activeEvaporateAB = null;
+  activeFlowBA = null;
+  activeFlowAB = null;
   activeParams = null;
   activeCellsB = null;
   activeCellsA = null;

@@ -4,12 +4,16 @@
 
 import {
   ComputeInvocation,
+  ComputePipeline,
   ComputePipelineSpec,
   FragmentInvocation,
   MutStorage,
   RenderPipelineSpec,
+  RenderPipeline,
   VertexInvocation,
   computePipeline,
+  createComputePipelineHost,
+  createRenderPipelineHost,
   renderPipelineInstanced,
 } from "./typegpu";
 import {
@@ -20,9 +24,7 @@ import {
   GPUBindGroup,
   GPUBuffer,
   GPUBufferUsage,
-  GPUComputePipeline,
   GPUHostOwnedDevice,
-  GPURenderPipeline,
   GPUTextureView,
   hostOwnedGPUDevice,
 } from "./webgpu";
@@ -137,12 +139,11 @@ export const confettiRender: RenderPipelineSpec = renderPipelineInstanced<
 >(confettiVertex, confettiFragment, { format: "bgra8unorm" });
 
 let activeDevice: GPUHostOwnedDevice | null = null;
-let activeCompute: GPUComputePipeline | null = null;
-let activeRender: GPURenderPipeline | null = null;
+let activeCompute: ComputePipeline | null = null;
+let activeRender: RenderPipeline | null = null;
 let activeGroup: GPUBindGroup | null = null;
 let activeVertices: GPUBuffer | null = null;
 let activeParticles: GPUBuffer | null = null;
-let frameCount: u32 = 0;
 
 export function init(
   instance: SubscriptTypegpuInstance,
@@ -198,77 +199,23 @@ export function init(
     );
   }
 
-  using computeBindLayout = hostDevice.createBindGroupLayout({
-    entries: [{
-      binding: confettiUpdate_LAYOUT0.entries[0].binding,
-      visibility: confettiUpdate_LAYOUT0.entries[0].visibility,
-      buffer: {
-        type: "storage",
-        minBindingSize: confettiUpdate_LAYOUT0.entries[0].minBindingSize,
-      },
-    }],
-  });
-  using computeLayout = hostDevice.createPipelineLayout({
-    bindGroupLayouts: [computeBindLayout],
-  });
-  using renderLayout = hostDevice.createPipelineLayout({ bindGroupLayouts: [] });
   hostDevice.pushErrorScope("validation");
-  using computeShader = hostDevice.createShaderModule({ code: confettiUpdate_WGSL });
-  const computePipeline = hostDevice.createComputePipeline({
-    layout: computeLayout,
-    compute: { module: computeShader, entryPoint: confettiUpdate_ENTRY },
-  });
-  using renderShader = hostDevice.createShaderModule({ code: confettiRender_WGSL });
-  const renderPipeline = hostDevice.createRenderPipeline({
-    layout: renderLayout,
-    vertex: {
-      module: renderShader,
-      entryPoint: confettiRender_VERTEX_ENTRY,
-      buffers: [
-        {
-          arrayStride: confettiRender_VERTEX_LAYOUT0.arrayStride,
-          stepMode: confettiRender_VERTEX_LAYOUT0.stepMode,
-          attributes: [{
-            format: confettiRender_VERTEX_LAYOUT0.attributes[0].format,
-            offset: confettiRender_VERTEX_LAYOUT0.attributes[0].offset,
-            shaderLocation: confettiRender_VERTEX_LAYOUT0.attributes[0].shaderLocation,
-          }],
-        },
-        {
-          arrayStride: confettiRender_VERTEX_LAYOUT1.arrayStride,
-          stepMode: confettiRender_VERTEX_LAYOUT1.stepMode,
-          attributes: [
-            {
-              format: confettiRender_VERTEX_LAYOUT1.attributes[0].format,
-              offset: confettiRender_VERTEX_LAYOUT1.attributes[0].offset,
-              shaderLocation: confettiRender_VERTEX_LAYOUT1.attributes[0].shaderLocation,
-            },
-            {
-              format: confettiRender_VERTEX_LAYOUT1.attributes[1].format,
-              offset: confettiRender_VERTEX_LAYOUT1.attributes[1].offset,
-              shaderLocation: confettiRender_VERTEX_LAYOUT1.attributes[1].shaderLocation,
-            },
-            {
-              format: confettiRender_VERTEX_LAYOUT1.attributes[2].format,
-              offset: confettiRender_VERTEX_LAYOUT1.attributes[2].offset,
-              shaderLocation: confettiRender_VERTEX_LAYOUT1.attributes[2].shaderLocation,
-            },
-            {
-              format: confettiRender_VERTEX_LAYOUT1.attributes[3].format,
-              offset: confettiRender_VERTEX_LAYOUT1.attributes[3].offset,
-              shaderLocation: confettiRender_VERTEX_LAYOUT1.attributes[3].shaderLocation,
-            },
-          ],
-        },
-      ],
-    },
-    primitive: { topology: confettiRender.topology },
-    fragment: {
-      module: renderShader,
-      entryPoint: confettiRender_FRAGMENT_ENTRY,
-      targets: [{ format: confettiRender_TARGET_FORMAT }],
-    },
-  });
+  const computePipeline = createComputePipelineHost(
+    hostDevice,
+    confettiUpdate_WGSL,
+    confettiUpdate_ENTRY,
+    [confettiUpdate_LAYOUT0],
+    [64, 1, 1],
+  );
+  const renderPipeline = createRenderPipelineHost(
+    hostDevice,
+    confettiRender_WGSL,
+    confettiRender_VERTEX_ENTRY,
+    confettiRender_FRAGMENT_ENTRY,
+    [],
+    [confettiRender_VERTEX_LAYOUT0, confettiRender_VERTEX_LAYOUT1],
+    confettiRender,
+  );
   const validationError = hostDevice.popErrorScope();
   if (validationError !== null) {
     renderPipeline.dispose();
@@ -278,6 +225,7 @@ export function init(
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
+  using computeBindLayout = computePipeline.bindGroupLayout(0);
   const group = hostDevice.createBindGroup({
     layout: computeBindLayout,
     entries: [{
@@ -312,13 +260,8 @@ export function frame(
   if (group === null) return;
   if (vertices === null) return;
   if (particles === null) return;
-  frameCount += 1;
   using encoder = device.createCommandEncoderDefault();
-  using computePass = encoder.beginComputePassDefault();
-  computePass.setPipeline(computePipeline);
-  computePass.setBindGroup(0, group);
-  computePass.dispatchWorkgroups(PARTICLE_COUNT / 64, 1, 1);
-  computePass.end();
+  computePipeline.dispatch(encoder, [group], PARTICLE_COUNT / 64, 1, 1);
   const target = new GPUTextureView(view);
   using renderPass = encoder.beginRenderPass({
     colorAttachments: [{
@@ -330,9 +273,7 @@ export function frame(
   });
   renderPass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   renderPass.setScissorRect(0, 0, width, height);
-  renderPass.setPipeline(renderPipeline);
-  renderPass.setVertexBuffer(0, vertices, 0, vertices.size());
-  renderPass.setVertexBuffer(1, particles, 0, particles.size());
+  renderPipeline.bind(renderPass, [], [vertices, particles]);
   renderPass.draw(6, PARTICLE_COUNT);
   renderPass.end();
   using command = encoder.finishDefault();

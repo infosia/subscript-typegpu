@@ -6,6 +6,7 @@ import {
   FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
+  createRenderPipelineHost,
   VertexInvocation,
   renderPipeline,
 } from "./typegpu";
@@ -18,7 +19,6 @@ import {
   GPUBuffer,
   GPUBufferUsage,
   GPUHostOwnedDevice,
-  GPURenderPipeline,
   GPUTextureView,
   hostOwnedGPUDevice,
 } from "./webgpu";
@@ -81,7 +81,6 @@ export const triangle: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
 let activeDevice: GPUHostOwnedDevice | null = null;
 let activePipeline: RenderPipeline | null = null;
 let activeVertices: GPUBuffer | null = null;
-let frameCount: u32 = 0;
 
 export function init(
   instance: SubscriptTypegpuInstance,
@@ -111,44 +110,25 @@ export function init(
   // entry names and the generated vertex layout. TypeGPU's `root.createRenderPipeline`
   // covers the same step.
   hostDevice.pushErrorScope("validation");
-  using shader = hostDevice.createShaderModule({ code: triangle_WGSL });
-  using layout = hostDevice.createPipelineLayout({ bindGroupLayouts: [] });
-  const nativePipeline: GPURenderPipeline = hostDevice.createRenderPipeline({
-    layout,
-    vertex: {
-      module: shader,
-      entryPoint: triangle_VERTEX_ENTRY,
-      buffers: [{
-        arrayStride: triangle_VERTEX_LAYOUT0.arrayStride,
-        stepMode: triangle_VERTEX_LAYOUT0.stepMode,
-        attributes: [{
-          format: triangle_VERTEX_LAYOUT0.attributes[0].format,
-          offset: triangle_VERTEX_LAYOUT0.attributes[0].offset,
-          shaderLocation: triangle_VERTEX_LAYOUT0.attributes[0].shaderLocation,
-        }],
-      }],
-    },
-    primitive: {
-      topology: triangle.topology,
-      cullMode: triangle.cullMode,
-      frontFace: triangle.frontFace,
-    },
-    fragment: {
-      module: shader,
-      entryPoint: triangle_FRAGMENT_ENTRY,
-      targets: [{ format: triangle_TARGET_FORMAT }],
-    },
-  });
+  const createdPipeline = createRenderPipelineHost(
+    hostDevice,
+    triangle_WGSL,
+    triangle_VERTEX_ENTRY,
+    triangle_FRAGMENT_ENTRY,
+    [],
+    [triangle_VERTEX_LAYOUT0],
+    triangle,
+  );
   const validationError = hostDevice.popErrorScope();
   if (validationError !== null) {
-    nativePipeline.dispose();
+    createdPipeline.dispose();
     vertices.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
   activeDevice = hostDevice;
   activeVertices = vertices;
-  activePipeline = new RenderPipeline(nativePipeline, "undefined");
+  activePipeline = createdPipeline;
 }
 
 // The window host owns the surface and the loop, and it calls this once per frame.
@@ -171,7 +151,6 @@ export function frame(
   if (vertices === null) {
     return;
   }
-  frameCount += 1;
   const target = new GPUTextureView(view);
   using encoder = device.createCommandEncoderDefault();
   using pass = encoder.beginRenderPass({
