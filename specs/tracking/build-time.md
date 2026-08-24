@@ -43,6 +43,7 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-23 | P9 review fixes, one program loader (gate 146 s → 168 s: the window example compiles in the gate and the loader generates the support module for every dev-lane program in one place) | 49 s | 0 s | 168 s | 164 s | 7 |
 | 2026-08-24 | Backend request merged (`7eb7d79`), reference machine re-check | — | — | — | 177 s | 7 |
 | 2026-08-24 | P10 slice 1 round 1 (seven example ports) | 49 s | 0 s | 172 s | 169 s | 7 |
+| 2026-08-24 | P10 slice 1 round 2 (three simulation ports) and the EX2 comments | 49 s | 0 s | 175 s | 175 s | 7 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate

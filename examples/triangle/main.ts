@@ -1,5 +1,5 @@
 // example: triangle
-// Draws one triangle whose interpolated color starts from the three vertex indices.
+// Draws one triangle and blends three corner colors that the vertex index selects.
 // Ported from TypeGPU's triangle example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -51,6 +51,9 @@ class Varyings {
   }
 }
 
+// TypeGPU reads three positions from a constant array and mixes two colors over
+// the uv. This port streams the positions through a vertex buffer and picks one
+// color per corner.
 function triangleVertex(value: Vertex, ctx: VertexInvocation): Varyings {
   const color: Vec3f = ctx.vertexIndex === 0
     ? new Vec3f(1.0, 0.15, 0.1)
@@ -67,6 +70,8 @@ function triangleFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(input.color.x, input.color.y, input.color.z, 1.0);
 }
 
+// The declaration pairs the two entry points and fixes the target format. The
+// generator walks it and emits the WGSL and the constants of `main.typegpu`.
 export const triangle: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
   triangleVertex,
   triangleFragment,
@@ -95,11 +100,16 @@ export function init(
   ];
   const vertices = hostDevice.createBuffer({
     label: "example-triangle-vertices",
+    // `Vertex_STRIDE` is a generated constant. TypeGPU computes the same number at run
+    // time from the schema object.
     size: (Vertex_STRIDE * 3) as u64,
     usage: GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
   using queue = hostDevice.queue();
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>(values));
+  // The host owns the device, so this example builds the pipeline from the generated
+  // entry names and the generated vertex layout. TypeGPU's `root.createRenderPipeline`
+  // covers the same step.
   hostDevice.pushErrorScope("validation");
   using shader = hostDevice.createShaderModule({ code: triangle_WGSL });
   using layout = hostDevice.createPipelineLayout({ bindGroupLayouts: [] });
@@ -141,6 +151,8 @@ export function init(
   activePipeline = new RenderPipeline(nativePipeline, "undefined");
 }
 
+// The window host owns the surface and the loop, and it calls this once per frame.
+// TypeGPU's example configures a canvas context and draws one time.
 export function frame(
   view: SubscriptTypegpuTextureView,
   width: u32,

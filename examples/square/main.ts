@@ -1,5 +1,6 @@
 // example: square
-// Draws an indexed quad with a four-corner color field interpolated through the varyings.
+// Draws an indexed quad and interpolates four committed corner colors.
+// The upstream color pickers become fixed vertex colors.
 // Ported from TypeGPU's square example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -53,6 +54,8 @@ class Varyings {
   }
 }
 
+// TypeGPU keeps the four positions inside the shader and streams only the colors.
+// This port streams position and color together as one `Vertex` record.
 function squareVertex(value: Vertex, ctx: VertexInvocation): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -64,6 +67,8 @@ function squareFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return input.color;
 }
 
+// The index format belongs to the declaration. TypeGPU attaches the index buffer to
+// the pipeline with `withIndexBuffer` instead.
 export const square: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
   squareVertex,
   squareFragment,
@@ -92,6 +97,8 @@ export function init(
     new Vertex(new Vec2f(-0.68, 0.68), new Vec4f(0.2, 0.25, 0.95, 1.0)),
     new Vertex(new Vec2f(0.68, 0.68), new Vec4f(0.95, 0.85, 0.15, 1.0)),
   ];
+  // The winding follows this port's vertex order. TypeGPU lists `[0, 2, 1, 0, 3, 2]`
+  // for its own corner order.
   const indices: FixedArray<u16, 6> = [0, 1, 2, 2, 1, 3];
   const vertices = hostDevice.createBuffer({
     label: "example-square-vertices",
@@ -192,6 +199,8 @@ export function frame(
   pass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   pass.setScissorRect(0, 0, width, height);
   pipeline.bind(pass, [], [vertices]);
+  // The pipeline supplies the index format that the declaration fixed. It traps when
+  // that format is undefined.
   pipeline.setIndexBuffer(pass, indices);
   pass.drawIndexed(6, 1);
   pass.end();

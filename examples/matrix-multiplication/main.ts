@@ -1,5 +1,6 @@
 // example: matrix-multiplication
-// Multiplies two fixed-size matrices and checks the GPU product against host simulation.
+// Multiplies two committed four-by-four matrices and checks the product on the host.
+// The upstream size sliders and random values become fixed data.
 // Ported from TypeGPU's matrix-multiplication example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -46,12 +47,16 @@ class Matrix {
   }
 }
 
+// TypeGPU declares the same three bindings with a bind group layout. A resources
+// class names them here, and the generator emits `multiply_LAYOUT0` from it.
 class MatrixLayout {
   left!: Storage<Matrix>;
   right!: Storage<Matrix>;
   product!: MutStorage<Matrix>;
 }
 
+// TypeGPU writes this kernel as a WGSL template and resolves it at run time.
+// The kernel is subscript source here, and the generator emits the WGSL.
 function multiplyKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
   const left: Matrix = res.left.get(0);
   const right: Matrix = res.right.get(0);
@@ -73,6 +78,8 @@ export const multiply: ComputePipelineSpec = computePipeline<MatrixLayout>(
   multiplyKernel,
   {
     name: "multiply",
+    // TypeGPU runs one thread per output cell in eight-by-eight workgroups. One thread
+    // walks every cell here, so a single dispatch stays inspectable.
     workgroupSize: [1, 1, 1],
   },
 );
@@ -201,6 +208,8 @@ export async function main(): Promise<void> {
       host.left = new Storage<Matrix>([leftValue]);
       host.right = new Storage<Matrix>([rightValue]);
       host.product = new MutStorage<Matrix>([zeroMatrix()]);
+      // The host lane runs the same kernel over host storage, so the example holds no
+      // second formula. TypeGPU's example prints the GPU result to the page.
       simulateComputeThreads<MatrixLayout>(
         multiplyKernel,
         host,
@@ -210,6 +219,8 @@ export async function main(): Promise<void> {
         1,
         multiply_HOST_RUNNABLE,
       );
+      // The read copies into a staging buffer and awaits the map. TypeGPU's `buffer.read`
+      // hides the same two steps.
       const bytes: u8[] = await product.read(device, 0, 1);
       const actual: Matrix = Context.fromBytes<Matrix>(bytes, 0);
       const expected: Matrix = host.product.get(0);

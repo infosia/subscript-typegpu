@@ -1,5 +1,6 @@
 // example: dispatch
-// Counts guarded compute invocations for non-multiple one-, two-, and three-axis thread sizes.
+// Counts guarded compute invocations for thread counts that no workgroup size divides.
+// This port keeps the upstream guard cases and drops its other tests.
 // Ported from TypeGPU's dispatch example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -53,6 +54,8 @@ class Counter {
   }
 }
 
+// TypeGPU's `createGuardedComputePipeline` allocates the mutable and the layout on
+// its own. This port declares the binding, and the generator emits `count1d_LAYOUT0`.
 class CounterLayout {
   counter!: MutStorage<Counter>;
 }
@@ -69,6 +72,8 @@ function count3dKernel(res: CounterLayout, ctx: ComputeInvocation): void {
   res.counter[0].value.add(1);
 }
 
+// `guarded: true` makes the generator wrap the kernel body in a global-id bounds
+// check. TypeGPU adds the same check inside `createGuardedComputePipeline`.
 export const count1d: ComputePipelineSpec = computePipeline<CounterLayout>(count1dKernel, {
   name: "count1d",
   workgroupSize: [8, 1, 1],
@@ -153,6 +158,9 @@ export async function main(): Promise<void> {
         device,
         firstLayout,
         count1d_LAYOUT0,
+        // The guard uniform is a hidden layout entry, so the author's resource list stays
+        // unchanged. Each pipeline owns its guard buffer, so one encoder carries all three
+        // dispatches.
         [bufferResource(first.handle())],
         firstPipeline.guardBuffer(0),
       );
@@ -173,6 +181,8 @@ export async function main(): Promise<void> {
         thirdPipeline.guardBuffer(0),
       );
       using encoder = device.createCommandEncoderDefault();
+      // No workgroup size divides these counts, so the guard drops the extra invocations.
+      // `dispatchThreads` writes the counts into the guard buffer before it records the pass.
       firstPipeline.dispatchThreads(encoder, [firstGroup], 13, 1, 1);
       secondPipeline.dispatchThreads(encoder, [secondGroup], 7, 5, 1);
       thirdPipeline.dispatchThreads(encoder, [thirdGroup], 5, 3, 3);

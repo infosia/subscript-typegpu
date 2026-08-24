@@ -51,3 +51,18 @@ formula-vs-literal check in `dispatch`; a no-effect barrier in
 drift. The upstream slider freezes are stated in each header (EX7),
 and the unused `key` parameter is the W2 signature, kept. A cleanup
 round fixes the code findings.
+
+## Slice 1 round 2 (2026-08-24)
+
+Landed: `confetti` (64 particles, compute update, the storage buffer
+doubles as the instance stream, six vertices for the upstream
+strip), `boids` (96 boids, guarded compute, A-B storage pair with a
+bind-group swap, velocity-oriented instanced triangles),
+`fluid-double-buffering` (32x32 grid, three passes ping-ponged, the
+obstacle x on the key scalar per EX7). The EX2 comments for round 1
+were applied with an upstream cross-check; three comments avoid the
+banned prefix by naming the TypeGPU construct without its namespace.
+
+Evidence: `tools/gate.sh --require-backend` green, 247 passed,
+175 s. Windowed with `--frames 60` on Metal (yawgpu): all three
+print `window:frames=60`, exit 0. `boids` the same on Dawn.

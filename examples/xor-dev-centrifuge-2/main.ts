@@ -1,5 +1,6 @@
 // example: xor-dev-centrifuge-2
 // Animates a polar tunnel from layered trigonometric bands and the host frame count.
+// The six upstream sliders become fixed constants inside the shader body.
 // Ported from TypeGPU's xor-dev-centrifuge-2 example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -66,17 +67,23 @@ class Varyings {
   }
 }
 
+// TypeGPU declares an eight-field `Params` struct and one `root.createUniform`.
+// This port sends one `vec4f` with time and aspect ratio, and a resources class
+// names the binding.
 class TunnelLayout {
   frame!: Uniform<FrameData>;
 }
 
+// A shell function has two bodies. This subscript body is the host implementation,
+// and the CPU lane runs it.
 function tunnelBands(point: Vec2f, time: f32): Vec3f {
   const radius: f32 = point.length();
   const pulse: f32 = 0.5 + 0.5 * (Math.sin((radius * 8.0 + time) as f64) as f32);
   return new Vec3f(pulse * 0.25, pulse * 0.08, pulse * 0.55);
 }
 
-// The shell uses a compact polar loop because the typed surface has no scalar atan2 mapping.
+// K11 maps no `atan2`, so the ring angle needs a WGSL shell. TypeGPU marches a 3D
+// ray instead. This shell accumulates twelve polar rings and tone-maps with `tanh`.
 const tunnelBandsGpu: WgslShellSpec = wgslShell<(point: Vec2f, time: f32) => Vec3f>(
   tunnelBands,
   {
@@ -95,6 +102,8 @@ function tunnelVertex(
   );
 }
 
+// The uniform arrives as a typed value, not through TypeGPU's `$` proxy. The port
+// re-centers uv here, because the vertex stage wrote it into the zero-to-one range.
 function tunnelFragment(
   res: TunnelLayout,
   input: Varyings,
@@ -238,6 +247,8 @@ export function frame(
   if (group === null) {
     return;
   }
+  // Time comes from the frame count divided by sixty. TypeGPU reads the
+  // `requestAnimationFrame` timestamp instead.
   frameCount += 1;
   const aspect: f32 = (width as f32) / (height as f32);
   using queue = device.queue();

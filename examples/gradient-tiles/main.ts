@@ -1,5 +1,6 @@
 // example: gradient-tiles
-// Quantizes a full-surface red-green gradient into a committed nine-by-nine grid.
+// Quantizes a full-surface gradient into a fixed nine-by-nine grid of flat tiles.
+// The two upstream span sliders become one committed tile count.
 // Ported from TypeGPU's gradient-tiles example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -50,8 +51,12 @@ class Varyings {
   }
 }
 
+// TypeGPU holds both spans in a `vec2f` uniform and writes it on every slider move.
+// One constant replaces that uniform here, so the fragment binds no resources.
 const TILE_COUNT: f32 = 9.0;
 
+// TypeGPU draws its full-surface triangle with `common.fullScreenTriangle`. This port
+// declares the same three clip-space vertices and maps them into uv space.
 function tilesVertex(value: Vertex, ctx: VertexInvocation): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -59,6 +64,8 @@ function tilesVertex(value: Vertex, ctx: VertexInvocation): Varyings {
   );
 }
 
+// TypeGPU computes `floor(uv * span) / span`. This port adds a half-tile offset, so
+// each tile shows the color of its own center.
 function tilesFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
   const cell: Vec2f = input.uv.scale(TILE_COUNT).floor();
   const red: f32 = (cell.x + 0.5) / TILE_COUNT;
@@ -87,7 +94,6 @@ export function init(
     return;
   }
   const hostDevice = hostOwnedGPUDevice(instance, device);
-  // A committed grid replaces the upstream slider surface.
   const values: FixedArray<Vertex, 3> = [
     new Vertex(new Vec2f(-1.0, -1.0)),
     new Vertex(new Vec2f(3.0, -1.0)),
@@ -100,6 +106,9 @@ export function init(
   });
   using queue = hostDevice.queue();
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>(values));
+  // The host owns the device, so this example builds the pipeline from the generated
+  // entry names and the generated vertex layout. TypeGPU's `root.createRenderPipeline`
+  // covers the same step.
   hostDevice.pushErrorScope("validation");
   using shader = hostDevice.createShaderModule({ code: tiles_WGSL });
   using layout = hostDevice.createPipelineLayout({ bindGroupLayouts: [] });

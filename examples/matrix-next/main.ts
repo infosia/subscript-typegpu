@@ -1,5 +1,6 @@
 // example: matrix-next
-// Compares naive and workgroup-tiled matrix products with one host result.
+// Compares a naive kernel and a workgroup-tiled kernel against one host result.
+// This port drops the upstream strategy switch, the sliders, and the timestamp timing.
 // Ported from TypeGPU's matrix-next example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -82,6 +83,8 @@ function naiveKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
 const leftTile: WorkgroupArray<f32> = workgroupArray<f32>(16);
 const rightTile: WorkgroupArray<f32> = workgroupArray<f32>(16);
 
+// TypeGPU loops over sixteen-wide tiles and bounds-checks every load. One tile covers
+// the whole matrix here, so each lane loads two values and multiplies four pairs.
 function tiledKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
   const left: Matrix = res.left.get(0);
   const right: Matrix = res.right.get(0);
@@ -103,6 +106,8 @@ export const naive: ComputePipelineSpec = computePipeline<MatrixLayout>(naiveKer
   workgroupSize: [1, 1, 1],
 });
 
+// The workgroup size belongs to the declaration. The generator writes it into the
+// WGSL and into `tiled_WORKGROUP_X`, which the pipeline below reads.
 export const tiled: ComputePipelineSpec = computePipeline<MatrixLayout>(tiledKernel, {
   name: "tiled",
   workgroupSize: [4, 4, 1],
@@ -245,6 +250,8 @@ export async function main(): Promise<void> {
       );
       using encoder = device.createCommandEncoderDefault();
       naivePipeline.dispatchThreads(encoder, [naiveGroup], 1, 1, 1);
+      // `dispatchThreads` takes thread counts and rounds up by the workgroup size.
+      // TypeGPU's example computes its workgroup counts with `Math.ceil`.
       tiledPipeline.dispatchThreads(encoder, [tiledGroup], 4, 4, 1);
       using command = encoder.finishDefault();
       queue.submit([command]);
@@ -253,6 +260,8 @@ export async function main(): Promise<void> {
       host.left = new Storage<Matrix>([leftValue]);
       host.right = new Storage<Matrix>([rightValue]);
       host.product = new MutStorage<Matrix>([zeroMatrix()]);
+      // The naive kernel runs on the host and gives the oracle for both GPU results. The
+      // tiled kernel reaches a barrier, so it has no host lane.
       simulateComputeThreads<MatrixLayout>(
         naiveKernel,
         host,
