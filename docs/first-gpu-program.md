@@ -190,9 +190,10 @@ export const badProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
 ```
 
 A kernel becomes GPU code, and GPU code has no access to host
-memory. The generator rejects a kernel that reads a mutable global.
-The `K19` diagnostic names the global. State the GPU can write lives in a buffer
-behind a `MutStorage` binding, and the host reads it back as bytes.
+memory. The generator rejects a kernel that reads a mutable global,
+and the `K19` diagnostic names the global. State the GPU can write
+lives in a buffer behind a `MutStorage` binding, and the host reads
+it back as bytes.
 
 ## The kernel also runs on the host
 
