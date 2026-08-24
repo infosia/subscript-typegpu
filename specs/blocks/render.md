@@ -1,7 +1,7 @@
 # Block: render (RN-rules)
 
 P3 contract. Rev 0, 2026-08-22. Rev 3 (RN18–RN19 index format,
-cull), 2026-08-23. Plan §8 P3 governs this block.
+cull), 2026-08-23. Rev 4 (RN20 strip), 2026-08-24. Plan §8 P3 governs this block.
 Kernels are `kernel.md` (K-rules) and apply to vertex and fragment
 kernels. Pipelines are `pipeline.md` (PI-rules) where this block
 does not say otherwise. Schemas are `schema.md`.

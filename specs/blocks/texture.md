@@ -1,6 +1,7 @@
 # Block: texture (TX-rules)
 
 P5 contract. Rev 0, 2026-08-23. Rev 1 (TX1, TX2, TX3, TX8),
+Rev 2 (TX9, TX10 upload), 2026-08-24.
 2026-08-23. Plan §8 P5 governs this block.
 Kernels are `kernel.md`, pipelines `pipeline.md`, render `render.md`.
 
