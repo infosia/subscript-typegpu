@@ -193,3 +193,15 @@ Evidence: gate green, 249 passed, 197 s. `clouds`, `confetti`, and
 `fluid-double-buffering` print `window:frames=30` on Metal. The
 owner's visual run of `clouds` is batched with the pointer-input
 round.
+
+## Slice 4 (2026-08-24)
+
+Landed: `fluid-with-atomics` — a 64x64 `AtomicU32` water grid,
+gravity then sideways equalization through `add`/`sub`, a pointer
+brush over the `sdLine` segment while the left button is down, the
+`1`/`2`/`0` keys for water/wall/erase (the header states the
+reduction), the fullscreen strip render. Eighteen examples compile
+in the gate (fourteen windowed, four headless).
+
+Evidence: gate green, 249 passed, 197 s. The smoke run prints
+`window:frames=30` on Metal, read before this commit.
