@@ -157,8 +157,8 @@ function obstacleKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   res.target.set(index, cell);
 }
 
-// Upstream draws a four-vertex triangle strip that the vertex index selects.
-// This port draws one full-screen triangle from a vertex buffer.
+// Upstream selects the four full-screen strip corners from the vertex index.
+// This port stores the same corners in a typed vertex buffer.
 function fluidVertex(
   res: FluidRenderLayout,
   value: Vertex,
@@ -207,7 +207,10 @@ export const fluidRender: RenderPipelineSpec = renderPipelineL<
   FluidRenderLayout,
   Vertex,
   Varyings
->(fluidVertex, fluidFragment, { format: "bgra8unorm" });
+>(fluidVertex, fluidFragment, {
+  format: "bgra8unorm",
+  topology: "triangle-strip",
+});
 
 let activeDevice: GPUHostOwnedDevice | null = null;
 let activeFlow: ComputePipeline | null = null;
@@ -239,14 +242,15 @@ export function init(
     return;
   }
   const hostDevice = hostOwnedGPUDevice(instance, device);
-  const vertexValues: FixedArray<Vertex, 3> = [
+  const vertexValues: FixedArray<Vertex, 4> = [
     new Vertex(new Vec2f(-1.0, -1.0)),
-    new Vertex(new Vec2f(3.0, -1.0)),
-    new Vertex(new Vec2f(-1.0, 3.0)),
+    new Vertex(new Vec2f(1.0, -1.0)),
+    new Vertex(new Vec2f(-1.0, 1.0)),
+    new Vertex(new Vec2f(1.0, 1.0)),
   ];
   const vertices = hostDevice.createBuffer({
     label: "fluid-vertices",
-    size: (Vertex_STRIDE * 3) as u64,
+    size: (Vertex_STRIDE * 4) as u64,
     usage: GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
   const cellsA = hostDevice.createBuffer({
@@ -265,7 +269,7 @@ export function init(
     usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
   });
   using queue = hostDevice.queue();
-  queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>(vertexValues));
+  queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 4>>(vertexValues));
   queue.writeBuffer(params, 0, Context.bytesOf<FluidParams>(new FluidParams(0.0)));
   const initialCells: u8[] = [];
   for (let index: u32 = 0; index < CELL_COUNT; index += 1) {
@@ -482,7 +486,7 @@ export function frame(
   renderPass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   renderPass.setScissorRect(0, 0, width, height);
   renderPipeline.bind(renderPass, [displayGroup], [vertices]);
-  renderPass.draw(3);
+  renderPass.draw(4);
   renderPass.end();
   using command = encoder.finishDefault();
   queue.submit([command]);

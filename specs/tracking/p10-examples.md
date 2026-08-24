@@ -179,3 +179,17 @@ Order decision (the owner delegated the P10/P11 order): P10 slice 3
 4 (fluid-with-atomics), P11 slice 3 (read-access storage textures),
 P10 slice 5 (slime-mold and the jump-flood pair as far as the
 features reach), P11 slice 4 (blending).
+
+## Slice 3 (2026-08-24)
+
+Landed: `clouds` (a CPU `perlin3d` noise texture uploaded with
+`writeTexturePixels`, six marched density layers, committed
+constants in the header), and the strip de-reductions — `confetti`
+and `fluid-double-buffering` draw the upstream four-vertex
+`triangle-strip` through RN20, with their comments reworded to
+match. Sixteen examples compile in the gate.
+
+Evidence: gate green, 249 passed, 197 s. `clouds`, `confetti`, and
+`fluid-double-buffering` print `window:frames=30` on Metal. The
+owner's visual run of `clouds` is batched with the pointer-input
+round.

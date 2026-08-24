@@ -49,6 +49,7 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-24 | P10 slice 1 round 5 (simulation cleanup), slice close | 48 s | 0 s | 173 s | 173 s | 7 |
 | 2026-08-24 | P10 slice 2 (sdf and noise modules, five ports) | 48 s | 1 s | 178 s | 177 s | 7 |
 | 2026-08-24 | P11 slice 1 (TX9/TX10 upload, RN20 strip; 2 `b`, 2 `x` programs) | 51 s | 3.9 s first no-op after a build, then sub-second | 198 s | 198 s | 7 |
+| 2026-08-24 | P10 slice 3 (clouds, strip de-reductions) | 49 s | 0 s | 197 s | 197 s | 7 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate

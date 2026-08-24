@@ -146,7 +146,10 @@ export const confettiRender: RenderPipelineSpec = renderPipelineInstanced<
   Vertex,
   Particle,
   Varyings
->(confettiVertex, confettiFragment, { format: "bgra8unorm" });
+>(confettiVertex, confettiFragment, {
+  format: "bgra8unorm",
+  topology: "triangle-strip",
+});
 
 let activeDevice: GPUHostOwnedDevice | null = null;
 let activeCompute: ComputePipeline | null = null;
@@ -165,20 +168,17 @@ export function init(
     return;
   }
   const hostDevice = hostOwnedGPUDevice(instance, device);
-  // Two triangles form one card, and each Particle supplies one instance record.
-  // Upstream draws a four-vertex triangle strip with no vertex buffer.
-  // This port draws six triangle-list vertices from one vertex buffer.
-  const vertices: FixedArray<Vertex, 6> = [
+  // Four strip vertices form one card, and each Particle supplies one instance record.
+  // This port retains a typed vertex buffer for the upstream strip corners.
+  const vertices: FixedArray<Vertex, 4> = [
     new Vertex(new Vec2f(-0.012, -0.022)),
     new Vertex(new Vec2f(0.012, -0.022)),
     new Vertex(new Vec2f(-0.012, 0.022)),
-    new Vertex(new Vec2f(-0.012, 0.022)),
-    new Vertex(new Vec2f(0.012, -0.022)),
     new Vertex(new Vec2f(0.012, 0.022)),
   ];
   const vertexBuffer = hostDevice.createBuffer({
     label: "confetti-vertices",
-    size: (Vertex_STRIDE * 6) as u64,
+    size: (Vertex_STRIDE * 4) as u64,
     usage: GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
   const particleBuffer = hostDevice.createBuffer({
@@ -187,7 +187,7 @@ export function init(
     usage: GPUBufferUsage.STORAGE + GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
   using queue = hostDevice.queue();
-  queue.writeBuffer(vertexBuffer, 0, Context.bytesOf<FixedArray<Vertex, 6>>(vertices));
+  queue.writeBuffer(vertexBuffer, 0, Context.bytesOf<FixedArray<Vertex, 4>>(vertices));
   for (let index: u32 = 0; index < PARTICLE_COUNT; index += 1) {
     const column: f32 = (index % 8) as f32;
     const row: f32 = (index / 8) as f32;
@@ -284,7 +284,7 @@ export function frame(
   renderPass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   renderPass.setScissorRect(0, 0, width, height);
   renderPipeline.bind(renderPass, [], [vertices, particles]);
-  renderPass.draw(6, PARTICLE_COUNT);
+  renderPass.draw(4, PARTICLE_COUNT);
   renderPass.end();
   using command = encoder.finishDefault();
   using queue = device.queue();
