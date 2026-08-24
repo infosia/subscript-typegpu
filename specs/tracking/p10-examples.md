@@ -383,3 +383,15 @@ slime-mold: every frame adds a centered LCG heading jitter of 0.3
 radians peak to peak before the sensing turn, the header updated.
 The smoke shows zero FAIL lines. The owner's re-check decides the
 visual pass.
+
+## slime-mold forms parallel stripes (2026-08-24)
+
+The owner's screenshot shows perfectly parallel, evenly spaced
+diagonal stripes: every agent's heading aligned. The 16-bit LCG's
+serial correlation is the cause — index-seeded triple draws give
+headings that vary smoothly with the index, and the per-frame
+jitter draws from the same weak stream, so the alignment feedback
+organizes the field into stripes instead of a network. The fix
+replaces the noise module's PRNG with a 32-bit xorshift (13, 17, 5)
+over a Wang-hash seed, the same shape on host and GPU, with the
+`prng-cpu-gpu` differential unchanged in role.
