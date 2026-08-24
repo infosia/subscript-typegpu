@@ -205,3 +205,16 @@ in the gate (fourteen windowed, four headless).
 
 Evidence: gate green, 249 passed, 197 s. The smoke run prints
 `window:frames=30` on Metal, read before this commit.
+
+## Visual runs (2026-08-24, Metal)
+
+The owner ran `clouds` (185 frames), `confetti` after the strip
+change (343), and `fluid-double-buffering` with the pointer (794):
+all three look as intended. `fluid-with-atomics` printed
+`FAIL validation shader.wgsl:31:38 error: value cannot be
+represented as 'i32'` — the PI14 scope made the backend rejection
+visible — and drew nothing for 1555 frames. The run raced the fix
+round's working tree, so whether the committed WGSL carries the
+defect is open until the round lands. If the committed module does,
+the lesson is that `naga` accepted a literal Tint refuses, and the
+generator gains a rule.
