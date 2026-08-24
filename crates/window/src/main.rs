@@ -12,6 +12,18 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
 
+#[cfg(target_os = "macos")]
+mod macos_colorspace {
+    use std::ffi::c_void;
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        pub static kCGColorSpaceSRGB: *const c_void;
+        pub fn CGColorSpaceCreateWithName(name: *const c_void) -> *mut c_void;
+        pub fn CGColorSpaceRelease(space: *mut c_void);
+    }
+}
+
 enum WindowError {
     Compile(ProgramLoadError),
     Host(String),
@@ -47,6 +59,17 @@ fn create_surface(
         let layer: *mut CAMetalLayer = unsafe { objc2::msg_send![CAMetalLayer::class(), layer] };
         if layer.is_null() {
             return Err("CAMetalLayer creation returned null".to_owned());
+        }
+        // SAFETY: the named constant is live. Create returns one owned color
+        // space. setColorspace retains it, and release balances this create once.
+        unsafe {
+            let color_space =
+                macos_colorspace::CGColorSpaceCreateWithName(macos_colorspace::kCGColorSpaceSRGB);
+            if color_space.is_null() {
+                return Err("sRGB color space creation returned null".to_owned());
+            }
+            let _: () = objc2::msg_send![layer, setColorspace: color_space];
+            macos_colorspace::CGColorSpaceRelease(color_space);
         }
         // SAFETY: `layer` is a live CAMetalLayer and setLayer retains it.
         unsafe { view.setLayer(Some(&*layer)) };
@@ -181,7 +204,8 @@ struct Host {
     frames: u64,
     frame_limit: Option<u64>,
     initialized: bool,
-    finished: bool,
+    exit_requested: bool,
+    shutdown_complete: bool,
     result: Result<(), String>,
 }
 
@@ -204,7 +228,8 @@ impl Host {
             frames: 0,
             frame_limit,
             initialized: false,
-            finished: false,
+            exit_requested: false,
+            shutdown_complete: false,
             result: Ok(()),
         }
     }
@@ -428,10 +453,20 @@ impl Host {
     }
 
     fn finish(&mut self, event_loop: &ActiveEventLoop, result: Result<(), String>) {
-        if self.finished {
+        if self.exit_requested {
             return;
         }
-        let mut result = result;
+        self.result = result;
+        self.exit_requested = true;
+        event_loop.exit();
+    }
+
+    fn shutdown(&mut self) {
+        if self.shutdown_complete {
+            return;
+        }
+        self.shutdown_complete = true;
+        let mut result = std::mem::replace(&mut self.result, Ok(()));
         if self.initialized {
             if let Err(error) = self.call_entry("shutdown", &[]) {
                 if result.is_ok() {
@@ -459,9 +494,10 @@ impl Host {
             self.instance = std::ptr::null_mut();
         }
         self.window.take();
+        if result.is_ok() {
+            println!("window:frames={}", self.frames);
+        }
         self.result = result;
-        self.finished = true;
-        event_loop.exit();
     }
 
     fn fail(&mut self, event_loop: &ActiveEventLoop, error: String) {
@@ -471,7 +507,7 @@ impl Host {
 
 impl ApplicationHandler for Host {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.window.is_none() && !self.finished {
+        if self.window.is_none() && !self.exit_requested {
             match self.initialize(event_loop) {
                 Ok(()) if self.reached_frame_limit() => self.finish(event_loop, Ok(())),
                 Ok(()) => {}
@@ -486,7 +522,7 @@ impl ApplicationHandler for Host {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        if self.window.as_ref().map(Window::id) != Some(window_id) || self.finished {
+        if self.window.as_ref().map(Window::id) != Some(window_id) || self.exit_requested {
             return;
         }
         match event {
@@ -515,6 +551,10 @@ impl ApplicationHandler for Host {
             _ => {}
         }
     }
+
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+        self.shutdown();
+    }
 }
 
 fn arguments() -> Result<(PathBuf, Option<u64>), String> {
@@ -541,7 +581,7 @@ fn arguments() -> Result<(PathBuf, Option<u64>), String> {
     Ok((program, frame_limit))
 }
 
-fn run() -> Result<u64, WindowError> {
+fn run() -> Result<(), WindowError> {
     let (program, frame_limit) = arguments()?;
     let session =
         subscript_typegpu_harness::load_program(&program).map_err(WindowError::Compile)?;
@@ -555,12 +595,12 @@ fn run() -> Result<u64, WindowError> {
         .run_app(&mut host)
         .map_err(|error| format!("event loop: {error}"))?;
     host.result?;
-    Ok(host.frames)
+    Ok(())
 }
 
 fn main() {
     match run() {
-        Ok(frames) => println!("window:frames={frames}"),
+        Ok(()) => {}
         Err(WindowError::Compile(error)) => {
             if let Some(diagnostics) = error.diagnostics() {
                 eprintln!("{diagnostics}");

@@ -162,3 +162,11 @@ the frames line on the `exiting` path so Cmd+Q reports like a close
 (W8).
 
 P10 slice 2 COMPLETE 2026-08-24.
+
+## The color question resolved (2026-08-24)
+
+The owner decided: the color differences against the upstream
+browser examples come from the ports' own palettes and reductions,
+and no color matching is pursued. The sRGB layer setting (W9 Rev 1)
+stays because it makes the output independent of the display's
+gamut. The exiting path (W8 Rev 2) closes the Cmd-Q report gap.
