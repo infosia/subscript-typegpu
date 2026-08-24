@@ -271,3 +271,15 @@ After the i32-minimum fix the owner ran `fluid-with-atomics` for
 4843 frames: the brush, the fall and the sideways flow, the wall,
 and the eraser work as intended. Every slice 1 through 4 example
 now has a passed visual run.
+
+## Slice 5 (2026-08-24)
+
+Landed: `slime-mold` (4096 agents over a 128x128 read-write trail,
+three-sample sensing, diffuse and decay with a per-frame pair swap)
+and `game-of-life` (the naive strategy, a read-only generation and a
+write-only next, pointer drawing, the `0` clear, a committed
+glider). Twenty examples compile in the gate.
+
+Evidence: gate green, 251 passed, 203 s. Both smoke runs print
+`window:frames=30` on Metal, read before this commit. The comment
+review and the owner's visual runs follow.

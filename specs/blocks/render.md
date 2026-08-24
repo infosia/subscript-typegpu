@@ -1,7 +1,7 @@
 # Block: render (RN-rules)
 
 P3 contract. Rev 0, 2026-08-22. Rev 3 (RN18–RN19 index format,
-cull), 2026-08-23. Rev 4 (RN20 strip), 2026-08-24. Plan §8 P3 governs this block.
+cull), 2026-08-23. Rev 4 (RN20 strip), 2026-08-24. Rev 5 (RN21 blending), 2026-08-24. Plan §8 P3 governs this block.
 Kernels are `kernel.md` (K-rules) and apply to vertex and fragment
 kernels. Pipelines are `pipeline.md` (PI-rules) where this block
 does not say otherwise. Schemas are `schema.md`.
@@ -176,6 +176,17 @@ does not say otherwise. Schemas are `schema.md`.
   strip image against the host rasterizer, whose triangle list for
   a strip of `n` vertices is the `n - 2` triangles with the even-odd
   winding flip. `stripIndexFormat` stays with the API layer.
+
+- **RN21 — Blending.** Rev 0, 2026-08-24. `RenderPipelineSpec`
+  gains `blend?: GPUBlendState | null = null`. The runtime passes it
+  into the color target. The generator does not read it. The host
+  rasterizer (RN14) blends a covered pixel with the destination
+  under the same equation for the factor pairs the programs use
+  (`src-alpha`/`one-minus-src-alpha` and `one`/`one`), and a factor
+  outside the host's set is a `RN21` trap in the host lane only.
+  `b21-blend` prints the spec's blend factors by name on both
+  tiers, and `x22-live-blend` draws two overlapping triangles with
+  alpha blending and compares against the host rasterizer.
 
 ## Rejections
 
