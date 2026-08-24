@@ -264,5 +264,6 @@ Each gate program has an `.expected` file with the same stem. Generated pipeline
 
 ## Documents
 
+- [docs/first-gpu-program.md](docs/first-gpu-program.md) builds the smallest compute program: a GPU counter from buffer creation to readback.
 - [docs/tutorial.md](docs/tutorial.md) walks `programs/b04-particles.ts` from the schema to the dispatch.
 - [docs/from-typegpu.md](docs/from-typegpu.md) compares TypeGPU with this library, topic by topic, with code from both sides.
