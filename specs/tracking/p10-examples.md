@@ -102,3 +102,9 @@ green 248 passed 172 s; `boids`, `xor-dev-centrifuge-2`, `confetti`,
 `fluid-double-buffering` each print `window:frames=60` on Metal.
 The owner's visual re-check of xor is the open item for the slice 1
 close.
+
+## Owner's visual re-check (2026-08-24, Metal)
+
+`xor-dev-centrifuge-2` after the round-4 tone-map fix (216 frames):
+the tunnel renders as intended. Every slice 1 windowed example now
+has a passed visual run.
