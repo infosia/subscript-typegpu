@@ -67,3 +67,17 @@ cold build is genuine: `cargo clean` removes `target/`, no user-wide
 build cache exists, and the rebuilt `target/` is 1.5 GB. Every
 number is inside the plan §7 budget (480 s / 5 s / 240 s / 120 s /
 2 per crate).
+
+## Where the time goes (2026-08-24)
+
+The harness executable holds 195 s of the 214 s gate: the
+differential suite runs every program serially inside one test
+function (dev JIT, ship C compile, run, compare). The growth from
+86 s at the P8 open tracks the program count. Round overhead on top:
+the full measurement (`--measure --yes`, about ten minutes) ran in
+every coding round and the planning side re-ran the same gate after
+green rounds. Practice from today: the measurement runs at slice
+closes only, and a green round's gate is not re-run on the same
+tree — only the lanes the coding agent cannot run (live, window).
+Proposed and pending the owner's go: a bounded parallel program
+loop in the differential suite.
