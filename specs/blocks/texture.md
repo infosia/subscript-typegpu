@@ -1,7 +1,8 @@
 # Block: texture (TX-rules)
 
 P5 contract. Rev 0, 2026-08-23. Rev 1 (TX1, TX2, TX3, TX8),
-Rev 2 (TX9, TX10 upload), 2026-08-24.
+Rev 2 (TX9, TX10 upload), 2026-08-24. Rev 3 (TX11, TX12 read
+access), 2026-08-24.
 2026-08-23. Plan §8 P5 governs this block.
 Kernels are `kernel.md`, pipelines `pipeline.md`, render `render.md`.
 
@@ -100,3 +101,26 @@ Kernels are `kernel.md`, pipelines `pipeline.md`, render `render.md`.
   on the GPU, and compares against `simulateCompute` with the same
   host pixels. A `t`-style fixture reaches the TX9 row-alignment
   trap.
+
+## Read access (P11 slice 3)
+
+- **TX11 — Read-access storage textures.** Rev 0, 2026-08-24.
+  `lib/typegpu.ts` adds `ReadStorageTexture2d<F>` (emits
+  `texture_storage_2d<F, read>`, layout entry access `read-only`,
+  methods `load(coords): Vec4f` and `dimensions(): Vec2u`) and
+  `ReadWriteStorageTexture2d<F>` (emits `read_write`, access
+  `read-write`, `load`, `store`, `dimensions`). `F` is the TX1
+  format marker set. The backends accept the r32 formats without a
+  feature (measured 2026-08-24, `p11-feature-gaps.md`); a program
+  that binds a non-r32 `read-write` format first checks
+  `hasFeature("texture-formats-tier2")` and reduces or exits with a
+  message. Host bodies read and write the `Vec4f[]` image as TX1.
+  A `load` on the write-only `StorageTexture2d` stays a diagnostic.
+- **TX12 — The programs.** `b20-read-storage` binds one `read-only`
+  and one `read-write` `r32float` storage texture, copies through a
+  kernel, prints the layout entry kinds and access by name, and
+  runs the host lane. `x21-live-read-storage` ping-pongs a small
+  blur between a `read-only` source and a write-only target over
+  two dispatches and compares against `simulateCompute`. Rejection
+  fixtures: a `Vec*b`-style misuse stays with SC5, a `load` on the
+  write-only wrapper (the TX11 diagnostic), red.

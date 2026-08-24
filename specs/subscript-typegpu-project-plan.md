@@ -615,6 +615,15 @@ step gives the brush stroke), keys switch the brush to a wall and an
 eraser as upstream's tool buttons. Renders through the fullscreen
 strip quad. This is the atomics showcase the survey ranked.
 
+Slice 5, on the read-access storage textures (P11 slice 3).
+`examples/slime-mold/main.ts`: agents in a storage buffer deposit
+into a `read_write` r32float trail texture, a diffuse-and-decay pass
+reads `read-only` and writes the pair's other texture, the render
+samples the trail. `examples/game-of-life/main.ts`: the naive
+strategy only — a `read-only` r32float generation and a write-only
+next generation, `textureLoad` per neighbor, the pointer draws
+cells. The jump-flood pair stays deferred on texture arrays.
+
 Deferred, by the missing feature (the survey ranks these gaps):
 read-only storage textures (slime-mold, game-of-life, the jump-flood
 pair), image decode and byte-to-texture upload (blur, image-tuning,
