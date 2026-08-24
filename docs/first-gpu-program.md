@@ -3,8 +3,7 @@
 A compute kernel runs an ordinary calculation on the GPU, without
 any graphics. This page builds the smallest useful one: a counter
 that the GPU increments. Every code block that names the program is
-a quote from `programs/b22-first-program.ts`, and a test checks
-those quotes against the program.
+a quote from `programs/b22-first-program.ts`.
 
 A GPU function needs more steps than a host function: handles cross
 between two processors, the memory is allocated ahead, and the code

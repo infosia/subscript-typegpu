@@ -10,10 +10,9 @@ design decision: TypeGPU builds schemas and generates WGSL at run time,
 and subscript-typegpu does both before the program runs.
 
 The TypeGPU examples come from the TypeGPU documentation at version
-0.12.0 (`apps/typegpu-docs/src/content/docs/` at commit `dc8f0de`).
-This repository does not run them. The subscript-typegpu examples are
-lines from `programs/`. A test checks that every quoted block exists
-in the named program.
+0.12.0 (`apps/typegpu-docs/src/content/docs/` at commit `dc8f0de`)
+and are quoted, not run here. The subscript-typegpu examples are
+lines from `programs/`.
 
 ## Summary
 
@@ -23,7 +22,7 @@ in the named program.
 | Schema | `d.struct({ ... })`, a run-time object | `@CStruct class`, a compile-time declaration |
 | Layout | computed at run time, `d.sizeOf(T)` | computed by the generator, `T_SIZE` and `T_STRIDE` constants |
 | Kernel | a function with `'use gpu'` | a plain function named by `computePipeline<L>(fn, spec)` |
-| WGSL | generated at run time from a compacted AST | generated before the program runs — a readable `.wgsl` file beside your program |
+| WGSL | generated at run time from a compacted AST | generated before the program runs — one readable `.wgsl` file per pipeline |
 | Bindings | `tgpu.bindGroupLayout({ ... })`, access by `layout.$.name` | a layout class with buffer, texture, and sampler binding fields |
 | Buffer data | JavaScript objects, converted by TypeGPU | `Context.bytesOf<T>(value)`, the bytes of the value |
 | Async | `Promise` | `await` over host-stepped futures |
@@ -154,9 +153,7 @@ Differences:
   `subscript-typegpu-harness dev <program>` or `ship <program>` —
   generates it in memory before the program runs.
 - The generator computes the C layout and the WGSL layout of every
-  schema and rejects a difference (rule `SC9`). A test compiles a C
-  probe and compares the real C layout with the generator's, for
-  every schema in every `b` program.
+  schema and rejects a difference (rule `SC9`).
 - One WGSL layout has no C form: a scalar after a `vec3` member shares
   the vector's tail in WGSL. The generator rejects such a schema. The
   author adds an alignment override to the field's class, or reorders
@@ -701,11 +698,10 @@ const resolved = tgpu.resolve([createSmallBoid, createBigBoid]);
 
 subscript-typegpu generates one WGSL module per pipeline declaration
 before the program runs. The support module holds it as
-`<name>_WGSL`, and it is also written beside the program as
-`programs/<program>.<pipeline>.wgsl` — one readable file per
-pipeline declaration, so you can open the exact WGSL your kernel
-became. The file always matches what runs: it is regenerated and
-validated whenever the program changes.
+`<name>_WGSL`, and the generator also writes it out as one
+readable `.wgsl` file per pipeline declaration, so you can open the
+exact WGSL your kernel became. Run the generator again after a
+kernel change and the file follows.
 
 There is no `tgpu.resolve`, no template with externals, and no
 `$uses`. A kernel refers to module-level constants, layout fields, and
@@ -773,8 +769,9 @@ These subscript-typegpu properties have no equivalent.
   C compiler and reproduces the JIT's output exactly.
 - A C layout equal to the WGSL layout, and `Context.bytesOf<T>`.
 - The emitted WGSL as a readable file beside the program.
-- A backend chosen at run time through `SUBSCRIPT_TYPEGPU_BACKEND_LIB`,
-  including a headless no-op backend for machines without a GPU.
+- A backend chosen at run time through `SUBSCRIPT_TYPEGPU_BACKEND_LIB`.
+  yawgpu's default Noop backend runs headless on a machine with no
+  GPU: copies execute, shaders do not.
 - Generation-time rejections with rule ids, including the uniform
   control flow check for barriers.
 - `simulateCompute` with the `HOST_RUNNABLE` constant.
