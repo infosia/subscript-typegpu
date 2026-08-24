@@ -283,3 +283,16 @@ glider). Twenty examples compile in the gate.
 Evidence: gate green, 251 passed, 203 s. Both smoke runs print
 `window:frames=30` on Metal, read before this commit. The comment
 review and the owner's visual runs follow.
+
+## Slice 5 fix round (2026-08-24)
+
+The slime-mold flow is diffuse A into B, sense A, deposit into B,
+render B, swap — no aliased binding and no read-modify-write race.
+K11's scalar `Math.sin` is unreachable in a kernel (the `f64` cast
+is a K12 diagnostic; recorded here as the measured answer), so one
+shared vector per angle carries the pair. One sensing helper (a
+texture wrapper cannot be a helper parameter under K5, so the
+helper returns the wrapped cell). game-of-life drops the impossible
+check and writes the edit uniform on edit frames only. Both frames
+guard through one sentinel. Gate green, live x01–x22 PASS both
+backends, both smokes read before this commit.

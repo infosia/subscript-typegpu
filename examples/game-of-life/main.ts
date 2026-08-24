@@ -150,7 +150,6 @@ function lifeEditKernel(res: LifeEditLayout, ctx: ComputeInvocation): void {
     res.generation.store(cell, new Vec4f(0.0, 0.0, 0.0, 1.0));
     return;
   }
-  if (params.mode !== EDIT_DRAW) return;
   let dx: f32 = (ctx.globalId.x as f32) - params.point.x;
   let dy: f32 = (ctx.globalId.y as f32) - params.point.y;
   if (dx < 0.0) dx = -dx;
@@ -208,22 +207,62 @@ export const lifeRender: RenderPipelineSpec = renderPipelineL<
   topology: "triangle-strip",
 });
 
-let activeDevice: GPUHostOwnedDevice | null = null;
-let activeStep: ComputePipeline | null = null;
-let activeEdit: ComputePipeline | null = null;
-let activeRender: RenderPipeline | null = null;
-let activeStepAB: GPUBindGroup | null = null;
-let activeStepBA: GPUBindGroup | null = null;
-let activeEditA: GPUBindGroup | null = null;
-let activeEditB: GPUBindGroup | null = null;
-let activeRenderA: GPUBindGroup | null = null;
-let activeRenderB: GPUBindGroup | null = null;
-let activeVertices: GPUBuffer | null = null;
-let activeEditParams: GPUBuffer | null = null;
-let activeGenerationA: GPUTexture | null = null;
-let activeGenerationB: GPUTexture | null = null;
-let activeViewA: GPUTextureView | null = null;
-let activeViewB: GPUTextureView | null = null;
+class LifeState {
+  device: GPUHostOwnedDevice;
+  step: ComputePipeline;
+  edit: ComputePipeline;
+  render: RenderPipeline;
+  stepAB: GPUBindGroup;
+  stepBA: GPUBindGroup;
+  editA: GPUBindGroup;
+  editB: GPUBindGroup;
+  renderA: GPUBindGroup;
+  renderB: GPUBindGroup;
+  vertices: GPUBuffer;
+  editParams: GPUBuffer;
+  generationA: GPUTexture;
+  generationB: GPUTexture;
+  viewA: GPUTextureView;
+  viewB: GPUTextureView;
+
+  constructor(
+    device: GPUHostOwnedDevice,
+    step: ComputePipeline,
+    edit: ComputePipeline,
+    render: RenderPipeline,
+    stepAB: GPUBindGroup,
+    stepBA: GPUBindGroup,
+    editA: GPUBindGroup,
+    editB: GPUBindGroup,
+    renderA: GPUBindGroup,
+    renderB: GPUBindGroup,
+    vertices: GPUBuffer,
+    editParams: GPUBuffer,
+    generationA: GPUTexture,
+    generationB: GPUTexture,
+    viewA: GPUTextureView,
+    viewB: GPUTextureView,
+  ) {
+    this.device = device;
+    this.step = step;
+    this.edit = edit;
+    this.render = render;
+    this.stepAB = stepAB;
+    this.stepBA = stepBA;
+    this.editA = editA;
+    this.editB = editB;
+    this.renderA = renderA;
+    this.renderB = renderB;
+    this.vertices = vertices;
+    this.editParams = editParams;
+    this.generationA = generationA;
+    this.generationB = generationB;
+    this.viewA = viewA;
+    this.viewB = viewB;
+  }
+}
+
+let activeState: LifeState | null = null;
 let frameCount: u32 = 0;
 
 // TypeGPU seeds the grid at random. This port writes one glider, so a reader sees the
@@ -300,11 +339,6 @@ export function init(
   ];
   using queue = hostDevice.queue();
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 4>>(vertexValues));
-  queue.writeBuffer(
-    editParams,
-    0,
-    Context.bytesOf<EditParams>(new EditParams(new Vec2f(0.0, 0.0), EDIT_NONE)),
-  );
   writeTexturePixels(queue, generationA, gliderSeed(), GRID_SIZE, GRID_SIZE);
   writeTexturePixels(queue, generationB, emptyGeneration(), GRID_SIZE, GRID_SIZE);
 
@@ -372,22 +406,24 @@ export function init(
   const renderB = createBindGroupHost(hostDevice, renderLayout, lifeRender_LAYOUT0, [
     textureResource(viewB),
   ]);
-  activeDevice = hostDevice;
-  activeStep = stepPipeline;
-  activeEdit = editPipeline;
-  activeRender = renderPipeline;
-  activeStepAB = stepAB;
-  activeStepBA = stepBA;
-  activeEditA = editA;
-  activeEditB = editB;
-  activeRenderA = renderA;
-  activeRenderB = renderB;
-  activeVertices = vertices;
-  activeEditParams = editParams;
-  activeGenerationA = generationA;
-  activeGenerationB = generationB;
-  activeViewA = viewA;
-  activeViewB = viewB;
+  activeState = new LifeState(
+    hostDevice,
+    stepPipeline,
+    editPipeline,
+    renderPipeline,
+    stepAB,
+    stepBA,
+    editA,
+    editB,
+    renderA,
+    renderB,
+    vertices,
+    editParams,
+    generationA,
+    generationB,
+    viewA,
+    viewB,
+  );
 }
 
 export function frame(
@@ -399,30 +435,8 @@ export function frame(
   pointerY: f32,
   buttons: u32,
 ): void {
-  const device = activeDevice;
-  const stepPipeline = activeStep;
-  const editPipeline = activeEdit;
-  const renderPipeline = activeRender;
-  const stepAB = activeStepAB;
-  const stepBA = activeStepBA;
-  const editA = activeEditA;
-  const editB = activeEditB;
-  const renderA = activeRenderA;
-  const renderB = activeRenderB;
-  const vertices = activeVertices;
-  const editParams = activeEditParams;
-  if (device === null) return;
-  if (stepPipeline === null) return;
-  if (editPipeline === null) return;
-  if (renderPipeline === null) return;
-  if (stepAB === null) return;
-  if (stepBA === null) return;
-  if (editA === null) return;
-  if (editB === null) return;
-  if (renderA === null) return;
-  if (renderB === null) return;
-  if (vertices === null) return;
-  if (editParams === null) return;
+  if (activeState === null) return;
+  const active = activeState;
   // The host passes the key as a Unicode scalar, and 48 is the `0` key.
   // Grid row 0 sits at the bottom of the surface, so the pointer Y is flipped.
   let editMode: u32 = EDIT_NONE;
@@ -436,22 +450,22 @@ export function frame(
       (1.0 - pointerY / (height as f32)) * ((GRID_SIZE - 1) as f32),
     );
   }
-  using queue = device.queue();
-  queue.writeBuffer(
-    editParams,
-    0,
-    Context.bytesOf<EditParams>(new EditParams(editPoint, editMode)),
-  );
+  using queue = active.device.queue();
   // The frame parity picks the step source and target. The edit pass and the render pass
   // both use the step target, so an edit lands on the grid the frame displays.
   const readsA: boolean = frameCount % 2 === 0;
-  const stepGroup: GPUBindGroup = readsA ? stepAB : stepBA;
-  const editGroup: GPUBindGroup = readsA ? editB : editA;
-  const displayGroup: GPUBindGroup = readsA ? renderB : renderA;
-  using encoder = device.createCommandEncoderDefault();
-  stepPipeline.dispatch(encoder, [stepGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
+  const stepGroup: GPUBindGroup = readsA ? active.stepAB : active.stepBA;
+  const editGroup: GPUBindGroup = readsA ? active.editB : active.editA;
+  const displayGroup: GPUBindGroup = readsA ? active.renderB : active.renderA;
+  using encoder = active.device.createCommandEncoderDefault();
+  active.step.dispatch(encoder, [stepGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
   if (editMode !== EDIT_NONE) {
-    editPipeline.dispatch(encoder, [editGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
+    queue.writeBuffer(
+      active.editParams,
+      0,
+      Context.bytesOf<EditParams>(new EditParams(editPoint, editMode)),
+    );
+    active.edit.dispatch(encoder, [editGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
   }
   const target = new GPUTextureView(view);
   using renderPass = encoder.beginRenderPass({
@@ -464,7 +478,7 @@ export function frame(
   });
   renderPass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   renderPass.setScissorRect(0, 0, width, height);
-  renderPipeline.bind(renderPass, [displayGroup], [vertices]);
+  active.render.bind(renderPass, [displayGroup], [active.vertices]);
   renderPass.draw(4);
   renderPass.end();
   using command = encoder.finishDefault();
@@ -473,36 +487,23 @@ export function frame(
 }
 
 export function shutdown(): void {
-  if (activeRenderB !== null) activeRenderB.dispose();
-  if (activeRenderA !== null) activeRenderA.dispose();
-  if (activeEditB !== null) activeEditB.dispose();
-  if (activeEditA !== null) activeEditA.dispose();
-  if (activeStepBA !== null) activeStepBA.dispose();
-  if (activeStepAB !== null) activeStepAB.dispose();
-  if (activeViewB !== null) activeViewB.dispose();
-  if (activeViewA !== null) activeViewA.dispose();
-  if (activeGenerationB !== null) activeGenerationB.dispose();
-  if (activeGenerationA !== null) activeGenerationA.dispose();
-  if (activeEditParams !== null) activeEditParams.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activeRender !== null) activeRender.dispose();
-  if (activeEdit !== null) activeEdit.dispose();
-  if (activeStep !== null) activeStep.dispose();
-  activeRenderB = null;
-  activeRenderA = null;
-  activeEditB = null;
-  activeEditA = null;
-  activeStepBA = null;
-  activeStepAB = null;
-  activeViewB = null;
-  activeViewA = null;
-  activeGenerationB = null;
-  activeGenerationA = null;
-  activeEditParams = null;
-  activeVertices = null;
-  activeRender = null;
-  activeEdit = null;
-  activeStep = null;
-  activeDevice = null;
+  if (activeState === null) return;
+  const active = activeState;
+  active.renderB.dispose();
+  active.renderA.dispose();
+  active.editB.dispose();
+  active.editA.dispose();
+  active.stepBA.dispose();
+  active.stepAB.dispose();
+  active.viewB.dispose();
+  active.viewA.dispose();
+  active.generationB.dispose();
+  active.generationA.dispose();
+  active.editParams.dispose();
+  active.vertices.dispose();
+  active.render.dispose();
+  active.edit.dispose();
+  active.step.dispose();
+  activeState = null;
   frameCount = 0;
 }

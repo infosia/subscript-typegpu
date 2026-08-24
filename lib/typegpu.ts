@@ -6,6 +6,8 @@ import {
   GPUBindGroupEntry,
   GPUBindGroupLayout,
   GPUBindGroupLayoutEntry,
+  GPUBlendComponent,
+  GPUBlendState,
   GPUBuffer,
   GPUCommandEncoder,
   GPUComputePipeline,
@@ -948,6 +950,49 @@ export class RenderPipelineSpec {
   cullMode?: GPUCullMode = "none";
   frontFace?: GPUFrontFace = "ccw";
   indexFormat?: GPUIndexFormat = "undefined";
+  blend?: GPUBlendState | null = null;
+}
+
+function hostBlendComponent(
+  source: f32,
+  destination: f32,
+  sourceAlpha: f32,
+  component: GPUBlendComponent,
+  channel: string,
+): f32 {
+  if (component.operation !== "add") {
+    authorTrap("RN21",
+      "hostBlend",
+      `${channel} srcFactor=${component.srcFactor} dstFactor=${component.dstFactor} operation=${component.operation}`,
+    );
+  }
+  let result: f32 = 0.0;
+  if (component.srcFactor === "src-alpha"
+    && component.dstFactor === "one-minus-src-alpha") {
+    result = source * sourceAlpha + destination * (1.0 - sourceAlpha);
+  } else if (component.srcFactor === "one" && component.dstFactor === "one") {
+    result = source + destination;
+  } else {
+    authorTrap("RN21",
+      "hostBlend",
+      `${channel} srcFactor=${component.srcFactor} dstFactor=${component.dstFactor} operation=${component.operation}`,
+    );
+  }
+  return Math.min(1.0, Math.max(0.0, result as f64)) as f32;
+}
+
+export function hostBlend(
+  source: Vec4f,
+  destination: Vec4f,
+  blend: GPUBlendState | null,
+): Vec4f {
+  if (blend === null) return source;
+  return new Vec4f(
+    hostBlendComponent(source.x, destination.x, source.w, blend.color, "color"),
+    hostBlendComponent(source.y, destination.y, source.w, blend.color, "color"),
+    hostBlendComponent(source.z, destination.z, source.w, blend.color, "color"),
+    hostBlendComponent(source.w, destination.w, source.w, blend.alpha, "alpha"),
+  );
 }
 
 @Descriptor
@@ -975,6 +1020,7 @@ export function renderPipeline<V, O>(
     cullMode: spec.cullMode,
     frontFace: spec.frontFace,
     indexFormat: spec.indexFormat,
+    blend: spec.blend,
   };
 }
 
@@ -989,6 +1035,7 @@ export function renderPipelineL<L, V, O>(
     cullMode: spec.cullMode,
     frontFace: spec.frontFace,
     indexFormat: spec.indexFormat,
+    blend: spec.blend,
   };
 }
 
@@ -1003,6 +1050,7 @@ export function renderPipelineInstanced<V, I, O>(
     cullMode: spec.cullMode,
     frontFace: spec.frontFace,
     indexFormat: spec.indexFormat,
+    blend: spec.blend,
   };
 }
 
@@ -1477,7 +1525,7 @@ function renderPipelineDescriptor(
     fragment: {
       module: shader,
       entryPoint: fragmentEntry,
-      targets: [{ format: spec.format }],
+      targets: [{ format: spec.format, blend: spec.blend }],
     },
   };
 }

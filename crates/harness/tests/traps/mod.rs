@@ -165,6 +165,10 @@ fn runtime_traps_are_named_and_numbered() {
             "texture-row-alignment.ts",
             "TX9 writeTextureBytes bytesPerRow=8 height=2",
         ),
+        (
+            "unsupported-host-blend.ts",
+            "RN21 hostBlend color srcFactor=zero dstFactor=one-minus-src-alpha operation=add",
+        ),
     ] {
         assert_trap(&directory.join(name), expected);
     }

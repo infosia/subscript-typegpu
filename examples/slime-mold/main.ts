@@ -121,48 +121,40 @@ function wrapTrail(value: f32): f32 {
   return wrapped;
 }
 
+function senseTrailCell(position: Vec2f, angle: f32): Vec2i {
+  const angles = new Vec2f(angle, angle);
+  const x: f32 = wrapTrail(
+    position.x + angles.cos().x * SENSOR_DISTANCE,
+  );
+  const y: f32 = wrapTrail(
+    position.y + angles.sin().x * SENSOR_DISTANCE,
+  );
+  return new Vec2i(x as i32, y as i32);
+}
+
 function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.x;
   const agent: Agent = res.agents.get(index);
-  const forwardAngle = new Vec2f(agent.heading, agent.heading);
-  const forwardX: f32 = wrapTrail(
-    agent.position.x + forwardAngle.cos().x * SENSOR_DISTANCE,
-  );
-  const forwardY: f32 = wrapTrail(
-    agent.position.y + forwardAngle.sin().x * SENSOR_DISTANCE,
-  );
-  const leftAngle: f32 = agent.heading + SENSOR_ANGLE;
-  const leftDirection = new Vec2f(leftAngle, leftAngle);
-  const leftX: f32 = wrapTrail(
-    agent.position.x + leftDirection.cos().x * SENSOR_DISTANCE,
-  );
-  const leftY: f32 = wrapTrail(
-    agent.position.y + leftDirection.sin().x * SENSOR_DISTANCE,
-  );
-  const rightAngle: f32 = agent.heading - SENSOR_ANGLE;
-  const rightDirection = new Vec2f(rightAngle, rightAngle);
-  const rightX: f32 = wrapTrail(
-    agent.position.x + rightDirection.cos().x * SENSOR_DISTANCE,
-  );
-  const rightY: f32 = wrapTrail(
-    agent.position.y + rightDirection.sin().x * SENSOR_DISTANCE,
-  );
   const forward: f32 = res.sense.load(
-    new Vec2i(forwardX as i32, forwardY as i32),
+    senseTrailCell(agent.position, agent.heading),
   ).x;
-  const left: f32 = res.sense.load(new Vec2i(leftX as i32, leftY as i32)).x;
-  const right: f32 = res.sense.load(new Vec2i(rightX as i32, rightY as i32)).x;
+  const left: f32 = res.sense.load(
+    senseTrailCell(agent.position, agent.heading + SENSOR_ANGLE),
+  ).x;
+  const right: f32 = res.sense.load(
+    senseTrailCell(agent.position, agent.heading - SENSOR_ANGLE),
+  ).x;
   if (left > forward && left > right) {
     agent.heading += TURN_SPEED;
   } else if (right > forward && right > left) {
     agent.heading -= TURN_SPEED;
   }
-  const stepDirection = new Vec2f(agent.heading, agent.heading);
+  const stepAngles = new Vec2f(agent.heading, agent.heading);
   agent.position.x = wrapTrail(
-    agent.position.x + stepDirection.cos().x * STEP_SIZE,
+    agent.position.x + stepAngles.cos().x * STEP_SIZE,
   );
   agent.position.y = wrapTrail(
-    agent.position.y + stepDirection.sin().x * STEP_SIZE,
+    agent.position.y + stepAngles.sin().x * STEP_SIZE,
   );
   res.agents.set(index, agent);
   const cell = new Vec2i(agent.position.x as i32, agent.position.y as i32);
@@ -238,22 +230,62 @@ export const slimeRender: RenderPipelineSpec = renderPipelineL<
   topology: "triangle-strip",
 });
 
-let activeDevice: GPUHostOwnedDevice | null = null;
-let activeMove: ComputePipeline | null = null;
-let activeDiffuse: ComputePipeline | null = null;
-let activeRender: RenderPipeline | null = null;
-let activeMoveA: GPUBindGroup | null = null;
-let activeMoveB: GPUBindGroup | null = null;
-let activeDiffuseAB: GPUBindGroup | null = null;
-let activeDiffuseBA: GPUBindGroup | null = null;
-let activeRenderA: GPUBindGroup | null = null;
-let activeRenderB: GPUBindGroup | null = null;
-let activeVertices: GPUBuffer | null = null;
-let activeAgents: GPUBuffer | null = null;
-let activeTrailA: GPUTexture | null = null;
-let activeTrailB: GPUTexture | null = null;
-let activeViewA: GPUTextureView | null = null;
-let activeViewB: GPUTextureView | null = null;
+class SlimeState {
+  device: GPUHostOwnedDevice;
+  move: ComputePipeline;
+  diffuse: ComputePipeline;
+  render: RenderPipeline;
+  moveAB: GPUBindGroup;
+  moveBA: GPUBindGroup;
+  diffuseAB: GPUBindGroup;
+  diffuseBA: GPUBindGroup;
+  renderA: GPUBindGroup;
+  renderB: GPUBindGroup;
+  vertices: GPUBuffer;
+  agents: GPUBuffer;
+  trailA: GPUTexture;
+  trailB: GPUTexture;
+  viewA: GPUTextureView;
+  viewB: GPUTextureView;
+
+  constructor(
+    device: GPUHostOwnedDevice,
+    move: ComputePipeline,
+    diffuse: ComputePipeline,
+    render: RenderPipeline,
+    moveAB: GPUBindGroup,
+    moveBA: GPUBindGroup,
+    diffuseAB: GPUBindGroup,
+    diffuseBA: GPUBindGroup,
+    renderA: GPUBindGroup,
+    renderB: GPUBindGroup,
+    vertices: GPUBuffer,
+    agents: GPUBuffer,
+    trailA: GPUTexture,
+    trailB: GPUTexture,
+    viewA: GPUTextureView,
+    viewB: GPUTextureView,
+  ) {
+    this.device = device;
+    this.move = move;
+    this.diffuse = diffuse;
+    this.render = render;
+    this.moveAB = moveAB;
+    this.moveBA = moveBA;
+    this.diffuseAB = diffuseAB;
+    this.diffuseBA = diffuseBA;
+    this.renderA = renderA;
+    this.renderB = renderB;
+    this.vertices = vertices;
+    this.agents = agents;
+    this.trailA = trailA;
+    this.trailB = trailB;
+    this.viewA = viewA;
+    this.viewB = viewB;
+  }
+}
+
+let activeState: SlimeState | null = null;
 let frameCount: u32 = 0;
 
 function zeroTrail(): Vec4f[] {
@@ -373,15 +405,15 @@ export function init(
   using moveLayout = movePipeline.bindGroupLayout(0);
   using diffuseLayout = diffusePipeline.bindGroupLayout(0);
   using renderLayout = renderPipeline.bindGroupLayout(0);
-  const moveA = createBindGroupHost(hostDevice, moveLayout, slimeMove_LAYOUT0, [
+  const moveAB = createBindGroupHost(hostDevice, moveLayout, slimeMove_LAYOUT0, [
     bufferResource(agents),
     textureResource(viewA),
-    textureResource(viewA),
+    textureResource(viewB),
   ]);
-  const moveB = createBindGroupHost(hostDevice, moveLayout, slimeMove_LAYOUT0, [
+  const moveBA = createBindGroupHost(hostDevice, moveLayout, slimeMove_LAYOUT0, [
     bufferResource(agents),
     textureResource(viewB),
-    textureResource(viewB),
+    textureResource(viewA),
   ]);
   const diffuseAB = createBindGroupHost(hostDevice, diffuseLayout, slimeDiffuse_LAYOUT0, [
     textureResource(viewA),
@@ -397,22 +429,24 @@ export function init(
   const renderB = createBindGroupHost(hostDevice, renderLayout, slimeRender_LAYOUT0, [
     textureResource(viewB),
   ]);
-  activeDevice = hostDevice;
-  activeMove = movePipeline;
-  activeDiffuse = diffusePipeline;
-  activeRender = renderPipeline;
-  activeMoveA = moveA;
-  activeMoveB = moveB;
-  activeDiffuseAB = diffuseAB;
-  activeDiffuseBA = diffuseBA;
-  activeRenderA = renderA;
-  activeRenderB = renderB;
-  activeVertices = vertices;
-  activeAgents = agents;
-  activeTrailA = trailA;
-  activeTrailB = trailB;
-  activeViewA = viewA;
-  activeViewB = viewB;
+  activeState = new SlimeState(
+    hostDevice,
+    movePipeline,
+    diffusePipeline,
+    renderPipeline,
+    moveAB,
+    moveBA,
+    diffuseAB,
+    diffuseBA,
+    renderA,
+    renderB,
+    vertices,
+    agents,
+    trailA,
+    trailB,
+    viewA,
+    viewB,
+  );
 }
 
 export function frame(
@@ -424,41 +458,23 @@ export function frame(
   pointerY: f32,
   buttons: u32,
 ): void {
-  const device = activeDevice;
-  const movePipeline = activeMove;
-  const diffusePipeline = activeDiffuse;
-  const renderPipeline = activeRender;
-  const moveA = activeMoveA;
-  const moveB = activeMoveB;
-  const diffuseAB = activeDiffuseAB;
-  const diffuseBA = activeDiffuseBA;
-  const renderA = activeRenderA;
-  const renderB = activeRenderB;
-  const vertices = activeVertices;
-  if (device === null) return;
-  if (movePipeline === null) return;
-  if (diffusePipeline === null) return;
-  if (renderPipeline === null) return;
-  if (moveA === null) return;
-  if (moveB === null) return;
-  if (diffuseAB === null) return;
-  if (diffuseBA === null) return;
-  if (renderA === null) return;
-  if (renderB === null) return;
-  if (vertices === null) return;
+  if (activeState === null) return;
+  const active = activeState;
+  // Frame parity diffuses A into B, then agents sense A and deposit into B.
+  // The render pass displays B before the pair swaps on the next frame.
   const readsA: boolean = frameCount % 2 === 0;
-  const moveGroup: GPUBindGroup = readsA ? moveA : moveB;
-  const diffuseGroup: GPUBindGroup = readsA ? diffuseAB : diffuseBA;
-  const displayGroup: GPUBindGroup = readsA ? renderB : renderA;
-  using encoder = device.createCommandEncoderDefault();
-  movePipeline.dispatch(encoder, [moveGroup], AGENT_COUNT / 64, 1, 1);
-  diffusePipeline.dispatch(
+  const moveGroup: GPUBindGroup = readsA ? active.moveAB : active.moveBA;
+  const diffuseGroup: GPUBindGroup = readsA ? active.diffuseAB : active.diffuseBA;
+  const displayGroup: GPUBindGroup = readsA ? active.renderB : active.renderA;
+  using encoder = active.device.createCommandEncoderDefault();
+  active.diffuse.dispatch(
     encoder,
     [diffuseGroup],
     TRAIL_SIZE / 8,
     TRAIL_SIZE / 8,
     1,
   );
+  active.move.dispatch(encoder, [moveGroup], AGENT_COUNT / 64, 1, 1);
   const target = new GPUTextureView(view);
   using renderPass = encoder.beginRenderPass({
     colorAttachments: [{
@@ -470,46 +486,33 @@ export function frame(
   });
   renderPass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   renderPass.setScissorRect(0, 0, width, height);
-  renderPipeline.bind(renderPass, [displayGroup], [vertices]);
+  active.render.bind(renderPass, [displayGroup], [active.vertices]);
   renderPass.draw(4);
   renderPass.end();
   using command = encoder.finishDefault();
-  using queue = device.queue();
+  using queue = active.device.queue();
   queue.submit([command]);
   frameCount += 1;
 }
 
 export function shutdown(): void {
-  if (activeRenderB !== null) activeRenderB.dispose();
-  if (activeRenderA !== null) activeRenderA.dispose();
-  if (activeDiffuseBA !== null) activeDiffuseBA.dispose();
-  if (activeDiffuseAB !== null) activeDiffuseAB.dispose();
-  if (activeMoveB !== null) activeMoveB.dispose();
-  if (activeMoveA !== null) activeMoveA.dispose();
-  if (activeViewB !== null) activeViewB.dispose();
-  if (activeViewA !== null) activeViewA.dispose();
-  if (activeTrailB !== null) activeTrailB.dispose();
-  if (activeTrailA !== null) activeTrailA.dispose();
-  if (activeAgents !== null) activeAgents.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activeRender !== null) activeRender.dispose();
-  if (activeDiffuse !== null) activeDiffuse.dispose();
-  if (activeMove !== null) activeMove.dispose();
-  activeRenderB = null;
-  activeRenderA = null;
-  activeDiffuseBA = null;
-  activeDiffuseAB = null;
-  activeMoveB = null;
-  activeMoveA = null;
-  activeViewB = null;
-  activeViewA = null;
-  activeTrailB = null;
-  activeTrailA = null;
-  activeAgents = null;
-  activeVertices = null;
-  activeRender = null;
-  activeDiffuse = null;
-  activeMove = null;
-  activeDevice = null;
+  if (activeState === null) return;
+  const active = activeState;
+  active.renderB.dispose();
+  active.renderA.dispose();
+  active.diffuseBA.dispose();
+  active.diffuseAB.dispose();
+  active.moveBA.dispose();
+  active.moveAB.dispose();
+  active.viewB.dispose();
+  active.viewA.dispose();
+  active.trailB.dispose();
+  active.trailA.dispose();
+  active.agents.dispose();
+  active.vertices.dispose();
+  active.render.dispose();
+  active.diffuse.dispose();
+  active.move.dispose();
+  activeState = null;
   frameCount = 0;
 }

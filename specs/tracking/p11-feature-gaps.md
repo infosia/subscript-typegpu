@@ -115,3 +115,16 @@ local edge test misses the second triangle at a pixel center on or
 near an edge. The fix moves the coordinates so every pixel center
 keeps a margin from every edge, the practice of the other live
 render programs. The blending code itself is not implicated.
+
+## Slice 4 close (2026-08-24)
+
+Blending landed: `RenderPipelineSpec.blend` through both device
+forms, the host rasterizer's two factor pairs with the `RN21` trap
+(red recorded), `b21-blend` on both tiers, and `x22-live-blend`
+fixed by coordinates with a checked `0.0025` edge margin for every
+pixel center (the failing pixel sat on the first triangle's `bc`
+edge at 3e-8). Gate green, 251 passed, 216 s. Live x01–x22 PASS:
+Metal (yawgpu) 66.09 s, Dawn 61.54 s.
+
+P11 slices 1–4 are complete. Deferred remains: depth, multisample,
+integer textures, texture arrays, 3D textures.
