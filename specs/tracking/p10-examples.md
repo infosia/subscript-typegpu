@@ -264,3 +264,10 @@ The first diagnosis (the unsuffixed literal) was a real defect K14
 Rev 6 fixed, but not this failure's cause. Gate green, 251 passed.
 The smoke run prints `window:frames=30` with no FAIL line, read
 before this commit.
+
+## The atomic fluid visual pass (2026-08-24, Metal)
+
+After the i32-minimum fix the owner ran `fluid-with-atomics` for
+4843 frames: the brush, the fall and the sideways flow, the wall,
+and the eraser work as intended. Every slice 1 through 4 example
+now has a passed visual run.
