@@ -303,3 +303,16 @@ backends, both smokes read before this commit.
 agents that land in one cell in one dispatch still overwrite one
 deposit, the same last-write-wins shape the upstream has, so it is
 not a port divergence.
+
+## slime-mold shows static lines (2026-08-24)
+
+The owner's run shows motionless lines and no network. Cause, from
+the source: the agents start on one small ring with tangent
+headings, the port has no random source, and the turn rule fires
+only when a side sample beats the forward sample, so the symmetric
+zero-trail start never breaks and every agent traces a closed
+straight torus line. TypeGPU breaks the symmetry with random
+seeding and a random turn. The fix seeds positions and headings
+from the noise module's LCG over the whole grid and gives each
+agent an LCG state for the tie-breaking turn, so the behavior stays
+deterministic per run while the symmetry breaks.
