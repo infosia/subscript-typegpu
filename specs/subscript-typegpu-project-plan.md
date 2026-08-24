@@ -607,6 +607,14 @@ reductions leave: `confetti` draws its card as a four-vertex
 upstream four-vertex strip quad. The affected comments change with
 the code.
 
+Slice 4, on the pointer input. `examples/fluid-with-atomics/main.ts`:
+the upstream atomic fluid — a grid of `AtomicU32` water levels,
+`atomicAdd` accumulation in compute, a pointer brush that adds water
+while the left button is down (`sdLine` from the pointer's frame
+step gives the brush stroke), keys switch the brush to a wall and an
+eraser as upstream's tool buttons. Renders through the fullscreen
+strip quad. This is the atomics showcase the survey ranked.
+
 Deferred, by the missing feature (the survey ranks these gaps):
 read-only storage textures (slime-mold, game-of-life, the jump-flood
 pair), image decode and byte-to-texture upload (blur, image-tuning,
