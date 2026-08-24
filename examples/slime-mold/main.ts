@@ -2,9 +2,9 @@
 // Moves trail-sensing agents and diffuses their deposits through a swapped texture pair.
 // TypeGPU exposes move speed, sensor angle, sensor distance, turn speed, and evaporation
 // rate as sliders. This port fixes step 1, sensor angle 0.5, sensor distance 5, turn 0.32,
-// and decay 0.985.
+// and decay 0.96.
 // TypeGPU runs 200000 agents over a canvas-sized texture pair, and one deposit adds 1.0 to
-// a cell. This port fixes 4096 agents, a 128-square trail, and deposit 0.2.
+// a cell. This port fixes 4096 agents, a 256-square trail, and deposit 0.2.
 // TypeGPU seeds agents in a disc and points them toward its center. This port derives
 // full-grid positions and full-circle headings from a deterministic 16-bit LCG.
 // The same LCG selects a turn when both sides win or all samples tie at zero. At the border,
@@ -69,14 +69,14 @@ import {
   slimeRender_WGSL,
 } from "./main.typegpu";
 
-const TRAIL_SIZE: u32 = 128;
+const TRAIL_SIZE: u32 = 256;
 const AGENT_COUNT: u32 = 4096;
 const SENSOR_DISTANCE: f32 = 5.0;
 const SENSOR_ANGLE: f32 = 0.5;
 const TURN_SPEED: f32 = 0.32;
 const STEP_SIZE: f32 = 1.0;
 const DEPOSIT_AMOUNT: f32 = 0.2;
-const TRAIL_DECAY: f32 = 0.985;
+const TRAIL_DECAY: f32 = 0.96;
 const TAU: f32 = 6.2831855;
 
 @CStruct
@@ -214,7 +214,7 @@ function diffuseTrail(res: SlimeDiffuseLayout, ctx: ComputeInvocation): void {
   res.target.store(new Vec2i(x, y), new Vec4f(value, 0.0, 0.0, 1.0));
 }
 
-// The vertex buffer carries the four corners of a full-screen strip.
+// The full-screen strip scales the complete trail across the current window viewport.
 // TypeGPU emits one oversized triangle from the vertex index and binds no vertex buffer.
 function slimeVertex(
   res: SlimeRenderLayout,
