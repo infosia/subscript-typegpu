@@ -16,11 +16,23 @@ use winit::window::{Window, WindowAttributes, WindowId};
 mod macos_colorspace {
     use std::ffi::c_void;
 
+    #[repr(C)]
+    pub struct CGColorSpace {
+        _opaque: [u8; 0],
+    }
+
+    // SAFETY: CGColorSpaceRef is encoded as a pointer to the opaque
+    // CGColorSpace struct by the Objective-C runtime.
+    unsafe impl objc2::RefEncode for CGColorSpace {
+        const ENCODING_REF: objc2::Encoding =
+            objc2::Encoding::Pointer(&objc2::Encoding::Struct("CGColorSpace", &[]));
+    }
+
     #[link(name = "CoreGraphics", kind = "framework")]
     extern "C" {
         pub static kCGColorSpaceSRGB: *const c_void;
-        pub fn CGColorSpaceCreateWithName(name: *const c_void) -> *mut c_void;
-        pub fn CGColorSpaceRelease(space: *mut c_void);
+        pub fn CGColorSpaceCreateWithName(name: *const c_void) -> *mut CGColorSpace;
+        pub fn CGColorSpaceRelease(space: *mut CGColorSpace);
     }
 }
 
