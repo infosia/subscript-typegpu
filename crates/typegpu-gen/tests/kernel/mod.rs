@@ -448,12 +448,14 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } f
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output!: MutStorage<Item>; }
 const LARGE: u32 = 2147483647 + 1;
-function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[ctx.globalId.x] = new Item(LARGE); }
+const MINIMUM: i32 = -2147483648;
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[ctx.globalId.x] = new Item(LARGE + (MINIMUM as u32)); }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
     assert!(wgsl.contains("const LARGE: u32 = 2147483648u;"));
+    assert!(wgsl.contains("const MINIMUM: i32 = (-2147483647i - 1i);"));
     validate(wgsl);
 }
 
@@ -477,6 +479,7 @@ function atomics(res: Layout, ctx: ComputeInvocation): void {
   localCounter.get().store(ctx.localIndex);
   localCounter.get().add(1);
   res.counters[0].signed.add(-1);
+  res.counters[0].signed.store(-2147483648);
   storageBarrier();
 }
 export const atomicPipeline: ComputePipelineSpec = computePipeline<Layout>(atomics, { name: "atomicPipeline", workgroupSize: [1, 1, 1] });
@@ -497,6 +500,7 @@ export const atomicPipeline: ComputePipelineSpec = computePipeline<Layout>(atomi
         "atomicStore(&localCounter, localIndex)",
         "atomicAdd(&localCounter, 1u)",
         "atomicAdd(&counters[0u].signed, -1i)",
+        "atomicStore(&counters[0u].signed, (-2147483647i - 1i))",
         "storageBarrier();",
     ] {
         assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");

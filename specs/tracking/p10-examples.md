@@ -252,3 +252,15 @@ literal was not this failure's cause: the suspect is a `u32` value
 at or above 2^31 crossing into an `i32` constant context in one of
 the example's four modules. The next round dumps the emitted
 modules and fixes the site.
+
+## The fluid failure's real cause (2026-08-24)
+
+The dumped module showed `atomicStore(&next[index].level,
+-2147483648i)`: WGSL reads the spelling as negation of `2147483648i`,
+which exceeds the `i32` maximum. `naga` accepted, Tint refused. The
+emitter now spells the minimum as `(-2147483647i - 1i)` (K14 Rev 6
+note), with generator coverage for the folded and the direct form.
+The first diagnosis (the unsuffixed literal) was a real defect K14
+Rev 6 fixed, but not this failure's cause. Gate green, 251 passed.
+The smoke run prints `window:frames=30` with no FAIL line, read
+before this commit.

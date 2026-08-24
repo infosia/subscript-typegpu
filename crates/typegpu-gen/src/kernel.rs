@@ -772,7 +772,7 @@ fn binary_operand(value: &Snippet, parent: u8, right: bool) -> String {
 fn literal(expr: &Expr) -> Result<String, Diagnostic> {
     match (&expr.kind, &expr.ty) {
         (ExprKind::Int(value), Type::U32) => Ok(crate::wgsl_u32_literal(value)),
-        (ExprKind::Int(value), Type::I32) => Ok(crate::wgsl_i32_literal(value)),
+        (ExprKind::Int(value), Type::I32) => Ok(crate::wgsl_i32_literal(*value)),
         (ExprKind::Float(value), Type::F32) => Ok(f32_literal(*value)),
         (ExprKind::Float(_), Type::F64) => Err(diagnostic(
             "K5",
@@ -828,9 +828,9 @@ impl FoldedConstant {
             Self::Bool(value) => Snippet::atom(value.to_string()),
             Self::I32(value) => {
                 if *value < 0 {
-                    Snippet::new(crate::wgsl_i32_literal(value), 9)
+                    Snippet::new(crate::wgsl_i32_literal(i64::from(*value)), 9)
                 } else {
-                    Snippet::atom(crate::wgsl_i32_literal(value))
+                    Snippet::atom(crate::wgsl_i32_literal(i64::from(*value)))
                 }
             }
             Self::U32(value) => Snippet::atom(crate::wgsl_u32_literal(value)),

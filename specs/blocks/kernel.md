@@ -120,7 +120,11 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   accepted `2147483648` in a `u32` context and Tint refused it with
   `value cannot be represented as 'i32'` (measured 2026-08-24, the
   atomic fluid example on Metal and recorded in
-  `specs/tracking/p10-examples.md`). Identifiers keep
+  `specs/tracking/p10-examples.md`). The emitter spells `i32`
+  minimum as `(-2147483647i - 1i)`, because WGSL reads
+  `-2147483648i` as negation of a literal above the maximum, `naga`
+  accepted it, and Tint refused it (the same example, the second
+  measurement). Identifiers keep
   their subscript names. A name that collides with a WGSL reserved
   word or a builtin function or type gets a `_` suffix, through one
   function applied to every identifier the emitter writes: struct
