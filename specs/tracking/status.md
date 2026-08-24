@@ -91,3 +91,17 @@ regression (the host compiled without the support module) closed by
 one shared program loader. Evidence: gate 246 passed 168 s; `--frames
 120` on Metal and Dawn; the owner's interactive Dawn run. Record:
 `specs/tracking/p9-window.md`.
+
+## P10 — the example ports; P11 — the feature gaps (2026-08-25)
+
+P10: twenty TypeGPU example ports under `examples/` (EX1–EX7), the
+sdf and noise library modules, every windowed port visually passed
+by the owner, and the survey of all 77 upstream examples. P11: the
+four planned gap slices — texture upload and strip, pointer input,
+read-access storage textures, blending — each proven by a `b` and
+an `x` program. The emitter gained three Tint-compatibility rules
+the examples surfaced (literal suffixes, the `i32` minimum
+spelling, logic parentheses), and T18's bounded worker pool cut the
+full gate from 214 s to 106 s. Records:
+`specs/tracking/p10-examples.md`, `specs/tracking/p11-feature-gaps.md`,
+`specs/tracking/build-time.md`.

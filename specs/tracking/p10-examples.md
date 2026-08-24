@@ -412,3 +412,22 @@ both sides. The targeted checks pass, `check:prng pass` on Metal
 (byte-exact GPU versus host), and the slime smoke shows zero FAIL
 lines, both read before this commit. The owner's re-check decides
 the visual pass.
+
+## slime-mold visual pass; P10 close (2026-08-25)
+
+With the xorshift PRNG the owner sees the network form (454-frame
+run): the visual pass closes the last example. The slime-mold chain
+took five defect rounds — the aliased binding, the saturation
+arithmetic, the line collapse without continuous jitter, the
+parallel stripes from the 16-bit LCG's serial correlation, and the
+struct-returning xorshift — each diagnosed from a measured symptom
+and recorded above.
+
+P10 COMPLETE 2026-08-25: twenty example ports (four headless with
+`check:` lines, sixteen windowed), every windowed example with a
+passed visual run, the sdf and noise library modules, EX1–EX7 with
+the quote-free comment contract, and the upstream survey that ranks
+what remains. Remaining upstream candidates wait on: texture
+arrays and the jump-flood pair, depth and the 3D set, multisample
+and the geometry set, sort and color modules, webcam and network
+examples (out of scope).
