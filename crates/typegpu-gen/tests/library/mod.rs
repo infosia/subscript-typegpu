@@ -115,3 +115,41 @@ export const sdf: ComputePipelineSpec = computePipeline<Layout>(sdfKernel, { nam
     }
     validate(wgsl);
 }
+
+#[test]
+fn noise_library_helpers_emit_and_validate() {
+    let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
+    files.pop();
+    files.push(SourceFile::new(
+        "noise-library-test.ts",
+        r#"
+import { Vec3f } from "./typegpu-types";
+import { RandomF32, perlin3d, randF32, randSeed } from "./typegpu-noise";
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { output!: MutStorage<f32>; }
+function noiseKernel(res: Layout, ctx: ComputeInvocation): void {
+  const seed: u32 = randSeed(ctx.globalId.x + 1);
+  const sample: RandomF32 = randF32(seed);
+  const noise: f32 = perlin3d(new Vec3f(0.25, 0.5, 0.75));
+  res.output.set(0, sample.value + noise + ((sample.state & 255) as f32));
+}
+export const noise: ComputePipelineSpec = computePipeline<Layout>(noiseKernel, { name: "noise", workgroupSize: [1, 1, 1] });
+"#,
+    ));
+    let generated = subscript_typegpu_gen::generate(&files)
+        .unwrap_or_else(|diagnostics| panic!("generate noise library kernel: {diagnostics:?}"));
+    let wgsl = &generated.pipelines[0].1;
+    for expected in [
+        "struct RandomF32 {",
+        "fn xorU32(",
+        "fn randSeed(",
+        "fn randF32(",
+        "fn perlin3d(",
+        "var next = xorU32(state, state * 8192u);",
+        "next = xorU32(next, next / 131072u);",
+        "next = xorU32(next, next * 32u);",
+    ] {
+        assert!(wgsl.contains(expected), "missing `{expected}`:\n{wgsl}");
+    }
+    validate(wgsl);
+}

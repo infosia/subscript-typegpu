@@ -29,19 +29,19 @@ pub(crate) fn is_bool_vector(module: &Module, ty: &Type) -> bool {
             && matches!(module.classes[id.0].name.as_str(), "Vec2b" | "Vec3b" | "Vec4b"))
 }
 
-fn is_library_file(file: &str) -> bool {
-    matches!(
-        file,
-        "webgpu.ts" | "typegpu-types.ts" | "typegpu.ts" | "typegpu-noise.ts" | "typegpu-sdf.ts"
-    )
-}
-
 fn is_indirect_schema(class: &ClassDef) -> bool {
     class.pos.file == "typegpu-types.ts"
         && matches!(
             class.name.as_str(),
             "DispatchIndirectArgs" | "DrawIndirectArgs" | "DrawIndexedIndirectArgs"
         )
+}
+
+fn is_schema_candidate(class: &ClassDef) -> bool {
+    !matches!(
+        class.pos.file.as_str(),
+        "webgpu.ts" | "typegpu-types.ts" | "typegpu.ts"
+    ) || is_indirect_schema(class)
 }
 
 fn vector_shape(name: &str) -> Option<(Scalar, u8)> {
@@ -325,9 +325,12 @@ pub(crate) fn discover(
     let mut diagnostics = Vec::new();
     let mut reachable = BTreeSet::new();
     for name in intended {
-        let Some((index, class)) = module.classes.iter().enumerate().find(|(_, class)| {
-            class.name == *name && (!is_library_file(&class.pos.file) || is_indirect_schema(class))
-        }) else {
+        let Some((index, class)) = module
+            .classes
+            .iter()
+            .enumerate()
+            .find(|(_, class)| class.name == *name && is_schema_candidate(class))
+        else {
             diagnostics.push(diagnostic(
                 "SC1",
                 format!("`{name}` is not a schema"),

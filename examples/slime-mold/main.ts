@@ -6,8 +6,8 @@
 // TypeGPU runs 200000 agents over a canvas-sized texture pair, and one deposit adds 1.0 to
 // a cell. This port fixes 4096 agents, a 256-square trail, and deposit 0.2.
 // TypeGPU seeds agents in a disc and points them toward its center. This port derives
-// full-grid positions and full-circle headings from a deterministic 16-bit LCG.
-// The same LCG adds centered heading jitter in [-0.15, 0.15) radians each frame.
+// full-grid positions and full-circle headings from a Wang-seeded xorshift32 PRNG.
+// The same PRNG adds centered heading jitter in [-0.15, 0.15) radians each frame.
 // It also selects a turn when both sides win or all samples tie at zero. At the border, this
 // port wraps the trail instead of the TypeGPU clamp, reflection, and jitter.
 // Ported from TypeGPU's slime-mold example (https://github.com/software-mansion/TypeGPU).
@@ -40,6 +40,7 @@ import {
   Vec4f,
 } from "./typegpu-types";
 import {
+  RandomF32,
   randF32,
   randSeed,
 } from "./typegpu-noise";
@@ -93,12 +94,12 @@ class Vertex {
 class Agent {
   position: Vec2f;
   heading: f32;
-  lcgState: u32;
+  randomState: u32;
 
-  constructor(position: Vec2f, heading: f32, lcgState: u32) {
+  constructor(position: Vec2f, heading: f32, randomState: u32) {
     this.position = position;
     this.heading = heading;
-    this.lcgState = lcgState;
+    this.randomState = randomState;
   }
 }
 
@@ -155,9 +156,9 @@ function senseTrailCell(position: Vec2f, angle: f32): Vec2i {
 function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.x;
   const agent: Agent = res.agents.get(index);
-  const jitter = randF32(agent.lcgState);
-  agent.lcgState = jitter.x as u32;
-  agent.heading += (jitter.y - 0.5) * 0.3;
+  const jitter: RandomF32 = randF32(agent.randomState);
+  agent.randomState = jitter.state;
+  agent.heading += (jitter.value - 0.5) * 0.3;
   const forward: f32 = res.sense.load(
     senseTrailCell(agent.position, agent.heading),
   ).x;
@@ -171,9 +172,9 @@ function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
     (left > forward && right > forward)
     || (forward === 0.0 && left === 0.0 && right === 0.0)
   ) {
-    const random = randF32(agent.lcgState);
-    agent.lcgState = random.x as u32;
-    if ((agent.lcgState & 1) === 0) {
+    const random: RandomF32 = randF32(agent.randomState);
+    agent.randomState = random.state;
+    if ((agent.randomState & 1) === 0) {
       agent.heading += TURN_SPEED;
     } else {
       agent.heading -= TURN_SPEED;
@@ -381,27 +382,27 @@ export function init(
     new Vertex(new Vec2f(-1.0, 1.0)),
     new Vertex(new Vec2f(1.0, 1.0)),
   ];
-  // Each agent index seeds the LCG. Three samples set the full-grid position and
+  // Each agent index seeds the PRNG. Three samples set the full-grid position and
   // full-circle heading. The stored state continues the deterministic sequence.
   const agentBytes: u8[] = [];
   let agentIndex: u32 = 0;
   while (agentIndex < AGENT_COUNT) {
-    let lcgState: u32 = randSeed(agentIndex);
-    let sample = randF32(lcgState);
-    lcgState = sample.x as u32;
-    const x: f32 = sample.y * (TRAIL_SIZE as f32);
-    sample = randF32(lcgState);
-    lcgState = sample.x as u32;
-    const y: f32 = sample.y * (TRAIL_SIZE as f32);
-    sample = randF32(lcgState);
-    lcgState = sample.x as u32;
-    const heading: f32 = sample.y * TAU;
+    let randomState: u32 = randSeed(agentIndex);
+    let sample: RandomF32 = randF32(randomState);
+    randomState = sample.state;
+    const x: f32 = sample.value * (TRAIL_SIZE as f32);
+    sample = randF32(randomState);
+    randomState = sample.state;
+    const y: f32 = sample.value * (TRAIL_SIZE as f32);
+    sample = randF32(randomState);
+    randomState = sample.state;
+    const heading: f32 = sample.value * TAU;
     const position = new Vec2f(
       x,
       y,
     );
     const bytes: u8[] = Context.bytesOf<Agent>(
-      new Agent(position, heading, lcgState),
+      new Agent(position, heading, randomState),
     );
     let byteIndex: i32 = 0;
     while (byteIndex < bytes.length) {

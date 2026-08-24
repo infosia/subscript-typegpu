@@ -1,19 +1,43 @@
 import {
-  Vec2f,
   Vec3f,
   mix,
 } from "./typegpu-types";
 
-// The PRNG is the classic 16-bit linear congruential generator, next = (state *
-// 25173 + 13849) mod 65536. `randF32` returns the next state exactly in x and its
-// value in the range [0, 1) in y. Callers cast x back to u32.
-export function randSeed(seed: u32): u32 {
-  return seed % 65536;
+// The PRNG hashes each input seed with Wang's 32-bit integer hash. It advances with
+// xorshift32 through left 13, right 17, and left 5 shifts.
+// `randF32` returns an exact `u32` state and an `f32` value in the range [0, 1).
+// The value scales by 2^-32 through `f32`, which keeps 24 significant bits.
+// A rounded upper endpoint clamps to the largest `f32` below 1.
+@CStruct
+export class RandomF32 {
+  state: u32;
+  value: f32;
+
+  constructor(state: u32, value: f32) {
+    this.state = state;
+    this.value = value;
+  }
 }
 
-export function randF32(state: u32): Vec2f {
-  const next: u32 = (state * 25173 + 13849) % 65536;
-  return new Vec2f(next as f32, (next as f32) / 65536.0);
+function xorU32(left: u32, right: u32): u32 {
+  return (left | right) & ~(left & right);
+}
+
+export function randSeed(seed: u32): u32 {
+  let state: u32 = xorU32(xorU32(seed, 61), seed / 65536);
+  state *= 9;
+  state = xorU32(state, state / 16);
+  state *= 668265261;
+  return xorU32(state, state / 32768);
+}
+
+export function randF32(state: u32): RandomF32 {
+  let next: u32 = xorU32(state, state * 8192);
+  next = xorU32(next, next / 131072);
+  next = xorU32(next, next * 32);
+  let value: f32 = (next as f32) * 0.00000000023283064;
+  if (value >= 1.0) value = 0.99999994;
+  return new RandomF32(next, value);
 }
 
 const PERMUTATION: FixedArray<u32, 256> = [

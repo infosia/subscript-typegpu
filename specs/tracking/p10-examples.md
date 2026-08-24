@@ -403,3 +403,12 @@ mantissa), so `randF32` returns a `@CStruct` value `{ state: u32;
 value: f32 }` instead of a `Vec2f`. A helper that returns a schema
 value class is a legal K2 return, and the state stays exact on both
 sides.
+
+## The xorshift PRNG landed (2026-08-24)
+
+`randF32` returns `RandomF32 { state: u32; value: f32 }` over a
+Wang-hash seed and a 32-bit xorshift (13, 17, 5), the same code on
+both sides. The targeted checks pass, `check:prng pass` on Metal
+(byte-exact GPU versus host), and the slime smoke shows zero FAIL
+lines, both read before this commit. The owner's re-check decides
+the visual pass.

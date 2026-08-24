@@ -1,7 +1,7 @@
 // example: prng-cpu-gpu
 // Checks that one deterministic PRNG produces byte-identical CPU and GPU sequences.
 // TypeGPU compares three generators and four seed functions inside a 1e-6 tolerance.
-// This port keeps one 16-bit LCG and one seed function, and compares raw bytes.
+// This port keeps one Wang-seeded xorshift32 and one seed function, and compares raw bytes.
 // Ported from TypeGPU's prng-cpu-gpu example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -17,9 +17,7 @@ import {
   simulateComputeThreads,
 } from "./typegpu";
 import {
-  Vec2f,
-} from "./typegpu-types";
-import {
+  RandomF32,
   randF32,
   randSeed,
 } from "./typegpu-noise";
@@ -64,12 +62,13 @@ function randomKernel(res: RandomLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.x;
   if (index >= res.output.length()) return;
   let state: u32 = randSeed(index + 1);
-  let sample: Vec2f = new Vec2f(0.0, 0.0);
+  let value: f32 = 0.0;
   for (let round: u32 = 0; round < ROUND_COUNT; round += 1) {
-    sample = randF32(state);
-    state = sample.x as u32;
+    const sample: RandomF32 = randF32(state);
+    state = sample.state;
+    value = sample.value;
   }
-  res.output.set(index, new RandomValue(state, sample.y));
+  res.output.set(index, new RandomValue(state, value));
 }
 
 export const randomFill: ComputePipelineSpec = computePipeline<RandomLayout>(randomKernel, {
