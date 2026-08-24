@@ -66,3 +66,15 @@ banned prefix by naming the TypeGPU construct without its namespace.
 Evidence: `tools/gate.sh --require-backend` green, 247 passed,
 175 s. Windowed with `--frames 60` on Metal (yawgpu): all three
 print `window:frames=60`, exit 0. `boids` the same on Dawn.
+
+## Owner's visual runs (2026-08-24, Metal)
+
+`boids` (387 frames), `confetti` (238), `fluid-double-buffering`
+(2378, the A and D keys moved the obstacle), `xor-dev-centrifuge-2`
+(1590): every run opened, animated, and closed through the close
+path. Verdict: the first three look as intended.
+`xor-dev-centrifuge-2` renders black. Open defect: either the
+tone-map keeps the color near 0.1, or the frame uniform does not
+reach the shader (an aspect of zero makes the uv NaN). The round-3
+K29 fix gives the shell one shared formula, so the host lane can
+evaluate it and split the two causes.
