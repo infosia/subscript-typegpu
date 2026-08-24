@@ -598,6 +598,15 @@ them as K2 helpers). Ports: `ray-marching`, `caustics`,
 the key scalar, EX7), and `prng-cpu-gpu` as a headless differential
 check of the noise module.
 
+Slice 3, on the P11 slice 1 features. `examples/clouds/main.ts`:
+the host fills an `rgba8unorm` noise texture from `perlin3d` on the
+CPU, uploads it with `writeTexturePixels` (TX9), and the fragment
+raymarches layered density from the sampled noise. The strip
+reductions leave: `confetti` draws its card as a four-vertex
+`triangle-strip` (RN20), and `fluid-double-buffering` draws the
+upstream four-vertex strip quad. The affected comments change with
+the code.
+
 Deferred, by the missing feature (the survey ranks these gaps):
 read-only storage textures (slime-mold, game-of-life, the jump-flood
 pair), image decode and byte-to-texture upload (blur, image-tuning,

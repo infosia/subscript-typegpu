@@ -170,3 +170,12 @@ browser examples come from the ports' own palettes and reductions,
 and no color matching is pursued. The sRGB layer setting (W9 Rev 1)
 stays because it makes the output independent of the display's
 gamut. The exiting path (W8 Rev 2) closes the Cmd-Q report gap.
+
+## Slice 3 start (2026-08-24)
+
+Order decision (the owner delegated the P10/P11 order): P10 slice 3
+(clouds, strip de-reductions) first because it proves the P11 slice
+1 features in examples, then P11 slice 2 (pointer input), P10 slice
+4 (fluid-with-atomics), P11 slice 3 (read-access storage textures),
+P10 slice 5 (slime-mold and the jump-flood pair as far as the
+features reach), P11 slice 4 (blending).
