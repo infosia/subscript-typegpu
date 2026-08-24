@@ -1,0 +1,5 @@
+strip.topology=triangle-strip
+strip_VERTEX_LAYOUT0.arrayStride=8
+strip_WGSL_LINES=18
+render:submitted
+PASS

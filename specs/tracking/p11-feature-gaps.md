@@ -53,3 +53,19 @@ reflects the device on both backends.
 (`b19-strip`, `x20-live-strip`, the host rasterizer's strip
 expansion with the even-odd winding flip). Unblocks the `clouds`
 port and the strip reductions.
+
+## Slice 1 (2026-08-24)
+
+Landed: `writeTexturePixels` (the encode table, round half away from
+zero for `rgba8unorm`), `writeTextureBytes`, the 256-byte
+row-alignment trap (red recorded), `b18-texture-upload` and
+`b19-strip` byte-identical on both tiers, `x19-live-texture-upload`
+against the host pixels, `x20-live-strip` against the host
+rasterizer's strip expansion with the winding flip before the cull.
+
+Evidence: gate green, 249 passed, 198 s at load 2.3.
+`tools/live.sh` x01–x20 PASS: Metal (yawgpu) 59.65 s, Dawn 55.53 s.
+The program-change gate grew from 86 s (P8 open) to 198 s with the
+program count; the growth tracks the suite size, not a regression.
+A future phase can parallelize the differential lane if the growth
+starts to hurt iteration.

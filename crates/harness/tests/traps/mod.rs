@@ -161,6 +161,10 @@ fn runtime_traps_are_named_and_numbered() {
             "index-buffer-without-format.ts",
             "RN18 RenderPipeline.setIndexBuffer indexFormat=undefined",
         ),
+        (
+            "texture-row-alignment.ts",
+            "TX9 writeTextureBytes bytesPerRow=8 height=2",
+        ),
     ] {
         assert_trap(&directory.join(name), expected);
     }
