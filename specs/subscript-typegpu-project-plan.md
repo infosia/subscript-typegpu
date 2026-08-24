@@ -340,12 +340,26 @@ A budget is a gate. If a phase needs more, the phase spec states the
 new number and the cause before the work starts.
 
 **Iteration speed is a design input (owner decision, 2026-08-24).**
-Program-driven suites run on a bounded worker pool (T18). A coding
-round runs the targeted modules and hygiene, and the full gate runs
-at a slice close. The full measurement runs at a slice close only.
-A green round's gate is not re-run on the same tree — only the
-lanes the coding agent cannot run. Budgets re-derive after T18
-lands.
+A test that one run can decide runs once, at the latest gate that
+needs it. The cadence has three tiers, and no tier repeats a lower
+tier's work on an unchanged tree:
+
+1. **Per coding round**: `tools/hygiene.sh` and only the test
+   modules the diff touches (an example round: the loader compile
+   test; a generator round: the generator tests and the WGSL
+   goldens; a library round: the affected harness module). Nothing
+   else. No full gate, no measurement, no repeat by the planning
+   side.
+2. **Per slice close, once each**: the full
+   `tools/gate.sh --require-backend`, the live lanes on both
+   backends, the window smokes with an explicit `FAIL` grep, and
+   the measurement.
+3. **Per phase close**: the review and the recorded budgets.
+
+Program-driven suites run on a bounded worker pool (T18). Budgets
+re-derive after T18 lands. A round that re-runs an unchanged
+tier-2 check, or a serial re-run of a suite one run already
+decided, is a process regression.
 
 **How a budget is read (owner decision, 2026-08-23).** The budgets
 exist for iteration speed. A gate that takes a few minutes is
