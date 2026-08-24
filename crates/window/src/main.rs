@@ -7,7 +7,7 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use subscript_typegpu_harness::{native as facade, EntryArg, ProgramLoadError, ReloadSession};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
-use winit::event::{ElementState, WindowEvent};
+use winit::event::{ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
@@ -213,6 +213,9 @@ struct Host {
     width: u32,
     height: u32,
     key: u32,
+    pointer_x: f32,
+    pointer_y: f32,
+    buttons: u32,
     frames: u64,
     frame_limit: Option<u64>,
     initialized: bool,
@@ -237,6 +240,9 @@ impl Host {
             width: 0,
             height: 0,
             key: 0,
+            pointer_x: -1.0,
+            pointer_y: -1.0,
+            buttons: 0,
             frames: 0,
             frame_limit,
             initialized: false,
@@ -440,6 +446,9 @@ impl Host {
                 EntryArg::U32(self.width),
                 EntryArg::U32(self.height),
                 EntryArg::U32(self.key),
+                EntryArg::F32(self.pointer_x),
+                EntryArg::F32(self.pointer_y),
+                EntryArg::U32(self.buttons),
             ],
         );
         if let Err(error) = called {
@@ -550,6 +559,25 @@ impl ApplicationHandler for Host {
                     Key::Named(NamedKey::Space) => u32::from(' '),
                     _ => 0,
                 };
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.pointer_x = position.x as f32;
+                self.pointer_y = position.y as f32;
+            }
+            WindowEvent::CursorLeft { .. } => {}
+            WindowEvent::MouseInput { state, button, .. } => {
+                let bit = match button {
+                    MouseButton::Left => Some(1_u32 << 0),
+                    MouseButton::Right => Some(1_u32 << 1),
+                    MouseButton::Middle => Some(1_u32 << 2),
+                    _ => None,
+                };
+                if let Some(bit) = bit {
+                    match state {
+                        ElementState::Pressed => self.buttons |= bit,
+                        ElementState::Released => self.buttons &= !bit,
+                    }
+                }
             }
             WindowEvent::RedrawRequested => match self.frame() {
                 Ok(()) if self.reached_frame_limit() => self.finish(event_loop, Ok(())),

@@ -119,6 +119,9 @@ export function frame(
   width: u32,
   height: u32,
   key: u32,
+  pointerX: f32,
+  pointerY: f32,
+  buttons: u32,
 ): void {
   const activeDevice: GPUHostOwnedDevice | null = ownedDevice;
   const activePipeline: RenderPipeline | null = pipeline;

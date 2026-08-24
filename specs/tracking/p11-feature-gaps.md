@@ -79,3 +79,16 @@ host stores and `frame` samples). Every windowed example adds the
 three parameters and reads them or not. The W13 signature test
 follows. Unlocks `fluid-with-atomics` unreduced and the drawing
 examples.
+
+## Slice 2 (2026-08-24)
+
+Landed: the host stores the pointer position in surface pixels
+(`-1, -1` before entry) and the button bit set, `frame` carries
+`pointerX`, `pointerY`, `buttons` after `key` (W2 Rev 2), the
+thirteen windowed examples take the new signature, the W13 test
+checks it, and `fluid-double-buffering` follows the pointer x while
+the left button is down with the keys kept.
+
+Evidence: gate green, 249 passed, 196 s. Smoke runs `triangle`,
+`fluid-double-buffering`, `boids` print `window:frames=30` on
+Metal, read before this commit.

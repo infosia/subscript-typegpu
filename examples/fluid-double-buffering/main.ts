@@ -1,5 +1,5 @@
 // example: fluid-double-buffering
-// Simulates a three-pass grid fluid whose obstacle moves horizontally from the A and D key scalar.
+// Simulates a three-pass grid fluid whose obstacle follows pointer input or the A and D keys.
 // The upstream source and wall sliders become fixed values, and this port uses a 32 by 32 grid.
 // Ported from TypeGPU's fluid-double-buffering example (https://github.com/software-mansion/TypeGPU).
 
@@ -421,6 +421,9 @@ export function frame(
   width: u32,
   height: u32,
   key: u32,
+  pointerX: f32,
+  pointerY: f32,
+  buttons: u32,
 ): void {
   const device = activeDevice;
   const flowPipeline = activeFlow;
@@ -452,9 +455,15 @@ export function frame(
   if (renderB === null) return;
   if (vertices === null) return;
   if (params === null) return;
-  // The A and D key scalar replaces the upstream obstacle sliders.
+  // The pointer maps surface pixels through grid cells; A and D remain keyboard controls.
   if (key === 65 || key === 97) obstacleX -= 0.08;
   if (key === 68 || key === 100) obstacleX += 0.08;
+  if ((buttons & 1) !== 0 && pointerX >= 0.0) {
+    const gridRadius: f32 = ((GRID_SIZE - 1) as f32) * 0.5;
+    const pointerCell: f32 =
+      (pointerX / (width as f32)) * ((GRID_SIZE - 1) as f32);
+    obstacleX = pointerCell / gridRadius - 1.0;
+  }
   if (obstacleX < -0.75) obstacleX = -0.75;
   if (obstacleX > 0.75) obstacleX = 0.75;
   frameCount += 1;
