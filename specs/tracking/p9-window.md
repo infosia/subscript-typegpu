@@ -83,3 +83,13 @@ space, resize, and close. `tools/live.sh` x01–x18 PASS on Metal
 
 P9 COMPLETE 2026-08-23. Open: the ship tier for the window host,
 Linux surfaces, a surface-format list on the render spec.
+
+## sRGB round defect (2026-08-24)
+
+The commit `b842e58` aborts at window start: objc2's type check
+rejects `setColorspace:` with a `*mut c_void` argument (`^v` against
+`^{CGColorSpace=}`). The gate stayed green because it never runs the
+window, and the commit landed before the smoke run's result was
+read. Two records: the fix types the pointer with an opaque
+`CGColorSpace` and `RefEncode`; and a window-host change is
+committed only after a `--frames` smoke run passes.
