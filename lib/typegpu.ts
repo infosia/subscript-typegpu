@@ -25,6 +25,7 @@ import {
   GPUBufferUsage,
   GPUMapMode,
   GPUTextureView,
+  GPUTexture,
   GPUVertexAttribute,
   GPUVertexBufferLayout,
 } from "./webgpu";
@@ -32,6 +33,98 @@ import {
 function authorTrap(rule: string, method: string, values: string): void {
   print(`${rule} ${method} ${values} (author)`);
   unreachable();
+}
+
+function appendBytes(target: u8[], source: u8[]): void {
+  let index: i32 = 0;
+  while (index < source.length) {
+    target.push(source[index]);
+    index += 1;
+  }
+}
+
+function textureComponentBytes(format: GPUTextureFormat): u32 {
+  if (format === "rgba8unorm") return 1;
+  if (format === "rgba16float") return 2;
+  if (format === "r32float" || format === "rgba32float") return 4;
+  authorTrap("TX9", "writeTexturePixels", `format=${format} is not supported`);
+  return 0;
+}
+
+function textureChannelCount(format: GPUTextureFormat): u32 {
+  return format === "r32float" ? 1 : 4;
+}
+
+function appendTextureComponent(bytes: u8[], format: GPUTextureFormat, value: f32): void {
+  if (format === "rgba8unorm") {
+    const clamped: f32 = Math.min(1.0, Math.max(0.0, value as f64)) as f32;
+    bytes.push(Math.floor((clamped * 255.0 + 0.5) as f64) as u8);
+    return;
+  }
+  if (format === "rgba16float") {
+    appendBytes(bytes, Context.bytesOf<FixedArray<f16, 1>>([value as f16]));
+    return;
+  }
+  appendBytes(bytes, Context.bytesOf<FixedArray<f32, 1>>([value]));
+}
+
+export function writeTextureBytes(
+  queue: GPUQueue,
+  texture: GPUTexture,
+  bytes: u8[],
+  bytesPerRow: u32,
+  width: u32,
+  height: u32,
+): void {
+  if (height > 1 && bytesPerRow < 256) {
+    authorTrap("TX9", "writeTextureBytes", `bytesPerRow=${bytesPerRow} height=${height}`);
+  }
+  queue.writeTexture(
+    { texture },
+    bytes,
+    { offset: 0, bytesPerRow, rowsPerImage: height },
+    { width, height, depthOrArrayLayers: 1 },
+  );
+}
+
+export function writeTexturePixels(
+  queue: GPUQueue,
+  texture: GPUTexture,
+  pixels: Vec4f[],
+  width: u32,
+  height: u32,
+): void {
+  const pixelCount: u32 = width * height;
+  if ((pixels.length as u32) !== pixelCount) {
+    authorTrap("TX9", "writeTexturePixels", `pixels=${pixels.length} width=${width} height=${height}`);
+  }
+  const format: GPUTextureFormat = texture.format();
+  const componentBytes: u32 = textureComponentBytes(format);
+  const channels: u32 = textureChannelCount(format);
+  const rowBytes: u32 = width * channels * componentBytes;
+  const bytesPerRow: u32 = height > 1 ? ((rowBytes + 255) / 256) * 256 : rowBytes;
+  const bytes: u8[] = [];
+  let y: u32 = 0;
+  while (y < height) {
+    let x: u32 = 0;
+    while (x < width) {
+      const pixel: Vec4f = pixels[(y * width + x) as i32];
+      appendTextureComponent(bytes, format, pixel.x);
+      if (channels === 4) {
+        appendTextureComponent(bytes, format, pixel.y);
+        appendTextureComponent(bytes, format, pixel.z);
+        appendTextureComponent(bytes, format, pixel.w);
+      }
+      x += 1;
+    }
+    let padding: u32 = rowBytes;
+    while (padding < bytesPerRow) {
+      bytes.push(0);
+      padding += 1;
+    }
+    y += 1;
+  }
+  writeTextureBytes(queue, texture, bytes, bytesPerRow, width, height);
 }
 
 export class Texture2d<T> {

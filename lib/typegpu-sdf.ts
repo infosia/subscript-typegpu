@@ -17,10 +17,13 @@ function sdfMax3(a: f32, b: f32, c: f32): f32 {
   return sdfMax(a, sdfMax(b, c));
 }
 
+// Returns the signed distance from `p` to a sphere of the given radius at the origin.
 export function sdSphere(p: Vec3f, radius: f32): f32 {
   return p.length() - radius;
 }
 
+// Returns the exact signed distance from `p` to an axis-aligned box centered on the
+// origin. `half` holds the half-extent on each axis.
 export function sdBox(p: Vec3f, half: Vec3f): f32 {
   const offset: Vec3f = p.abs().sub(half);
   const outside: Vec3f = offset.max(new Vec3f(0.0, 0.0, 0.0));
@@ -28,6 +31,8 @@ export function sdBox(p: Vec3f, half: Vec3f): f32 {
   return outside.length() + inside;
 }
 
+// Returns the signed distance to the twelve edge bars of a box of half-extent `half`.
+// `edge` is the bar thickness. The result is the minimum of the three axis cases.
 export function sdBoxFrame(p: Vec3f, half: Vec3f, edge: f32): f32 {
   const offset: Vec3f = p.abs().sub(half);
   const edgeVector = new Vec3f(edge, edge, edge);
@@ -45,10 +50,14 @@ export function sdBoxFrame(p: Vec3f, half: Vec3f, edge: f32): f32 {
   return sdfMin(xDistance, sdfMin(yDistance, zDistance));
 }
 
+// Returns the signed distance from `p` to an infinite plane. `normal` must be a unit
+// vector. `height` offsets the plane along that normal.
 export function sdPlane(p: Vec3f, normal: Vec3f, height: f32): f32 {
   return p.dot(normal) + height;
 }
 
+// Returns the unsigned distance from `p` to the segment from `a` to `b`.
+// The result is undefined when `a` equals `b`.
 export function sdLine(p: Vec2f, a: Vec2f, b: Vec2f): f32 {
   const pointOffset: Vec2f = p.sub(a);
   const segment: Vec2f = b.sub(a);
@@ -56,10 +65,13 @@ export function sdLine(p: Vec2f, a: Vec2f, b: Vec2f): f32 {
   return pointOffset.sub(segment.scale(amount)).length();
 }
 
+// Returns the union of two fields, the smaller of the two distances.
 export function opUnion(a: f32, b: f32): f32 {
   return sdfMin(a, b);
 }
 
+// Returns a union with a smooth seam of width `k`. The seam reaches k/4 below the
+// plain union where the two fields are equal. `k` must be greater than zero.
 export function opSmoothUnion(a: f32, b: f32, k: f32): f32 {
   const amount: f32 = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
   return mix(b, a, amount) - k * amount * (1.0 - amount);

@@ -1,6 +1,7 @@
 // example: caustics
 // Layers animated three-dimensional noise into bright caustic bands over a dark floor.
-// The upstream scale, speed, and color controls are fixed constants in the fragment helper.
+// TypeGPU exposes one tile density slider. This port drops the tile pattern, the
+// perspective skew, the god rays, and the fog, and commits the scale and the colors.
 // Ported from TypeGPU's caustics example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -76,6 +77,8 @@ class CausticLayout {
   frame!: Uniform<FrameData>;
 }
 
+// Four octaves of absolute noise build a ridged field. One minus that field, cubed,
+// leaves narrow bright bands. TypeGPU distorts the sample coordinates first instead.
 function causticIntensity(point: Vec2f, time: f32): f32 {
   let frequency: f32 = 1.6;
   let amplitude: f32 = 0.58;

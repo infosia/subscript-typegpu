@@ -1,6 +1,8 @@
 // example: vaporrave
 // Raymarches a noise-warped sphere above a luminous retro grid floor.
-// The upstream palette, camera, and effect controls are fixed constants; time follows frames.
+// TypeGPU exposes glow intensity, a floor speed, a sphere speed, a sphere color, and
+// a floor pattern. This port commits one grid floor and one palette, and drops the
+// glow accumulation and the sky fog.
 // Ported from TypeGPU's vaporrave example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -83,6 +85,8 @@ class VaporLayout {
 
 function vaporDistance(point: Vec3f, time: f32): f32 {
   const spherePoint = point.sub(new Vec3f(0.0, 1.05, 0.0));
+  // Noise added to the sphere distance warps the surface. The amplitude stays small,
+  // so the marched field stays close to a true distance.
   const noise: f32 = perlin3d(spherePoint.scale(2.4).add(new Vec3f(0.0, time * 0.35, 0.0)));
   const sphere: f32 = sdSphere(spherePoint, 0.82) + noise * 0.07;
   const floor: f32 = sdPlane(point, new Vec3f(0.0, 1.0, 0.0), 0.0);
@@ -99,6 +103,9 @@ function vaporNormal(point: Vec3f, time: f32): Vec3f {
   ).normalize();
 }
 
+// Points near the floor plane take a grid line color from the fractional cell
+// distance. Every other point takes the sphere palette. TypeGPU selects the floor
+// pattern through a slot and rebuilds the pipeline.
 function retroSurface(point: Vec3f, normal: Vec3f, time: f32): Vec3f {
   if (point.y < 0.025) {
     const cell: Vec2f = point.xz().fract();

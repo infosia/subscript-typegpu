@@ -1,6 +1,7 @@
 // example: prng-cpu-gpu
 // Checks that one deterministic PRNG produces byte-identical CPU and GPU sequences.
-// This port fixes the sample count and rounds instead of exposing the upstream controls.
+// TypeGPU compares three generators and four seed functions inside a 1e-6 tolerance.
+// This port keeps one 16-bit LCG and one seed function, and compares raw bytes.
 // Ported from TypeGPU's prng-cpu-gpu example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -57,6 +58,8 @@ class RandomLayout {
   output!: MutStorage<RandomValue>;
 }
 
+// One thread per sample. Each thread seeds from its own index and advances the
+// generator ROUND_COUNT times, so the host repeats the same walk.
 function randomKernel(res: RandomLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.x;
   if (index >= res.output.length()) return;
@@ -143,6 +146,8 @@ export async function main(): Promise<void> {
       device.queue().submit([command]);
 
       const gpuBytes: u8[] = await output.read(device, 0, SAMPLE_COUNT);
+      // The Noop backend leaves the output at zero. The example reports `noop` for that
+      // case, so an unexecuted kernel never reads as a passing comparison.
       let allZero: boolean = true;
       for (let index: i32 = 0; index < gpuBytes.length; index += 1) {
         allZero = allZero && gpuBytes[index] === 0;

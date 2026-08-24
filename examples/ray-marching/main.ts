@@ -1,6 +1,7 @@
 // example: ray-marching
 // Raymarches a sphere, a framed box, and a floor with animated soft shadows.
-// The upstream camera and lighting controls become fixed constants; time follows the frame count.
+// TypeGPU exposes no controls here. This port drops the rotating two-sphere blend,
+// the per-shape colors, the checkered floor, the orbiting light, and the distance fog.
 // Ported from TypeGPU's ray-marching example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -81,6 +82,8 @@ class SceneLayout {
 }
 
 function sceneDistance(point: Vec3f, time: f32): f32 {
+  // The type library exposes sine on vectors only. One lane of a two-component sine
+  // gives the scalar phase.
   const phase: f32 = new Vec2f(time * 0.7, time * 0.7).sin().x;
   const sphere: f32 = sdSphere(point.sub(new Vec3f(-0.8, 0.75 + phase * 0.18, 0.0)), 0.72);
   const frame: f32 = sdBoxFrame(
@@ -102,6 +105,9 @@ function sceneNormal(point: Vec3f, time: f32): Vec3f {
   ).normalize();
 }
 
+// The shadow ray keeps the smallest ratio of field distance to travel distance.
+// TypeGPU marches toward an orbiting light position. This port uses one fixed
+// direction and one floor value.
 function softShadow(origin: Vec3f, direction: Vec3f, time: f32): f32 {
   let visibility: f32 = 1.0;
   let distance: f32 = 0.03;

@@ -4,8 +4,9 @@ import {
   mix,
 } from "./typegpu-types";
 
-// The PRNG is a 16-bit linear congruential generator. `randF32` returns the next
-// state exactly in x and its zero-to-one value in y; callers cast x back to u32.
+// The PRNG is the classic 16-bit linear congruential generator, next = (state *
+// 25173 + 13849) mod 65536. `randF32` returns the next state exactly in x and its
+// value in the range [0, 1) in y. Callers cast x back to u32.
 export function randSeed(seed: u32): u32 {
   return seed % 65536;
 }
@@ -34,10 +35,14 @@ const PERMUTATION: FixedArray<u32, 256> = [
   13, 128, 166, 52, 209, 148, 92, 216, 136, 88, 76, 240, 120, 4, 192, 208,
 ];
 
+// Returns Perlin's quintic interpolant 6t^5 - 15t^4 + 10t^3. The first and second
+// derivatives are zero at 0 and at 1.
 export function fade(value: f32): f32 {
   return value * value * value * (value * (value * 6.0 - 15.0) + 10.0);
 }
 
+// Returns the dot product of (x, y, z) with one of the twelve improved-noise
+// gradient vectors. The low four bits of `hash` select the vector.
 export function grad(hash: u32, x: f32, y: f32, z: f32): f32 {
   const code: u32 = hash & 15;
   const first: f32 = code < 8 ? x : y;
@@ -55,6 +60,9 @@ function cornerHash(x: i32, y: i32, z: i32): u32 {
   return permutation((permutation((permutation(x) as i32) + y) as i32) + z);
 }
 
+// Returns Ken Perlin's improved 3D noise at `p`, from a fixed 256-entry permutation
+// table. TypeGPU's perlin3d draws random gradients from a seeded unit-sphere
+// sampler, so the two produce different values for the same point.
 export function perlin3d(p: Vec3f): f32 {
   const base: Vec3f = p.floor();
   const local: Vec3f = p.sub(base);

@@ -1,6 +1,7 @@
 // example: smoky-triangle
 // Fills a single triangle with layered animated smoke instead of a flat color.
-// The upstream smoke speed and density controls are fixed in the frame uniform.
+// TypeGPU exposes distortion, sharpness, two gradient colors, and two mode toggles.
+// This port commits one gradient and one density, and drops the grain and the polar mode.
 // Ported from TypeGPU's smoky-triangle example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -54,6 +55,8 @@ class Vertex {
 
 @CStruct
 class FrameData {
+  // One vec2f carries time and density. TypeGPU holds a full parameter struct that
+  // its sliders patch on every frame.
   motion: Vec2f;
 
   constructor(time: f32, density: f32) {
@@ -76,6 +79,8 @@ class SmokeLayout {
   frame!: Uniform<FrameData>;
 }
 
+// Four octaves of noise drift across the surface. The third noise axis carries the
+// time and one offset per octave, so no two octaves repeat each other.
 function smokeField(uv: Vec2f, time: f32): f32 {
   let frequency: f32 = 2.2;
   let amplitude: f32 = 0.58;
