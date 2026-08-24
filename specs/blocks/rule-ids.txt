@@ -262,7 +262,9 @@ W13
 W13 Rev 1
 W2
 W2 Rev 1
+W2 Rev 2
 W3
+W3 Rev 1
 W4
 W5
 W6

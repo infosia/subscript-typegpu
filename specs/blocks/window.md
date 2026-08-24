@@ -2,7 +2,8 @@
 
 P9 contract. Rev 0, 2026-08-23. Rev 1 (W2, W6, W11 from the phase
 review), 2026-08-23. Rev 2 (W8, W13 after the first `--frames` run),
-2026-08-23. Rev 3 (W8 Rev 2 exiting path, W9 Rev 1 sRGB), 2026-08-24. Plan §8 P9 governs this block. The
+2026-08-23. Rev 3 (W8 Rev 2 exiting path, W9 Rev 1 sRGB), 2026-08-24. Rev 4
+(W2 Rev 2, W3 Rev 1 pointer input), 2026-08-24. Plan §8 P9 governs this block. The
 facade side is `facade.md` L14 and `facade-generator.md` F23. The
 script side is the API layer (`api-layer.md`) and the TypeGPU layer.
 
@@ -20,8 +21,12 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   `init(instance: SubscriptTypegpuInstance, device:
   SubscriptTypegpuDevice, format: GPUTextureFormat): void` once
   after the surface is configured, `frame(view:
-  SubscriptTypegpuTextureView, width: u32, height: u32, key: u32):
-  void` once per presented frame, and `shutdown(): void` once before
+  SubscriptTypegpuTextureView, width: u32, height: u32, key: u32,
+  pointerX: f32, pointerY: f32, buttons: u32): void` once per
+  presented frame (Rev 2: the pointer position in surface pixels,
+  `-1, -1` before the pointer first enters the window, and a button
+  bit set — bit 0 left, bit 1 right, bit 2 middle — sampled when
+  the frame is called), and `shutdown(): void` once before
   the host releases the device. `GPUTextureFormat` is the wire enum
   alias in `lib/wire-enum-aliases.generated.d.ts`, and the host
   passes the configured format's wire value (Rev 1: no second
@@ -31,12 +36,16 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   `destroy`) and the view with `new GPUTextureView(view)` and
   disposes neither. The host owns both. A harness test checks the
   three signatures of the example through the HIR.
-- **W3 — The host translates input, the script decides.** The host
-  handles three window events: close ends the loop, resize
-  reconfigures the surface, and a key press stores the key's
-  Unicode scalar in one slot that the next `frame` call receives and
-  clears (`0` when none). A second press before the next frame
-  replaces the first. The meaning of a key is script code.
+- **W3 — The host translates input, the script decides.** Rev 1.
+  The host handles five window events: close ends the loop, resize
+  reconfigures the surface, a key press stores the key's Unicode
+  scalar in one slot that the next `frame` call receives and clears
+  (`0` when none), a pointer move stores the position in surface
+  pixels, and a pointer button press or release updates the button
+  bit set. A second press before the next frame replaces the first
+  key. Position and buttons are level state, not events: `frame`
+  reads the latest value and nothing clears them. The meaning of
+  every input is script code.
 - **W4 — One instance.** The host creates the instance through the
   facade's `subscript_typegpu_create_instance` with the L13 backend
   request, creates the surface on it, and requests the adapter and

@@ -69,3 +69,13 @@ The program-change gate grew from 86 s (P8 open) to 198 s with the
 program count; the growth tracks the suite size, not a regression.
 A future phase can parallelize the differential lane if the growth
 starts to hurt iteration.
+
+## Slice 2 contract (2026-08-24)
+
+`window.md` Rev 4: W2 Rev 2 (`frame` gains `pointerX`, `pointerY`
+in surface pixels with `-1, -1` before entry, and a `buttons` bit
+set) and W3 Rev 1 (pointer position and buttons are level state the
+host stores and `frame` samples). Every windowed example adds the
+three parameters and reads them or not. The W13 signature test
+follows. Unlocks `fluid-with-atomics` unreduced and the drawing
+examples.
