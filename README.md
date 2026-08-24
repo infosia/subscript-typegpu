@@ -101,7 +101,7 @@ JIT and the emitted C — with byte-identical output.
 |---|---|---|
 | Schema | `d.struct({ ... })`, a run-time value | `@CStruct class`, a declaration |
 | Memory layout | computed at run time | computed by the generator, emitted as constants |
-| WGSL | generated at run time from a compacted AST | generated before the program runs, committed, and compared byte for byte by the tests |
+| WGSL | generated at run time from a compacted AST | generated before the program runs and committed to the repository |
 | Kernel marker | `'use gpu'` directive and a build plugin | `computePipeline<L>(fn, spec)` declaration |
 | Buffer data | JavaScript values converted by the library | `Context.bytesOf<T>(value)`, the bytes of the value |
 | Lifetime | garbage collection | `using` and `dispose()` |
