@@ -5,7 +5,7 @@ P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
 2026-08-23. Rev 4 (K14 shadowing), 2026-08-23. Rev 5 (K10, K25–K28),
 2026-08-23. Rev 6 (K25 Rev 1 argument order, K27 count), 2026-08-23. Rev 7
 (K29–K31 WGSL shells), 2026-08-23. Rev 8 (K14 Rev 5 one order),
-2026-08-23. Plan §3 D2, D3, D7, D9 and §4
+2026-08-23. Rev 9 (K19 Rev 4 FixedArray constants), 2026-08-24. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -163,7 +163,7 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `break` and `continue` inside a `for`, `while`, or `switch` emit
   the WGSL statement of the same name. A `continue` inside a
   `switch` inside a loop targets the loop, as in WGSL.
-- **K19 — Module constants.** Rev 3. A module-level `const` of a
+- **K19 — Module constants.** Rev 4. A module-level `const` of a
   scalar, a library vector, or a library matrix type reaches a
   kernel as a WGSL `const` of the same name when the generator folds
   its initializer: a literal, a unary or binary expression of
@@ -172,7 +172,10 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   division by zero, an overflow, a cycle, any other initializer, and
   a mutable global are K19 diagnostics when a kernel reads the
   constant. A rejected `privateVar` initializer is a K20
-  diagnostic.
+  diagnostic. Rev 4: a module-level `const` of a `FixedArray` of a
+  foldable scalar type reaches a kernel as a WGSL `const` array of
+  the same name when every element folds under the same rules. The
+  noise module's permutation tables are the first use.
 - **K20 — Private and workgroup variables.** A module-level `const`
   whose initializer is `privateVar<T>(init)`, `workgroupVar<T>()`,
   or `workgroupArray<T>(n)` (library generic functions with real

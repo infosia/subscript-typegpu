@@ -127,3 +127,19 @@ three headless examples print their `check:` lines `pass` on Metal.
 P10 slice 1 COMPLETE 2026-08-24: ten ports, `tools/example.sh`,
 EG10 with the host bind-group form. Next: slice 2 (the sdf and
 noise modules, five ports).
+
+## Slice 2 (2026-08-24)
+
+Landed: `lib/typegpu-sdf.ts` (seven functions from the mathematical
+definitions, a generator test compiles and `naga`-validates a kernel
+that calls each), `lib/typegpu-noise.ts` (a 16-bit LCG with a
+documented state shape, `perlin3d` over committed permutation
+tables through K19 Rev 4 `FixedArray` constants), the headless
+`prng-cpu-gpu` differential, and the windowed `ray-marching`,
+`caustics`, `smoky-triangle`, `vaporrave`.
+
+Evidence: gate green, 249 passed, 177 s. `prng-cpu-gpu` prints
+`check:prng pass` on Metal (byte-exact GPU versus host over 64
+samples). The four windowed ports print `window:frames=60` on
+Metal, and `ray-marching` also on Dawn. The owner's visual runs and
+the comment review are the open items for the slice close.

@@ -47,6 +47,7 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-24 | P10 slice 1 round 3 (EG10 migration, cleanup) | 49 s | 0 s | 173 s | 172 s | 7 |
 | 2026-08-24 | P10 slice 1 round 4 (PI15 Rev 2, xor tone-map) | 48 s | 0 s | 173 s | 172 s | 7 |
 | 2026-08-24 | P10 slice 1 round 5 (simulation cleanup), slice close | 48 s | 0 s | 173 s | 173 s | 7 |
+| 2026-08-24 | P10 slice 2 (sdf and noise modules, five ports) | 48 s | 1 s | 178 s | 177 s | 7 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate
