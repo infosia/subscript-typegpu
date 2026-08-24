@@ -53,7 +53,7 @@ import {
 } from "./main.typegpu";
 
 const GRID_SIZE: u32 = 32;
-const CELL_COUNT: u32 = 1024;
+const CELL_COUNT: u32 = GRID_SIZE * GRID_SIZE;
 
 @CStruct
 class Vertex {
@@ -77,10 +77,10 @@ class FluidCell {
 
 @CStruct
 class FluidParams {
-  values: Vec4f;
+  obstacleX: f32;
 
-  constructor(obstacleX: f32, time: f32) {
-    this.values = new Vec4f(obstacleX, time, GRID_SIZE as f32, 0.0);
+  constructor(obstacleX: f32) {
+    this.obstacleX = obstacleX;
   }
 }
 
@@ -120,20 +120,17 @@ function flowKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   const right: FluidCell = res.source.get(rightIndex);
   const down: FluidCell = res.source.get(downIndex);
   const up: FluidCell = res.source.get(upIndex);
-  const params: FluidParams = res.params.get();
   const neighborDensity: f32 = (left.density + right.density + down.density + up.density) * 0.25;
   cell.density = cell.density * 0.91 + neighborDensity * 0.09;
   cell.velocity.x = cell.velocity.x * 0.97 + (left.density - right.density) * 0.001;
   cell.velocity.y = cell.velocity.y * 0.97 + (down.density - up.density) * 0.001;
-  cell.density += params.values.w;
   res.target.set(index, cell);
 }
 
 function evaporateKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.y * GRID_SIZE + ctx.globalId.x;
   const cell: FluidCell = res.source.get(index);
-  const params: FluidParams = res.params.get();
-  cell.density *= 0.992 + params.values.w;
+  cell.density *= 0.992;
   res.target.set(index, cell);
 }
 
@@ -143,9 +140,10 @@ function obstacleKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   const index: u32 = y * GRID_SIZE + x;
   const cell: FluidCell = res.source.get(index);
   const params: FluidParams = res.params.get();
-  const normalizedX: f32 = (x as f32) / 15.5 - 1.0;
-  const normalizedY: f32 = (y as f32) / 15.5 - 1.0;
-  let distanceX: f32 = normalizedX - params.values.x;
+  const gridRadius: f32 = ((GRID_SIZE - 1) as f32) * 0.5;
+  const normalizedX: f32 = (x as f32) / gridRadius - 1.0;
+  const normalizedY: f32 = (y as f32) / gridRadius - 1.0;
+  let distanceX: f32 = normalizedX - params.obstacleX;
   if (distanceX < 0.0) distanceX = -distanceX;
   let distanceY: f32 = normalizedY;
   if (distanceY < 0.0) distanceY = -distanceY;
@@ -268,18 +266,20 @@ export function init(
   });
   using queue = hostDevice.queue();
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>(vertexValues));
-  queue.writeBuffer(params, 0, Context.bytesOf<FluidParams>(new FluidParams(0.0, 0.0)));
+  queue.writeBuffer(params, 0, Context.bytesOf<FluidParams>(new FluidParams(0.0)));
+  const initialCells: u8[] = [];
   for (let index: u32 = 0; index < CELL_COUNT; index += 1) {
     const x: u32 = index % GRID_SIZE;
     const y: u32 = index / GRID_SIZE;
     let density: f32 = 0.0;
     if (x > 12 && x < 20 && y < 8) density = 0.8;
     const cell = new FluidCell(new Vec2f(0.0, 0.0), density);
-    const offset: u64 = (index as u64) * (FluidCell_STRIDE as u64);
     const bytes: u8[] = Context.bytesOf<FluidCell>(cell);
-    queue.writeBuffer(cellsA, offset, bytes);
-    queue.writeBuffer(cellsB, offset, bytes);
+    for (let byteIndex: i32 = 0; byteIndex < bytes.length; byteIndex += 1) {
+      initialCells.push(bytes[byteIndex]);
+    }
   }
+  queue.writeBuffer(cellsA, 0, initialCells);
 
   hostDevice.pushErrorScope("validation");
   const flowPipeline = createComputePipelineHost(
@@ -458,14 +458,14 @@ export function frame(
   queue.writeBuffer(
     params,
     0,
-    Context.bytesOf<FluidParams>(new FluidParams(obstacleX, frameCount as f32 / 60.0)),
+    Context.bytesOf<FluidParams>(new FluidParams(obstacleX)),
   );
-  const even: boolean = frameCount % 2 === 1;
+  const writesToB: boolean = frameCount % 2 === 1;
   // Each pass reads what the pass before it wrote. The next frame reverses every role.
-  const flowGroup: GPUBindGroup = even ? flowAB : flowBA;
-  const evaporateGroup: GPUBindGroup = even ? evaporateBA : evaporateAB;
-  const obstacleGroup: GPUBindGroup = even ? obstacleAB : obstacleBA;
-  const displayGroup: GPUBindGroup = even ? renderB : renderA;
+  const flowGroup: GPUBindGroup = writesToB ? flowAB : flowBA;
+  const evaporateGroup: GPUBindGroup = writesToB ? evaporateBA : evaporateAB;
+  const obstacleGroup: GPUBindGroup = writesToB ? obstacleAB : obstacleBA;
+  const displayGroup: GPUBindGroup = writesToB ? renderB : renderA;
   using encoder = device.createCommandEncoderDefault();
   flowPipeline.dispatch(encoder, [flowGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
   evaporatePipeline.dispatch(encoder, [evaporateGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);

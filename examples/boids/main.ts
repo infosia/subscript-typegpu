@@ -13,7 +13,9 @@ import {
   RenderPipeline,
   Storage,
   VertexInvocation,
+  bufferResource,
   computePipeline,
+  createBindGroupHost,
   createComputePipelineHost,
   createRenderPipelineHost,
   renderPipelineInstanced,
@@ -262,32 +264,20 @@ export function init(
   using computeBindLayout = computePipeline.bindGroupLayout(0);
   // The guard buffer carries the dispatched thread count. It gives the kernel the bound
   // that TypeGPU's createGuardedComputePipeline applies for the caller.
-  const guard = computePipeline.guardBuffer(0);
-  if (guard === null) {
-    renderPipeline.dispose();
-    computePipeline.dispose();
-    boidsB.dispose();
-    boidsA.dispose();
-    vertices.dispose();
-    print("FAIL guard missing");
-    return;
-  }
-  const groupAB = hostDevice.createBindGroup({
-    layout: computeBindLayout,
-    entries: [
-      { binding: boidUpdate_LAYOUT0.entries[0].binding, buffer: boidsA, size: boidsA.size() },
-      { binding: boidUpdate_LAYOUT0.entries[1].binding, buffer: boidsB, size: boidsB.size() },
-      { binding: boidUpdate_LAYOUT0.entries[2].binding, buffer: guard, size: 16 },
-    ],
-  });
-  const groupBA = hostDevice.createBindGroup({
-    layout: computeBindLayout,
-    entries: [
-      { binding: boidUpdate_LAYOUT0.entries[0].binding, buffer: boidsB, size: boidsB.size() },
-      { binding: boidUpdate_LAYOUT0.entries[1].binding, buffer: boidsA, size: boidsA.size() },
-      { binding: boidUpdate_LAYOUT0.entries[2].binding, buffer: guard, size: 16 },
-    ],
-  });
+  const groupAB = createBindGroupHost(
+    hostDevice,
+    computeBindLayout,
+    boidUpdate_LAYOUT0,
+    [bufferResource(boidsA), bufferResource(boidsB)],
+    computePipeline.guardBuffer(0),
+  );
+  const groupBA = createBindGroupHost(
+    hostDevice,
+    computeBindLayout,
+    boidUpdate_LAYOUT0,
+    [bufferResource(boidsB), bufferResource(boidsA)],
+    computePipeline.guardBuffer(0),
+  );
   activeDevice = hostDevice;
   activeCompute = computePipeline;
   activeRender = renderPipeline;

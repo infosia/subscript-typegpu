@@ -1497,13 +1497,11 @@ export const COMPUTE_VISIBILITY: u64 = GPUShaderStage.COMPUTE;
 export const VERTEX_VISIBILITY: u64 = GPUShaderStage.VERTEX;
 export const FRAGMENT_VISIBILITY: u64 = GPUShaderStage.FRAGMENT;
 
-export function createBindGroup(
-  device: GPUDevice,
-  layout: GPUBindGroupLayout,
+function bindGroupEntries(
   spec: BindGroupLayoutSpec,
   resources: BindingResource[],
   guardBuffer: GPUBuffer | null = null,
-): GPUBindGroup {
+): GPUBindGroupEntry[] {
   let authorCount: i32 = 0;
   let countIndex: i32 = 0;
   while (countIndex < spec.entries.length) {
@@ -1566,5 +1564,31 @@ export function createBindGroup(
     });
     index = index + 1;
   }
-  return device.createBindGroup({ layout, entries });
+  return entries;
+}
+
+export function createBindGroup(
+  device: GPUDevice,
+  layout: GPUBindGroupLayout,
+  spec: BindGroupLayoutSpec,
+  resources: BindingResource[],
+  guardBuffer: GPUBuffer | null = null,
+): GPUBindGroup {
+  return device.createBindGroup({
+    layout,
+    entries: bindGroupEntries(spec, resources, guardBuffer),
+  });
+}
+
+export function createBindGroupHost(
+  device: GPUHostOwnedDevice,
+  layout: GPUBindGroupLayout,
+  spec: BindGroupLayoutSpec,
+  resources: BindingResource[],
+  guardBuffer: GPUBuffer | null = null,
+): GPUBindGroup {
+  return device.createBindGroup({
+    layout,
+    entries: bindGroupEntries(spec, resources, guardBuffer),
+  });
 }

@@ -12,7 +12,9 @@ import {
   RenderPipelineSpec,
   RenderPipeline,
   VertexInvocation,
+  bufferResource,
   computePipeline,
+  createBindGroupHost,
   createComputePipelineHost,
   createRenderPipelineHost,
   renderPipelineInstanced,
@@ -111,8 +113,9 @@ function confettiVertex(
   particle: Particle,
   ctx: VertexInvocation,
 ): Varyings {
-  const cosine: f32 = new Vec2f(particle.angle, particle.angle).cos().x;
-  const sine: f32 = new Vec2f(particle.angle, particle.angle).sin().x;
+  const angles = new Vec2f(particle.angle, particle.angle);
+  const cosine: f32 = angles.cos().x;
+  const sine: f32 = angles.sin().x;
   const rotated = new Vec2f(
     value.position.x * cosine - value.position.y * sine,
     value.position.x * sine + value.position.y * cosine,
@@ -132,11 +135,11 @@ function confettiFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return input.color;
 }
 
-// Upstream uses a guarded pipeline. The particle count here is a whole number of workgroups,
-// so this pipeline dispatches workgroups directly and needs no guard.
+// Upstream uses a guarded pipeline. This port keeps the guard and dispatches the exact
+// particle thread count through `dispatchThreads`.
 export const confettiUpdate: ComputePipelineSpec = computePipeline<ParticleLayout>(
   updateParticles,
-  { name: "confettiUpdate", workgroupSize: [64, 1, 1] },
+  { name: "confettiUpdate", workgroupSize: [64, 1, 1], guarded: true },
 );
 
 export const confettiRender: RenderPipelineSpec = renderPipelineInstanced<
@@ -234,14 +237,13 @@ export function init(
     return;
   }
   using computeBindLayout = computePipeline.bindGroupLayout(0);
-  const group = hostDevice.createBindGroup({
-    layout: computeBindLayout,
-    entries: [{
-      binding: confettiUpdate_LAYOUT0.entries[0].binding,
-      buffer: particleBuffer,
-      size: (Particle_STRIDE * PARTICLE_COUNT) as u64,
-    }],
-  });
+  const group = createBindGroupHost(
+    hostDevice,
+    computeBindLayout,
+    confettiUpdate_LAYOUT0,
+    [bufferResource(particleBuffer)],
+    computePipeline.guardBuffer(0),
+  );
   activeDevice = hostDevice;
   activeCompute = computePipeline;
   activeRender = renderPipeline;
@@ -269,7 +271,7 @@ export function frame(
   if (vertices === null) return;
   if (particles === null) return;
   using encoder = device.createCommandEncoderDefault();
-  computePipeline.dispatch(encoder, [group], PARTICLE_COUNT / 64, 1, 1);
+  computePipeline.dispatchThreads(encoder, [group], PARTICLE_COUNT, 1, 1);
   const target = new GPUTextureView(view);
   using renderPass = encoder.beginRenderPass({
     colorAttachments: [{

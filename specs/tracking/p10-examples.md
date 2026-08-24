@@ -108,3 +108,22 @@ close.
 `xor-dev-centrifuge-2` after the round-4 tone-map fix (216 frames):
 the tunnel renders as intended. Every slice 1 windowed example now
 has a passed visual run.
+
+## Slice 1 close (2026-08-24)
+
+Round 5 landed: the fluid uniform holds only the live value, the
+constants derive from `GRID_SIZE`, one staged grid write, confetti
+on a guarded `dispatchThreads`, one shared vector for the angle
+trigonometry, the boids guard bound through the library so the
+`size: 16` literal left, and `createBindGroupHost` joined EG10.
+Comment review for the three simulation ports applied with an
+upstream cross-check.
+
+Evidence: gate green, 248 passed, 173 s. `confetti`, `boids`,
+`fluid-double-buffering` print `window:frames=60` on Metal. The
+owner's visual runs cover all eight windowed examples, and the
+three headless examples print their `check:` lines `pass` on Metal.
+
+P10 slice 1 COMPLETE 2026-08-24: ten ports, `tools/example.sh`,
+EG10 with the host bind-group form. Next: slice 2 (the sdf and
+noise modules, five ports).
