@@ -35,3 +35,12 @@ project ships first is unaffected.
 
 Verdict: slice 3 is unblocked. The r32 formats first, tier-2
 formats behind `hasFeature("texture-formats-tier2")`.
+
+## yawgpu response (2026-08-24)
+
+The tier-2 report landed in yawgpu: `a3b1db0` gates
+`texture-formats-tier2` on `MTLDevice.readWriteTextureSupport`, and
+`feed066` adds the Vulkan twin with
+`shaderStorageImageExtendedFormats`. The slice 3 caveat on tier-2
+formats reduces to `hasFeature("texture-formats-tier2")`, which now
+reflects the device on both backends.
