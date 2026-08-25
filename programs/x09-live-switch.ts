@@ -52,7 +52,7 @@ function liveSwitchKernel(res: SwitchLayout, ctx: ComputeInvocation): void {
     }
     iteration += 1;
   }
-  res.output.set(ctx.globalId.x, new SwitchValue(value));
+  res.output[ctx.globalId.x] = new SwitchValue(value);
 }
 
 export const liveSwitch: ComputePipelineSpec = computePipeline<SwitchLayout>(liveSwitchKernel, {
@@ -137,7 +137,7 @@ export async function main(): Promise<void> {
     print("readback:mapped");
     index = 0;
     while (index < count) {
-      const expected: u32 = hostLayout.output.get(index).value;
+      const expected: u32 = hostLayout.output[index].value;
       if (result[index as i32].value !== expected) {
         print(`FAIL ${index} expected=${expected} got=${result[index as i32].value}`);
         return;

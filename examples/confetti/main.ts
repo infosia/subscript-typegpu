@@ -91,7 +91,7 @@ class ParticleLayout {
 // This port applies constant gravity, a spin, and a wrap to the top edge.
 function updateParticles(res: ParticleLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.x;
-  const particle: Particle = res.particles.get(index);
+  const particle: Particle = res.particles[index];
   particle.velocity.y -= 0.00032;
   particle.position.x += particle.velocity.x;
   particle.position.y += particle.velocity.y;
@@ -103,7 +103,7 @@ function updateParticles(res: ParticleLayout, ctx: ComputeInvocation): void {
   if (particle.position.x > 1.12) {
     particle.position.x = -1.12;
   }
-  res.particles.set(index, particle);
+  res.particles[index] = particle;
 }
 
 // TypeGPU rotates the card by a fixed per-particle angle and corrects for the canvas aspect ratio.

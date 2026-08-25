@@ -41,24 +41,24 @@ fn every_library_method_has_the_sc6_body() {
         );
     }
     for factory in [
-        "v3fFrom2",
-        "v4fFrom2",
-        "v4fFrom3",
-        "v2fSplat",
-        "v3fSplat",
-        "v4fSplat",
-        "v3iFrom2",
-        "v4iFrom2",
-        "v4iFrom3",
-        "v2iSplat",
-        "v3iSplat",
-        "v4iSplat",
-        "v3uFrom2",
-        "v4uFrom2",
-        "v4uFrom3",
-        "v2uSplat",
-        "v3uSplat",
-        "v4uSplat",
+        "vec3fFrom2",
+        "vec4fFrom2",
+        "vec4fFrom3",
+        "vec2fSplat",
+        "vec3fSplat",
+        "vec4fSplat",
+        "vec3iFrom2",
+        "vec4iFrom2",
+        "vec4iFrom3",
+        "vec2iSplat",
+        "vec3iSplat",
+        "vec4iSplat",
+        "vec3uFrom2",
+        "vec4uFrom2",
+        "vec4uFrom3",
+        "vec2uSplat",
+        "vec3uSplat",
+        "vec4uSplat",
         "mat2x2fIdentity",
         "mat3x3fIdentity",
         "mat4x4fIdentity",
@@ -91,7 +91,7 @@ function sdfKernel(res: Layout, ctx: ComputeInvocation): void {
   value += sdLine(new Vec2f(1.0, 2.0), new Vec2f(0.0, 0.0), new Vec2f(2.0, 0.0));
   value += opUnion(1.0, 2.0);
   value += opSmoothUnion(1.0, 2.0, 0.5);
-  res.output.set(0, value);
+  res.output[0] = value;
 }
 export const sdf: ComputePipelineSpec = computePipeline<Layout>(sdfKernel, { name: "sdf", workgroupSize: [1, 1, 1] });
 "#,
@@ -131,7 +131,7 @@ function noiseKernel(res: Layout, ctx: ComputeInvocation): void {
   const seed: u32 = randSeed(ctx.globalId.x + 1);
   const sample: RandomF32 = randF32(seed);
   const noise: f32 = perlin3d(new Vec3f(0.25, 0.5, 0.75));
-  res.output.set(0, sample.value + noise + ((sample.state & 255) as f32));
+  res.output[0] = sample.value + noise + ((sample.state & 255) as f32);
 }
 export const noise: ComputePipelineSpec = computePipeline<Layout>(noiseKernel, { name: "noise", workgroupSize: [1, 1, 1] });
 "#,

@@ -58,8 +58,8 @@ class MatrixLayout {
 // TypeGPU writes this kernel as a WGSL template and resolves it at run time.
 // The kernel is subscript source here, and the generator emits the WGSL.
 function multiplyKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
-  const left: Matrix = res.left.get(0);
-  const right: Matrix = res.right.get(0);
+  const left: Matrix = res.left[0];
+  const right: Matrix = res.right[0];
   for (let row: u32 = 0; row < left.size.x; row += 1) {
     for (let column: u32 = 0; column < right.size.y; column += 1) {
       let total: f32 = 0.0;
@@ -221,7 +221,7 @@ export async function main(): Promise<void> {
       // hides the same two steps.
       const bytes: u8[] = await product.readOne(device, 0);
       const actual: Matrix = Context.fromBytes<Matrix>(bytes, 0);
-      const expected: Matrix = host.product.get(0);
+      const expected: Matrix = host.product[0];
       print(`product:first=${actual.body[0]} last=${actual.body[15]}`);
       // Noop validates the pipeline but leaves the product zeroed.
       state = resultState(actual, expected);

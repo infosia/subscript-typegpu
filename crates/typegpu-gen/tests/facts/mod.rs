@@ -132,7 +132,7 @@ import { lower_SIZE } from "./lowercase.typegpu";
 import { UPPER_WGSL } from "./uppercase.typegpu";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
 class Layout { output!: MutStorage<u32>; }
-function kernel(res: Layout, ctx: ComputeInvocation): void { res.output.set(0, 1); }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = 1; }
 export const UPPER: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "UPPER", workgroupSize: [1, 1, 1] });
 "#,
     );

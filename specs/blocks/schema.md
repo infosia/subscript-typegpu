@@ -66,9 +66,10 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
   | `Mat2x2f`, `Mat3x3f`, `Mat4x4f` | `mul` (matrix × matrix), `mulVec` (matrix × vector), `transpose`, and a free `identity` factory |
 
   `kernel.md` extends the set in P2.
-- **SC7 — Constructors.** Each vector class has a constructor that
-  takes its components in order. A free factory `v3f(x, y, z)` and
-  family exists beside it. A matrix constructor takes its columns.
+- **SC7 — Constructors.** Rev 1, 2026-08-25 (the factory root,
+  EG11). Each vector class has a constructor that takes its
+  components in order. A free factory `vec3f(x, y, z)` and family
+  exists beside it. A matrix constructor takes its columns.
 - **SC8 — `f16` vectors hold `f16` fields.** `f16` is storage-only
   in subscript, so `Vec2h`, `Vec3h`, `Vec4h` declare no arithmetic.
 

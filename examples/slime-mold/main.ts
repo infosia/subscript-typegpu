@@ -155,7 +155,7 @@ function senseTrailCell(position: Vec2f, angle: f32): Vec2i {
 // One invocation senses three cells, turns the agent, moves it, and deposits a trail mark.
 function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.x;
-  const agent: Agent = res.agents.get(index);
+  const agent: Agent = res.agents[index];
   const jitter: RandomF32 = randF32(agent.randomState);
   agent.randomState = jitter.state;
   agent.heading += (jitter.value - 0.5) * 0.3;
@@ -191,7 +191,7 @@ function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
   agent.position.y = wrapTrail(
     agent.position.y + stepAngles.sin().x * STEP_SIZE,
   );
-  res.agents.set(index, agent);
+  res.agents[index] = agent;
   const cell = new Vec2i(agent.position.x as i32, agent.position.y as i32);
   const previous: f32 = res.trail.load(cell).x;
   res.trail.store(cell, new Vec4f(previous + DEPOSIT_AMOUNT, 0.0, 0.0, 1.0));

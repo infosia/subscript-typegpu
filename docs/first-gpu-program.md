@@ -20,9 +20,9 @@ declaration.
 
 ```ts program=programs/b22-first-program.ts
 function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
-  const state: State = res.state.get(0);
+  const state: State = res.state[0];
   state.counter += state.incrementBy;
-  res.state.set(0, state);
+  res.state[0] = state;
 }
 
 export const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
@@ -180,7 +180,7 @@ below checks the arithmetic anywhere, device or not.
 let counter: u32 = 0;
 
 function badKernel(res: CounterLayout, ctx: ComputeInvocation): void {
-  res.state.set(0, new State(counter, 1));
+  res.state[0] = new State(counter, 1);
 }
 
 export const badProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
@@ -211,9 +211,9 @@ proven without a device.
       [1, 1, 1],
       firstProgram_HOST_RUNNABLE,
     );
-    const hostState: State = hostLayout.state.get(0);
+    const hostState: State = hostLayout.state[0];
     hostState.incrementBy = 25;
-    hostLayout.state.set(0, hostState);
+    hostLayout.state[0] = hostState;
     simulateCompute<CounterLayout>(
       incrementCounter,
       hostLayout,
@@ -221,7 +221,7 @@ proven without a device.
       [1, 1, 1],
       firstProgram_HOST_RUNNABLE,
     );
-    print(`host:counter=${hostLayout.state.get(0).counter}`);
+    print(`host:counter=${hostLayout.state[0].counter}`);
 ```
 
 Two increments — 10, then 25 — leave the host counter at 35, on

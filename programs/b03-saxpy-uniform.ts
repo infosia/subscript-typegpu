@@ -58,9 +58,9 @@ function saxpyKernel(res: SaxpyLayout, ctx: ComputeInvocation): void {
   const settings: SaxpyParams = res.params.get();
   const i: u32 = ctx.globalId.x;
   if (i < settings.count) {
-    const xItem: Item = res.x.get(i);
-    const yItem: Item = res.y.get(i);
-    res.y.set(i, new Item(settings.a * xItem.value + yItem.value));
+    const xItem: Item = res.x[i];
+    const yItem: Item = res.y[i];
+    res.y[i] = new Item(settings.a * xItem.value + yItem.value);
   }
 }
 
@@ -142,7 +142,7 @@ export async function main(): Promise<void> {
     print(`saxpy_WORKGROUP_Z=${saxpy_WORKGROUP_Z}`);
     print(`saxpy_WGSL_LINES=${saxpy_WGSL.split("\n").length}`);
     print("dispatch:submitted");
-    print(`host:out=${hostLayout.y.get(0).value},${hostLayout.y.get(1).value}`);
+    print(`host:out=${hostLayout.y[0].value},${hostLayout.y[1].value}`);
   }
   gpu.dispose();
   print("PASS");

@@ -51,7 +51,7 @@ class ShellLayout {
 
 function shellKernel(res: ShellLayout, ctx: ComputeInvocation): void {
   if (ctx.globalId.x === 0) {
-    res.output.set(0, addBias(5));
+    res.output[0] = addBias(5);
   }
 }
 
@@ -123,7 +123,7 @@ export async function main(): Promise<void> {
       shellPipeline_HOST_RUNNABLE,
     );
     print(`shellPipeline_WGSL_LINES=${shellPipeline_WGSL.split("\n").length}`);
-    print(`host:out=${host.output.get(0)}`);
+    print(`host:out=${host.output[0]}`);
   }
   gpu.dispose();
   print("PASS");

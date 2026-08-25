@@ -59,7 +59,7 @@ function uploadKernel(res: UploadLayout, ctx: ComputeInvocation): void {
     ((ctx.globalId.x as f32) + 0.5) / (WIDTH as f32),
     ((ctx.globalId.y as f32) + 0.5) / (HEIGHT as f32),
   );
-  res.output.set(index, res.source.sampleLevel(res.nearest, uv, 0.0));
+  res.output[index] = res.source.sampleLevel(res.nearest, uv, 0.0);
 }
 
 export const uploadPass: ComputePipelineSpec = computePipeline<UploadLayout>(

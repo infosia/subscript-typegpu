@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 mod api;
+mod authored_spelling;
 mod backend;
 mod c_layout;
 mod coverage;

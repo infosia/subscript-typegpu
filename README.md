@@ -39,9 +39,9 @@ writes the WGSL for you. TypeGPU marks the same function with
 
 ```ts program=programs/b22-first-program.ts
 function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
-  const state: State = res.state.get(0);
+  const state: State = res.state[0];
   state.counter += state.incrementBy;
-  res.state.set(0, state);
+  res.state[0] = state;
 }
 
 export const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(

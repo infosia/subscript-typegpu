@@ -22,8 +22,9 @@ export function main(): void {
   const uniform: Uniform<u32> = new Uniform<u32>(7);
   const storage: Storage<u32> = new Storage<u32>([2, 3]);
   const mutable: MutStorage<u32> = new MutStorage<u32>([4, 5]);
+  mutable[0] = storage[0];
   mutable.set(1, 9);
-  print(`runtime=${uniform.get()},${storage.get(1)},${storage.length()},${mutable.get(1)},${mutable.length()}`);
+  print(`runtime=${uniform.get()},${storage.get(1)},${storage.length()},${mutable.get(1)},${mutable.length()},${mutable[0]}`);
   const privateValue: PrivateVar<u32> = privateVar<u32>(6);
   privateValue.set(privateValue.get() + 1);
   const workgroupValue: WorkgroupVar<u32> = workgroupVar<u32>();
@@ -31,9 +32,11 @@ export function main(): void {
   const workgroupValues: WorkgroupArray<u32> = workgroupArray<u32>(2);
   workgroupValues.set(0, 9);
   workgroupValues.set(1, 10);
+  workgroupValues[0] = 11;
+  const indexedWorkgroupValue: u32 = workgroupValues[0];
   workgroupBarrier();
   storageBarrier();
-  print(`variables=${privateValue.get()},${workgroupValue.get()},${workgroupValues.get(0)},${workgroupValues.get(1)},${workgroupValues.length()}`);
+  print(`variables=${privateValue.get()},${workgroupValue.get()},${workgroupValues.get(0)},${workgroupValues.get(1)},${workgroupValues.length()},${indexedWorkgroupValue}`);
   const unsigned: AtomicU32 = new AtomicU32(10);
   const signed: AtomicI32 = new AtomicI32(-2);
   print(`atomic=${unsigned.add(5)},${unsigned.sub(3)},${unsigned.min(20)},${unsigned.max(20)},${unsigned.exchange(7)},${unsigned.load()}`);
@@ -68,7 +71,7 @@ export function main(): void {
     std::fs::remove_dir(&directory).expect("remove runtime test directory");
     assert_eq!(
         output,
-        b"runtime=7,3,2,9,2\nvariables=7,8,9,10,2\natomic=10,15,12,12,20,7\nsigned=4,-2,-3,9,1\ntexture=2,1,0,1,1,0,1,nearest=true\n"
+        b"runtime=7,3,2,9,2,2\nvariables=7,8,11,10,2,11\natomic=10,15,12,12,20,7\nsigned=4,-2,-3,9,1\ntexture=2,1,0,1,1,0,1,nearest=true\n"
     );
 }
 

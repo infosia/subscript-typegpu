@@ -43,6 +43,56 @@ fn validate(wgsl: &str) {
     .unwrap_or_else(|error| panic!("WGSL validation failed: {error:?}\n{wgsl}"));
 }
 
+#[test]
+fn binding_methods_and_indices_emit_identical_wgsl() {
+    let method_source = r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, Storage, WorkgroupArray, computePipeline, workgroupArray } from "./typegpu";
+class Layout { input!: Storage<u32>; output!: MutStorage<u32>; }
+const shared: WorkgroupArray<u32> = workgroupArray<u32>(1);
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  const index: u32 = ctx.localIndex;
+  const inputValue: u32 = res.input.get(index);
+  const outputValue: u32 = res.output.get(index);
+  const sharedValue: u32 = shared.get(index);
+  shared.set(index, inputValue + outputValue + sharedValue);
+  res.output.set(index, shared.get(index));
+}
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#;
+    let index_source = r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, Storage, WorkgroupArray, computePipeline, workgroupArray } from "./typegpu";
+class Layout { input!: Storage<u32>; output!: MutStorage<u32>; }
+const shared: WorkgroupArray<u32> = workgroupArray<u32>(1);
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  const index: u32 = ctx.localIndex;
+  const inputValue: u32 = res.input[index];
+  const outputValue: u32 = res.output[index];
+  const sharedValue: u32 = shared[index];
+  shared[index] = inputValue + outputValue + sharedValue;
+  res.output[index] = shared[index];
+}
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#;
+    let method_wgsl = &generate(method_source).pipelines[0].1;
+    let index_wgsl = &generate(index_source).pipelines[0].1;
+    for expected in [
+        "let inputValue = input[index];",
+        "let outputValue = output[index];",
+        "let sharedValue = shared_[index];",
+        "shared_[index] = inputValue + outputValue + sharedValue;",
+        "output[index] = shared_[index];",
+    ] {
+        assert!(
+            method_wgsl.contains(expected),
+            "T21: method form omitted `{expected}` from:\n{method_wgsl}"
+        );
+    }
+    assert_eq!(
+        method_wgsl, index_wgsl,
+        "T21: method and index forms emitted different WGSL"
+    );
+}
+
 fn assert_host_runnable(source: &str, expected: bool) {
     let generated = generate(source);
     let pipeline = generated
@@ -80,7 +130,7 @@ import { AtomicU32 } from "./typegpu-types";
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
 @CStruct class Counter { value: AtomicU32; constructor(value: AtomicU32) { this.value = value; } }
 class Layout { counters!: MutStorage<Counter>; }
-function kernel(res: Layout, ctx: ComputeInvocation): void { res.counters.get(0).value.add(1); }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.counters[0].value.add(1); }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
         false,
@@ -122,7 +172,7 @@ fn cl6_read_private_variable_alone_is_host_runnable() {
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, PrivateVar, computePipeline, privateVar } from "./typegpu";
 class Layout { output!: MutStorage<u32>; }
 const state: PrivateVar<u32> = privateVar<u32>(1);
-function kernel(res: Layout, ctx: ComputeInvocation): void { res.output.set(0, state.get()); }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = state.get(); }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
         true,
@@ -136,7 +186,7 @@ fn pipeline_name_must_match_its_declaration() {
             r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
 class Layout { output!: MutStorage<u32>; }
-function kernel(res: Layout, ctx: ComputeInvocation): void { res.output.set(0, 1); }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = 1; }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
 "#,
             "options omit name",
@@ -145,7 +195,7 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { w
             r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
 class Layout { output!: MutStorage<u32>; }
-function kernel(res: Layout, ctx: ComputeInvocation): void { res.output.set(0, 1); }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = 1; }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "other", workgroupSize: [1, 1, 1] });
 "#,
             "options name is `other`",
@@ -169,7 +219,7 @@ function shadow(res: Layout, ctx: ComputeInvocation): void {
   let params: Params = res.params.get();
   params.value = params.value + 1;
   const reread: Params = res.params.get();
-  res.output.set(0, new Result(params.value, reread.value));
+  res.output[0] = new Result(params.value, reread.value);
 }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(shadow, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
@@ -307,13 +357,13 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { n
 fn switch_grouping_module_constants_and_nested_control_flow_emit() {
     let generated = generate(
         r#"
-import { Mat2x2f, Vec2u, v2f, v2u } from "./typegpu-types";
+import { Mat2x2f, Vec2u, vec2f, vec2u } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output!: MutStorage<Item>; }
 const LIMIT: u32 = 4;
-const OFFSET: Vec2u = v2u(1, 2);
-const BASIS: Mat2x2f = new Mat2x2f(v2f(1.0, 0.0), v2f(0.0, 1.0));
+const OFFSET: Vec2u = vec2u(1, 2);
+const BASIS: Mat2x2f = new Mat2x2f(vec2f(1.0, 0.0), vec2f(0.0, 1.0));
 function depth(res: Layout, ctx: ComputeInvocation): void {
   let i: u32 = 0;
   let result: u32 = 0;
@@ -335,7 +385,7 @@ function depth(res: Layout, ctx: ComputeInvocation): void {
     case 0:
     default: result += 1; break;
   }
-  res.output[0] = new Item(result + (BASIS.mulVec(v2f(1.0, 0.0)).x as u32));
+  res.output[0] = new Item(result + (BASIS.mulVec(vec2f(1.0, 0.0)).x as u32));
 }
 export const depthPipeline: ComputePipelineSpec = computePipeline<Layout>(depth, { name: "depthPipeline", workgroupSize: [1, 1, 1] });
 "#,
@@ -397,7 +447,7 @@ export const variablePipeline: ComputePipelineSpec = computePipeline<Layout>(var
 }
 
 #[test]
-fn uniform_reads_binding_lengths_and_workgroup_get_follow_k22() {
+fn uniform_reads_binding_lengths_and_workgroup_indices_follow_k22() {
     let generated = generate(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, Storage, Uniform, WorkgroupArray, workgroupArray, workgroupBarrier } from "./typegpu";
@@ -406,9 +456,9 @@ class Layout { params!: Uniform<Item>; input!: Storage<Item>; output!: MutStorag
 const hist: WorkgroupArray<u32> = workgroupArray<u32>(4);
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   if (res.params.get().value > 0 && res.input.length() > 0) { workgroupBarrier(); }
-  const fromGet: u32 = hist.get(ctx.localIndex);
-  const fromIndex: u32 = hist[ctx.localIndex];
-  res.output[0] = new Item(fromGet + fromIndex);
+  const firstRead: u32 = hist[ctx.localIndex];
+  const secondRead: u32 = hist[ctx.localIndex];
+  res.output[0] = new Item(firstRead + secondRead);
 }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
 "#,
@@ -883,7 +933,7 @@ function choose(input: u32): u32 { return input; }
 const shell: WgslShellSpec = wgslShell<(input: u32) => u32>(choose, {
   body: "    if (input > 0u) {\n      return input;\n\n    }\n    return 0u;",
 });
-function kernel(res: Layout, ctx: ComputeInvocation): void { res.output.set(0, choose(1)); }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = choose(1); }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );

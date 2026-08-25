@@ -50,10 +50,10 @@ class VecAddLayout {
 function vecAddKernel(res: VecAddLayout, ctx: ComputeInvocation): void {
   const i: u32 = ctx.globalId.x;
   if (i < res.out.length()) {
-    const left: Item = res.a.get(i);
-    const right: Item = res.b.get(i);
+    const left: Item = res.a[i];
+    const right: Item = res.b[i];
     const sum: Item = new Item(left.value + right.value);
-    res.out.set(i, sum);
+    res.out[i] = sum;
   }
 }
 
@@ -134,7 +134,7 @@ export async function main(): Promise<void> {
     print(`vecAdd_WORKGROUP_Z=${vecAdd_WORKGROUP_Z}`);
     print(`vecAdd_WGSL_LINES=${vecAdd_WGSL.split("\n").length}`);
     print("dispatch:submitted");
-    print(`host:out=${hostLayout.out.get(0).value},${hostLayout.out.get(1).value},${hostLayout.out.get(2).value}`);
+    print(`host:out=${hostLayout.out[0].value},${hostLayout.out[1].value},${hostLayout.out[2].value}`);
   }
   gpu.dispose();
   print("PASS");

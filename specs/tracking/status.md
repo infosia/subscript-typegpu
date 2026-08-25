@@ -1,6 +1,6 @@
 # Project status
 
-Updated 2026-08-23 at `42ecb7f`.
+Updated 2026-08-25.
 
 | Phase | Status | Close |
 |---|---|---|
@@ -105,3 +105,19 @@ spelling, logic parentheses), and T18's bounded worker pool cut the
 full gate from 214 s to 106 s. Records:
 `specs/tracking/p10-examples.md`, `specs/tracking/p11-feature-gaps.md`,
 `specs/tracking/build-time.md`.
+
+## P12 — the TypeGPU spelling parity (2026-08-25)
+
+EG11 fixes the authored spelling. The index form replaced `get(i)`
+and `set(i, v)` on `Storage`, `MutStorage`, and `WorkgroupArray`
+everywhere, and the vector factory family took the `vec` root that
+TypeGPU uses. The measurement behind the scope is the table in
+`specs/tracking/p12-spelling.md`: it names the subscript rule that
+forces every divergence the change did not close. Two rules now hold
+the spelling: T20 gates the authored form in `programs/` and
+`examples/`, and T21 pins the two forms to one WGSL. Phase review: 1
+MAJOR (the sweep erased the only proof of that equality) and 12
+MINOR, all closed. Evidence: gate green with the backend, 256
+passed, 1 ignored, 116 s, every `.wgsl` and `.expected` golden
+byte-identical, live green on Metal 67.49 s. Record:
+`specs/tracking/p12-spelling.md`.

@@ -53,7 +53,7 @@ class ShellLayout {
 
 function shellKernel(res: ShellLayout, ctx: ComputeInvocation): void {
   if (ctx.globalId.x === 0) {
-    res.output.set(0, addBias(5));
+    res.output[0] = addBias(5);
   }
 }
 
@@ -128,8 +128,8 @@ export async function main(): Promise<void> {
       [1, 1, 1],
       shellPipeline_HOST_RUNNABLE,
     );
-    if (gpuValue !== host.output.get(0)) {
-      print(`FAIL gpu=${gpuValue} host=${host.output.get(0)}`);
+    if (gpuValue !== host.output[0]) {
+      print(`FAIL gpu=${gpuValue} host=${host.output[0]}`);
       return;
     }
   }

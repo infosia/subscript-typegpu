@@ -74,7 +74,7 @@ class IndirectLayout {
 
 function computeStep(res: IndirectLayout, ctx: ComputeInvocation): void {
   if (ctx.globalId.x === 0) {
-    res.output.set(0, 23);
+    res.output[0] = 23;
   }
 }
 
@@ -261,7 +261,7 @@ export async function main(): Promise<void> {
       [1, 1, 1],
       indirectCompute_HOST_RUNNABLE,
     );
-    if (gpuValues[0] !== host.output.get(0)) {
+    if (gpuValues[0] !== host.output[0]) {
       print("FAIL compute");
       return;
     }

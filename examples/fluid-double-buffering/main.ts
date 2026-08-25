@@ -115,30 +115,30 @@ function flowKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   const rightIndex: u32 = x + 1 < GRID_SIZE ? index + 1 : index;
   const downIndex: u32 = y > 0 ? index - GRID_SIZE : index;
   const upIndex: u32 = y + 1 < GRID_SIZE ? index + GRID_SIZE : index;
-  const cell: FluidCell = res.source.get(index);
-  const left: FluidCell = res.source.get(leftIndex);
-  const right: FluidCell = res.source.get(rightIndex);
-  const down: FluidCell = res.source.get(downIndex);
-  const up: FluidCell = res.source.get(upIndex);
+  const cell: FluidCell = res.source[index];
+  const left: FluidCell = res.source[leftIndex];
+  const right: FluidCell = res.source[rightIndex];
+  const down: FluidCell = res.source[downIndex];
+  const up: FluidCell = res.source[upIndex];
   const neighborDensity: f32 = (left.density + right.density + down.density + up.density) * 0.25;
   cell.density = cell.density * 0.91 + neighborDensity * 0.09;
   cell.velocity.x = cell.velocity.x * 0.97 + (left.density - right.density) * 0.001;
   cell.velocity.y = cell.velocity.y * 0.97 + (down.density - up.density) * 0.001;
-  res.target.set(index, cell);
+  res.target[index] = cell;
 }
 
 function evaporateKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.y * GRID_SIZE + ctx.globalId.x;
-  const cell: FluidCell = res.source.get(index);
+  const cell: FluidCell = res.source[index];
   cell.density *= 0.992;
-  res.target.set(index, cell);
+  res.target[index] = cell;
 }
 
 function obstacleKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   const x: u32 = ctx.globalId.x;
   const y: u32 = ctx.globalId.y;
   const index: u32 = y * GRID_SIZE + x;
-  const cell: FluidCell = res.source.get(index);
+  const cell: FluidCell = res.source[index];
   const params: FluidParams = res.params.get();
   const gridRadius: f32 = ((GRID_SIZE - 1) as f32) * 0.5;
   const normalizedX: f32 = (x as f32) / gridRadius - 1.0;
@@ -154,7 +154,7 @@ function obstacleKernel(res: FluidLayout, ctx: ComputeInvocation): void {
     cell.velocity.y += 0.012;
     cell.density = 1.0;
   }
-  res.target.set(index, cell);
+  res.target[index] = cell;
 }
 
 // TypeGPU selects the four full-screen strip corners from the vertex index.
@@ -179,7 +179,7 @@ function fluidFragment(
   let y: u32 = (input.uv.y * (GRID_SIZE as f32)) as u32;
   if (x >= GRID_SIZE) x = GRID_SIZE - 1;
   if (y >= GRID_SIZE) y = GRID_SIZE - 1;
-  const cell: FluidCell = res.cells.get(y * GRID_SIZE + x);
+  const cell: FluidCell = res.cells[y * GRID_SIZE + x];
   return new Vec4f(
     0.03 + cell.density * 0.12,
     0.05 + cell.density * 0.52,

@@ -24,24 +24,24 @@ import {
   Vec4f,
   Vec4i,
   Vec4u,
-  v2fSplat,
-  v2iSplat,
-  v2uSplat,
-  v3fFrom2,
-  v3fSplat,
-  v3iFrom2,
-  v3iSplat,
-  v3uFrom2,
-  v3uSplat,
-  v4fFrom2,
-  v4fFrom3,
-  v4fSplat,
-  v4iFrom2,
-  v4iFrom3,
-  v4iSplat,
-  v4uFrom2,
-  v4uFrom3,
-  v4uSplat,
+  vec2fSplat,
+  vec2iSplat,
+  vec2uSplat,
+  vec3fFrom2,
+  vec3fSplat,
+  vec3iFrom2,
+  vec3iSplat,
+  vec3uFrom2,
+  vec3uSplat,
+  vec4fFrom2,
+  vec4fFrom3,
+  vec4fSplat,
+  vec4iFrom2,
+  vec4iFrom3,
+  vec4iSplat,
+  vec4uFrom2,
+  vec4uFrom3,
+  vec4uSplat,
 } from "./typegpu-types";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
 import {
@@ -267,12 +267,12 @@ function coverUnsigned4(a: Vec4u, b: Vec4u): Vec4u {
 
 
 function vectorKernel(res: VectorLayout, ctx: ComputeInvocation): void {
-  const input: VectorInput = res.input.get(0);
+  const input: VectorInput = res.input[0];
   const a: Vec4f = input.floatA;
   const b: Vec4f = input.floatB;
   const low: Vec4f = new Vec4f(0.1, 0.2, 0.3, 0.4);
   const high: Vec4f = new Vec4f(1.0, 1.1, 1.2, 1.3);
-  let output: VectorOutput = res.output.get(0);
+  let output: VectorOutput = res.output[0];
 
   output.exactFloat = a.abs()
     .add(a.floor())
@@ -380,22 +380,22 @@ function vectorKernel(res: VectorLayout, ctx: ComputeInvocation): void {
     input.unsignedA.xyz().x + input.unsignedA.xyw().z + input.unsignedA.xzw().y + input.unsignedA.yzw().z,
   );
 
-  const f2: Vec2f = v2fSplat(2.0);
-  const f3From: Vec3f = v3fFrom2(f2, 3.0);
-  output.factoryFloat = v4fFrom2(f2, 3.0, 4.0)
-    .add(v4fFrom3(f3From, 4.0))
-    .add(new Vec4f(v3fSplat(1.0).x, v3fSplat(1.0).y, v3fSplat(1.0).z, v4fSplat(1.0).w));
-  const i2: Vec2i = v2iSplat(2);
-  const i3From: Vec3i = v3iFrom2(i2, 3);
-  output.factorySigned = v4iFrom2(i2, 3, 4)
-    .add(v4iFrom3(i3From, 4))
-    .add(new Vec4i(v3iSplat(1).x, v3iSplat(1).y, v3iSplat(1).z, v4iSplat(1).w));
-  const u2: Vec2u = v2uSplat(2);
-  const u3From: Vec3u = v3uFrom2(u2, 3);
-  output.factoryUnsigned = v4uFrom2(u2, 3, 4)
-    .add(v4uFrom3(u3From, 4))
-    .add(new Vec4u(v3uSplat(1).x, v3uSplat(1).y, v3uSplat(1).z, v4uSplat(1).w));
-  res.output.set(0, output);
+  const f2: Vec2f = vec2fSplat(2.0);
+  const f3From: Vec3f = vec3fFrom2(f2, 3.0);
+  output.factoryFloat = vec4fFrom2(f2, 3.0, 4.0)
+    .add(vec4fFrom3(f3From, 4.0))
+    .add(new Vec4f(vec3fSplat(1.0).x, vec3fSplat(1.0).y, vec3fSplat(1.0).z, vec4fSplat(1.0).w));
+  const i2: Vec2i = vec2iSplat(2);
+  const i3From: Vec3i = vec3iFrom2(i2, 3);
+  output.factorySigned = vec4iFrom2(i2, 3, 4)
+    .add(vec4iFrom3(i3From, 4))
+    .add(new Vec4i(vec3iSplat(1).x, vec3iSplat(1).y, vec3iSplat(1).z, vec4iSplat(1).w));
+  const u2: Vec2u = vec2uSplat(2);
+  const u3From: Vec3u = vec3uFrom2(u2, 3);
+  output.factoryUnsigned = vec4uFrom2(u2, 3, 4)
+    .add(vec4uFrom3(u3From, 4))
+    .add(new Vec4u(vec3uSplat(1).x, vec3uSplat(1).y, vec3uSplat(1).z, vec4uSplat(1).w));
+  res.output[0] = output;
 }
 
 export const vectorBuiltins: ComputePipelineSpec = computePipeline<VectorLayout>(
@@ -448,7 +448,7 @@ export async function main(): Promise<void> {
     hostLayout.input = new Storage<VectorInput>([source]);
     hostLayout.output = new MutStorage<VectorOutput>([new VectorOutput()]);
     simulateCompute<VectorLayout>(vectorKernel, hostLayout, vectorBuiltins, [1, 1, 1], vectorBuiltins_HOST_RUNNABLE);
-    const host = hostLayout.output.get(0);
+    const host = hostLayout.output[0];
     print(`host:k25-float=${host.exactFloat.x},${host.exactFloat.y},${host.exactFloat.z},${host.exactFloat.w},${host.transFloat.x},${host.transFloat.y},${host.transFloat.z},${host.transFloat.w};k25-integer=${host.signedValue.x},${host.signedValue.y},${host.signedValue.z},${host.signedValue.w},${host.unsignedValue.x},${host.unsignedValue.y},${host.unsignedValue.z},${host.unsignedValue.w};k26=${host.comparisonBits.x},${host.comparisonBits.y},${host.comparisonBits.z},${host.comparisonBits.w},${host.selectedValue.x},${host.selectedValue.y},${host.selectedValue.z},${host.selectedValue.w};k27-swizzles=${host.swizzleFloat.x},${host.swizzleFloat.y},${host.swizzleFloat.z},${host.swizzleFloat.w},${host.swizzleSigned.x},${host.swizzleSigned.y},${host.swizzleSigned.z},${host.swizzleSigned.w},${host.swizzleUnsigned.x},${host.swizzleUnsigned.y},${host.swizzleUnsigned.z},${host.swizzleUnsigned.w};k27-factories=${host.factoryFloat.x},${host.factoryFloat.y},${host.factoryFloat.z},${host.factoryFloat.w},${host.factorySigned.x},${host.factorySigned.y},${host.factorySigned.z},${host.factorySigned.w},${host.factoryUnsigned.x},${host.factoryUnsigned.y},${host.factoryUnsigned.z},${host.factoryUnsigned.w};width2=${host.width2Float.x},${host.width2Float.y},${host.width2Signed.x},${host.width2Signed.y},${host.width2Unsigned.x},${host.width2Unsigned.y};width3=${host.width3Float.x},${host.width3Float.y},${host.width3Float.z},${host.width3Signed.x},${host.width3Signed.y},${host.width3Signed.z},${host.width3Unsigned.x},${host.width3Unsigned.y},${host.width3Unsigned.z};step=${host.orderStep.x},${host.orderStep.y},${host.orderStep.z},${host.orderStep.w};smoothstep=${host.orderSmoothstep.x},${host.orderSmoothstep.y},${host.orderSmoothstep.z},${host.orderSmoothstep.w};mix=${host.orderMix.x},${host.orderMix.y},${host.orderMix.z},${host.orderMix.w};clamp=${host.orderClamp.x},${host.orderClamp.y},${host.orderClamp.z},${host.orderClamp.w};refract=${host.orderRefract.x},${host.orderRefract.y},${host.orderRefract.z},${host.orderRefract.w};faceForward=${host.orderFaceForward.x},${host.orderFaceForward.y},${host.orderFaceForward.z},${host.orderFaceForward.w};select=${host.orderSelect.x},${host.orderSelect.y},${host.orderSelect.z},${host.orderSelect.w}`);
     print(`vectorBuiltins_WGSL_LINES=${vectorBuiltins_WGSL.split("\n").length}`);
   }

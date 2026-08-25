@@ -107,3 +107,34 @@ question (P2 review M6), and the diagnostic sweep.
   single-sourced: the shared part lives in one helper over the
   values both device classes produce. A windowed example uses the
   host form.
+
+- **EG11 — The authored spelling follows TypeGPU where subscript
+  allows it.** Rev 0, 2026-08-25. Two forms change.
+
+  The index form is the authored form for `Storage`, `MutStorage`,
+  and `WorkgroupArray`. An author writes `res.items[i]` and
+  `res.items[i] = v`. The methods `get(i)` and `set(i, v)` stay,
+  because subscript's index signature needs them as its accessors.
+  No file under `programs/`, `examples/`, or `docs/`, and not
+  `README.md`, calls the two methods by name. A test over those
+  four trees enforces it (T20). A direct test of the two methods
+  stays, because they are public API. PI6 emits the same WGSL for
+  both forms, and a generator test pins that equality (T21). A
+  golden that moves under this rule is a defect, not a
+  regeneration.
+
+  The vector factory family is `vec2f`, `vec3f`, `vec4f`, and the
+  same three shapes for the `i`, `u`, and `h` families. The `f`
+  family adds six mixed and splat forms: `vec3fFrom2`,
+  `vec4fFrom2`, `vec4fFrom3`, `vec2fSplat`, `vec3fSplat`, and
+  `vec4fSplat`. The `i` and `u` families add the same six shapes.
+  TypeGPU writes `d.vec3f`. The class names stay `Vec2f` through
+  `Vec4h`, because a subscript program writes them as type
+  annotations.
+
+  A spelling that subscript forbids stays as it is. `get()` on
+  `Uniform`, `PrivateVar`, and `WorkgroupVar` stays, because the
+  language has no accessors. `scale` stays beside `mul`, because
+  the language has no overloads. `createBuffer<T>` stays a free
+  function, because a user-declared method takes no type
+  parameters.

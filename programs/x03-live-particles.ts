@@ -77,7 +77,7 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
   const settings: SimParams = res.params.get();
   const i: u32 = ctx.globalId.x;
   if (i < settings.count) {
-    res.particles.set(i, integrate(res.particles.get(i), settings.dt));
+    res.particles[i] = integrate(res.particles[i], settings.dt);
   }
 }
 
@@ -231,7 +231,7 @@ export async function main(): Promise<void> {
     print("readback:mapped");
     index = 0;
     while (index < 64) {
-      if (!equalParticle(result[index], hostLayout.particles.get(index as u32))) {
+      if (!equalParticle(result[index], hostLayout.particles[index as u32])) {
         print(`FAIL ${index}`);
         return;
       }

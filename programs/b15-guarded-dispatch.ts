@@ -34,7 +34,7 @@ class GuardedLayout {
 }
 
 function guardedKernel(res: GuardedLayout, ctx: ComputeInvocation): void {
-  res.output.set(ctx.globalId.x, ctx.globalId.x + 100);
+  res.output[ctx.globalId.x] = ctx.globalId.x + 100;
 }
 
 export const guardedPipeline: ComputePipelineSpec = computePipeline<GuardedLayout>(
@@ -112,7 +112,7 @@ export async function main(): Promise<void> {
     print(`guard.group=${guardGroup}`);
     print(`guard.binding=${guard.binding}`);
     print(`layout.entries=${guardedPipeline_LAYOUT0.entries.length}`);
-    print(`host:out=${host.output.get(0)},${host.output.get(5)},${host.output.get(6)},${host.output.get(7)}`);
+    print(`host:out=${host.output[0]},${host.output[5]},${host.output[6]},${host.output[7]}`);
   }
   gpu.dispose();
   print("PASS");

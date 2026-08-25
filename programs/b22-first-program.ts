@@ -50,9 +50,9 @@ class CounterLayout {
 }
 
 function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
-  const state: State = res.state.get(0);
+  const state: State = res.state[0];
   state.counter += state.incrementBy;
-  res.state.set(0, state);
+  res.state[0] = state;
 }
 
 export const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
@@ -153,9 +153,9 @@ export async function main(): Promise<void> {
       [1, 1, 1],
       firstProgram_HOST_RUNNABLE,
     );
-    const hostState: State = hostLayout.state.get(0);
+    const hostState: State = hostLayout.state[0];
     hostState.incrementBy = 25;
-    hostLayout.state.set(0, hostState);
+    hostLayout.state[0] = hostState;
     simulateCompute<CounterLayout>(
       incrementCounter,
       hostLayout,
@@ -163,7 +163,7 @@ export async function main(): Promise<void> {
       [1, 1, 1],
       firstProgram_HOST_RUNNABLE,
     );
-    print(`host:counter=${hostLayout.state.get(0).counter}`);
+    print(`host:counter=${hostLayout.state[0].counter}`);
   }
   gpu.dispose();
   print("PASS");

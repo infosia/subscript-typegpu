@@ -68,7 +68,7 @@ function randomKernel(res: RandomLayout, ctx: ComputeInvocation): void {
     state = sample.state;
     value = sample.value;
   }
-  res.output.set(index, new RandomValue(state, value));
+  res.output[index] = new RandomValue(state, value);
 }
 
 export const randomFill: ComputePipelineSpec = computePipeline<RandomLayout>(randomKernel, {
@@ -89,7 +89,7 @@ function makeHostLayout(): RandomLayout {
 function hostBytes(layout: RandomLayout): u8[] {
   const bytes: u8[] = [];
   for (let index: u32 = 0; index < SAMPLE_COUNT; index += 1) {
-    const valueBytes: u8[] = Context.bytesOf<RandomValue>(layout.output.get(index));
+    const valueBytes: u8[] = Context.bytesOf<RandomValue>(layout.output[index]);
     for (let byteIndex: i32 = 0; byteIndex < valueBytes.length; byteIndex += 1) {
       bytes.push(valueBytes[byteIndex]);
     }

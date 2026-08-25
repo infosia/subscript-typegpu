@@ -47,7 +47,10 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   `set(i, v)`, `length(): u32`. WGSL `var<storage, read_write>`.
   `T` is a schema class, a library vector or matrix, or `f32`,
   `i32`, `u32`. The wrappers have real bodies over a `T[]` so a
-  kernel runs on the host (P7).
+  kernel runs on the host (P7). Rev 1, 2026-08-25: the index form is
+  the authored form (EG11). `get(i)` and `set(i, v)` are the
+  accessors that subscript's index signature needs, and no program
+  calls them by name.
 - **PI6 — Binding access emits the variable.** `res.params.get()` →
   `params` (a copy into the local the author declared, `var` for a
   value class per K8). `res.particles[i]` → `particles[i]`.

@@ -13,7 +13,7 @@ import {
   bufferResource,
   simulateCompute,
 } from "./typegpu";
-import { Vec2u, v2u } from "./typegpu-types";
+import { Vec2u, vec2u } from "./typegpu-types";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
 import {
   DepthItem_SIZE,
@@ -37,7 +37,7 @@ class DepthLayout {
 }
 
 const ITERATIONS: u32 = 4;
-const INCREMENTS: Vec2u = v2u(2, 3);
+const INCREMENTS: Vec2u = vec2u(2, 3);
 
 function depthKernel(res: DepthLayout, ctx: ComputeInvocation): void {
   let iteration: u32 = 0;
@@ -52,7 +52,7 @@ function depthKernel(res: DepthLayout, ctx: ComputeInvocation): void {
     { value += 1; }
     iteration += 1;
   }
-  res.output.set(ctx.globalId.x, new DepthItem(value));
+  res.output[ctx.globalId.x] = new DepthItem(value);
 }
 
 export const kernelDepth: ComputePipelineSpec = computePipeline<DepthLayout>(depthKernel, {
@@ -116,7 +116,7 @@ export async function main(): Promise<void> {
     print(`kernelDepth_WORKGROUP_Z=${kernelDepth_WORKGROUP_Z}`);
     print(`kernelDepth_WGSL_LINES=${kernelDepth_WGSL.split("\n").length}`);
     print("dispatch:submitted");
-    print(`host:out=${hostLayout.output.get(0).value},${hostLayout.output.get(7).value}`);
+    print(`host:out=${hostLayout.output[0].value},${hostLayout.output[7].value}`);
   }
   gpu.dispose();
   print("PASS");

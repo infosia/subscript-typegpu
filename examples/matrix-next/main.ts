@@ -63,9 +63,9 @@ class MatrixLayout {
 }
 
 function naiveKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
-  const left: Matrix = res.left.get(0);
-  const right: Matrix = res.right.get(0);
-  const output: Matrix = res.product.get(0);
+  const left: Matrix = res.left[0];
+  const right: Matrix = res.right[0];
+  const output: Matrix = res.product[0];
   for (let row: u32 = 0; row < 4; row += 1) {
     for (let column: u32 = 0; column < 4; column += 1) {
       let total: f32 = 0.0;
@@ -76,7 +76,7 @@ function naiveKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
       output.body[(row * 4 + column) as i32] = total;
     }
   }
-  res.product.set(0, output);
+  res.product[0] = output;
 }
 
 // This port fixes both matrices and the tile to 4-by-4 for one inspectable dispatch.
@@ -86,8 +86,8 @@ const rightTile: WorkgroupArray<f32> = workgroupArray<f32>(16);
 // TypeGPU loops over sixteen-wide tiles and bounds-checks every load. One tile covers
 // the whole matrix here, so each lane loads two values and multiplies four pairs.
 function tiledKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
-  const left: Matrix = res.left.get(0);
-  const right: Matrix = res.right.get(0);
+  const left: Matrix = res.left[0];
+  const right: Matrix = res.right[0];
   const lane: u32 = ctx.localId.y * 4 + ctx.localId.x;
   leftTile[lane] = left.body[(ctx.globalId.y * 4 + ctx.localId.x) as i32];
   rightTile[lane] = right.body[(ctx.localId.y * 4 + ctx.globalId.x) as i32];
@@ -274,7 +274,7 @@ export async function main(): Promise<void> {
       const tiledBytes: u8[] = await tiledOutput.readOne(device, 0);
       const naiveActual: Matrix = Context.fromBytes<Matrix>(naiveBytes, 0);
       const tiledActual: Matrix = Context.fromBytes<Matrix>(tiledBytes, 0);
-      const expected: Matrix = host.product.get(0);
+      const expected: Matrix = host.product[0];
       print(`products:first=${naiveActual.body[0]},${tiledActual.body[0]}`);
       // Noop validates both kernels but leaves both products zeroed.
       naiveState = resultState(naiveActual, expected);

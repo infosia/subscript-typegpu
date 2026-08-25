@@ -114,7 +114,7 @@ P0 and P1 can start. Names are provisional until `schema.md` and
 `kernel.md` land.
 
 ```ts
-import { Vec3f, v3f, Uniform, Storage, MutStorage, GlobalInvocationId,
+import { Vec3f, vec3f, Uniform, Storage, MutStorage, GlobalInvocationId,
          computePipeline } from "./typegpu";
 
 @CStruct class Params { dt: f32; count: u32; }
@@ -700,6 +700,38 @@ dependents.
 Exit per slice: the block Rev, the programs and goldens on both
 tiers, the live lane on Metal and Dawn, the rejection fixtures, the
 unlocked P10 example ported, budgets recorded.
+
+### P12 — the TypeGPU spelling parity (small)
+
+The authoring surface diverges from TypeGPU in three kinds of place.
+Kind one is a form that subscript forbids. Kind two is a form that
+subscript allows and the programs do not use. Kind three is a name
+this project chose freely. P12 closes kinds two and three. It adds
+no capability.
+
+`specs/blocks/ergonomics.md` EG11 is the contract.
+
+Slice 1 — the index form. `Storage`, `MutStorage`, and
+`WorkgroupArray` already carry an index signature, and PI6 already
+emits `name[i]` for both spellings. Every program, example, and
+document moves from `get(i)` and `set(i, v)` to `res.items[i]` and
+`res.items[i] = v`. TypeGPU writes `layout.$.items[i]`.
+
+Slice 2 — the factory names. The vector factories become `vec2f`
+through `vec4h`. The `From` and `Splat` forms take the same root.
+TypeGPU writes `d.vec3f`. The class names do not move.
+
+Kind one stays and EG11 names it: `get()` on `Uniform` and the
+address-space variables, `scale` beside `mul`, the free
+`createBuffer<T>`, and the method form of every swizzle. Each one
+follows from a measured subscript rule. A change there is a
+subscript change request, not a library decision.
+
+Exit: EG11 and the block cross-references, `tools/gate.sh
+--require-backend` green, every `.wgsl` golden byte-identical, the
+live lane green on one backend, and the record in
+`specs/tracking/p12-spelling.md`. A moved golden kills the slice and
+reopens the emission question.
 
 ## 9. Risk register
 

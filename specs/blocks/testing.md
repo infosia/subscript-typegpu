@@ -184,3 +184,30 @@ principles" govern this block.
   Red fixtures: `x20-live-strip` with the fragment color `0.5`
   fails RN14. `x22-live-blend` with the blue source `0.9` fails
   RN21.
+
+- **T20 — The authored spelling is gated.** Rev 0, 2026-08-25. One
+  harness test checks every program under `programs/` and every
+  example under `examples/`. The test walks the checked HIR. A call
+  to `get` or `set` on a receiver of type `Storage`, `MutStorage`,
+  or `WorkgroupArray` fails the test and names EG11. The message
+  gives the file, the line, and the index form to write instead.
+
+  The two methods stay public, so the test scopes itself to the two
+  program trees. `crates/harness/tests/runtime/mod.rs` is their
+  direct test and keeps its calls. `docs/*.md` and `README.md` need
+  no scan, because T12's quote test already binds every quoted line
+  to a program line.
+
+  Red fixture: one program line restored to `set(0, v)` fails the
+  test and names EG11.
+
+- **T21 — Both binding spellings emit one WGSL.** Rev 0,
+  2026-08-25. One generator test emits two kernels. The first reads
+  and writes a `Storage`, a `MutStorage`, and a `WorkgroupArray`
+  through `get` and `set`. The second does the same through the
+  index form. The two sources agree in every other name, so the two
+  WGSL modules must be equal, byte for byte.
+
+  EG11 rests on this equality, and T20 removes the method form from
+  every program, so this test is the only cover for the emitter's
+  method arms.

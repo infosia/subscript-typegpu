@@ -16,7 +16,7 @@ const shell: WgslShellSpec = wgslShell<(value: u32) => u32>(textureSample_, {
 });
 class Layout { input!: Storage<textureSample>; output!: MutStorage<u32>; }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
-  res.output.set(0, textureSample_(res.input.get(0).value));
+  res.output[0] = textureSample_(res.input[0].value);
 }
 export const rejected: ComputePipelineSpec = computePipeline<Layout>(kernel, {
   name: "rejected",

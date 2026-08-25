@@ -7,7 +7,7 @@ import { ComputeInvocation, ComputePipelineSpec, computePipeline, MutStorage, wo
 class Layout { output!: MutStorage<u32>; }
 function guardedKernel(res: Layout, ctx: ComputeInvocation): void {
   workgroupBarrier();
-  res.output.set(ctx.globalId.x, 1);
+  res.output[ctx.globalId.x] = 1;
 }
 export const rejected: ComputePipelineSpec = computePipeline<Layout>(guardedKernel, {
   name: "rejected",

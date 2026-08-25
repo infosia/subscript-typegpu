@@ -67,9 +67,9 @@ function saxpyKernel(res: SaxpyLayout, ctx: ComputeInvocation): void {
   const settings: SaxpyParams = res.params.get();
   const i: u32 = ctx.globalId.x;
   if (i < settings.count) {
-    const xItem: Item = res.x.get(i);
-    const yItem: Item = res.y.get(i);
-    res.y.set(i, new Item(settings.a * xItem.value + yItem.value));
+    const xItem: Item = res.x[i];
+    const yItem: Item = res.y[i];
+    res.y[i] = new Item(settings.a * xItem.value + yItem.value);
   }
 }
 
@@ -219,7 +219,7 @@ export async function main(): Promise<void> {
     print("readback:mapped");
     index = 0;
     while (index < 64) {
-      const expected: f32 = hostLayout.y.get(index as u32).value;
+      const expected: f32 = hostLayout.y[index as u32].value;
       if (result[index].value !== expected) {
         print(`FAIL ${index} expected=${expected} got=${result[index].value}`);
         return;

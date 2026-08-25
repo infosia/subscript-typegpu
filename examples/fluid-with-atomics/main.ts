@@ -163,12 +163,12 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
   const x: u32 = ctx.globalId.x;
   const y: u32 = ctx.globalId.y;
   const index: u32 = y * GRID_SIZE + x;
-  let level: u32 = res.current.get(index).level;
+  let level: u32 = res.current[index].level;
   if (level === 0 || level >= WALL_LEVEL) return;
 
   if (y > 0) {
     const belowIndex: u32 = index - GRID_SIZE;
-    const belowLevel: u32 = res.current.get(belowIndex).level;
+    const belowLevel: u32 = res.current[belowIndex].level;
     if (belowLevel < MAX_WATER) {
       const gravity: u32 = minU32(
         level,
@@ -187,7 +187,7 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
   let targetLevel: u32 = level;
   if (x > 0) {
     const leftIndex: u32 = index - 1;
-    const leftLevel: u32 = res.current.get(leftIndex).level;
+    const leftLevel: u32 = res.current[leftIndex].level;
     if (leftLevel < targetLevel) {
       targetIndex = leftIndex;
       targetLevel = leftLevel;
@@ -195,7 +195,7 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
   }
   if (x + 1 < GRID_SIZE) {
     const rightIndex: u32 = index + 1;
-    const rightLevel: u32 = res.current.get(rightIndex).level;
+    const rightLevel: u32 = res.current[rightIndex].level;
     if (rightLevel < targetLevel) {
       targetIndex = rightIndex;
       targetLevel = rightLevel;
@@ -212,7 +212,7 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
 
 function atomicFinalizeKernel(res: AtomicFinalizeLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.y * GRID_SIZE + ctx.globalId.x;
-  const current: u32 = res.current.get(index).level;
+  const current: u32 = res.current[index].level;
   if (current >= WALL_LEVEL) {
     res.next[index].level.store(-2147483648);
     return;

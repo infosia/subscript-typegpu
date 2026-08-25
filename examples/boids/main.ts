@@ -93,7 +93,7 @@ class BoidLayout {
 // Each invocation reads the complete previous flock and writes one next-state record.
 function updateBoids(res: BoidLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.x;
-  const boid: Boid = res.previous.get(index);
+  const boid: Boid = res.previous[index];
   let positionX: f32 = 0.0;
   let positionY: f32 = 0.0;
   let velocityX: f32 = 0.0;
@@ -105,7 +105,7 @@ function updateBoids(res: BoidLayout, ctx: ComputeInvocation): void {
   // This port uses one perception radius and weights separation by inverse square distance.
   for (let otherIndex: u32 = 0; otherIndex < BOID_COUNT; otherIndex += 1) {
     if (otherIndex !== index) {
-      const other: Boid = res.previous.get(otherIndex);
+      const other: Boid = res.previous[otherIndex];
       const deltaX: f32 = other.position.x - boid.position.x;
       const deltaY: f32 = other.position.y - boid.position.y;
       const distanceSquared: f32 = deltaX * deltaX + deltaY * deltaY;
@@ -140,7 +140,7 @@ function updateBoids(res: BoidLayout, ctx: ComputeInvocation): void {
   if (boid.position.x > 1.05) boid.position.x = -1.05;
   if (boid.position.y < -1.05) boid.position.y = 1.05;
   if (boid.position.y > 1.05) boid.position.y = -1.05;
-  res.next.set(index, boid);
+  res.next[index] = boid;
 }
 
 // The rotation matches upstream. Upstream colors each triangle from a palette uniform

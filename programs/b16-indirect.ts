@@ -76,7 +76,7 @@ class IndirectLayout {
 
 function computeStep(res: IndirectLayout, ctx: ComputeInvocation): void {
   if (ctx.globalId.x === 0) {
-    res.output.set(0, 1);
+    res.output[0] = 1;
   }
 }
 
@@ -247,7 +247,7 @@ export async function main(): Promise<void> {
     print(`DrawIndexedIndirectArgs_SIZE=${DrawIndexedIndirectArgs_SIZE}`);
     print(`offsets=${dispatchOffset},${drawOffset},${drawIndexedOffset}`);
     print(`indirectRender_INDEX_FORMAT=${indirectRender_INDEX_FORMAT}`);
-    print(`host:out=${host.output.get(0)}`);
+    print(`host:out=${host.output[0]}`);
     print("indirect:submitted");
   }
   gpu.dispose();

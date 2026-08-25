@@ -273,6 +273,11 @@ Differences:
   as read-only storage. `MutStorage<T>` binds `array<T>` as
   read-write storage. TypeGPU writes the same choice as `access:
   'mutable'`.
+- A kernel reads each binding through its layout parameter.
+  `res.params.get()` reads a uniform. `res.items[i]` reads one element,
+  and `res.items[i] = v` writes one element of a `MutStorage`. TypeGPU
+  writes `layout.$.params` and `layout.$.items[i]`. subscript has no
+  user-defined accessors, so a uniform read uses a method call.
 - A layout class is a parameter. A kernel with two layout parameters
   uses two bind groups, group 0 and group 1, in parameter order.
   `b11-texture` declares `computePipeline2<TextureLayout, ParamsLayout>`.
@@ -331,7 +336,7 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
   const settings: SimParams = res.params.get();
   const i: u32 = ctx.globalId.x;
   if (i < settings.count) {
-    res.particles.set(i, integrate(res.particles.get(i), settings.dt));
+    res.particles[i] = integrate(res.particles[i], settings.dt);
   }
 }
 
@@ -391,15 +396,19 @@ Differences:
   return a `Vec2b`, `Vec3b`, or `Vec4b` with `any`, `all`, and
   `not`. `select(other, mask)` picks per component. TypeGPU writes
   `std.lt(a, b)` and `std.select`.
+- The free factories are `vec2f` through `vec4h` and take their
+  components in order. TypeGPU writes `d.vec3f(x, y, z)`. `Vec3f` is
+  the type annotation. `new Vec3f(x, y, z)` builds the same value.
 - Swizzles are methods, because subscript has no user-defined
   accessors: `v.xy()`, `v.xyz()`, and the other in-order subsets.
   TypeGPU writes `v.xy`. Mixed constructors are free functions:
-  `v4fFrom3(v, w)`, `v3fFrom2(v, z)`, `v3fSplat(s)`, and the same
+  `vec4fFrom3(v, w)`, `vec3fFrom2(v, z)`, `vec3fSplat(s)`, and the same
   shapes for the integer families. TypeGPU writes `d.vec4f(v, w)`.
 - There is no operator on vectors. subscript has no operator
   overloading, and the library does not add a build step for it.
 - `scale(s)` multiplies by a scalar. `mul(v)` multiplies component by
-  component. TypeGPU uses `mul` for both.
+  component. TypeGPU uses `mul` for both. subscript has no overloads,
+  so one name carries one signature.
 - Matrices are `Mat2x2f`, `Mat3x3f`, and `Mat4x4f` with `mulVec`, `mul`,
   and `transpose`.
 

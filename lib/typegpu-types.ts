@@ -762,36 +762,36 @@ export class Mat4x4f {
   }
 }
 
-export function v2f(x: f32, y: f32): Vec2f { return new Vec2f(x, y); }
-export function v3f(x: f32, y: f32, z: f32): Vec3f { return new Vec3f(x, y, z); }
-export function v4f(x: f32, y: f32, z: f32, w: f32): Vec4f { return new Vec4f(x, y, z, w); }
-export function v2i(x: i32, y: i32): Vec2i { return new Vec2i(x, y); }
-export function v3i(x: i32, y: i32, z: i32): Vec3i { return new Vec3i(x, y, z); }
-export function v4i(x: i32, y: i32, z: i32, w: i32): Vec4i { return new Vec4i(x, y, z, w); }
-export function v2u(x: u32, y: u32): Vec2u { return new Vec2u(x, y); }
-export function v3u(x: u32, y: u32, z: u32): Vec3u { return new Vec3u(x, y, z); }
-export function v4u(x: u32, y: u32, z: u32, w: u32): Vec4u { return new Vec4u(x, y, z, w); }
-export function v3fFrom2(v: Vec2f, z: f32): Vec3f { return new Vec3f(v.x, v.y, z); }
-export function v4fFrom2(v: Vec2f, z: f32, w: f32): Vec4f { return new Vec4f(v.x, v.y, z, w); }
-export function v4fFrom3(v: Vec3f, w: f32): Vec4f { return new Vec4f(v.x, v.y, v.z, w); }
-export function v2fSplat(s: f32): Vec2f { return new Vec2f(s, s); }
-export function v3fSplat(s: f32): Vec3f { return new Vec3f(s, s, s); }
-export function v4fSplat(s: f32): Vec4f { return new Vec4f(s, s, s, s); }
-export function v3iFrom2(v: Vec2i, z: i32): Vec3i { return new Vec3i(v.x, v.y, z); }
-export function v4iFrom2(v: Vec2i, z: i32, w: i32): Vec4i { return new Vec4i(v.x, v.y, z, w); }
-export function v4iFrom3(v: Vec3i, w: i32): Vec4i { return new Vec4i(v.x, v.y, v.z, w); }
-export function v2iSplat(s: i32): Vec2i { return new Vec2i(s, s); }
-export function v3iSplat(s: i32): Vec3i { return new Vec3i(s, s, s); }
-export function v4iSplat(s: i32): Vec4i { return new Vec4i(s, s, s, s); }
-export function v3uFrom2(v: Vec2u, z: u32): Vec3u { return new Vec3u(v.x, v.y, z); }
-export function v4uFrom2(v: Vec2u, z: u32, w: u32): Vec4u { return new Vec4u(v.x, v.y, z, w); }
-export function v4uFrom3(v: Vec3u, w: u32): Vec4u { return new Vec4u(v.x, v.y, v.z, w); }
-export function v2uSplat(s: u32): Vec2u { return new Vec2u(s, s); }
-export function v3uSplat(s: u32): Vec3u { return new Vec3u(s, s, s); }
-export function v4uSplat(s: u32): Vec4u { return new Vec4u(s, s, s, s); }
-export function v2h(x: f16, y: f16): Vec2h { return new Vec2h(x, y); }
-export function v3h(x: f16, y: f16, z: f16): Vec3h { return new Vec3h(x, y, z); }
-export function v4h(x: f16, y: f16, z: f16, w: f16): Vec4h { return new Vec4h(x, y, z, w); }
+export function vec2f(x: f32, y: f32): Vec2f { return new Vec2f(x, y); }
+export function vec3f(x: f32, y: f32, z: f32): Vec3f { return new Vec3f(x, y, z); }
+export function vec4f(x: f32, y: f32, z: f32, w: f32): Vec4f { return new Vec4f(x, y, z, w); }
+export function vec2i(x: i32, y: i32): Vec2i { return new Vec2i(x, y); }
+export function vec3i(x: i32, y: i32, z: i32): Vec3i { return new Vec3i(x, y, z); }
+export function vec4i(x: i32, y: i32, z: i32, w: i32): Vec4i { return new Vec4i(x, y, z, w); }
+export function vec2u(x: u32, y: u32): Vec2u { return new Vec2u(x, y); }
+export function vec3u(x: u32, y: u32, z: u32): Vec3u { return new Vec3u(x, y, z); }
+export function vec4u(x: u32, y: u32, z: u32, w: u32): Vec4u { return new Vec4u(x, y, z, w); }
+export function vec3fFrom2(v: Vec2f, z: f32): Vec3f { return new Vec3f(v.x, v.y, z); }
+export function vec4fFrom2(v: Vec2f, z: f32, w: f32): Vec4f { return new Vec4f(v.x, v.y, z, w); }
+export function vec4fFrom3(v: Vec3f, w: f32): Vec4f { return new Vec4f(v.x, v.y, v.z, w); }
+export function vec2fSplat(s: f32): Vec2f { return new Vec2f(s, s); }
+export function vec3fSplat(s: f32): Vec3f { return new Vec3f(s, s, s); }
+export function vec4fSplat(s: f32): Vec4f { return new Vec4f(s, s, s, s); }
+export function vec3iFrom2(v: Vec2i, z: i32): Vec3i { return new Vec3i(v.x, v.y, z); }
+export function vec4iFrom2(v: Vec2i, z: i32, w: i32): Vec4i { return new Vec4i(v.x, v.y, z, w); }
+export function vec4iFrom3(v: Vec3i, w: i32): Vec4i { return new Vec4i(v.x, v.y, v.z, w); }
+export function vec2iSplat(s: i32): Vec2i { return new Vec2i(s, s); }
+export function vec3iSplat(s: i32): Vec3i { return new Vec3i(s, s, s); }
+export function vec4iSplat(s: i32): Vec4i { return new Vec4i(s, s, s, s); }
+export function vec3uFrom2(v: Vec2u, z: u32): Vec3u { return new Vec3u(v.x, v.y, z); }
+export function vec4uFrom2(v: Vec2u, z: u32, w: u32): Vec4u { return new Vec4u(v.x, v.y, z, w); }
+export function vec4uFrom3(v: Vec3u, w: u32): Vec4u { return new Vec4u(v.x, v.y, v.z, w); }
+export function vec2uSplat(s: u32): Vec2u { return new Vec2u(s, s); }
+export function vec3uSplat(s: u32): Vec3u { return new Vec3u(s, s, s); }
+export function vec4uSplat(s: u32): Vec4u { return new Vec4u(s, s, s, s); }
+export function vec2h(x: f16, y: f16): Vec2h { return new Vec2h(x, y); }
+export function vec3h(x: f16, y: f16, z: f16): Vec3h { return new Vec3h(x, y, z); }
+export function vec4h(x: f16, y: f16, z: f16, w: f16): Vec4h { return new Vec4h(x, y, z, w); }
 
 export function clamp(value: f32, low: f32, high: f32): f32 {
   if (value < low) {
@@ -834,23 +834,23 @@ export function sign(value: f32): f32 {
 }
 
 export function mat2x2fIdentity(): Mat2x2f {
-  return new Mat2x2f(v2f(1.0, 0.0), v2f(0.0, 1.0));
+  return new Mat2x2f(vec2f(1.0, 0.0), vec2f(0.0, 1.0));
 }
 
 export function mat3x3fIdentity(): Mat3x3f {
   return new Mat3x3f(
-    v3f(1.0, 0.0, 0.0),
-    v3f(0.0, 1.0, 0.0),
-    v3f(0.0, 0.0, 1.0),
+    vec3f(1.0, 0.0, 0.0),
+    vec3f(0.0, 1.0, 0.0),
+    vec3f(0.0, 0.0, 1.0),
   );
 }
 
 export function mat4x4fIdentity(): Mat4x4f {
   return new Mat4x4f(
-    v4f(1.0, 0.0, 0.0, 0.0),
-    v4f(0.0, 1.0, 0.0, 0.0),
-    v4f(0.0, 0.0, 1.0, 0.0),
-    v4f(0.0, 0.0, 0.0, 1.0),
+    vec4f(1.0, 0.0, 0.0, 0.0),
+    vec4f(0.0, 1.0, 0.0, 0.0),
+    vec4f(0.0, 0.0, 1.0, 0.0),
+    vec4f(0.0, 0.0, 0.0, 1.0),
   );
 }
 

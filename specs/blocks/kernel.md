@@ -61,8 +61,9 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 
 ## Expressions
 
-- **K9 — The expression set.** Literals, locals, parameters, field
-  access, `FixedArray` index, binding access (PI6), unary `-`, `!`,
+- **K9 — The expression set.** Rev 1, 2026-08-25 (the factory root,
+  EG11). Literals, locals, parameters, field access, `FixedArray`
+  index, binding access (PI6), unary `-`, `!`,
   `~`, binary `+ - * / %`, comparisons, `&&`, `||`, `&`, `|`, the
   conditional `?:` (lowered to `if`/`else` over a `var` placed
   where the expression is evaluated — inside the loop for a loop
@@ -71,7 +72,7 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `i32`, `u32`, calls to
   helpers, calls to library methods (K10), `new` of a library
   vector or matrix, `new` of a schema class with all fields set by
-  its constructor, and the `v3f` family of factories. Any other
+  its constructor, and the `vec3f` family of factories. Any other
   expression is a diagnostic: a template string, an array literal,
   a lambda, `await`, `yield`, a `Math` call outside K11, a
   `JSON`/`Date`/`RegExp` call, `Length` of a `T[]`.
@@ -191,15 +192,17 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   foldable scalar type reaches a kernel as a WGSL `const` array of
   the same name when every element folds under the same rules. The
   noise module's permutation tables are the first use.
-- **K20 — Private and workgroup variables.** A module-level `const`
-  whose initializer is `privateVar<T>(init)`, `workgroupVar<T>()`,
+- **K20 — Private and workgroup variables.** Rev 1, 2026-08-25 (the
+  access forms, EG11). A module-level `const` whose initializer is
+  `privateVar<T>(init)`, `workgroupVar<T>()`,
   or `workgroupArray<T>(n)` (library generic functions with real
   bodies over a `T` or a `T[]`, `n` a literal) declares a variable
   the kernel reaches by name. The emitter writes `var<private> x: T
   = init;`, `var<workgroup> x: T;`, or `var<workgroup> x: array<T,
   n>;`. `T` is a scalar, a library vector or matrix, or a schema
-  class. Access is `x.get()`, `x.set(v)`, `x[i]`, `x[i] = v`,
-  `x.length()`, as the binding wrappers (PI6). A private or
+  class. Access is `x.get()` and `x.set(v)` for a scalar variable,
+  `x[i]` and `x[i] = v` for an array, and `x.length()`, as the
+  binding wrappers (PI6 and EG11). A private or
   workgroup variable initialized with a value in WGSL's forbidden
   positions (a workgroup variable with an initializer) is a
   diagnostic.
@@ -295,20 +298,21 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `a < b`, `a <= b`, `a > b`, `a >= b`, `a == b`, `a != b`,
   `any(v)`, `all(v)`, `!v`, `select(a, b, mask)`. A scalar select
   is the conditional `?:` of K9 and gets no function.
-- **K27 — Swizzles and factories.** Every float and integer vector
-  gains the in-order swizzle methods: on a `Vec3*`, `xy()`, `xz()`,
+- **K27 — Swizzles and factories.** Rev 1, 2026-08-25 (the factory
+  root, EG11). Every float and integer vector gains the in-order
+  swizzle methods: on a `Vec3*`, `xy()`, `xz()`,
   `yz()`; on a `Vec4*`, `xy()`, `xz()`, `xw()`, `yz()`, `yw()`,
   `zw()`, `xyz()`, `xyw()`, `xzw()`, `yzw()`. Each returns a new
   vector and emits `v.xy` and family. A swizzle outside this set is
   not a method, so subscript's checker rejects it before the
   generator runs. `lib/typegpu-types.ts` adds the factories
-  `v3fFrom2(v: Vec2f, z: f32)`, `v4fFrom2(v: Vec2f, z: f32, w:
-  f32)`, `v4fFrom3(v: Vec3f, w: f32)`, `v2fSplat(s: f32)`,
-  `v3fSplat(s)`, `v4fSplat(s)`, and the same six shapes for the
+  `vec3fFrom2(v: Vec2f, z: f32)`, `vec4fFrom2(v: Vec2f, z: f32, w:
+  f32)`, `vec4fFrom3(v: Vec3f, w: f32)`, `vec2fSplat(s: f32)`,
+  `vec3fSplat(s)`, `vec4fSplat(s)`, and the same six shapes for the
   `i` and `u` families. They emit `vec3<f32>(v, z)`, `vec4<f32>(v,
   z, w)`, `vec4<f32>(v, w)`, `vec2<f32>(s)`, `vec3<f32>(s)`, and
   `vec4<f32>(s)`, with `i32` and `u32` for the other families. The factories join
-  the K9 `v3f` family. A swizzle is never an assignment target:
+  the K9 `vec3f` family. A swizzle is never an assignment target:
   `v.xy() = ...` is not subscript.
 - **K28 — The P8 rejections.** Rev 1 adds the slice 2 set: a
   shell with a non-literal body, a shell whose function is a kernel,

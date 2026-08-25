@@ -53,9 +53,9 @@ class VecAddLayout {
 function vecAddKernel(res: VecAddLayout, ctx: ComputeInvocation): void {
   const i: u32 = ctx.globalId.x;
   if (i < res.out.length()) {
-    const left: Item = res.a.get(i);
-    const right: Item = res.b.get(i);
-    res.out.set(i, new Item(left.value + right.value));
+    const left: Item = res.a[i];
+    const right: Item = res.b[i];
+    res.out[i] = new Item(left.value + right.value);
   }
 }
 
@@ -205,7 +205,7 @@ export async function main(): Promise<void> {
     print("readback:mapped");
     index = 0;
     while (index < 64) {
-      const expected: f32 = hostLayout.out.get(index as u32).value;
+      const expected: f32 = hostLayout.out[index as u32].value;
       if (result[index].value !== expected) {
         print(`FAIL ${index} expected=${expected} got=${result[index].value}`);
         return;

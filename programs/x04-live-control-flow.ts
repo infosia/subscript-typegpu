@@ -44,12 +44,12 @@ function controlFlowKernel(res: ControlLayout, ctx: ComputeInvocation): void {
   let index: u32 = 0;
   let total: f32 = 0.0;
   while (index < (4 as u32) ? true : false) {
-    const source: f32 = res.input.get(index).value;
+    const source: f32 = res.input[index].value;
     const chosen: f32 = source > 0.0 ? (source > 2.0 ? source : 2.0) : 1.0;
     total += chosen;
     index += 1;
   }
-  res.output.set(0, new Item(total));
+  res.output[0] = new Item(total);
 }
 
 export const controlFlow: ComputePipelineSpec = computePipeline<ControlLayout>(controlFlowKernel, {
@@ -101,7 +101,7 @@ export async function main(): Promise<void> {
     queue.submit([command]);
     if (!await readback.handle().mapAsync(GPUMapMode.READ, 0, Item_STRIDE as u64)) { print("FAIL map"); return; }
     const result: FixedArray<Item, 1> = Context.fromBytes<FixedArray<Item, 1>>(readBuffer<Item>(readback, 0, 1), 0);
-    const expected: f32 = hostLayout.output.get(0).value;
+    const expected: f32 = hostLayout.output[0].value;
     if (result[0].value !== expected) { print(`FAIL expected=${expected} got=${result[0].value}`); return; }
     readback.handle().unmap();
   }

@@ -14,7 +14,7 @@ wgslDeclarations("struct Collision { value: u32, }");
 
 class CollisionLayout { input!: Storage<Collision>; }
 function collisionKernel(res: CollisionLayout, ctx: ComputeInvocation): void {
-  const value: Collision = res.input.get(ctx.globalId.x);
+  const value: Collision = res.input[ctx.globalId.x];
 }
 export const rejected: ComputePipelineSpec = computePipeline<CollisionLayout>(collisionKernel, {
   name: "rejected",
