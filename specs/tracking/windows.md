@@ -193,3 +193,24 @@ The gap is closed at the current tree. `8a25831` and `bea7da5` hold
 passed and 1 ignored at `8a25831`. The reference machine ran 253
 passed and 1 ignored at `bea7da5`. Both platforms run every test
 function.
+
+## W5 follow-up: T19 gates the rule (2026-08-25)
+
+RN14 Rev 1 forbade the tie one day before `x20-live-strip` used
+`0.5`. A prose rule did not hold. T19 gates it now.
+
+`crates/harness/tests/pixel_colors/mod.rs` reads the checked HIR of
+every `x` program. It selects the pixel oracles, collects the color
+literals, and applies the RN14 and RN21 predicates.
+
+Demonstrated red, one scratch fixture per rule:
+
+```
+x20-live-strip.ts:61: literal 0.5 has product 127.5 with 255 and violates RN14
+x22-live-blend.ts:180: literal 0.9 has product 229.5 with 255 and violates RN14
+x22-live-blend.ts:180: literal 0.9 has product 229.5 with 255 and violates RN21
+```
+
+Both fixtures were restored. Evidence: `tools/gate.sh
+--require-backend` green, 254 passed and 1 ignored, 106 s. The tree
+gained one test function and no test executable.

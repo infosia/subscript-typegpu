@@ -9,6 +9,7 @@ mod differential;
 mod docs;
 mod library;
 mod live;
+mod pixel_colors;
 mod rejections;
 mod runtime;
 mod scopes;

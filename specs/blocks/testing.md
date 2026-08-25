@@ -140,3 +140,47 @@ principles" govern this block.
   one-executable rule stay. The owner's standing decision: the
   iteration loop's speed is a design input, and a change that
   serializes a program loop again is a regression.
+
+## Program conventions
+
+- **T19 — A pixel oracle's color literals are gated.** Rev 0,
+  2026-08-25. One harness test reads the checked HIR of every `x`
+  program and applies RN14 and RN21 to the color literals. The
+  test follows the PI14 scope test in shape.
+
+  A pixel-oracle program is an `x` program that calls
+  `copyTextureToBuffer`, or that names one of `rgba8unorm`,
+  `rgba8unorm-srgb`, `bgra8unorm`, and `bgra8unorm-srgb`. A texture
+  format can reach the program through a generated constant, so the
+  format alone is not a reliable selector. A color literal is a
+  `Vec3f` or a `Vec4f` constructor call in such a program where
+  every argument is a number literal. A call with a variable
+  argument carries a position or a computed value, so the test
+  skips it.
+
+  The test computes the product in `f32`: `product = (value as f32)
+  * 255.0f32`. Two predicates apply.
+
+  RN14 covers every color literal. The distance from the fractional
+  part of `product` to 0.5 must be 0.01 or more.
+
+  RN21 covers every color literal in a program whose
+  `RenderPipelineSpec` sets `blend`. The distance from `product` to
+  the nearest integer must be 0.01 or less.
+
+  A margin is safer than an equality test. `0.5` gives the product
+  127.5 and `0.9` gives 229.5. Both products are exact in `f32`, so
+  an equality test catches both measured defects. An implementation
+  computes the product in its own pipeline, so a product near a
+  half-integer can round either way there. The margin 0.01 covers
+  that case. It is about 600 times the `f32` step at 255, which is
+  1.5e-5. Every color literal in the tree keeps a margin of 0.25 or
+  more today, so the margin costs nothing.
+
+  The test holds one allow list for a literal that it rejects for a
+  legitimate reason. Each entry names the program, the literal, and
+  the reason. The list is empty today.
+
+  Red fixtures: `x20-live-strip` with the fragment color `0.5`
+  fails RN14. `x22-live-blend` with the blue source `0.9` fails
+  RN21.
