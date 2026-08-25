@@ -200,9 +200,11 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   the kernel reaches by name. The emitter writes `var<private> x: T
   = init;`, `var<workgroup> x: T;`, or `var<workgroup> x: array<T,
   n>;`. `T` is a scalar, a library vector or matrix, or a schema
-  class. Access is `x.get()` and `x.set(v)` for a scalar variable,
-  `x[i]` and `x[i] = v` for an array, and `x.length()`, as the
-  binding wrappers (PI6 and EG11). A private or
+  class. Access is `x.$` and `x.$ = v` for a scalar variable, `x[i]`
+  and `x[i] = v` for an array, and `x.length()`, as the binding
+  wrappers (PI6 and EG11). Rev 2, 2026-08-25: the scalar forms are
+  accessors on subscript R37. A read records as the method `x`, and a
+  write records as the method `x=`. A private or
   workgroup variable initialized with a value in WGSL's forbidden
   positions (a workgroup variable with an initializer) is a
   diagnostic.
@@ -299,12 +301,15 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `any(v)`, `all(v)`, `!v`, `select(a, b, mask)`. A scalar select
   is the conditional `?:` of K9 and gets no function.
 - **K27 — Swizzles and factories.** Rev 1, 2026-08-25 (the factory
-  root, EG11). Every float and integer vector gains the in-order
-  swizzle methods: on a `Vec3*`, `xy()`, `xz()`,
-  `yz()`; on a `Vec4*`, `xy()`, `xz()`, `xw()`, `yz()`, `yw()`,
-  `zw()`, `xyz()`, `xyw()`, `xzw()`, `yzw()`. Each returns a new
+  root, EG11). Rev 2, 2026-08-25: every swizzle is a read accessor on
+  subscript R37, so an author writes `v.xy`. Its read records as the
+  method of the same name, and the K10 table needs no change. Every
+  float and integer vector gains the in-order
+  swizzle accessors: on a `Vec3*`, `xy`, `xz`,
+  `yz`; on a `Vec4*`, `xy`, `xz`, `xw`, `yz`, `yw`,
+  `zw`, `xyz`, `xyw`, `xzw`, `yzw`. Each returns a new
   vector and emits `v.xy` and family. A swizzle outside this set is
-  not a method, so subscript's checker rejects it before the
+  not an accessor, so subscript's checker rejects it before the
   generator runs. `lib/typegpu-types.ts` adds the factories
   `vec3fFrom2(v: Vec2f, z: f32)`, `vec4fFrom2(v: Vec2f, z: f32, w:
   f32)`, `vec4fFrom3(v: Vec3f, w: f32)`, `vec2fSplat(s: f32)`,
@@ -312,8 +317,9 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `i` and `u` families. They emit `vec3<f32>(v, z)`, `vec4<f32>(v,
   z, w)`, `vec4<f32>(v, w)`, `vec2<f32>(s)`, `vec3<f32>(s)`, and
   `vec4<f32>(s)`, with `i32` and `u32` for the other families. The factories join
-  the K9 `vec3f` family. A swizzle is never an assignment target:
-  `v.xy() = ...` is not subscript.
+  the K9 `vec3f` family. A swizzle is never an assignment target,
+  because subscript R37 forbids a write accessor on a `@CStruct`
+  value class.
 - **K28 — The P8 rejections.** Rev 1 adds the slice 2 set: a
   shell with a non-literal body, a shell whose function is a kernel,
   a fence token in a body (`@group`), unbalanced braces, a second

@@ -85,8 +85,37 @@ three as proposed.
 3. **A write accessor on a value class.** Forbidden. A value class
    copies on assignment, so the write reaches a copy.
 
+## R37 landed (2026-08-25)
+
+subscript `a2228d9` carries it: contract `2bc4a4f`, amended
+`0840f51` after a phase review, implementation `f29c4c5`.
+`specs/blocks/compiler.md` §65 is the rule, and `collisions.md` C12
+records the JS divergence. The workspace re-pins to `a2228d9`.
+
+The shape landed as asked, with one divergence and four additions
+that this side must read.
+
+- **The divergence.** The request asked for one method per accessor
+  name. The pair records as two methods: the read as `name` with no
+  parameters, and the write as `name=` with one parameter and the
+  return type `void`. A method table holds one signature per name,
+  and both tiers key a method by name, so one name for both
+  collides. An identifier holds no `=`, so `name=` collides with no
+  declared method. The emitter therefore reads the method name `$`
+  for a read and `$=` for a write.
+- The read accessor declares no parameter and an explicit return
+  type. The write accessor declares one typed parameter, no default,
+  and no return type.
+- The read and the write of one name must share one type (§65 rule
+  1a).
+- A write accessor without a read accessor is illegal (§65 rule 6).
+- The C name gained two escapes, `$` to `_dollar_` and `=` to
+  `_set_`, plus a per-namespace deduplication. Point 1 of the owner
+  decisions landed wider than it was asked, because the phase review
+  measured a collision that needs no `$` at all.
+
 ## Status
 
-2026-08-25: request written and issued to the subscript repository
-as R37. The measurements above are the evidence. Nothing on this
-side waits for it.
+2026-08-25: R37 landed and the workspace pin moved to `a2228d9`.
+EG11 Rev 1, PI5 Rev 2, PI6, K20 Rev 2, and K27 Rev 2 carry the
+authored forms. The library and the sweep are the next step.

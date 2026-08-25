@@ -40,7 +40,7 @@ this block. Kernels are `kernel.md`. The runtime classes live in
 
 ## Binding wrappers
 
-- **PI5 — The buffer wrappers.** (P5 adds the texture wrappers, TX1.) `Uniform<T>`: `get(): T`. WGSL
+- **PI5 — The buffer wrappers.** (P5 adds the texture wrappers, TX1.) `Uniform<T>`: the read accessor `$: T`. WGSL
   `var<uniform> name: T`. `Storage<T>`: `[index: u32]: T` readonly
   through `get(i)`, `length(): u32`. WGSL `var<storage, read> name:
   array<T>`. `MutStorage<T>`: `[index: u32]: T` through `get(i)` and
@@ -50,8 +50,10 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   kernel runs on the host (P7). Rev 1, 2026-08-25: the index form is
   the authored form (EG11). `get(i)` and `set(i, v)` are the
   accessors that subscript's index signature needs, and no program
-  calls them by name.
-- **PI6 — Binding access emits the variable.** `res.params.get()` →
+  calls them by name. Rev 2, 2026-08-25: `Uniform<T>` takes the read
+  accessor `$` on subscript R37 (EG11 Rev 1). Its read records as the
+  method `$` with no arguments.
+- **PI6 — Binding access emits the variable.** `res.params.$` →
   `params` (a copy into the local the author declared, `var` for a
   value class per K8). `res.particles[i]` → `particles[i]`.
   `res.particles[i] = v` → `particles[i] = v;`.

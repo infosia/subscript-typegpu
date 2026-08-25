@@ -109,7 +109,8 @@ question (P2 review M6), and the diagnostic sweep.
   host form.
 
 - **EG11 — The authored spelling follows TypeGPU where subscript
-  allows it.** Rev 0, 2026-08-25. Two forms change.
+  allows it.** Rev 0, 2026-08-25. Rev 1, 2026-08-25: subscript R37
+  landed, so the accessor forms move too. Three forms change.
 
   The index form is the authored form for `Storage`, `MutStorage`,
   and `WorkgroupArray`. An author writes `res.items[i]` and
@@ -132,9 +133,20 @@ question (P2 review M6), and the diagnostic sweep.
   `Vec4h`, because a subscript program writes them as type
   annotations.
 
-  A spelling that subscript forbids stays as it is. `get()` on
-  `Uniform`, `PrivateVar`, and `WorkgroupVar` stays, because the
-  language has no accessors. `scale` stays beside `mul`, because
-  the language has no overloads. `createBuffer<T>` stays a free
-  function, because a user-declared method takes no type
-  parameters.
+  The property form is the authored form for a value that takes no
+  index. `Uniform<T>` declares the read accessor `$`. `PrivateVar<T>`
+  and `WorkgroupVar<T>` declare the read accessor `$` and the write
+  accessor `$`. Every swizzle declares a read accessor of its own
+  name. An author writes `res.params.$`, `privateOffset.$ = v`, and
+  `position.xy`. TypeGPU writes `layout.$.params`, `privateVar.$`,
+  and `position.xy`.
+
+  subscript R37 rejects `x.$ += 1`, so a read-modify-write reads and
+  writes in one statement: `x.$ = x.$ + 1`. subscript R37 also
+  forbids a write accessor on a `@CStruct` value class, so a swizzle
+  is a read accessor and never an assignment target.
+
+  A spelling that subscript forbids stays as it is. `scale` stays
+  beside `mul`, because the language has no overloads.
+  `createBuffer<T>` stays a free function, because a user-declared
+  method takes no type parameters.
