@@ -11,8 +11,8 @@ and subscript-typegpu does both before the program runs.
 
 Every pair of code blocks shows the same step in both libraries.
 The subscript-typegpu side is quoted from `programs/`. The TypeGPU
-side shows how TypeGPU 0.12 writes that same step: it follows the
-TypeGPU documentation and is illustrative, not run here.
+side shows how TypeGPU 0.12 writes that same step. The TypeGPU code
+is illustrative. This repository does not run it.
 
 ## Summary
 
@@ -167,9 +167,12 @@ converts JavaScript values to bytes.
 const input = root
   .createBuffer(d.arrayOf(ReductionValue, count))
   .$usage('storage');
+const output = root
+  .createBuffer(ReductionCounter)
+  .$usage('storage');
 
-input.write(values);              // typed values, serialized by the schema
-const result = await output.read(); // decoded values back on the CPU
+input.write(values);                // typed values, serialized by the schema
+const result = await output.read(); // decoded value back on the CPU
 ```
 
 subscript-typegpu creates a `Buffer<T>` from the device, an element
@@ -288,7 +291,14 @@ the pipeline is first used.
 ```ts
 const integrate = (particle: d.Infer<typeof Particle>, dt: number) => {
   'use gpu';
-  // same helper logic as below
+  const speed = std.length(particle.vel);
+  if (speed > 0) {
+    return Particle({
+      pos: std.add(particle.pos, std.mul(particle.vel, dt)),
+      vel: particle.vel,
+    });
+  }
+  return particle;
 };
 
 const particleKernel = tgpu.computeFn({
@@ -356,7 +366,7 @@ values, and JavaScript operators inside `'use gpu'` functions.
 ```ts
 const value = loaded.add(sampled).mul(0.5);
 // or: std.mul(std.add(loaded, sampled), 0.5)
-// or, inside 'use gpu' code: (loaded + sampled) * 0.5
+// or, inside 'use gpu' code with tsover configured: (loaded + sampled) * 0.5
 ```
 
 subscript-typegpu offers methods. The method bodies are real subscript
@@ -532,6 +542,7 @@ const texturesLayout = tgpu.bindGroupLayout({
 });
 
 // inside a compute function:
+const uv = d.vec2f((gid.x + 0.5) / params.width, (gid.y + 0.5) / params.height);
 const loaded = std.textureLoad(texturesLayout.$.source, coords, 0);
 const sampled = std.textureSampleLevel(texturesLayout.$.source, texturesLayout.$.nearest, uv, 0);
 std.textureStore(texturesLayout.$.target, coords, loaded.add(sampled).mul(0.5));
@@ -595,7 +606,11 @@ const frag = tgpu.fragmentFn({
   out: d.vec4f,
 })((input) => d.vec4f(input.color, 1));
 
+const Vertex = d.struct({ position: d.vec2f, color: d.vec3f });
+const vertexLayout = tgpu.vertexLayout((n) => d.arrayOf(Vertex, n));
+
 const tri = root.createRenderPipeline({
+  attribs: vertexLayout.attrib,
   vertex: vert,
   fragment: frag,
   targets: { format: 'rgba8unorm' },
@@ -652,6 +667,8 @@ Differences:
 ## Running a kernel on the CPU
 
 A TypeGPU function with `'use gpu'` is also a JavaScript function.
+A `tgpu.computeFn` entry has no direct CPU call form, so the CPU
+path calls the helpers.
 
 ```ts
 // integrate carries 'use gpu' and is still a JavaScript function:
@@ -751,7 +768,7 @@ const addBiasShell: WgslShellSpec = wgslShell<(value: u32) => u32>(
 TypeGPU writes the same escape hatch as a WGSL-bodied function:
 
 ```ts
-const SHELL_BIAS = 7;
+const SHELL_BIAS = tgpu.const(d.u32, 7);
 
 const addBias = tgpu.fn([d.u32], d.u32)`(value) {
   return value + SHELL_BIAS;
