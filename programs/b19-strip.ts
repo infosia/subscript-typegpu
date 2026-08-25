@@ -97,7 +97,7 @@ export async function main(): Promise<void> {
       GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
       "b19-vertices",
     );
-    vertices.write(device.queue(), 0, Context.bytesOf<FixedArray<Vertex, 4>>(values));
+    vertices.write(device.queue, 0, Context.bytesOf<FixedArray<Vertex, 4>>(values));
     using target = device.createTexture({
       label: "b19-target",
       size: { width: 8, height: 8 },
@@ -134,7 +134,7 @@ export async function main(): Promise<void> {
     pass.draw(4);
     pass.end();
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     print(`strip.topology=${strip.topology}`);
     print(`strip_VERTEX_LAYOUT0.arrayStride=${strip_VERTEX_LAYOUT0.arrayStride}`);
     print(`strip_WGSL_LINES=${strip_WGSL.split("\n").length}`);

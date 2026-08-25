@@ -128,7 +128,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     const hostLayout = new ParticleLayout();
     hostLayout.params = new Uniform<SimParams>(new SimParams(2.0, 1));
     hostLayout.particles = new MutStorage<Particle>([

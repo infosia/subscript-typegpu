@@ -32,7 +32,7 @@ export async function main(): Promise<void> {
   {
     using adapter = adapterResult;
     using device = deviceResult;
-    const queue = device.queue();
+    const queue = device.queue;
     using upload = device.createBuffer({
       label: "a02-upload",
       size: 256,
@@ -40,8 +40,8 @@ export async function main(): Promise<void> {
       mappedAtCreation: true,
     });
     upload.label("a02-upload-label");
-    upload.usage();
-    upload.mapState();
+    const uploadUsage: u64 = upload.usage;
+    const uploadMapState: GPUBufferMapState = upload.mapState;
     upload.writeMappedRange(0, [1, 2, 3, 4]);
     upload.unmap();
     queue.writeBufferF32(upload, 0, [1.0, 2.0, 3.0, 4.0]);
@@ -70,14 +70,14 @@ export async function main(): Promise<void> {
       usage: GPUTextureUsage.COPY_DST + GPUTextureUsage.COPY_SRC,
     });
     textureA.label("a02-texture-label");
-    textureA.width();
-    textureA.height();
-    textureA.depthOrArrayLayers();
-    textureA.mipLevelCount();
-    textureA.sampleCount();
-    textureA.dimension();
-    textureA.format();
-    textureA.usage();
+    const textureWidth: u32 = textureA.width;
+    const textureHeight: u32 = textureA.height;
+    const textureDepth: u32 = textureA.depthOrArrayLayers;
+    const textureMipLevels: u32 = textureA.mipLevelCount;
+    const textureSamples: u32 = textureA.sampleCount;
+    const textureDimension: GPUTextureDimension = textureA.dimension;
+    const textureFormat: GPUTextureFormat = textureA.format;
+    const textureUsage: u64 = textureA.usage;
     using view = textureA.createView();
     view.label("a02-view");
     using sampler = device.createSampler({ minFilter: "nearest", magFilter: "nearest" });
@@ -89,8 +89,8 @@ export async function main(): Promise<void> {
       count: 2,
     });
     queries.label("a02-query-label");
-    queries.type();
-    queries.count();
+    const queryType: GPUQueryType = queries.type;
+    const queryCount: u32 = queries.count;
 
     using encoder = device.createCommandEncoder({ label: "a02-encoder" });
     encoder.label("a02-encoder-label");
@@ -122,8 +122,19 @@ export async function main(): Promise<void> {
     textureB.destroy();
     upload.destroy();
     readback.destroy();
-    print("textures:covered");
-    print("queries:covered");
+    const texturesCovered: boolean = uploadUsage !== 0
+      && uploadMapState === "mapped"
+      && textureWidth === 1
+      && textureHeight === 1
+      && textureDepth === 1
+      && textureMipLevels === 1
+      && textureSamples === 1
+      && textureDimension === "2d"
+      && textureFormat === "rgba8unorm"
+      && textureUsage !== 0;
+    const queriesCovered: boolean = queryType === "occlusion" && queryCount === 2;
+    print(texturesCovered ? "textures:covered" : "textures:missing");
+    print(queriesCovered ? "queries:covered" : "queries:missing");
   }
   gpu.dispose();
   print("PASS");

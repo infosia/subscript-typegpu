@@ -151,16 +151,16 @@ export async function main(): Promise<void> {
       usage: GPUBufferUsage.INDEX + GPUBufferUsage.COPY_DST,
     });
     vertices.write(
-      device.queue(),
+      device.queue,
       0,
       Context.bytesOf<FixedArray<Vertex, 4>>(vertexValues),
     );
     instances.write(
-      device.queue(),
+      device.queue,
       0,
       Context.bytesOf<FixedArray<Instance, 3>>(instanceValues),
     );
-    device.queue().writeBuffer(
+    device.queue.writeBuffer(
       indexBuffer,
       0,
       Context.bytesOf<FixedArray<u16, 6>>(indices),
@@ -213,7 +213,7 @@ export async function main(): Promise<void> {
     pass.draw(3);
     pass.end();
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     print("pipelines:created");
     print(`quad_VERTEX_LAYOUT0.arrayStride=${quad_VERTEX_LAYOUT0.arrayStride}`);
     print(`quad_VERTEX_LAYOUT0.stepMode=${quad_VERTEX_LAYOUT0.stepMode}`);

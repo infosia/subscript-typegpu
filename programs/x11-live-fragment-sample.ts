@@ -137,7 +137,7 @@ export async function main(): Promise<void> {
       device, FragmentVertex_STRIDE, 6,
       GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST, "x11-vertices",
     );
-    vertexBuffer.write(device.queue(), 0, Context.bytesOf<FixedArray<FragmentVertex, 6>>(vertices));
+    vertexBuffer.write(device.queue, 0, Context.bytesOf<FixedArray<FragmentVertex, 6>>(vertices));
     using source = device.createTexture({
       label: "x11-source",
       size: { width: 4, height: 4, depthOrArrayLayers: 1 },
@@ -161,7 +161,7 @@ export async function main(): Promise<void> {
       label: "x11-readback", size: 1024,
       usage: GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
     });
-    device.queue().writeTexture(
+    device.queue.writeTexture(
       { texture: source }, checkerBytes(),
       { offset: 0, bytesPerRow: 16, rowsPerImage: 4 },
       { width: 4, height: 4, depthOrArrayLayers: 1 },
@@ -200,8 +200,8 @@ export async function main(): Promise<void> {
       { width: 4, height: 4, depthOrArrayLayers: 1 },
     );
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
-    if (!await device.queue().onSubmittedWorkDone()) { print("FAIL submit"); return; }
+    device.queue.submit([command]);
+    if (!await device.queue.onSubmittedWorkDone()) { print("FAIL submit"); return; }
     print("draw:submitted");
     if (!await readback.mapAsync(GPUMapMode.READ, 0, 1024)) { print("FAIL map"); return; }
     const pixels: u8[] = readback.readMappedRange(0, 1024);

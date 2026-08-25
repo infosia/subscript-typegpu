@@ -93,7 +93,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     const hostValues: DepthItem[] = [];
     let hostIndex: u32 = 0;
     while (hostIndex < count) {

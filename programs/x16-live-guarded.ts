@@ -71,7 +71,7 @@ export async function main(): Promise<void> {
       "x16-output",
     );
     output.write(
-      device.queue(),
+      device.queue,
       0,
       Context.bytesOf<FixedArray<u32, 8>>([
         999,
@@ -111,7 +111,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], 6, 1, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     const outputBytes: u8[] = await output.read(device, 0, 8);
     const values: FixedArray<u32, 8> = Context.fromBytes<FixedArray<u32, 8>>(
       outputBytes,

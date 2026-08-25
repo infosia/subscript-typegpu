@@ -32,7 +32,7 @@ export async function main(): Promise<void> {
   {
     using adapter = adapterResult;
     using device = deviceResult;
-    const queue = device.queue();
+    const queue = device.queue;
     using source = device.createBuffer({
       label: "a01-source",
       size: 16,

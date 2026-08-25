@@ -72,7 +72,7 @@ export async function main(): Promise<void> {
       GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
       "b05-readback",
     );
-    const queue = device.queue();
+    const queue = device.queue;
     source.write(queue, 0, bytes);
     const patchedVelocity = new Vec3f(3.0, -2.0, 1.0);
     source.patch(

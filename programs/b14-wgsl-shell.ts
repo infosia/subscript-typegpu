@@ -112,7 +112,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatch(encoder, [bindGroup], 1, 1, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     const host = new ShellLayout();
     host.output = new MutStorage<u32>([0]);
     simulateCompute<ShellLayout>(

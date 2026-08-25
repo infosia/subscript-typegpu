@@ -98,7 +98,7 @@ export async function main(): Promise<void> {
       "b06-vertices",
     );
     vertices.write(
-      device.queue(),
+      device.queue,
       0,
       Context.bytesOf<FixedArray<Vertex, 3>>(values),
     );
@@ -138,7 +138,7 @@ export async function main(): Promise<void> {
     pass.draw(3);
     pass.end();
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     print("pipeline:created");
     print(`tri_VERTEX_LAYOUT0.arrayStride=${tri_VERTEX_LAYOUT0.arrayStride}`);
     print(`position.offset=${tri_VERTEX_LAYOUT0.attributes[0].offset}`);

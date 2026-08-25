@@ -26,5 +26,5 @@ export async function main(): Promise<void> {
     "trap-write-non-multiple",
   );
   const bytes: u8[] = [0, 0, 0];
-  buffer.write(device.queue(), 0, bytes);
+  buffer.write(device.queue, 0, bytes);
 }

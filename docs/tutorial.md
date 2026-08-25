@@ -131,5 +131,5 @@ The command buffer enters the device queue after the encoder finishes.
 
 ```ts program=programs/b04-particles.ts
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
 ```

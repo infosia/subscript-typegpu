@@ -122,7 +122,7 @@ export async function main(): Promise<void> {
       size: 1024,
       usage: GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
     });
-    device.queue().writeTexture(
+    device.queue.writeTexture(
       { texture: source },
       checkerBytes(),
       { offset: 0, bytesPerRow: 16, rowsPerImage: 4 },
@@ -155,8 +155,8 @@ export async function main(): Promise<void> {
       { width: 4, height: 4, depthOrArrayLayers: 1 },
     );
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
-    if (!await device.queue().onSubmittedWorkDone()) { print("FAIL submit"); return; }
+    device.queue.submit([command]);
+    if (!await device.queue.onSubmittedWorkDone()) { print("FAIL submit"); return; }
     print("dispatch:submitted");
     if (!await readback.mapAsync(GPUMapMode.READ, 0, 1024)) { print("FAIL map"); return; }
     const pixels: u8[] = readback.readMappedRange(0, 1024);

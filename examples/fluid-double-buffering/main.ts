@@ -336,48 +336,48 @@ export function init(
   const flowAB = hostDevice.createBindGroup({
     layout: flowBindLayout,
     entries: [
-      { binding: flow_LAYOUT0.entries[0].binding, buffer: cellsA, size: cellsA.size() },
-      { binding: flow_LAYOUT0.entries[1].binding, buffer: cellsB, size: cellsB.size() },
+      { binding: flow_LAYOUT0.entries[0].binding, buffer: cellsA, size: cellsA.size },
+      { binding: flow_LAYOUT0.entries[1].binding, buffer: cellsB, size: cellsB.size },
       { binding: flow_LAYOUT0.entries[2].binding, buffer: params, size: FluidParams_SIZE as u64 },
     ],
   });
   const flowBA = hostDevice.createBindGroup({
     layout: flowBindLayout,
     entries: [
-      { binding: flow_LAYOUT0.entries[0].binding, buffer: cellsB, size: cellsB.size() },
-      { binding: flow_LAYOUT0.entries[1].binding, buffer: cellsA, size: cellsA.size() },
+      { binding: flow_LAYOUT0.entries[0].binding, buffer: cellsB, size: cellsB.size },
+      { binding: flow_LAYOUT0.entries[1].binding, buffer: cellsA, size: cellsA.size },
       { binding: flow_LAYOUT0.entries[2].binding, buffer: params, size: FluidParams_SIZE as u64 },
     ],
   });
   const evaporateAB = hostDevice.createBindGroup({
     layout: evaporateBindLayout,
     entries: [
-      { binding: evaporate_LAYOUT0.entries[0].binding, buffer: cellsA, size: cellsA.size() },
-      { binding: evaporate_LAYOUT0.entries[1].binding, buffer: cellsB, size: cellsB.size() },
+      { binding: evaporate_LAYOUT0.entries[0].binding, buffer: cellsA, size: cellsA.size },
+      { binding: evaporate_LAYOUT0.entries[1].binding, buffer: cellsB, size: cellsB.size },
       { binding: evaporate_LAYOUT0.entries[2].binding, buffer: params, size: FluidParams_SIZE as u64 },
     ],
   });
   const evaporateBA = hostDevice.createBindGroup({
     layout: evaporateBindLayout,
     entries: [
-      { binding: evaporate_LAYOUT0.entries[0].binding, buffer: cellsB, size: cellsB.size() },
-      { binding: evaporate_LAYOUT0.entries[1].binding, buffer: cellsA, size: cellsA.size() },
+      { binding: evaporate_LAYOUT0.entries[0].binding, buffer: cellsB, size: cellsB.size },
+      { binding: evaporate_LAYOUT0.entries[1].binding, buffer: cellsA, size: cellsA.size },
       { binding: evaporate_LAYOUT0.entries[2].binding, buffer: params, size: FluidParams_SIZE as u64 },
     ],
   });
   const obstacleAB = hostDevice.createBindGroup({
     layout: obstacleBindLayout,
     entries: [
-      { binding: obstacle_LAYOUT0.entries[0].binding, buffer: cellsA, size: cellsA.size() },
-      { binding: obstacle_LAYOUT0.entries[1].binding, buffer: cellsB, size: cellsB.size() },
+      { binding: obstacle_LAYOUT0.entries[0].binding, buffer: cellsA, size: cellsA.size },
+      { binding: obstacle_LAYOUT0.entries[1].binding, buffer: cellsB, size: cellsB.size },
       { binding: obstacle_LAYOUT0.entries[2].binding, buffer: params, size: FluidParams_SIZE as u64 },
     ],
   });
   const obstacleBA = hostDevice.createBindGroup({
     layout: obstacleBindLayout,
     entries: [
-      { binding: obstacle_LAYOUT0.entries[0].binding, buffer: cellsB, size: cellsB.size() },
-      { binding: obstacle_LAYOUT0.entries[1].binding, buffer: cellsA, size: cellsA.size() },
+      { binding: obstacle_LAYOUT0.entries[0].binding, buffer: cellsB, size: cellsB.size },
+      { binding: obstacle_LAYOUT0.entries[1].binding, buffer: cellsA, size: cellsA.size },
       { binding: obstacle_LAYOUT0.entries[2].binding, buffer: params, size: FluidParams_SIZE as u64 },
     ],
   });
@@ -386,7 +386,7 @@ export function init(
     entries: [{
       binding: fluidRender_LAYOUT0.entries[0].binding,
       buffer: cellsA,
-      size: cellsA.size(),
+      size: cellsA.size,
     }],
   });
   const renderB = hostDevice.createBindGroup({
@@ -394,7 +394,7 @@ export function init(
     entries: [{
       binding: fluidRender_LAYOUT0.entries[0].binding,
       buffer: cellsB,
-      size: cellsB.size(),
+      size: cellsB.size,
     }],
   });
   activeDevice = hostDevice;

@@ -25,5 +25,5 @@ export async function main(): Promise<void> {
     GPUBufferUsage.COPY_SRC,
     "trap-write-without-copy-dst",
   );
-  buffer.write(device.queue(), 0, [0, 0, 0, 0]);
+  buffer.write(device.queue, 0, [0, 0, 0, 0]);
 }

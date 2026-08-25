@@ -130,7 +130,7 @@ export async function main(): Promise<void> {
       format: "rgba8unorm",
       usage: GPUTextureUsage.TEXTURE_BINDING + GPUTextureUsage.COPY_DST,
     });
-    writeTexturePixels(device.queue(), source, pixels, WIDTH, HEIGHT);
+    writeTexturePixels(device.queue, source, pixels, WIDTH, HEIGHT);
     using sourceView = source.createView();
     const nearestDescriptor: GPUSamplerDescriptor = {
       minFilter: "nearest",
@@ -168,8 +168,8 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [group], WIDTH, HEIGHT, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
-    if (!await device.queue().onSubmittedWorkDone()) {
+    device.queue.submit([command]);
+    if (!await device.queue.onSubmittedWorkDone()) {
       print("FAIL submit");
       return;
     }

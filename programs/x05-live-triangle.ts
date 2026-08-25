@@ -145,7 +145,7 @@ export async function main(): Promise<void> {
       "x05-vertices",
     );
     vertices.write(
-      device.queue(),
+      device.queue,
       0,
       Context.bytesOf<FixedArray<Vertex, 3>>(values),
     );
@@ -196,8 +196,8 @@ export async function main(): Promise<void> {
       { width: 64, height: 64 },
     );
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
-    if (!await device.queue().onSubmittedWorkDone()) {
+    device.queue.submit([command]);
+    if (!await device.queue.onSubmittedWorkDone()) {
       print("FAIL submit");
       return;
     }

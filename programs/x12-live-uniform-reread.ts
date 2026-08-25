@@ -95,7 +95,7 @@ export async function main(): Promise<void> {
       GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
       "x12-readback",
     );
-    const queue = device.queue();
+    const queue = device.queue;
     params.writeOne(queue, 0, Context.bytesOf<Params>(new Params(5)));
     print("inputs:written");
     device.pushErrorScope("validation");

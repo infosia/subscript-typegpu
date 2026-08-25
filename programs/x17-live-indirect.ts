@@ -143,12 +143,12 @@ export async function main(): Promise<void> {
       size: 28,
       usage: GPUBufferUsage.INDIRECT + GPUBufferUsage.COPY_DST,
     });
-    device.queue().writeBuffer(
+    device.queue.writeBuffer(
       indirect,
       0,
       Context.bytesOf<DispatchIndirectArgs>(new DispatchIndirectArgs(1, 1, 1)),
     );
-    device.queue().writeBuffer(
+    device.queue.writeBuffer(
       indirect,
       12,
       Context.bytesOf<DrawIndirectArgs>(new DrawIndirectArgs(3, 1, 0, 0)),
@@ -171,7 +171,7 @@ export async function main(): Promise<void> {
       "x17-vertices",
     );
     vertices.write(
-      device.queue(),
+      device.queue,
       0,
       Context.bytesOf<FixedArray<Vertex, 3>>([
         new Vertex(a),
@@ -242,8 +242,8 @@ export async function main(): Promise<void> {
       { width: 4, height: 4 },
     );
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
-    if (!await device.queue().onSubmittedWorkDone()) {
+    device.queue.submit([command]);
+    if (!await device.queue.onSubmittedWorkDone()) {
       print("FAIL submit");
       return;
     }

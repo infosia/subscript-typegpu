@@ -83,7 +83,7 @@ export async function main(): Promise<void> {
     using input: Buffer<Item> = createBuffer<Item>(device, Item_STRIDE, 4, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST, "x04-input");
     using output: Buffer<Item> = createBuffer<Item>(device, Item_STRIDE, 1, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_SRC, "x04-output");
     using readback: Buffer<Item> = createBuffer<Item>(device, Item_STRIDE, 1, GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST, "x04-readback");
-    const queue = device.queue();
+    const queue = device.queue;
     input.write(queue, 0, Context.bytesOf<FixedArray<Item, 4>>(inputValues));
     device.pushErrorScope("validation");
     using pipeline = createComputePipeline(device, controlFlow_WGSL, controlFlow_ENTRY, [controlFlow_LAYOUT0], [controlFlow_WORKGROUP_X, controlFlow_WORKGROUP_Y, controlFlow_WORKGROUP_Z]);

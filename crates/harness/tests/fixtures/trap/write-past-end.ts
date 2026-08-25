@@ -26,5 +26,5 @@ export async function main(): Promise<void> {
     "trap-write-past-end",
   );
   const bytes: u8[] = [0, 0, 0, 0, 0, 0, 0, 0];
-  buffer.write(device.queue(), 1, bytes);
+  buffer.write(device.queue, 1, bytes);
 }

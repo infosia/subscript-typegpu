@@ -1435,7 +1435,7 @@ reason = "compilation-info records remain outside the selected API subset"
 [[api.deviations]]
 member = "GPUShaderModule.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.deviations]]
 member = "GPUComputePipeline.getBindGroupLayout"
@@ -1446,7 +1446,7 @@ reason = "the facade names the WebIDL index parameter groupIndex. The generated 
 [[api.deviations]]
 member = "GPUComputePipeline.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.deviations]]
 member = "GPURenderPipeline.getBindGroupLayout"
@@ -1457,7 +1457,7 @@ reason = "the facade names the WebIDL index parameter groupIndex. The generated 
 [[api.deviations]]
 member = "GPURenderPipeline.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.generate]]
 member = "GPUShaderModuleDescriptor.label"
@@ -2142,25 +2142,21 @@ member = "GPUDevice.@constructor"
 pattern = "host-owned-wrapper"
 reason = "JavaScript exposes no GPUDevice constructor. Static methods are unavailable, so this API keeps a public owning constructor that accepts private raw-handle fields, acquires and caches one queue reference through subscript_typegpu_device_get_queue, and is paired with hostOwnedGPUDevice, whose GPUHostOwnedDevice wraps a host-owned device, exposes the same creation methods but neither dispose nor destroy, and returns a new owned queue wrapper from each queue call"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUDevice.queue"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL attribute is a cached zero-argument method"
+pattern = "attribute-accessor"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUBuffer.size"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+pattern = "attribute-accessor"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUBuffer.usage"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+pattern = "attribute-accessor"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUBuffer.mapState"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL string-enum attribute is a zero-argument method with generated reverse lowering"
+pattern = "attribute-accessor"
 
 [[api.deviations]]
 member = "GPUBuffer.mapAsync"
@@ -2324,12 +2320,12 @@ reason = "JavaScript handler registration becomes consuming nextUncapturedError(
 [[api.deviations]]
 member = "GPUDevice.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.deviations]]
 member = "GPUBuffer.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.deviations]]
 member = "GPUQueue.submit"
@@ -2350,7 +2346,7 @@ reason = "DOM external-image integration is excluded"
 [[api.deviations]]
 member = "GPUQueue.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.generate]]
 member = "GPUTexture.createView"
@@ -2360,45 +2356,37 @@ pattern = "operation"
 member = "GPUTexture.destroy"
 pattern = "operation"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUTexture.width"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+pattern = "attribute-accessor"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUTexture.height"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+pattern = "attribute-accessor"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUTexture.depthOrArrayLayers"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+pattern = "attribute-accessor"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUTexture.mipLevelCount"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+pattern = "attribute-accessor"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUTexture.sampleCount"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+pattern = "attribute-accessor"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUTexture.dimension"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL string-enum attribute is a zero-argument method with generated reverse lowering"
+pattern = "attribute-accessor"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUTexture.format"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL string-enum attribute is a zero-argument method with generated reverse lowering"
+pattern = "attribute-accessor"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUTexture.usage"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL attribute is a zero-argument method"
+pattern = "attribute-accessor"
 
 [[api.exclude]]
 member = "GPUTexture.textureBindingViewDimension"
@@ -2407,17 +2395,17 @@ reason = "Q32 literal-union aliases cannot be nullable, so the IDL enum-or-undef
 [[api.deviations]]
 member = "GPUTexture.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.deviations]]
 member = "GPUTextureView.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.deviations]]
 member = "GPUSampler.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.generate]]
 member = "GPUTextureDescriptor.label"
@@ -3137,17 +3125,17 @@ pattern = "enum-value"
 [[api.deviations]]
 member = "GPUBindGroupLayout.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.deviations]]
 member = "GPUBindGroup.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.deviations]]
 member = "GPUPipelineLayout.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.generate]]
 member = "GPUBufferBindingLayout.type"
@@ -3672,7 +3660,7 @@ pattern = "operation"
 [[api.deviations]]
 member = "GPUCommandEncoder.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.generate]]
 member = "GPUComputePassEncoder.setPipeline"
@@ -3716,7 +3704,7 @@ reason = "the facade exposes immediateSize capability fields but no set-immediat
 [[api.deviations]]
 member = "GPUComputePassEncoder.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.generate]]
 member = "GPURenderPassEncoder.setViewport"
@@ -3809,12 +3797,12 @@ pattern = "operation"
 [[api.deviations]]
 member = "GPURenderPassEncoder.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.deviations]]
 member = "GPUCommandBuffer.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.deviations]]
 member = "GPURenderBundleEncoder.finish"
@@ -3881,31 +3869,29 @@ pattern = "operation"
 [[api.deviations]]
 member = "GPURenderBundleEncoder.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.deviations]]
 member = "GPURenderBundle.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.generate]]
 member = "GPUQuerySet.destroy"
 pattern = "operation"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUQuerySet.type"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL type attribute is a zero-argument method"
+pattern = "attribute-accessor"
 
-[[api.deviations]]
+[[api.generate]]
 member = "GPUQuerySet.count"
-pattern = "attribute-method"
-reason = "user-defined accessors are unavailable, so the IDL count attribute is a zero-argument method"
+pattern = "attribute-accessor"
 
 [[api.deviations]]
 member = "GPUQuerySet.label"
 pattern = "label-method"
-reason = "the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable"
+reason = "the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only"
 
 [[api.deviations]]
 member = "GPUError.message"

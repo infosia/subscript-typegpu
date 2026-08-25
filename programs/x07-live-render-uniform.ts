@@ -189,13 +189,13 @@ export async function main(): Promise<void> {
       size: Tint_SIZE as u64,
       usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
     });
-    vertices.write(device.queue(), 0, Context.bytesOf<FixedArray<Vertex, 3>>(values));
-    device.queue().writeBuffer(
+    vertices.write(device.queue, 0, Context.bytesOf<FixedArray<Vertex, 3>>(values));
+    device.queue.writeBuffer(
       params,
       0,
       Context.bytesOf<Offset>(new Offset(new Vec4f(offset.x, offset.y, 0.0, 0.0))),
     );
-    device.queue().writeBuffer(
+    device.queue.writeBuffer(
       tint,
       0,
       Context.bytesOf<Tint>(new Tint(new Vec4f(0.25, 0.6, 0.75, 1.0))),
@@ -254,8 +254,8 @@ export async function main(): Promise<void> {
       { width: 64, height: 64 },
     );
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
-    if (!await device.queue().onSubmittedWorkDone()) {
+    device.queue.submit([command]);
+    if (!await device.queue.onSubmittedWorkDone()) {
       print("FAIL submit");
       return;
     }

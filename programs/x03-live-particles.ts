@@ -181,7 +181,7 @@ export async function main(): Promise<void> {
       GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
       "x03-readback",
     );
-    const queue = device.queue();
+    const queue = device.queue;
     params.writeOne(queue, 0, Context.bytesOf<SimParams>(new SimParams(dt, count)));
     particlesBuffer.write(
       queue,

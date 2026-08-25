@@ -425,8 +425,8 @@ export async function main(): Promise<void> {
     using input = device.createBuffer({ label: "b13-input", size: VectorInput_SIZE as u64, usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST });
     using output = device.createBuffer({ label: "b13-output", size: VectorOutput_SIZE as u64, usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST });
     const source = inputValue();
-    device.queue().writeBuffer(input, 0, Context.bytesOf<VectorInput>(source));
-    device.queue().writeBuffer(output, 0, Context.bytesOf<VectorOutput>(new VectorOutput()));
+    device.queue.writeBuffer(input, 0, Context.bytesOf<VectorInput>(source));
+    device.queue.writeBuffer(output, 0, Context.bytesOf<VectorOutput>(new VectorOutput()));
     device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
@@ -442,7 +442,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], 1, 1, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
 
     const hostLayout = new VectorLayout();
     hostLayout.input = new Storage<VectorInput>([source]);

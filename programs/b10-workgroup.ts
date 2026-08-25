@@ -97,7 +97,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count * 4, 1, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     print("pipeline:created");
     print(`WorkCounter_SIZE=${WorkCounter_SIZE}`);
     print(`workgroup_WORKGROUP_X=${workgroup_WORKGROUP_X}`);

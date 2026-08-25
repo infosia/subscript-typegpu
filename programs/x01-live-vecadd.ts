@@ -163,7 +163,7 @@ export async function main(): Promise<void> {
       GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
       "x01-readback",
     );
-    const queue = device.queue();
+    const queue = device.queue;
     a.write(queue, 0, Context.bytesOf<FixedArray<Item, 64>>(aValues));
     b.write(queue, 0, Context.bytesOf<FixedArray<Item, 64>>(bValues));
     print("inputs:written");

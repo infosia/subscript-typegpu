@@ -19,5 +19,5 @@ export async function main(): Promise<void> {
     GPUBufferUsage.COPY_DST,
     "trap-patch-past-field",
   );
-  buffer.patch(device.queue(), 0, 3, [1, 2]);
+  buffer.patch(device.queue, 0, 3, [1, 2]);
 }

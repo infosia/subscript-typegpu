@@ -141,7 +141,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [group0, group1], 4, 4, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     const hostSourcePixels: Vec4f[] = [new Vec4f(1.0, 0.0, 0.0, 1.0)];
     const hostTargetPixels: Vec4f[] = [new Vec4f(0.0, 0.0, 0.0, 0.0)];
     const hostTextures = new TextureLayout();

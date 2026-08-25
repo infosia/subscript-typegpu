@@ -194,7 +194,7 @@ padding included. `Context.bytesInto<T>` writes them into an existing
 `u8[]` at an offset.
 
 ```ts program=programs/x08-live-reduction.ts
-    const queue = device.queue();
+    const queue = device.queue;
     input.write(queue, 0, inputBytes);
     output.writeOne(
       queue,
@@ -447,7 +447,7 @@ layout constants. A validation error scope surrounds the creation.
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
 ```
 
 Differences:

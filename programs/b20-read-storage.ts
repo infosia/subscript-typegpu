@@ -129,7 +129,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [group], WIDTH, HEIGHT, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
 
     const hostSource: Vec4f[] = sourcePixels();
     const hostTarget: Vec4f[] = zeroPixels();

@@ -19,5 +19,5 @@ export async function main(): Promise<void> {
     GPUBufferUsage.COPY_DST,
     "trap-patch-unaligned",
   );
-  buffer.patch(device.queue(), 0, 2, [0, 0]);
+  buffer.patch(device.queue, 0, 2, [0, 0]);
 }

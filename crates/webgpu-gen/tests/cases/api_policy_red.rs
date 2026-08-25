@@ -1,5 +1,6 @@
-//! J9's API policy is checked in both directions: bad policy cannot
-//! name nothing, classify twice, go unused, or omit a reachable member.
+//! J9's API policy is checked in both directions.
+//! Bad policy cannot name nothing, classify twice, go unused, omit a reachable member,
+//! reuse a retired pattern, or misclassify a generated pattern.
 
 use std::path::Path;
 
@@ -35,7 +36,7 @@ fn without(policy: &str, block: &str) -> String {
 }
 
 #[test]
-fn api_policy_rejects_unknown_entries() {
+fn api_policy_rejects_unknown_and_retired_entries() {
     let policy = format!(
         "{}\n[[api.generate]]\nmember = \"GPU.notReal\"\npattern = \"operation\"\n",
         repo_file("crates/webgpu-gen/policy.toml")
@@ -47,6 +48,37 @@ fn api_policy_rejects_unknown_entries() {
     assert_eq!(
         error,
         "api policy error (unknown): policy names `GPU.notReal` but the selected IDL/mirror join has no such construct"
+    );
+
+    let policy = repo_file("crates/webgpu-gen/policy.toml").replacen(
+        "member = \"GPUBuffer.size\"\npattern = \"attribute-accessor\"",
+        "member = \"GPUBuffer.size\"\npattern = \"attribute-method\"",
+        1,
+    );
+    let Some(error) = generate_error(&policy) else {
+        return;
+    };
+    eprintln!("{error}");
+    assert_eq!(
+        error,
+        "api policy error (invalid): `GPUBuffer.size`: pattern `attribute-method` does not match the IDL member kind"
+    );
+}
+
+#[test]
+fn api_policy_rejects_generated_patterns_on_deviation_rows() {
+    let policy = repo_file("crates/webgpu-gen/policy.toml").replacen(
+        "[[api.generate]]\nmember = \"GPUBuffer.size\"\npattern = \"attribute-accessor\"",
+        "[[api.deviations]]\nmember = \"GPUBuffer.size\"\npattern = \"attribute-accessor\"\nreason = \"generated pattern red fixture\"",
+        1,
+    );
+    let Some(error) = generate_error(&policy) else {
+        return;
+    };
+    eprintln!("{error}");
+    assert_eq!(
+        error,
+        "api policy error (invalid): `GPUBuffer.size`: pattern `attribute-accessor` does not match the IDL member kind"
     );
 }
 

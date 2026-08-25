@@ -95,7 +95,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], 6, 1, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     const host = new GuardedLayout();
     host.output = new MutStorage<u32>([999, 999, 999, 999, 999, 999, 999, 999]);
     simulateComputeThreads<GuardedLayout>(

@@ -122,7 +122,7 @@ fn api_accounting_and_absence_enum_members_are_stable() {
             generated.wrapper_constructs,
             generated.result_constructs,
         ),
-        (526, 116, 24, 21, 4),
+        (540, 102, 24, 21, 4),
     );
     assert_eq!(
         generated.absence_enum_members,

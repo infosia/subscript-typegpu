@@ -172,10 +172,9 @@ export async function main(): Promise<void> {
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
       "matrix-product",
     );
-    using queue = device.queue();
-    left.writeOne(queue, 0, Context.bytesOf<Matrix>(leftValue));
-    right.writeOne(queue, 0, Context.bytesOf<Matrix>(rightValue));
-    product.writeOne(queue, 0, Context.bytesOf<Matrix>(zeroMatrix()));
+    left.writeOne(device.queue, 0, Context.bytesOf<Matrix>(leftValue));
+    right.writeOne(device.queue, 0, Context.bytesOf<Matrix>(rightValue));
+    product.writeOne(device.queue, 0, Context.bytesOf<Matrix>(zeroMatrix()));
     device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
@@ -200,7 +199,7 @@ export async function main(): Promise<void> {
       using encoder = device.createCommandEncoderDefault();
       pipeline.dispatchThreads(encoder, [bindGroup], 1, 1, 1);
       using command = encoder.finishDefault();
-      queue.submit([command]);
+      device.queue.submit([command]);
 
       const host = new MatrixLayout();
       host.left = new Storage<Matrix>([leftValue]);

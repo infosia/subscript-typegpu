@@ -121,3 +121,31 @@ MINOR, all closed. Evidence: gate green with the backend, 256
 passed, 1 ignored, 116 s, every `.wgsl` and `.expected` golden
 byte-identical, live green on Metal 67.49 s. Record:
 `specs/tracking/p12-spelling.md`.
+
+## P13 and P14 — the accessor spelling (2026-08-25)
+
+subscript R37 landed a named accessor on this project's request. The
+record is `specs/tracking/accessor-request.md`.
+
+P13 moved the TypeGPU layer: `Uniform`, `PrivateVar`, and
+`WorkgroupVar` take the accessor `$`, and every swizzle is a read
+accessor. The index families kept `get(i)` and `set(i, v)`, which
+subscript's index signature needs.
+
+P14 moved the WebGPU layer: 14 IDL attributes generate as read
+accessors, and the 14 deviation rows that claimed "user-defined
+accessors are unavailable" left the policy. 157 sites became
+property reads. `GPUHostOwnedDevice.queue()` stays a method, because
+it returns a new owned wrapper per call.
+
+Both phases held every `.wgsl` and `.expected` golden byte-identical,
+which is the proof that the checker rewrite feeds the emitter the
+call HIR it already read.
+
+The two reviews found one defect class twice: a caller disposed a
+queue wrapper the owned device owns. Three examples and
+`createComputePipeline` did it. PI15 Rev 2 makes the ownership
+explicit, and a test facade makes the release observable.
+
+Evidence: gate green, 258 passed, 1 ignored, 144 s; live green on
+Metal 89.70 s; four window smokes at `--frames 30`.

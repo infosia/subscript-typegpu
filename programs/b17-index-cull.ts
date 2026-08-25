@@ -97,7 +97,7 @@ export async function main(): Promise<void> {
       size: 8,
       usage: GPUBufferUsage.INDEX + GPUBufferUsage.COPY_DST,
     });
-    device.queue().writeBuffer(
+    device.queue.writeBuffer(
       vertices,
       0,
       Context.bytesOf<FixedArray<Vertex, 3>>([
@@ -106,7 +106,7 @@ export async function main(): Promise<void> {
         new Vertex(new Vec2f(0.0, 0.5)),
       ]),
     );
-    device.queue().writeBuffer(
+    device.queue.writeBuffer(
       indices,
       0,
       Context.bytesOf<FixedArray<u16, 4>>([0, 1, 2, 0]),
@@ -148,7 +148,7 @@ export async function main(): Promise<void> {
     pass.drawIndexed(3);
     pass.end();
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     print(`culled_INDEX_FORMAT=${culled_INDEX_FORMAT}`);
     print(`culled.cullMode=${culled.cullMode}`);
     print(`culled.frontFace=${culled.frontFace}`);

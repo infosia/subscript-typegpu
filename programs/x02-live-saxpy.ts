@@ -176,7 +176,7 @@ export async function main(): Promise<void> {
       GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
       "x02-readback",
     );
-    const queue = device.queue();
+    const queue = device.queue;
     params.writeOne(queue, 0, Context.bytesOf<SaxpyParams>(new SaxpyParams(aValue, count)));
     x.write(queue, 0, Context.bytesOf<FixedArray<Item, 64>>(xValues));
     y.write(queue, 0, Context.bytesOf<FixedArray<Item, 64>>(yValues));

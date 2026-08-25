@@ -134,7 +134,7 @@ export async function main(): Promise<void> {
       format: "r32float",
       usage: GPUTextureUsage.STORAGE_BINDING,
     });
-    writeTexturePixels(device.queue(), textureA, initial, WIDTH, HEIGHT);
+    writeTexturePixels(device.queue, textureA, initial, WIDTH, HEIGHT);
     using viewA = textureA.createView();
     using viewB = textureB.createView();
     using readback = device.createBuffer({
@@ -178,8 +178,8 @@ export async function main(): Promise<void> {
       { width: WIDTH, height: HEIGHT, depthOrArrayLayers: 1 },
     );
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
-    if (!await device.queue().onSubmittedWorkDone()) {
+    device.queue.submit([command]);
+    if (!await device.queue.onSubmittedWorkDone()) {
       print("FAIL submit");
       return;
     }

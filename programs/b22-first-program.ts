@@ -90,7 +90,7 @@ export async function main(): Promise<void> {
 
     const initialState = new State(0, 10);
     stateBuffer.write(
-      device.queue(),
+      device.queue,
       0,
       Context.bytesOf<State>(initialState),
     );
@@ -126,10 +126,10 @@ export async function main(): Promise<void> {
     using firstEncoder = device.createCommandEncoderDefault();
     pipeline.dispatch(firstEncoder, [bindGroup], 1, 1, 1);
     using firstCommand = firstEncoder.finishDefault();
-    device.queue().submit([firstCommand]);
+    device.queue.submit([firstCommand]);
 
     stateBuffer.patch(
-      device.queue(),
+      device.queue,
       0,
       State_OFFSET_incrementBy,
       Context.bytesOf<FixedArray<u32, 1>>([25]),
@@ -138,7 +138,7 @@ export async function main(): Promise<void> {
     using secondEncoder = device.createCommandEncoderDefault();
     pipeline.dispatch(secondEncoder, [bindGroup], 1, 1, 1);
     using secondCommand = secondEncoder.finishDefault();
-    device.queue().submit([secondCommand]);
+    device.queue.submit([secondCommand]);
 
     const readbackBytes: u8[] = await stateBuffer.readOne(device, 0);
     const readback: State = Context.fromBytes<State>(readbackBytes, 0);

@@ -100,7 +100,7 @@ export function writeTexturePixels(
   if ((pixels.length as u32) !== pixelCount) {
     authorTrap("TX9", "writeTexturePixels", `pixels=${pixels.length} width=${width} height=${height}`);
   }
-  const format: GPUTextureFormat = texture.format();
+  const format: GPUTextureFormat = texture.format;
   const componentBytes: u32 = textureComponentBytes(format);
   const channels: u32 = textureChannelCount(format);
   const rowBytes: u32 = width * channels * componentBytes;
@@ -445,7 +445,7 @@ export class Buffer<T> {
     using encoder = device.createCommandEncoderDefault();
     this.copyTo(encoder, staging, elementIndex, elementCount);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     if (!await staging.handle().mapAsync(GPUMapMode.READ, 0, byteLength)) {
       staging.dispose();
       authorTrap("BF9", "Buffer.read", `elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`);
@@ -1093,6 +1093,7 @@ export class BindGroupLayoutSpec {
 export class ComputePipeline {
   private pipeline: GPUComputePipeline;
   private guardQueue: GPUQueue | null;
+  private guardQueueOwned: boolean;
   private workgroup: FixedArray<u32, 3>;
   private guarded: boolean;
   private guardGroups: u32[];
@@ -1103,12 +1104,14 @@ export class ComputePipeline {
     pipeline: GPUComputePipeline,
     workgroup: FixedArray<u32, 3>,
     guardQueue: GPUQueue | null = null,
+    guardQueueOwned: boolean = false,
     guarded: boolean = false,
     guardGroups: u32[] = [],
     guardBuffers: GPUBuffer[] = [],
   ) {
     this.pipeline = pipeline;
     this.guardQueue = guardQueue;
+    this.guardQueueOwned = guardQueueOwned;
     this.workgroup = workgroup;
     this.guarded = guarded;
     this.guardGroups = guardGroups;
@@ -1270,8 +1273,11 @@ export class ComputePipeline {
       index = index + 1;
     }
     if (this.guardQueue !== null) {
-      this.guardQueue.dispose();
+      if (this.guardQueueOwned) {
+        this.guardQueue.dispose();
+      }
       this.guardQueue = null;
+      this.guardQueueOwned = false;
     }
     this.pipeline.dispose();
   }
@@ -1359,7 +1365,7 @@ export class RenderPipeline {
     }
     let slot: i32 = 0;
     while (slot < vertexBuffers.length) {
-      pass.setVertexBuffer(slot as u32, vertexBuffers[slot], 0, vertexBuffers[slot].size());
+      pass.setVertexBuffer(slot as u32, vertexBuffers[slot], 0, vertexBuffers[slot].size);
       slot = slot + 1;
     }
   }
@@ -1369,7 +1375,7 @@ export class RenderPipeline {
       authorTrap("RN18", "RenderPipeline.setIndexBuffer", "indexFormat=undefined");
       return;
     }
-    pass.setIndexBuffer(buffer, this.indexFormat, 0, buffer.size());
+    pass.setIndexBuffer(buffer, this.indexFormat, 0, buffer.size);
   }
 
   dispose(): void {
@@ -1536,11 +1542,13 @@ function finishComputePipeline(
   guardGroups: u32[],
   guardBuffers: GPUBuffer[],
   guardQueue: GPUQueue | null,
+  guardQueueOwned: boolean,
 ): ComputePipeline {
   return new ComputePipeline(
     pipeline,
     workgroup,
     guardQueue,
+    guardQueueOwned,
     guardBuffers.length > 0,
     guardGroups,
     guardBuffers,
@@ -1590,13 +1598,14 @@ export function createComputePipeline(
     nativeLayouts[group].dispose();
     group = group + 1;
   }
-  const guardQueue: GPUQueue | null = guardBuffers.length > 0 ? device.queue() : null;
+  const guardQueue: GPUQueue | null = guardBuffers.length > 0 ? device.queue : null;
   return finishComputePipeline(
     pipeline,
     workgroup,
     guardGroups,
     guardBuffers,
     guardQueue,
+    false,
   );
 }
 
@@ -1643,6 +1652,7 @@ export function createComputePipelineHost(
     guardGroups,
     guardBuffers,
     guardQueue,
+    true,
   );
 }
 

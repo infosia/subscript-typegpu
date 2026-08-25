@@ -122,7 +122,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     const hostLayout = new SaxpyLayout();
     hostLayout.params = new Uniform<SaxpyParams>(new SaxpyParams(2.0, 2));
     hostLayout.x = new Storage<Item>([new Item(3.0), new Item(4.0)]);

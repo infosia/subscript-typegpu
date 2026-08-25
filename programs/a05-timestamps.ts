@@ -80,7 +80,7 @@ export async function main(): Promise<void> {
     pair.resolve(encoder);
     pair.copyTo(encoder, readback);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     const mapped: boolean = await readback.handle().mapAsync(GPUMapMode.READ, 0, 16);
     if (!mapped) {
       print("FAIL map");

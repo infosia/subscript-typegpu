@@ -107,7 +107,7 @@ export async function main(): Promise<void> {
       GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
       "b21-vertices",
     );
-    vertices.write(device.queue(), 0, Context.bytesOf<FixedArray<Vertex, 3>>(values));
+    vertices.write(device.queue, 0, Context.bytesOf<FixedArray<Vertex, 3>>(values));
     using target = device.createTexture({
       label: "b21-target",
       size: { width: 8, height: 8 },
@@ -144,7 +144,7 @@ export async function main(): Promise<void> {
     pass.draw(3);
     pass.end();
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     if (blended.blend === null) {
       print("FAIL blend missing");
       return;

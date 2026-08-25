@@ -152,6 +152,17 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   is outside `[x, y, z]` for a guarded spec, and `simulateCompute`
   runs every invocation of every workgroup. A `guarded` value that
   is not a literal is a diagnostic.
+
+  Rev 2, 2026-08-25: the guard queue's ownership is explicit. A
+  `ComputePipeline` never releases a queue wrapper it did not
+  create. `createComputePipeline` takes the owned device's cached
+  queue, which the device owns and disposes, and marks it not owned.
+  `createComputePipelineHost` takes a wrapper that
+  `GPUHostOwnedDevice.queue()` created for it, and marks it owned.
+  `dispose()` disposes the queue only when the pipeline owns it. The
+  earlier text disposed it in both cases, so a guarded pipeline
+  released the device's queue, and a later read of `device.queue`
+  reached a released handle.
 - **PI16 — Indirect dispatch.** `ComputePipeline` gains
   `dispatchIndirect(encoder, groups, buffer: GPUBuffer, offset:
   u64)`, which records `dispatchWorkgroupsIndirect`. On a guarded

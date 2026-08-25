@@ -142,7 +142,7 @@ export async function main(): Promise<void> {
       using encoder = device.createCommandEncoderDefault();
       pipeline.dispatchThreads(encoder, [group], SAMPLE_COUNT, 1, 1);
       using command = encoder.finishDefault();
-      device.queue().submit([command]);
+      device.queue.submit([command]);
 
       const gpuBytes: u8[] = await output.read(device, 0, SAMPLE_COUNT);
       // The Noop backend leaves the output at zero. The example reports `noop` for that

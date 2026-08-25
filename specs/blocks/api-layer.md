@@ -40,9 +40,10 @@ first-party rules. The API generator, the `[api]` policy section, and
   from the attribute plan, and the body is the body it emits today.
 
   The `attribute-method` pattern and its 14 deviation rows leave the
-  policy. A faithful attribute is a generated member under J9 and
-  needs no row. The generator rejects the retired pattern name, so a
-  stale row fails loudly.
+  policy. A faithful attribute is a generated member under J9, so it
+  carries an `[[api.generate]]` row and no deviation row. The
+  generator rejects the retired pattern name, so a stale row fails
+  loudly.
 
   `GPUHostOwnedDevice` is a policy class, not an IDL class. Its
   `queue()` stays a method, because it returns a new owned wrapper
@@ -51,9 +52,12 @@ first-party rules. The API generator, the `[api]` policy section, and
   The owned `GPUDevice` caches its queue, so its `queue` is an
   accessor like every other attribute.
 
-  A write accessor does not appear. Every covered IDL attribute is
-  read-only in this subset, and subscript R37 forbids a write
-  accessor on a value class.
+  A write accessor does not appear. Every covered IDL attribute
+  except `label` is read-only, and `label` keeps its write-only
+  method. The facade exposes no label getter, and subscript R37
+  rejects a write accessor that has no read accessor beside it, so
+  no accessor pair is possible. The `label-method` rows state that
+  cause.
 
 ## 5. What is not a rule here
 

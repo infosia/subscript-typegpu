@@ -115,7 +115,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     const hostLayout = new VecAddLayout();
     hostLayout.a = new Storage<Item>([new Item(1.0), new Item(2.0), new Item(3.0)]);
     hostLayout.b = new Storage<Item>([new Item(4.0), new Item(5.0), new Item(6.0)]);

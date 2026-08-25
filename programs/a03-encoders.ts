@@ -43,7 +43,7 @@ export async function main(): Promise<void> {
   {
     using adapter = adapterResult;
     using device = deviceResult;
-    const queue = device.queue();
+    const queue = device.queue;
     device.pushErrorScope("validation");
     using shader: GPUShaderModule = device.createShaderModule({ label: "a03-shader", code: SHADER });
     shader.label("a03-shader-label");

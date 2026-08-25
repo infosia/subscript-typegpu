@@ -167,11 +167,11 @@ contract and plan §8 P14 is the phase.
 
 ## The finding that scoped P14
 
-`crates/webgpu-gen/policy.toml` holds 14 `attribute-method`
-deviations, and each one gives "user-defined accessors are
-unavailable" as its reason. The generator copies that reason into
-`lib/webgpu.ts`, so a shipped artifact carries it 14 times. R37
-makes the reason false.
+`crates/webgpu-gen/policy.toml` held 14 `attribute-method`
+deviations, and each one gave "user-defined accessors are
+unavailable" as its reason. The generator copied that reason into
+`lib/webgpu.ts`, so a shipped artifact carried it 14 times. R37 made
+the reason false. P14 closed it.
 
 The members are `GPUDevice.queue`, `GPUBuffer.size`, `usage`, and
 `mapState`, `GPUTexture.width`, `height`, `depthOrArrayLayers`,
@@ -208,3 +208,84 @@ property at each use.
 today. It returns a new owned wrapper per call, and every windowed
 example binds it with `using`. J14 keeps it a method for that
 reason.
+
+## P14 — the API layer's attributes (2026-08-25)
+
+The 14 rows moved from `[[api.deviations]]` to `[[api.generate]]`
+with the pattern `attribute-accessor`. The generator emits
+`get name(): T { ... }` for them and rejects the retired pattern
+name. The API accounting moved from 526 generated and 116 deviations
+to 540 and 102, which is the same 14 members.
+
+157 authored sites became property reads. 33 `queue()` calls stayed,
+every one of them on a `GPUHostOwnedDevice` receiver, because that
+class returns a new owned wrapper per call.
+
+The phase closed the recorded defect and found two more of its kind.
+Three examples bound an owned device's cached queue with `using`:
+`matrix-next`, `dispatch`, and `matrix-multiplication`. The record
+above named the first two.
+
+## Phase review of P14 (2026-08-25)
+
+CRITICAL 1, MAJOR 2, MINOR 5.
+
+The CRITICAL is the same defect class again, in the library rather
+than in an example. `createComputePipeline` gave the owned device's
+cached queue to `ComputePipeline`, and `dispose()` released it. A
+guarded pipeline therefore released the device's queue, and
+`GPUQueue.dispose()` guards on a flag, so no test saw it. The defect
+predates P14: `lib/typegpu.ts` line 1593 read `device.queue()` at
+`3595a74` and at `a753747`, which is the same cached wrapper. P14
+changed the spelling and the review found the ownership. PI15 Rev 2
+makes the ownership explicit.
+
+The first MAJOR is 19 more rows with the same false cause. Their
+wording differs, so the P14 grep missed them: the `label-method`
+rows say "user-defined accessors and a facade label getter are
+unavailable". The true cause survives in the second half. The facade
+exposes no label getter, and R37 rejects a write accessor with no
+read accessor beside it, so no accessor pair is possible. J14's last
+paragraph states it.
+
+The second MAJOR was this record, which held no P14 evidence.
+
+Of the five MINOR findings, two were wrong sentences in J14, one was
+an elidable coverage read in `a02-textures`, and two were a missing
+red fixture and a stale doc comment for the new rejection.
+
+Lesson, one line: a false claim hides behind its own wording, so
+grep the claim's cause, not its sentence.
+
+## P14 close (2026-08-25)
+
+The review fixes landed. `ComputePipeline` records whether it owns
+its guard queue (PI15 Rev 2). The owned-device factory passes the
+device's cached queue and `false`. The host-owned factory passes the
+wrapper it created and `true`. `dispose()` releases the queue only
+when it owns it.
+
+The red is real, and it needed a test facade. A script cannot read
+`GPUQueue`'s private disposed flag, and `writeBuffer` does not check
+it, so the test facade rejects a write after a native queue release
+and counts the accepted writes. Before the fix the focused test
+failed:
+
+```text
+assertion `left == right` failed: queue write did not reach the live buffer: writes=0
+  left: "writes=0\n"
+ right: "writes=1\n"
+```
+
+The 19 `label-method` reasons now name the missing facade getter and
+the R37 accessor-pair rule. `grep -c "user-defined accessors"`
+reports 0 in `policy.toml` and in `lib/webgpu.ts`.
+`a02-textures` binds every covered read, and its golden is
+unchanged. The `attribute-accessor` rejection gained a red fixture.
+
+Close evidence: `tools/gate.sh --require-backend` green, 258 passed,
+1 ignored, 144 s. The count grew by the two new tests. Every
+`programs/*.wgsl` and `programs/*.expected` file stayed
+byte-identical. `tools/live.sh` on Metal (yawgpu) green, 89.70 s.
+Window smokes with `--frames 30`: `triangle`, `square`, `boids`, and
+`fluid-with-atomics` each printed `window:frames=30` and exited 0.

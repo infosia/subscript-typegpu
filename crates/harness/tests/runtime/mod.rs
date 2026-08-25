@@ -1,4 +1,93 @@
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+
+use subscript_typegpu_harness::native::{
+    SubscriptTypegpuBindGroupLayout, SubscriptTypegpuBindGroupLayoutDescriptor,
+    SubscriptTypegpuBuffer, SubscriptTypegpuBufferDescriptor, SubscriptTypegpuComputePipeline,
+    SubscriptTypegpuComputePipelineDescriptor, SubscriptTypegpuDevice, SubscriptTypegpuInstance,
+    SubscriptTypegpuPipelineLayout, SubscriptTypegpuPipelineLayoutDescriptor,
+    SubscriptTypegpuQueue, SubscriptTypegpuShaderModule, SubscriptTypegpuShaderModuleDescriptor,
+};
+
+static TEST_QUEUE_RELEASED: AtomicBool = AtomicBool::new(false);
+static TEST_QUEUE_WRITES: AtomicU32 = AtomicU32::new(0);
+
+extern "C" fn test_instance() -> SubscriptTypegpuInstance {
+    1_usize as SubscriptTypegpuInstance
+}
+
+extern "C" fn test_device() -> SubscriptTypegpuDevice {
+    2_usize as SubscriptTypegpuDevice
+}
+
+extern "C" fn test_queue_writes() -> u32 {
+    TEST_QUEUE_WRITES.load(Ordering::SeqCst)
+}
+
+extern "C" fn test_device_get_queue(_: SubscriptTypegpuDevice) -> SubscriptTypegpuQueue {
+    3_usize as SubscriptTypegpuQueue
+}
+
+extern "C" fn test_device_create_buffer(
+    _: SubscriptTypegpuDevice,
+    _: *const SubscriptTypegpuBufferDescriptor,
+) -> SubscriptTypegpuBuffer {
+    4_usize as SubscriptTypegpuBuffer
+}
+
+extern "C" fn test_device_create_bind_group_layout(
+    _: SubscriptTypegpuDevice,
+    _: *const SubscriptTypegpuBindGroupLayoutDescriptor,
+) -> SubscriptTypegpuBindGroupLayout {
+    5_usize as SubscriptTypegpuBindGroupLayout
+}
+
+extern "C" fn test_device_create_pipeline_layout(
+    _: SubscriptTypegpuDevice,
+    _: *const SubscriptTypegpuPipelineLayoutDescriptor,
+) -> SubscriptTypegpuPipelineLayout {
+    6_usize as SubscriptTypegpuPipelineLayout
+}
+
+extern "C" fn test_device_create_shader_module(
+    _: SubscriptTypegpuDevice,
+    _: *const SubscriptTypegpuShaderModuleDescriptor,
+) -> SubscriptTypegpuShaderModule {
+    7_usize as SubscriptTypegpuShaderModule
+}
+
+extern "C" fn test_device_create_compute_pipeline(
+    _: SubscriptTypegpuDevice,
+    _: *const SubscriptTypegpuComputePipelineDescriptor,
+) -> SubscriptTypegpuComputePipeline {
+    8_usize as SubscriptTypegpuComputePipeline
+}
+
+extern "C" fn test_queue_write_buffer(
+    _: SubscriptTypegpuQueue,
+    _: SubscriptTypegpuBuffer,
+    _: u64,
+    _: usize,
+    _: *const u8,
+) {
+    if !TEST_QUEUE_RELEASED.load(Ordering::SeqCst) {
+        TEST_QUEUE_WRITES.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+extern "C" fn test_queue_release(_: SubscriptTypegpuQueue) {
+    TEST_QUEUE_RELEASED.store(true, Ordering::SeqCst);
+}
+
+extern "C" fn test_buffer_release(_: SubscriptTypegpuBuffer) {}
+
+extern "C" fn test_bind_group_layout_release(_: SubscriptTypegpuBindGroupLayout) {}
+
+extern "C" fn test_pipeline_layout_release(_: SubscriptTypegpuPipelineLayout) {}
+
+extern "C" fn test_shader_module_release(_: SubscriptTypegpuShaderModule) {}
+
+extern "C" fn test_compute_pipeline_release(_: SubscriptTypegpuComputePipeline) {}
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -6,6 +95,144 @@ fn root() -> PathBuf {
         .nth(2)
         .expect("harness crate is below repository root")
         .to_path_buf()
+}
+
+fn replace_symbol(symbols: &mut [(String, *const u8)], name: &str, address: *const u8) {
+    let (_, current) = symbols
+        .iter_mut()
+        .find(|(candidate, _)| candidate == name)
+        .unwrap_or_else(|| panic!("facade symbol table lacks {name}"));
+    *current = address;
+}
+
+#[test]
+fn owned_device_queue_survives_guarded_pipeline_disposal() {
+    TEST_QUEUE_RELEASED.store(false, Ordering::SeqCst);
+    TEST_QUEUE_WRITES.store(0, Ordering::SeqCst);
+    let directory = std::env::temp_dir().join(format!(
+        "subscript-typegpu-queue-ownership-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&directory).expect("create queue ownership test directory");
+    let program = directory.join("queue-ownership.ts");
+    let source = r#"
+import { BindGroupLayoutSpec, createComputePipeline } from "./typegpu";
+import { GPUBufferUsage, GPUDevice, GPUShaderStage } from "./webgpu";
+export function main(): void {
+  const device = new GPUDevice(test_instance(), test_device());
+  const target = device.createBuffer({ size: 4, usage: GPUBufferUsage.COPY_DST });
+  const guardLayout: BindGroupLayoutSpec = {
+    entries: [{ binding: 0, visibility: GPUShaderStage.COMPUTE, kind: "guard", minBindingSize: 16 }],
+  };
+  const pipeline = createComputePipeline(
+    device,
+    "@compute @workgroup_size(1) fn main() {}",
+    "main",
+    [guardLayout],
+    [1, 1, 1],
+  );
+  pipeline.dispose();
+  device.queue.writeBuffer(target, 0, [1, 0, 0, 0]);
+  print(`writes=${test_queue_writes()}`);
+}
+"#;
+    std::fs::write(&program, "export function main(): void {}\n")
+        .expect("write queue ownership test placeholder");
+    let mut files =
+        subscript_typegpu_harness::program_files(&program).expect("load queue ownership program");
+    files
+        .last_mut()
+        .expect("queue ownership program file")
+        .source = source.to_owned();
+    files.push(subscript_compiler::SourceFile::ambient(
+        "queue-ownership.d.ts",
+        "// @subscript-c-header include=\"queue-ownership.h\"\n\
+         declare function test_instance(): SubscriptTypegpuInstance;\n\
+         declare function test_device(): SubscriptTypegpuDevice;\n\
+         declare function test_queue_writes(): u32;\n",
+    ));
+    let mut symbols = subscript_typegpu_harness::native_symbols_generated::facade_symbols();
+    for (name, address) in [
+        (
+            "subscript_typegpu_create_instance",
+            test_instance as *const u8,
+        ),
+        (
+            "subscript_typegpu_device_get_queue",
+            test_device_get_queue as *const u8,
+        ),
+        (
+            "subscript_typegpu_device_create_buffer",
+            test_device_create_buffer as *const u8,
+        ),
+        (
+            "subscript_typegpu_device_create_bind_group_layout",
+            test_device_create_bind_group_layout as *const u8,
+        ),
+        (
+            "subscript_typegpu_device_create_pipeline_layout",
+            test_device_create_pipeline_layout as *const u8,
+        ),
+        (
+            "subscript_typegpu_device_create_shader_module",
+            test_device_create_shader_module as *const u8,
+        ),
+        (
+            "subscript_typegpu_device_create_compute_pipeline",
+            test_device_create_compute_pipeline as *const u8,
+        ),
+        (
+            "subscript_typegpu_queue_write_buffer",
+            test_queue_write_buffer as *const u8,
+        ),
+        (
+            "subscript_typegpu_queue_release",
+            test_queue_release as *const u8,
+        ),
+        (
+            "subscript_typegpu_buffer_release",
+            test_buffer_release as *const u8,
+        ),
+        (
+            "subscript_typegpu_bind_group_layout_release",
+            test_bind_group_layout_release as *const u8,
+        ),
+        (
+            "subscript_typegpu_pipeline_layout_release",
+            test_pipeline_layout_release as *const u8,
+        ),
+        (
+            "subscript_typegpu_shader_module_release",
+            test_shader_module_release as *const u8,
+        ),
+        (
+            "subscript_typegpu_compute_pipeline_release",
+            test_compute_pipeline_release as *const u8,
+        ),
+    ] {
+        replace_symbol(&mut symbols, name, address);
+    }
+    symbols.extend([
+        ("test_instance".to_owned(), test_instance as *const u8),
+        ("test_device".to_owned(), test_device as *const u8),
+        (
+            "test_queue_writes".to_owned(),
+            test_queue_writes as *const u8,
+        ),
+    ]);
+    // SAFETY: each function has static lifetime and matches its ambient C signature.
+    let library = unsafe { subscript_codegen::NativeLibrary::new(Vec::new(), Vec::new(), symbols) };
+    let mut session =
+        subscript_codegen::ReloadSession::new_with_native_libraries(&files, &[library])
+            .expect("compile queue ownership program");
+    session.call_main().expect("run queue ownership program");
+    let output = String::from_utf8(session.take_output()).expect("UTF-8 queue ownership output");
+    std::fs::remove_file(&program).expect("remove queue ownership test program");
+    std::fs::remove_dir(&directory).expect("remove queue ownership test directory");
+    assert_eq!(
+        output, "writes=1\n",
+        "queue write did not reach the live buffer: {output}"
+    );
 }
 
 #[test]

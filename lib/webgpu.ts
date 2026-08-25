@@ -5,11 +5,11 @@
 // API policy deviations:
 // - *.dispose: J7 replaces JavaScript garbage-collection lifetime with explicit dispose()
 // - gpu: the exported gpu constant replaces navigator.gpu because the DOM surface is excluded
-// - GPUShaderModule.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
+// - GPUShaderModule.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
 // - GPUComputePipeline.getBindGroupLayout: the facade names the WebIDL index parameter groupIndex. The generated API keeps the IDL name and joins it explicitly
-// - GPUComputePipeline.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
+// - GPUComputePipeline.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
 // - GPURenderPipeline.getBindGroupLayout: the facade names the WebIDL index parameter groupIndex. The generated API keeps the IDL name and joins it explicitly
-// - GPURenderPipeline.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
+// - GPURenderPipeline.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
 // - GPUProgrammableStage.entryPoint: JavaScript can omit entryPoint when exactly one matching shader entry can be inferred, while this API requires the entry-point name explicitly
 // - GPUProgrammableStage.constants: WebIDL's map literal { constants: { gain: 2.0 } } is not expressible, so JavaScript users must supply an entry array { constants: [{ key: "gain", value: 2.0 }] }. Unlike a record, the array can contain duplicate keys, so duplicates become backend validation errors instead of an unrepresentable state
 // - GPUComputePipelineDescriptor.layout: IDL requires a layout handle or the string "auto". This API makes layout optional and replaces "auto" with null, so omission/null selects automatic layout *(docs)* and an accidentally omitted layout produces a pipeline whose bind groups cannot be shared through an explicit GPUPipelineLayout
@@ -28,10 +28,6 @@
 // - GPUAdapter.requestDevice: GPUDeviceDescriptor is lowered through the facade's WithDescriptor route and requiredFeatures entries are passed without filtering, so an unsupported feature fails the request rather than being dropped. JavaScript rejects requestDevice with a DOMException on failure, while this API resolves null without an error reason or message
 // - GPUDeviceDescriptor.requiredLimits: WebIDL accepts an open record<DOMString, GPUSize64>, while this API uses a fixed-key GPURequiredLimits descriptor for the 32 fields exposed by the facade (29 u32 and 3 u64), so arbitrary keys, the four compatibility-only limits, and values above u32 for narrowed fields are unavailable. Public zero is reserved for omission and cannot request a real zero-valued limit, lowering u32 omission to WGPU_LIMIT_U32_UNDEFINED and leaving the three u64 fields for the facade's F13 zero-to-undefined rule
 // - GPUDevice.@constructor: JavaScript exposes no GPUDevice constructor. Static methods are unavailable, so this API keeps a public owning constructor that accepts private raw-handle fields, acquires and caches one queue reference through subscript_typegpu_device_get_queue, and is paired with hostOwnedGPUDevice, whose GPUHostOwnedDevice wraps a host-owned device, exposes the same creation methods but neither dispose nor destroy, and returns a new owned queue wrapper from each queue call
-// - GPUDevice.queue: user-defined accessors are unavailable, so the IDL attribute is a cached zero-argument method
-// - GPUBuffer.size: user-defined accessors are unavailable, so the IDL attribute is a zero-argument method
-// - GPUBuffer.usage: user-defined accessors are unavailable, so the IDL attribute is a zero-argument method
-// - GPUBuffer.mapState: user-defined accessors are unavailable, so the IDL string-enum attribute is a zero-argument method with generated reverse lowering
 // - GPUBuffer.mapAsync: the facade accepts explicit offset and size values and exposes mapping completion as Promise<boolean> while encapsulating future polling
 // - GPUBuffer.getMappedRange: ArrayBuffer and raw pointers are unavailable, so readMappedRange(offset, size) and writeMappedRange(offset, data) require explicit ranges. Failed reads return an empty u8[] indistinguishable from zero-size success
 // - GPUBuffer.readMappedRangeF32: the IDL spells this element type as Float32Array inside BufferSource, and subscript has no typed-array view. Offset counts bytes and count counts elements
@@ -50,29 +46,21 @@
 // - GPUDevice.lost: JavaScript exposes a once-resolving device.lost promise attribute that can be awaited at setup. Without promise attributes this API provides non-consuming deviceLostInfo(), so callers must poll at chosen points and can read the same record repeatedly. Each call pumps the instance event loop and can complete unrelated futures
 // - GPUDevice.popErrorScope: JavaScript rejects a failed pop and resolves a GPUError subclass or null. This API polls the F6 delivery separately, then converts a captured fill to flattened GPUError, so delivery-status failure, fill-take failure, and a successful NoError fill all resolve null and carry no rejection detail
 // - GPUDevice.onuncapturederror: JavaScript handler registration becomes consuming nextUncapturedError() over the F11 FIFO. Callers lose EventTarget delivery and preventDefault, errors are observed only when the program drains, and unlike deviceLostInfo() the drain does not pump the instance event loop
-// - GPUDevice.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
-// - GPUBuffer.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
+// - GPUDevice.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
+// - GPUBuffer.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
 // - GPUQueue.submit: the public method keeps IDL's commandBuffers name while explicitly joining the facade's R11-collapsed commands handle array. The array shape is unchanged
 // - GPUQueue.writeTexture: the facade reorders the IDL byte source after its three lowered copy dictionaries and accepts u8[] instead of AllowSharedBufferSource
-// - GPUQueue.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
-// - GPUTexture.width: user-defined accessors are unavailable, so the IDL attribute is a zero-argument method
-// - GPUTexture.height: user-defined accessors are unavailable, so the IDL attribute is a zero-argument method
-// - GPUTexture.depthOrArrayLayers: user-defined accessors are unavailable, so the IDL attribute is a zero-argument method
-// - GPUTexture.mipLevelCount: user-defined accessors are unavailable, so the IDL attribute is a zero-argument method
-// - GPUTexture.sampleCount: user-defined accessors are unavailable, so the IDL attribute is a zero-argument method
-// - GPUTexture.dimension: user-defined accessors are unavailable, so the IDL string-enum attribute is a zero-argument method with generated reverse lowering
-// - GPUTexture.format: user-defined accessors are unavailable, so the IDL string-enum attribute is a zero-argument method with generated reverse lowering
-// - GPUTexture.usage: user-defined accessors are unavailable, so the IDL attribute is a zero-argument method
-// - GPUTexture.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
-// - GPUTextureView.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
-// - GPUSampler.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
+// - GPUQueue.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
+// - GPUTexture.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
+// - GPUTextureView.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
+// - GPUSampler.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
 // - GPUTextureViewDescriptor.mipLevelCount: WebIDL permits omission, while this API requires an explicit mipLevelCount instead of exposing the facade's undefined-count sentinel as a descriptor default, so callers lose backend-derived remaining-level selection
 // - GPUTextureViewDescriptor.arrayLayerCount: WebIDL permits omission, while this API requires an explicit arrayLayerCount instead of exposing the facade's undefined-count sentinel as a descriptor default, so callers lose backend-derived remaining-layer selection
 // - GPUTexelCopyBufferLayout.bytesPerRow: WebIDL permits omission, while this API requires an explicit bytesPerRow instead of exposing the facade's undefined-stride sentinel as a descriptor default, so callers lose the omission form where WebGPU permits inferred layout
 // - GPUTexelCopyBufferLayout.rowsPerImage: WebIDL permits omission, while this API requires an explicit rowsPerImage instead of exposing the facade's undefined-stride sentinel as a descriptor default, so callers lose the omission form where WebGPU permits inferred layout
-// - GPUBindGroupLayout.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
-// - GPUBindGroup.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
-// - GPUPipelineLayout.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
+// - GPUBindGroupLayout.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
+// - GPUBindGroup.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
+// - GPUPipelineLayout.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
 // - GPUBindGroupLayoutEntry.binding: the facade's bindingArraySize field is fixed to zero because JavaScript bind-group-layout entries have no binding-array member in the selected IDL
 // - GPUBindGroupLayoutEntry.buffer: the optional JavaScript buffer layout becomes GPUBufferBindingLayout | null. Null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error
 // - GPUBindGroupLayoutEntry.sampler: the optional JavaScript sampler layout becomes GPUSamplerBindingLayout | null. Null is lowered to the facade BindingNotUsed sentinel, while setting more than one layout kind remains a backend validation error rather than a type error
@@ -103,23 +91,21 @@
 // - GPUCommandEncoder.beginComputePass: JavaScript omits the empty compute-pass descriptor. This API keeps a typed beginComputePass(descriptor) and provides beginComputePassDefault() for omission
 // - GPUCommandEncoder.clearBuffer: JavaScript can omit offset and size to clear the rest of the buffer. The facade exposes no whole-size sentinel, so this API requires both an explicit offset and an explicit size
 // - GPUCommandEncoder.finish: JavaScript omits the empty command-buffer descriptor. This API keeps finish(descriptor) and provides finishDefault() for omission
-// - GPUCommandEncoder.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
+// - GPUCommandEncoder.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
 // - GPUComputePassEncoder.setBindGroup: this API keeps setBindGroup(index, bindGroup, dynamicOffsets = []) and drops the Uint32Array subrange overload with dynamicOffsetsDataStart/dynamicOffsetsDataLength. Callers lose zero-copy subrange selection
-// - GPUComputePassEncoder.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
+// - GPUComputePassEncoder.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
 // - GPURenderPassEncoder.setBindGroup: this API keeps setBindGroup(index, bindGroup, dynamicOffsets = []) and drops the Uint32Array subrange overload with dynamicOffsetsDataStart/dynamicOffsetsDataLength. Callers lose zero-copy subrange selection
 // - GPURenderPassEncoder.setIndexBuffer: JavaScript can omit offset and size to bind the rest of the index buffer. The facade exposes no whole-size sentinel, so this API requires both, while retaining the IDL indexFormat name
 // - GPURenderPassEncoder.setVertexBuffer: JavaScript can omit offset and size to bind the rest of the vertex buffer. The facade exposes no whole-size sentinel, so this API requires both. A null buffer still unbinds the slot
-// - GPURenderPassEncoder.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
-// - GPUCommandBuffer.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
+// - GPURenderPassEncoder.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
+// - GPUCommandBuffer.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
 // - GPURenderBundleEncoder.finish: JavaScript omits the empty render-bundle descriptor. This API keeps finish(descriptor) and provides finishDefault() for omission
 // - GPURenderBundleEncoder.setBindGroup: this API keeps setBindGroup(index, bindGroup, dynamicOffsets = []) and drops the Uint32Array subrange overload with dynamicOffsetsDataStart/dynamicOffsetsDataLength. Callers lose zero-copy subrange selection
 // - GPURenderBundleEncoder.setIndexBuffer: JavaScript can omit offset and size to bind the rest of the index buffer. The facade exposes no whole-size sentinel, so this API requires both, while retaining the IDL indexFormat name
 // - GPURenderBundleEncoder.setVertexBuffer: JavaScript can omit offset and size to bind the rest of the vertex buffer. The facade exposes no whole-size sentinel, so this API requires both. A null buffer still unbinds the slot
-// - GPURenderBundleEncoder.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
-// - GPURenderBundle.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
-// - GPUQuerySet.type: user-defined accessors are unavailable, so the IDL type attribute is a zero-argument method
-// - GPUQuerySet.count: user-defined accessors are unavailable, so the IDL count attribute is a zero-argument method
-// - GPUQuerySet.label: the readable/writable JavaScript label becomes a write-only label(value) method because user-defined accessors and a facade label getter are unavailable
+// - GPURenderBundleEncoder.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
+// - GPURenderBundle.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
+// - GPUQuerySet.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
 // - GPUError.message: GPUValidationError, GPUOutOfMemoryError, and GPUInternalError are flattened into GPUError(type, message). Callers retain a string type but lose subclass constructors and err instanceof GPUValidationError-style checks
 // - GPUBufferUsage: static fields and user-defined namespaces are unavailable, so WebIDL namespaces become numeric singleton objects
 // - GPUMapMode: static fields and user-defined namespaces are unavailable, so WebIDL namespaces become numeric singleton objects
@@ -2101,7 +2087,7 @@ export class GPUDevice {
     return fromSubscriptTypegpuAdapterInfo(record);
   }
 
-  queue(): GPUQueue {
+  get queue(): GPUQueue {
     return this.queueValue;
   }
 
@@ -2432,15 +2418,15 @@ export class GPUBuffer {
     this.buffer = buffer;
   }
 
-  size(): u64 {
+  get size(): u64 {
     return subscript_typegpu_buffer_get_size(this.buffer);
   }
 
-  usage(): u64 {
+  get usage(): u64 {
     return subscript_typegpu_buffer_get_usage(this.buffer);
   }
 
-  mapState(): GPUBufferMapState {
+  get mapState(): GPUBufferMapState {
     return subscript_typegpu_buffer_get_map_state(this.buffer);
   }
 
@@ -2582,35 +2568,35 @@ export class GPUTexture {
     subscript_typegpu_texture_destroy(this.texture);
   }
 
-  width(): u32 {
+  get width(): u32 {
     return subscript_typegpu_texture_get_width(this.texture);
   }
 
-  height(): u32 {
+  get height(): u32 {
     return subscript_typegpu_texture_get_height(this.texture);
   }
 
-  depthOrArrayLayers(): u32 {
+  get depthOrArrayLayers(): u32 {
     return subscript_typegpu_texture_get_depth_or_array_layers(this.texture);
   }
 
-  mipLevelCount(): u32 {
+  get mipLevelCount(): u32 {
     return subscript_typegpu_texture_get_mip_level_count(this.texture);
   }
 
-  sampleCount(): u32 {
+  get sampleCount(): u32 {
     return subscript_typegpu_texture_get_sample_count(this.texture);
   }
 
-  dimension(): GPUTextureDimension {
+  get dimension(): GPUTextureDimension {
     return subscript_typegpu_texture_get_dimension(this.texture);
   }
 
-  format(): GPUTextureFormat {
+  get format(): GPUTextureFormat {
     return subscript_typegpu_texture_get_format(this.texture);
   }
 
-  usage(): u64 {
+  get usage(): u64 {
     return subscript_typegpu_texture_get_usage(this.texture);
   }
 
@@ -3151,11 +3137,11 @@ export class GPUQuerySet {
     subscript_typegpu_query_set_destroy(this.querySet);
   }
 
-  type(): GPUQueryType {
+  get type(): GPUQueryType {
     return subscript_typegpu_query_set_get_type(this.querySet);
   }
 
-  count(): u32 {
+  get count(): u32 {
     return subscript_typegpu_query_set_get_count(this.querySet);
   }
 

@@ -89,7 +89,7 @@ own offsets:
 ```ts program=programs/b22-first-program.ts
     const initialState = new State(0, 10);
     stateBuffer.write(
-      device.queue(),
+      device.queue,
       0,
       Context.bytesOf<State>(initialState),
     );
@@ -135,7 +135,7 @@ dispatch adds invocations without any other change.
     using firstEncoder = device.createCommandEncoderDefault();
     pipeline.dispatch(firstEncoder, [bindGroup], 1, 1, 1);
     using firstCommand = firstEncoder.finishDefault();
-    device.queue().submit([firstCommand]);
+    device.queue.submit([firstCommand]);
 ```
 
 TypeGPU compiles the pipeline lazily on the first
@@ -151,7 +151,7 @@ typed value.
 
 ```ts program=programs/b22-first-program.ts
     stateBuffer.patch(
-      device.queue(),
+      device.queue,
       0,
       State_OFFSET_incrementBy,
       Context.bytesOf<FixedArray<u32, 1>>([25]),
@@ -160,7 +160,7 @@ typed value.
     using secondEncoder = device.createCommandEncoderDefault();
     pipeline.dispatch(secondEncoder, [bindGroup], 1, 1, 1);
     using secondCommand = secondEncoder.finishDefault();
-    device.queue().submit([secondCommand]);
+    device.queue.submit([secondCommand]);
 
     const readbackBytes: u8[] = await stateBuffer.readOne(device, 0);
     const readback: State = Context.fromBytes<State>(readbackBytes, 0);

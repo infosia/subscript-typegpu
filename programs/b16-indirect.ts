@@ -147,22 +147,22 @@ export async function main(): Promise<void> {
     const dispatchOffset: u64 = 0;
     const drawOffset: u64 = 12;
     const drawIndexedOffset: u64 = 28;
-    device.queue().writeBuffer(
+    device.queue.writeBuffer(
       indirect,
       dispatchOffset,
       Context.bytesOf<DispatchIndirectArgs>(new DispatchIndirectArgs(1, 1, 1)),
     );
-    device.queue().writeBuffer(
+    device.queue.writeBuffer(
       indirect,
       drawOffset,
       Context.bytesOf<DrawIndirectArgs>(new DrawIndirectArgs(3, 1, 0, 0)),
     );
-    device.queue().writeBuffer(
+    device.queue.writeBuffer(
       indirect,
       drawIndexedOffset,
       Context.bytesOf<DrawIndexedIndirectArgs>(new DrawIndexedIndirectArgs(3, 1, 0, 0, 0)),
     );
-    device.queue().writeBuffer(
+    device.queue.writeBuffer(
       vertices,
       0,
       Context.bytesOf<FixedArray<Vertex, 3>>([
@@ -171,7 +171,7 @@ export async function main(): Promise<void> {
         new Vertex(new Vec2f(0.0, 0.5)),
       ]),
     );
-    device.queue().writeBuffer(
+    device.queue.writeBuffer(
       indices,
       0,
       Context.bytesOf<FixedArray<u16, 4>>([0, 1, 2, 0]),
@@ -232,7 +232,7 @@ export async function main(): Promise<void> {
     pass.drawIndexedIndirect(indirect, drawIndexedOffset);
     pass.end();
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     const host = new IndirectLayout();
     host.output = new MutStorage<u32>([0]);
     simulateCompute<IndirectLayout>(

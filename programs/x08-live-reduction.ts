@@ -124,7 +124,7 @@ export async function main(): Promise<void> {
       GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
       "x08-readback",
     );
-    const queue = device.queue();
+    const queue = device.queue;
     input.write(queue, 0, inputBytes);
     output.writeOne(
       queue,

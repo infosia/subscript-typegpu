@@ -30,7 +30,7 @@ export async function main(): Promise<void> {
     device.limits();
     device.adapterInfo();
     device.label("a04-device");
-    device.queue().label("a04-queue");
+    device.queue.label("a04-queue");
     print("feature:checked");
 
     device.pushErrorScope("validation");

@@ -177,7 +177,7 @@ export async function main(): Promise<void> {
       "x18-vertices",
     );
     vertices.write(
-      device.queue(),
+      device.queue,
       0,
       Context.bytesOf<FixedArray<Vertex, 3>>([
         new Vertex(a),
@@ -230,7 +230,7 @@ export async function main(): Promise<void> {
       return;
     }
     indices.write(
-      device.queue(),
+      device.queue,
       0,
       Context.bytesOf<FixedArray<u16, 4>>([0, 1, 2, 0]),
     );
@@ -254,13 +254,13 @@ export async function main(): Promise<void> {
       { width: 8, height: 8 },
     );
     using command1 = encoder1.finishDefault();
-    device.queue().submit([command1]);
-    if (!await device.queue().onSubmittedWorkDone()) {
+    device.queue.submit([command1]);
+    if (!await device.queue.onSubmittedWorkDone()) {
       print("FAIL first submit");
       return;
     }
     indices.write(
-      device.queue(),
+      device.queue,
       0,
       Context.bytesOf<FixedArray<u16, 4>>([0, 2, 1, 0]),
     );
@@ -293,8 +293,8 @@ export async function main(): Promise<void> {
       { width: 8, height: 8 },
     );
     using command2 = encoder2.finishDefault();
-    device.queue().submit([command2]);
-    if (!await device.queue().onSubmittedWorkDone()) {
+    device.queue.submit([command2]);
+    if (!await device.queue.onSubmittedWorkDone()) {
       print("FAIL second submit");
       return;
     }

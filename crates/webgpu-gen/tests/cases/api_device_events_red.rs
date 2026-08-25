@@ -386,12 +386,12 @@ fn device_lost_poll_requires_the_exact_fill_record() {
 fn result_record_attributes_require_the_claiming_pattern() {
     let policy = policy().replace(
         "member = \"GPUDeviceLostInfo.message\"\npattern = \"result-record-field\"",
-        "member = \"GPUDeviceLostInfo.message\"\npattern = \"attribute-method\"",
+        "member = \"GPUDeviceLostInfo.message\"\npattern = \"attribute-accessor\"",
     );
     red(
         &document(),
         &mirror(),
         &policy,
-        "api policy error (invalid): `GPUDeviceLostInfo.message`: pattern `attribute-method` does not match the IDL member kind",
+        "api policy error (invalid): `GPUDeviceLostInfo.message`: result-record attributes require the result-record-field pattern",
     );
 }

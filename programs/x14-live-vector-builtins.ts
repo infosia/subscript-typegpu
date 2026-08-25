@@ -475,8 +475,8 @@ export async function main(): Promise<void> {
     using input: Buffer<VectorInput> = createBuffer<VectorInput>(device, VectorInput_STRIDE, 1, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST, "x14-input");
     using output: Buffer<VectorOutput> = createBuffer<VectorOutput>(device, VectorOutput_STRIDE, 1, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC, "x14-output");
     const source = inputValue();
-    input.writeOne(device.queue(), 0, Context.bytesOf<VectorInput>(source));
-    output.writeOne(device.queue(), 0, Context.bytesOf<VectorOutput>(new VectorOutput()));
+    input.writeOne(device.queue, 0, Context.bytesOf<VectorInput>(source));
+    output.writeOne(device.queue, 0, Context.bytesOf<VectorOutput>(new VectorOutput()));
     device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device, vectorBuiltins_WGSL, vectorBuiltins_ENTRY, [vectorBuiltins_LAYOUT0],
@@ -492,7 +492,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatchThreads(encoder, [bindGroup], 1, 1, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     const gpuBytes: u8[] = await output.read(device, 0, 1);
     const gpuOutput: VectorOutput = Context.fromBytes<VectorOutput>(gpuBytes, 0);
     const hostLayout = new VectorLayout();

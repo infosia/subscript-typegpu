@@ -202,11 +202,10 @@ export async function main(): Promise<void> {
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
       "matrix-next-tiled",
     );
-    using queue = device.queue();
-    left.writeOne(queue, 0, Context.bytesOf<Matrix>(leftValue));
-    right.writeOne(queue, 0, Context.bytesOf<Matrix>(rightValue));
-    naiveOutput.writeOne(queue, 0, Context.bytesOf<Matrix>(zeroMatrix()));
-    tiledOutput.writeOne(queue, 0, Context.bytesOf<Matrix>(zeroMatrix()));
+    left.writeOne(device.queue, 0, Context.bytesOf<Matrix>(leftValue));
+    right.writeOne(device.queue, 0, Context.bytesOf<Matrix>(rightValue));
+    naiveOutput.writeOne(device.queue, 0, Context.bytesOf<Matrix>(zeroMatrix()));
+    tiledOutput.writeOne(device.queue, 0, Context.bytesOf<Matrix>(zeroMatrix()));
 
     device.pushErrorScope("validation");
     using naivePipeline = createComputePipeline(
@@ -253,7 +252,7 @@ export async function main(): Promise<void> {
       // TypeGPU's example computes its workgroup counts with `Math.ceil`.
       tiledPipeline.dispatchThreads(encoder, [tiledGroup], 4, 4, 1);
       using command = encoder.finishDefault();
-      queue.submit([command]);
+      device.queue.submit([command]);
 
       const host = new MatrixLayout();
       host.left = new Storage<Matrix>([leftValue]);

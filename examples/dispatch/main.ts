@@ -120,10 +120,9 @@ export async function main(): Promise<void> {
     using second = counterBuffer(device, "dispatch-2d");
     using third = counterBuffer(device, "dispatch-3d");
     const zero = new Counter(new AtomicU32(0));
-    using queue = device.queue();
-    first.writeOne(queue, 0, Context.bytesOf<Counter>(zero));
-    second.writeOne(queue, 0, Context.bytesOf<Counter>(zero));
-    third.writeOne(queue, 0, Context.bytesOf<Counter>(zero));
+    first.writeOne(device.queue, 0, Context.bytesOf<Counter>(zero));
+    second.writeOne(device.queue, 0, Context.bytesOf<Counter>(zero));
+    third.writeOne(device.queue, 0, Context.bytesOf<Counter>(zero));
 
     device.pushErrorScope("validation");
     using firstPipeline = createComputePipeline(
@@ -201,7 +200,7 @@ export async function main(): Promise<void> {
         DISPATCH_3D[2],
       );
       using command = encoder.finishDefault();
-      queue.submit([command]);
+      device.queue.submit([command]);
 
       const firstBytes: u8[] = await first.readOne(device, 0);
       const secondBytes: u8[] = await second.readOne(device, 0);

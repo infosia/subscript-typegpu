@@ -122,7 +122,7 @@ export async function main(): Promise<void> {
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     output.copyTo(encoder, readback, 0, count);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     print("dispatch:submitted");
     const mapped: boolean = await readback.handle().mapAsync(
       GPUMapMode.READ,

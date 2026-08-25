@@ -1444,7 +1444,7 @@ fn validate_pattern(
     let valid = match (&member.kind, pattern) {
         (IdlMemberKind::Operation { .. }, "operation") => true,
         (IdlMemberKind::Operation { .. }, "async-request") if deviation => true,
-        (IdlMemberKind::Attribute { .. }, "attribute-method") if deviation => true,
+        (IdlMemberKind::Attribute { .. }, "attribute-accessor") if !deviation => true,
         (IdlMemberKind::DictionaryField { .. }, "dictionary-field") if !deviation => true,
         (IdlMemberKind::DictionaryField { .. }, "dictionary-required") if deviation => true,
         (IdlMemberKind::DictionaryField { .. }, "dictionary-default") if deviation => true,
@@ -3888,7 +3888,7 @@ fn build_method(
             descriptors,
             enums,
         ),
-        "attribute-method" => build_attribute_method(mirror, policy, member, receiver, enums),
+        "attribute-accessor" => build_attribute_accessor(mirror, policy, member, receiver, enums),
         "operation" => build_operation_method(
             mirror,
             policy,
@@ -4596,7 +4596,7 @@ fn build_async_method(
     }
 }
 
-fn build_attribute_method(
+fn build_attribute_accessor(
     mirror: &MirrorModel,
     policy: &ApiSection,
     member: &IdlMember,
@@ -4606,7 +4606,7 @@ fn build_attribute_method(
     let IdlMemberKind::Attribute { ty } = &member.kind else {
         return Err(ApiPolicyError::Invalid {
             entry: member.key(),
-            message: "attribute-method requires an IDL attribute".to_owned(),
+            message: "attribute-accessor requires an IDL attribute".to_owned(),
         });
     };
     let getter = format!(
@@ -6163,8 +6163,14 @@ fn render_interface_class(
                 result_class,
                 enum_conversion,
             } => {
-                out.push_str(&format!("  {name}(): {return_type} {{\n"));
-                if host_owned && interface.name == "GPUDevice" && name == "queue" {
+                let host_owned_queue =
+                    host_owned && interface.name == "GPUDevice" && name == "queue";
+                if host_owned_queue {
+                    out.push_str(&format!("  {name}(): {return_type} {{\n"));
+                } else {
+                    out.push_str(&format!("  get {name}(): {return_type} {{\n"));
+                }
+                if host_owned_queue {
                     out.push_str(&format!(
                         "    return new GPUQueue(this.instance, {getter}(this.{}));\n",
                         interface.raw_field

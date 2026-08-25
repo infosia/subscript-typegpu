@@ -193,7 +193,7 @@ export async function main(): Promise<void> {
       GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
       "x22-vertices",
     );
-    vertices.write(device.queue(), 0, Context.bytesOf<FixedArray<Vertex, 6>>(values));
+    vertices.write(device.queue, 0, Context.bytesOf<FixedArray<Vertex, 6>>(values));
     using target = device.createTexture({
       label: "x22-target",
       size: { width: SIZE as u32, height: SIZE as u32 },
@@ -242,8 +242,8 @@ export async function main(): Promise<void> {
       { width: SIZE as u32, height: SIZE as u32, depthOrArrayLayers: 1 },
     );
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
-    if (!await device.queue().onSubmittedWorkDone()) {
+    device.queue.submit([command]);
+    if (!await device.queue.onSubmittedWorkDone()) {
       print("FAIL submit");
       return;
     }

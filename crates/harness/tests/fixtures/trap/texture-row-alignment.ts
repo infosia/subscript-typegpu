@@ -30,7 +30,7 @@ export async function main(): Promise<void> {
     usage: GPUTextureUsage.COPY_DST,
   });
   writeTextureBytes(
-    device.queue(),
+    device.queue,
     texture,
     [
       0, 0, 0, 255, 255, 255, 255, 255,

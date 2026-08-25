@@ -33,5 +33,5 @@ export async function main(): Promise<void> {
     GPUBufferUsage.COPY_DST,
     "trap-write-unaligned",
   );
-  buffer.write(device.queue(), 0, [0, 0, 1, 0, 2, 0]);
+  buffer.write(device.queue, 0, [0, 0, 1, 0, 2, 0]);
 }

@@ -115,7 +115,7 @@ export async function main(): Promise<void> {
     using encoder = device.createCommandEncoderDefault();
     pipeline.dispatch(encoder, [bindGroup], 1, 1, 1);
     using command = encoder.finishDefault();
-    device.queue().submit([command]);
+    device.queue.submit([command]);
     const bytes: u8[] = await output.read(device, 0, 1);
     const gpuValues: FixedArray<u32, 1> = Context.fromBytes<FixedArray<u32, 1>>(bytes, 0);
     const gpuValue: u32 = gpuValues[0];

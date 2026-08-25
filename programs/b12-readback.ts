@@ -56,7 +56,7 @@ export async function main(): Promise<void> {
       GPUBufferUsage.COPY_SRC + GPUBufferUsage.COPY_DST,
       "b12-readback",
     );
-    buffer.write(device.queue(), 0, Context.bytesOf<FixedArray<Particle, 4>>(particles));
+    buffer.write(device.queue, 0, Context.bytesOf<FixedArray<Particle, 4>>(particles));
     const bytes: u8[] = await buffer.read(device, 0, 4);
     const decoded: FixedArray<Particle, 4> = Context.fromBytes<FixedArray<Particle, 4>>(bytes, 0);
     let index: i32 = 0;
