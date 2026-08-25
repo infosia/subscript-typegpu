@@ -59,15 +59,21 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-24 | slime-mold symmetry fix | 48 s | 1 s | 222 s | 218 s | 7 |
 | 2026-08-24 | Emitter parenthesizes mixed logical chains | 49 s | 0 s | 216 s | 213 s | 7 |
 | 2026-08-24 | T18 bounded worker pool: differential 154.5 s → 43.2 s, coverage 112.3 s → 33.9 s, simulate 95.1 s → 26.6 s, c_layout 31.1 s → 10.5 s; full gate 214 s → 106 s | 49 s | 0 s | — | 106 s | 7 |
+| 2026-08-25 | Windows W5, the pixel-oracle fix (`24ca42e`), the tree at `bea7da5` | 49 s | 0 s | 112 s | 120 s | 7 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate
 paid for the first `target/ship-build`). Row 2 onward: the T12 Rev 1
-order. Rows 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22: the coding agent. Row 3: the planner. The
+order. Rows 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22: the coding agent. Rows 3 and 53: the planner. The
 cold build is genuine: `cargo clean` removes `target/`, no user-wide
 build cache exists, and the rebuilt `target/` is 1.5 GB. Every
 number is inside the plan §7 budget (480 s / 5 s / 240 s / 120 s /
 2 per crate).
+
+Row 53 measures 120 s for the program-change gate. That is the
+budget exactly. Row 52 measured 106 s. The tree gained one program
+between the two rows, `b22-first-program`. The differential suite
+runs every program, so the program count sets the gate time.
 
 ## Where the time goes (2026-08-24)
 

@@ -128,3 +128,21 @@ Metal (yawgpu) 66.09 s, Dawn 61.54 s.
 
 P11 slices 1–4 are complete. Deferred remains: depth, multisample,
 integer textures, texture arrays, 3D textures.
+
+## Correction to the slice 4 close (2026-08-25)
+
+The slice 4 close records `Live x01–x22 PASS: Metal (yawgpu) 66.09
+s, Dawn 61.54 s`. Both runs used macOS. The claim did not hold on
+every adapter. A Vulkan live run on an NVIDIA adapter failed
+`x20-live-strip` and `x22-live-blend`. Both programs carried a
+unorm tie in the pixel oracle. `specs/tracking/windows.md` W5 holds
+the defect, the rule change, and the fix.
+
+`24ca42e` changed both programs, so the times above measure a tree
+that no longer exists.
+
+Corrected claim, at `bea7da5` on the reference machine (Apple M2,
+macOS): `tools/live.sh` x01–x22 PASS on both tiers, Metal (yawgpu)
+65.81 s, Dawn 61.55 s. The gate is green at the same tree, 253
+passed and 1 ignored. `specs/tracking/build-time.md` row 53 holds
+the times.
