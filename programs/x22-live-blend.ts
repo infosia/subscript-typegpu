@@ -136,6 +136,15 @@ function unorm8(value: f32): u8 {
   return Math.floor((value * 255.0 + 0.5) as f64) as u8;
 }
 
+function quantized(value: Vec4f): Vec4f {
+  return new Vec4f(
+    (unorm8(value.x) as f32) / 255.0,
+    (unorm8(value.y) as f32) / 255.0,
+    (unorm8(value.z) as f32) / 255.0,
+    (unorm8(value.w) as f32) / 255.0,
+  );
+}
+
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
   if (adapterResult === null) {
@@ -167,8 +176,8 @@ export async function main(): Promise<void> {
       print("FAIL pixel center inside edge margin");
       return;
     }
-    const firstColor = new Vec4f(0.8, 0.2, 0.1, 0.4);
-    const secondColor = new Vec4f(0.1, 0.3, 0.9, 0.6);
+    const firstColor = new Vec4f(0.8, 0.2, 0.4, 0.4);
+    const secondColor = new Vec4f(0.2, 0.6, 0.8, 0.6);
     const values: FixedArray<Vertex, 6> = [
       new Vertex(firstA, firstColor),
       new Vertex(firstB, firstColor),
@@ -252,10 +261,10 @@ export async function main(): Promise<void> {
         const point: Vec2f = pixelCenter(x, y);
         let expected = new Vec4f(0.0, 0.0, 0.0, 0.0);
         if (insideTriangle(point, firstA, firstB, firstC)) {
-          expected = hostBlend(firstColor, expected, blendLive.blend);
+          expected = quantized(hostBlend(firstColor, expected, blendLive.blend));
         }
         if (insideTriangle(point, secondA, secondB, secondC)) {
-          expected = hostBlend(secondColor, expected, blendLive.blend);
+          expected = quantized(hostBlend(secondColor, expected, blendLive.blend));
         }
         const expectedR: u8 = unorm8(expected.x);
         const expectedG: u8 = unorm8(expected.y);

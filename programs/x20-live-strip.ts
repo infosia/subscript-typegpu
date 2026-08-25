@@ -58,7 +58,7 @@ function vertexStep(value: Vertex, ctx: VertexInvocation): Varyings {
 }
 
 function fragmentStep(value: Varyings, ctx: FragmentInvocation): Vec4f {
-  return new Vec4f(0.25, 0.5, 0.75, 1.0);
+  return new Vec4f(0.25, 0.6, 0.75, 1.0);
 }
 
 export const stripLive: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
@@ -248,14 +248,16 @@ export async function main(): Promise<void> {
       while (x < SIZE) {
         const covered: boolean = stripCovered(pixelCenter(x, y), positions);
         const expectedR: u8 = covered ? 64 : 0;
-        const expectedG: u8 = covered ? 128 : 0;
+        const expectedG: u8 = covered ? 153 : 0;
         const expectedB: u8 = covered ? 191 : 0;
         const offset: i32 = y * 256 + x * 4;
         if (pixels[offset] !== expectedR
           || pixels[offset + 1] !== expectedG
           || pixels[offset + 2] !== expectedB
           || pixels[offset + 3] !== 255) {
-          print(`FAIL x=${x} y=${y}`);
+          print(
+            `FAIL x=${x} y=${y} expected=${expectedR},${expectedG},${expectedB},255 got=${pixels[offset]},${pixels[offset + 1]},${pixels[offset + 2]},${pixels[offset + 3]}`,
+          );
           return;
         }
         x += 1;

@@ -13,5 +13,5 @@ fn vertexStep(value: Vertex) -> Varyings {
 
 @fragment
 fn fragmentStep(value: Varyings) -> @location(0u) vec4<f32> {
-  return vec4<f32>(0.25f, 0.5f, 0.75f, 1.0f);
+  return vec4<f32>(0.25f, 0.6f, 0.75f, 1.0f);
 }

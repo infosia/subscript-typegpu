@@ -120,19 +120,20 @@ does not say otherwise. Schemas are `schema.md`.
   layout constants by name, and the WGSL line count. Noop draws
   nothing, so no pixel is read.
 - **RN14 — Live programs compare pixels with a host rasterizer.**
-  Rev 1, 2026-08-24. `x05-live-triangle` draws one flat-colored
+  Rev 2, 2026-08-25. `x05-live-triangle` draws one flat-colored
   triangle into a 64×64 `rgba8unorm` target whose vertices put no
   pixel center on an edge, copies the texture to a buffer
   (`bytesPerRow` 256), maps, reads, and compares every pixel with
   the host's own point-in-triangle test at pixel centers: inside →
   the color, outside → the clear color. It prints `PASS` or `FAIL
   x=<n> y=<n> expected=<rgba> got=<rgba>`. No reference hash exists.
-  A fragment color constant in a pixel-oracle program must not
-  produce an exact `.5` product with 255. The float-to-unorm
-  rounding of a tie is implementation-defined: for `0.5`, NVIDIA
-  (Vulkan and D3D12) returns 127 and Apple (Metal) returns 128
-  (measured 2026-08-24, `x17-live-indirect` pixel 1,2). `0.6` maps
-  to 153 on both.
+  A color constant in a pixel-oracle program must not produce an
+  exact `.5` product with 255. The rule covers every color the
+  program compares and every color a blend consumes (RN21). The
+  float-to-unorm rounding of a tie is implementation-defined: for
+  `0.5`, NVIDIA (Vulkan and D3D12) returns 127 and Apple (Metal)
+  returns 128 (measured 2026-08-24, `x17-live-indirect` pixel 1,2).
+  `0.6` maps to 153 on both.
 - **RN15 — Draw variants.** `b07-draw-variants` and
   `x06-live-draw-variants` cover `drawIndexed` with an index buffer
   and an instanced draw through `renderPipelineInstanced`, with the
@@ -177,7 +178,7 @@ does not say otherwise. Schemas are `schema.md`.
   a strip of `n` vertices is the `n - 2` triangles with the even-odd
   winding flip. `stripIndexFormat` stays with the API layer.
 
-- **RN21 — Blending.** Rev 0, 2026-08-24. `RenderPipelineSpec`
+- **RN21 — Blending.** Rev 1, 2026-08-25. `RenderPipelineSpec`
   gains `blend?: GPUBlendState | null = null`. The runtime passes it
   into the color target. The generator does not read it. The host
   rasterizer (RN14) blends a covered pixel with the destination
@@ -187,6 +188,20 @@ does not say otherwise. Schemas are `schema.md`.
   `b21-blend` prints the spec's blend factors by name on both
   tiers, and `x22-live-blend` draws two overlapping triangles with
   alpha blending and compares against the host rasterizer.
+
+  A source color that a blend consumes must be an exact multiple of
+  1/255. An implementation can convert the source color to the
+  target format before it blends. For the source `0.9` with
+  `src-alpha` `0.6` over a zero destination, NVIDIA (Vulkan)
+  converts the source to 229 and returns 137. Apple (Metal) and
+  Dawn blend the float value and return 138 (measured 2026-08-25,
+  `x22-live-blend` pixel 39,14). An exact source removes the
+  difference.
+
+  A host oracle that draws more than once into one target must
+  convert the destination to the target format after each draw. The
+  target holds 8-bit values, so the next draw reads a converted
+  destination.
 
 ## Rejections
 
