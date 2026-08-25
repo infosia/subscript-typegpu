@@ -9,10 +9,10 @@ subscript-typegpu program does not run in a browser. The reason is one
 design decision: TypeGPU builds schemas and generates WGSL at run time,
 and subscript-typegpu does both before the program runs.
 
-The TypeGPU examples come from the TypeGPU documentation at version
-0.12.0 (`apps/typegpu-docs/src/content/docs/` at commit `dc8f0de`)
-and are quoted, not run here. The subscript-typegpu examples are
-lines from `programs/`.
+Every pair of code blocks shows the same step in both libraries.
+The subscript-typegpu side is quoted from `programs/`. The TypeGPU
+side shows how TypeGPU 0.12 writes that same step: it follows the
+TypeGPU documentation and is illustrative, not run here.
 
 ## Summary
 
@@ -78,9 +78,8 @@ constructs instances.
 
 ```ts
 const Particle = d.struct({
-  position: d.vec3f,
-  velocity: d.vec3f,
-  health: d.f32,
+  pos: d.vec3f,
+  vel: d.vec3f,
 });
 ```
 
@@ -120,8 +119,8 @@ TypeGPU computes a schema's size and alignment when a program first
 asks for them.
 
 ```ts
-d.sizeOf(Circle) // 16
-d.alignmentOf(Circle) // 16
+d.sizeOf(Particle) // 32
+d.alignmentOf(Particle) // 16
 ```
 
 subscript-typegpu computes every layout before the program runs.
@@ -165,15 +164,12 @@ TypeGPU creates a buffer from a schema and an initial value. It
 converts JavaScript values to bytes.
 
 ```ts
-const buffer = root
-  .createBuffer(
-    d.arrayOf(Particle, 100), // <- holds 100 particles
-    Array.from({ length: 100 }).map(createParticle), // <- initial value
-  )
-  .$usage('storage'); // <- can be used as a "storage buffer"
+const input = root
+  .createBuffer(d.arrayOf(ReductionValue, count))
+  .$usage('storage');
 
-// Reading back from the buffer
-const value = await buffer.read();
+input.write(values);              // typed values, serialized by the schema
+const result = await output.read(); // decoded values back on the CPU
 ```
 
 subscript-typegpu creates a `Buffer<T>` from the device, an element
@@ -249,9 +245,10 @@ TypeGPU declares a layout as an object. The binding index follows the
 property order. A kernel reads a binding through `layout.$.name`.
 
 ```ts
-const fooLayout = tgpu.bindGroupLayout({
-  foo: { uniform: d.vec3f },
-  bar: { texture: d.texture2d(d.f32) },
+const saxpyLayout = tgpu.bindGroupLayout({
+  params: { uniform: SaxpyParams },
+  x: { storage: d.arrayOf(Item) },
+  y: { storage: d.arrayOf(Item), access: 'mutable' },
 });
 ```
 
@@ -289,10 +286,20 @@ plugin extracts its AST, and TypeGPU generates WGSL from that AST when
 the pipeline is first used.
 
 ```ts
-const pipeline = root.createGuardedComputePipeline((x) => {
+const integrate = (particle: d.Infer<typeof Particle>, dt: number) => {
   'use gpu';
-  // Access and modify the bound buffer via the layout
-  layout.$.points[x] = d.vec2i(1, 2);
+  // same helper logic as below
+};
+
+const particleKernel = tgpu.computeFn({
+  in: { gid: d.builtin.globalInvocationId },
+  workgroupSize: [64],
+})((input) => {
+  const settings = layout.$.params;
+  const i = input.gid.x;
+  if (i < settings.count) {
+    layout.$.particles[i] = integrate(layout.$.particles[i], settings.dt);
+  }
 });
 ```
 
@@ -347,11 +354,9 @@ TypeGPU offers three spellings: `std` functions, methods on the
 values, and JavaScript operators inside `'use gpu'` functions.
 
 ```ts
-const v1 = d.vec2f(1, 2);
-const v2 = d.vec2f(3, 4);
-
-const addition = v1.add(v2); // same as std.add(v1, v2)
-const multiplication = v1.mul(v2).mul(3); // same as std.mul(std.mul(v1, v2), 3)
+const value = loaded.add(sampled).mul(0.5);
+// or: std.mul(std.add(loaded, sampled), 0.5)
+// or, inside 'use gpu' code: (loaded + sampled) * 0.5
 ```
 
 subscript-typegpu offers methods. The method bodies are real subscript
@@ -394,15 +399,11 @@ TypeGPU creates the pipeline from the kernel and dispatches with a
 bind group attached.
 
 ```ts
-const computePipeline1 = root.createComputePipeline({
-  compute: mainCompute,
-});
-```
+const pipeline = root.createComputePipeline({ compute: vecAdd });
 
-```ts
-computePipeline
+pipeline
   .with(bindGroup)
-  .dispatchWorkgroups(1);
+  .dispatchWorkgroups(Math.ceil(count / 64));
 ```
 
 subscript-typegpu creates the pipeline from the generated WGSL and
@@ -461,12 +462,26 @@ TypeGPU declares address-space variables with `tgpu.privateVar` and
 `tgpu.workgroupVar`, and reads them through `.$`.
 
 ```ts
-const count = tgpu.workgroupVar(d.atomic(d.u32));
+const privateOffset = tgpu.privateVar(d.u32, 3);
+const sharedValues = tgpu.workgroupVar(d.arrayOf(d.u32, 4));
+const sharedCounter = tgpu.workgroupVar(d.atomic(d.u32));
 
-function incrementAndGet() {
-  'use gpu';
-  return std.atomicAdd(count.$, 1);
-}
+const workgroupKernel = tgpu.computeFn({
+  in: { lid: d.builtin.localInvocationIndex, wid: d.builtin.workgroupId },
+  workgroupSize: [4],
+})((input) => {
+  privateOffset.$ += 1;
+  sharedValues.$[input.lid] = input.lid + privateOffset.$;
+  if (input.lid === 0) {
+    std.atomicStore(sharedCounter.$, 0);
+  }
+  std.workgroupBarrier();
+  std.atomicAdd(sharedCounter.$, sharedValues.$[input.lid]);
+  std.workgroupBarrier();
+  if (input.lid === 0) {
+    std.atomicAdd(layout.$.counters[input.wid.x].total, std.atomicLoad(sharedCounter.$));
+  }
+});
 ```
 
 subscript-typegpu declares them with `privateVar<T>`, `workgroupVar<T>`,
@@ -510,11 +525,16 @@ Differences:
 TypeGPU binds a texture through the layout and samples with `std`.
 
 ```ts
-const myShader = tgpu.fn([d.vec2f], d.vec4f)((uv) => {
-  'use gpu';
-  // Use the fixed texture view directly
-  return std.textureSample(sampledView.$, sampler.$, uv);
+const texturesLayout = tgpu.bindGroupLayout({
+  source: { texture: d.texture2d(d.f32) },
+  nearest: { sampler: 'non-filtering' },
+  target: { storageTexture: d.textureStorage2d('rgba8unorm') },
 });
+
+// inside a compute function:
+const loaded = std.textureLoad(texturesLayout.$.source, coords, 0);
+const sampled = std.textureSampleLevel(texturesLayout.$.source, texturesLayout.$.nearest, uv, 0);
+std.textureStore(texturesLayout.$.target, coords, loaded.add(sampled).mul(0.5));
 ```
 
 subscript-typegpu binds textures through layout fields of type
@@ -562,18 +582,24 @@ TypeGPU declares a vertex function and a fragment function with typed
 `in` and `out` objects.
 
 ```ts
-const mainVertex = tgpu.vertexFn({
-  in: { vertexIndex: d.builtin.vertexIndex },
-  out: { pos: d.builtin.position },
-})((input) => {
-  const pos = [d.vec2f(-1, -1), d.vec2f(3, -1), d.vec2f(-1, 3)];
+const vert = tgpu.vertexFn({
+  in: { position: d.vec2f, color: d.vec3f },
+  out: { pos: d.builtin.position, color: d.vec3f },
+})((input) => ({
+  pos: d.vec4f(input.position, 0, 1),
+  color: input.color,
+}));
 
-  return {
-    pos: d.vec4f(pos[input.vertexIndex], 0, 1),
-  };
+const frag = tgpu.fragmentFn({
+  in: { color: d.vec3f },
+  out: d.vec4f,
+})((input) => d.vec4f(input.color, 1));
+
+const tri = root.createRenderPipeline({
+  vertex: vert,
+  fragment: frag,
+  targets: { format: 'rgba8unorm' },
 });
-
-const mainFragment = tgpu.fragmentFn({ out: d.vec4f })(() => d.vec4f(1, 0, 0, 1));
 ```
 
 subscript-typegpu declares a vertex class, a varyings class, and two
@@ -628,13 +654,8 @@ Differences:
 A TypeGPU function with `'use gpu'` is also a JavaScript function.
 
 ```ts
-const main = () => {
-  'use gpu';
-  return neighborhood(1.1, 0.5);
-};
-
-// #1) Can be called in JS
-const range = main();
+// integrate carries 'use gpu' and is still a JavaScript function:
+const moved = integrate(particle, 0.5);
 ```
 
 A subscript-typegpu kernel is also a subscript function.
@@ -727,8 +748,17 @@ const addBiasShell: WgslShellSpec = wgslShell<(value: u32) => u32>(
 );
 ```
 
-TypeGPU writes `tgpu.fn([d.u32], d.u32)\`(value) { return value + SHELL_BIAS; }\``
-with `$uses`. Differences:
+TypeGPU writes the same escape hatch as a WGSL-bodied function:
+
+```ts
+const SHELL_BIAS = 7;
+
+const addBias = tgpu.fn([d.u32], d.u32)`(value) {
+  return value + SHELL_BIAS;
+}`.$uses({ SHELL_BIAS });
+```
+
+Differences:
 
 - The WGSL `fn` line comes from the subscript signature. The body
   string holds statements only.
