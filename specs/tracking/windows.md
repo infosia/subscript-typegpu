@@ -167,3 +167,29 @@ Evidence: `tools/regen.sh` changes only
 `programs/x20-live-strip.stripLive.wgsl`, from `0.5f` to `0.6f`.
 `tools/live.sh` on Vulkan prints x01–x22 PASS: yawgpu 70.56 s, Dawn
 64.49 s.
+
+## Correction to the c4ff8a7 re-check (2026-08-25)
+
+The c4ff8a7 re-check states "The tree holds 244 test functions" and
+concludes that windows-msvc skips no test. The count is wrong, so the
+conclusion is wrong.
+
+Measurement: `c4ff8a7` holds 247 `#[test]` attributes under `crates/`
+and one `#[ignore]`, the live lane. `specs/tracking/p9-window.md`
+records 246 passed at that tree. 246 passed plus 1 ignored is 247, so
+the reference-machine count is correct and needs no re-check.
+
+The windows-msvc run had 243 passed plus 1 ignored, which is 244.
+windows-msvc ran three fewer test functions than the tree holds.
+
+The cause is not recorded. No test carries a `cfg(unix)`,
+`cfg(windows)`, or `cfg(target_family)` attribute at `c4ff8a7` or
+today. The only `cfg(unix)` in `crates/` guards the shared counter
+mapping in `crates/harness/src/lib.rs`, which is library code. The run
+log does not exist, so the three tests stay unnamed.
+
+The gap is closed at the current tree. `8a25831` and `bea7da5` hold
+254 `#[test]` attributes and one `#[ignore]`. windows-msvc ran 253
+passed and 1 ignored at `8a25831`. The reference machine ran 253
+passed and 1 ignored at `bea7da5`. Both platforms run every test
+function.
