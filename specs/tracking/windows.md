@@ -116,3 +116,54 @@ skips no test. `specs/tracking/p9-window.md` records 246 passed at this
 tree. That count needs a reference-machine re-check.
 
 The port needed no new source change. W1 to W4 hold.
+
+## Re-check at 8a25831 (2026-08-25)
+
+The tree gained P10 and P11 after the last re-check. This run measures
+the port again on windows-msvc. It adds a Vulkan live run on a real
+adapter.
+
+Machine: Windows 11, `x86_64-pc-windows-msvc`, rustc 1.95.0, Git Bash.
+Backend: a yawgpu Windows release build. Adapter: NVIDIA RTX 5060 Ti.
+
+`tools/gate.sh --require-backend` exits 0 and prints `gate: green` with
+zero pending. The run has 253 passed and 1 ignored in six executables,
+and takes 129 s. This number is not a reference-machine measurement.
+
+The tree holds 254 test functions. The gate runs 253 and ignores the
+live lane, so windows-msvc skips no test. The `examples/` programs
+compile inside the gate, through
+`window_example_compiles_through_the_host_loader_without_a_device`.
+
+The port needed no new source change. W1 to W4 hold. The Vulkan live
+run found two program defects, recorded as W5.
+
+### W5 Two pixel oracles carried an unorm tie
+
+`tools/live.sh` with `SUBSCRIPT_TYPEGPU_BACKEND=vulkan` printed two
+failures. Both are oracle defects. The backend is not implicated.
+
+`x20-live-strip` printed `FAIL x=3 y=3`. Its fragment color was `0.5`.
+`0.5 * 255` is `127.5`. NVIDIA returns 127 and Apple returns 128. RN14
+Rev 1 forbids this constant already. The program is newer than the rule.
+
+`x22-live-blend` printed
+`FAIL x=39 y=14 expected=15,46,138,153 got=15,46,137,153`. Its blue
+source was `0.9`. `0.9 * 255` is `229.5`. NVIDIA converts the source to
+229 before it blends, and returns 137. Apple and Dawn blend the float
+value, and return 138.
+
+`specs/tracking/p11-feature-gaps.md` records x01–x22 PASS at slice 3 and
+slice 4. Those runs used Metal and Dawn on macOS. The claim did not hold
+on NVIDIA.
+
+Fix: `RN14` Rev 2 covers every color a blend consumes. `RN21` Rev 1
+requires an exact source color and a converted destination between
+draws. `x20-live-strip` uses `0.6`, expects 153, and prints the full
+RN14 message. `x22-live-blend` uses source channels that are exact
+multiples of 1/255, and converts the expected color after each draw.
+
+Evidence: `tools/regen.sh` changes only
+`programs/x20-live-strip.stripLive.wgsl`, from `0.5f` to `0.6f`.
+`tools/live.sh` on Vulkan prints x01–x22 PASS: yawgpu 70.56 s, Dawn
+64.49 s.
