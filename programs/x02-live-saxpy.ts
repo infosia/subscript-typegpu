@@ -64,7 +64,7 @@ class SaxpyLayout {
 }
 
 function saxpyKernel(res: SaxpyLayout, ctx: ComputeInvocation): void {
-  const settings: SaxpyParams = res.params.get();
+  const settings: SaxpyParams = res.params.$;
   const i: u32 = ctx.globalId.x;
   if (i < settings.count) {
     const xItem: Item = res.x[i];

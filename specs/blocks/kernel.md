@@ -203,8 +203,8 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   class. Access is `x.$` and `x.$ = v` for a scalar variable, `x[i]`
   and `x[i] = v` for an array, and `x.length()`, as the binding
   wrappers (PI6 and EG11). Rev 2, 2026-08-25: the scalar forms are
-  accessors on subscript R37. A read records as the method `x`, and a
-  write records as the method `x=`. A private or
+  accessors on subscript R37. The accessor is named `$`, so a read
+  records as the method `$`, and a write records as the method `$=`. A private or
   workgroup variable initialized with a value in WGSL's forbidden
   positions (a workgroup variable with an initializer) is a
   diagnostic.

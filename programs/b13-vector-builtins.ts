@@ -360,24 +360,24 @@ function vectorKernel(res: VectorLayout, ctx: ComputeInvocation): void {
 
   const f3 = new Vec3f(a.x, a.y, a.z);
   output.swizzleFloat = new Vec4f(
-    f3.xy().x + f3.xz().y + f3.yz().x,
-    a.xy().x + a.xz().y + a.xw().y,
-    a.yz().x + a.yw().y + a.zw().x,
-    a.xyz().x + a.xyw().z + a.xzw().y + a.yzw().z,
+    f3.xy.x + f3.xz.y + f3.yz.x,
+    a.xy.x + a.xz.y + a.xw.y,
+    a.yz.x + a.yw.y + a.zw.x,
+    a.xyz.x + a.xyw.z + a.xzw.y + a.yzw.z,
   );
   const i3 = new Vec3i(input.signedA.x, input.signedA.y, input.signedA.z);
   output.swizzleSigned = new Vec4i(
-    i3.xy().x + i3.xz().y + i3.yz().x,
-    input.signedA.xy().x + input.signedA.xz().y + input.signedA.xw().y,
-    input.signedA.yz().x + input.signedA.yw().y + input.signedA.zw().x,
-    input.signedA.xyz().x + input.signedA.xyw().z + input.signedA.xzw().y + input.signedA.yzw().z,
+    i3.xy.x + i3.xz.y + i3.yz.x,
+    input.signedA.xy.x + input.signedA.xz.y + input.signedA.xw.y,
+    input.signedA.yz.x + input.signedA.yw.y + input.signedA.zw.x,
+    input.signedA.xyz.x + input.signedA.xyw.z + input.signedA.xzw.y + input.signedA.yzw.z,
   );
   const u3 = new Vec3u(input.unsignedA.x, input.unsignedA.y, input.unsignedA.z);
   output.swizzleUnsigned = new Vec4u(
-    u3.xy().x + u3.xz().y + u3.yz().x,
-    input.unsignedA.xy().x + input.unsignedA.xz().y + input.unsignedA.xw().y,
-    input.unsignedA.yz().x + input.unsignedA.yw().y + input.unsignedA.zw().x,
-    input.unsignedA.xyz().x + input.unsignedA.xyw().z + input.unsignedA.xzw().y + input.unsignedA.yzw().z,
+    u3.xy.x + u3.xz.y + u3.yz.x,
+    input.unsignedA.xy.x + input.unsignedA.xz.y + input.unsignedA.xw.y,
+    input.unsignedA.yz.x + input.unsignedA.yw.y + input.unsignedA.zw.x,
+    input.unsignedA.xyz.x + input.unsignedA.xyw.z + input.unsignedA.xzw.y + input.unsignedA.yzw.z,
   );
 
   const f2: Vec2f = vec2fSplat(2.0);

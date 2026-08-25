@@ -144,7 +144,7 @@ function lifeStepKernel(res: LifeStepLayout, ctx: ComputeInvocation): void {
 // TypeGPU draws a capsule between two pointer samples with a radius and a mode control.
 // This port draws a fixed square around one pointer sample and only sets cells alive.
 function lifeEditKernel(res: LifeEditLayout, ctx: ComputeInvocation): void {
-  const params: EditParams = res.edit.get();
+  const params: EditParams = res.edit.$;
   const cell = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);
   if (params.mode === EDIT_CLEAR) {
     res.generation.store(cell, new Vec4f(0.0, 0.0, 0.0, 1.0));

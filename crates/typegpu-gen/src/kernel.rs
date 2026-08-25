@@ -477,7 +477,7 @@ fn expression_blocks_host(module: &Module, expression: &Expr) -> bool {
                 }
                 Callee::Method { recv, name } => {
                     atomic_scalar(module, &recv.ty).is_some()
-                        || (name == "set" && is_private_var(module, &recv.ty))
+                        || (name == "$=" && is_private_var(module, &recv.ty))
                         || expression_blocks_host(module, recv)
                 }
                 Callee::Value(value) => expression_blocks_host(module, value),
@@ -1589,7 +1589,9 @@ impl<'a> Emitter<'a> {
             ExprKind::Call {
                 callee: Callee::Method { recv, name },
                 args,
-            } if name == "get" && args.len() <= 1 => self.global_root(recv),
+            } if (name == "$" && args.is_empty()) || (name == "get" && args.len() == 1) => {
+                self.global_root(recv)
+            }
             _ => None,
         }
     }
@@ -1634,7 +1636,7 @@ impl<'a> Emitter<'a> {
             args,
         } = &recv.kind
         {
-            if name == "get" && args.is_empty() {
+            if name == "$" && args.is_empty() {
                 if let Some(global) = self.wrapper_ref(recv) {
                     return Ok(Snippet::atom(mapping::ident(&global.name)));
                 }
@@ -2079,10 +2081,10 @@ impl<'a> Emitter<'a> {
                     let (args, prelude) = self.snippets(args)?;
                     let target = mapping::ident(&global.name);
                     let text = match (&global.kind, name.as_str(), args.as_slice()) {
-                        (KernelGlobalKind::Private(_), "get", [])
-                        | (KernelGlobalKind::WorkgroupVar, "get", []) => target,
-                        (KernelGlobalKind::Private(_), "set", [value])
-                        | (KernelGlobalKind::WorkgroupVar, "set", [value]) => {
+                        (KernelGlobalKind::Private(_), "$", [])
+                        | (KernelGlobalKind::WorkgroupVar, "$", []) => target,
+                        (KernelGlobalKind::Private(_), "$=", [value])
+                        | (KernelGlobalKind::WorkgroupVar, "$=", [value]) => {
                             if type_contains_atomic(self.module, &global.ty) {
                                 return Err(diagnostic(
                                     "K21",
@@ -2116,7 +2118,11 @@ impl<'a> Emitter<'a> {
                             ))
                         }
                     };
-                    let precedence = if name == "set" { 0 } else { 10 };
+                    let precedence = if matches!(name.as_str(), "$=" | "set") {
+                        0
+                    } else {
+                        10
+                    };
                     return Ok(Snippet {
                         text,
                         precedence,
@@ -2126,7 +2132,7 @@ impl<'a> Emitter<'a> {
                 if let Some(binding) = self.binding_ref(recv) {
                     let (args, prelude) = self.snippets(args)?;
                     let text = match (binding.kind, name.as_str(), args.as_slice()) {
-                        (BindingKind::Uniform, "get", []) => binding.name,
+                        (BindingKind::Uniform, "$", []) => binding.name,
                         (BindingKind::Storage | BindingKind::MutStorage, "get", [index]) => {
                             format!("{}[{index}]", binding.name)
                         }
@@ -2805,7 +2811,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                 )),
                 Callee::Method { recv, name }
                     if args.is_empty()
-                        && name == "get"
+                        && name == "$"
                         && self
                             .emitter
                             .binding_ref(recv)

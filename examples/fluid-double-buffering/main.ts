@@ -139,7 +139,7 @@ function obstacleKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   const y: u32 = ctx.globalId.y;
   const index: u32 = y * GRID_SIZE + x;
   const cell: FluidCell = res.source[index];
-  const params: FluidParams = res.params.get();
+  const params: FluidParams = res.params.$;
   const gridRadius: f32 = ((GRID_SIZE - 1) as f32) * 0.5;
   const normalizedX: f32 = (x as f32) / gridRadius - 1.0;
   const normalizedY: f32 = (y as f32) / gridRadius - 1.0;

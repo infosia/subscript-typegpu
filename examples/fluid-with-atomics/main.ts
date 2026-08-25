@@ -226,7 +226,7 @@ function atomicBrushKernel(res: AtomicBrushLayout, ctx: ComputeInvocation): void
   const x: u32 = ctx.globalId.x;
   const y: u32 = ctx.globalId.y;
   const index: u32 = y * GRID_SIZE + x;
-  const brush: BrushParams = res.brush.get();
+  const brush: BrushParams = res.brush.$;
   if (brush.active === 0) return;
   const point = new Vec2f(x as f32, y as f32);
   if (sdLine(point, brush.previous, brush.current) > BRUSH_RADIUS) return;

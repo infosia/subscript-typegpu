@@ -129,7 +129,7 @@ import { Vec2f, Vec4f } from "./typegpu-types";
 const vertexShift: f32 = 0.25;
 const fragmentAlpha: PrivateVar<f32> = privateVar<f32>(0.75);
 function vert(value: Vertex, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(value.position.x + vertexShift, value.position.y, 0.0, 1.0)); }
-function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { return new Vec4f(1.0, 0.0, 0.0, fragmentAlpha.get()); }
+function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { return new Vec4f(1.0, 0.0, 0.0, fragmentAlpha.$); }
 export const pipeline: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
 "#,
     );
@@ -163,7 +163,7 @@ import { Vec2f, Vec4f } from "./typegpu-types";
 @CStruct class Tint { value: Vec4f; constructor(value: Vec4f) { this.value = value; } }
 @CStruct class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
 class Layout { vertexOnly!: Uniform<Offset>; fragmentOnly!: Storage<Tint>; both!: Storage<Tint>; }
-function vert(res: Layout, value: Vertex, ctx: VertexInvocation): Varyings { const offset: Offset = res.vertexOnly.get(); const shared: Tint = res.both[0]; return new Varyings(new Vec4f(value.position.x + offset.value.x + shared.value.x * 0.0, value.position.y + offset.value.y, 0.0, 1.0)); }
+function vert(res: Layout, value: Vertex, ctx: VertexInvocation): Varyings { const offset: Offset = res.vertexOnly.$; const shared: Tint = res.both[0]; return new Varyings(new Vec4f(value.position.x + offset.value.x + shared.value.x * 0.0, value.position.y + offset.value.y, 0.0, 1.0)); }
 function frag(res: Layout, input: Varyings, ctx: FragmentInvocation): Vec4f { const tint: Tint = res.fragmentOnly[0]; const shared: Tint = res.both[0]; return tint.value.add(shared.value.scale(0.0)); }
 export const shifted: RenderPipelineSpec = renderPipelineL<Layout, Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
 "#,

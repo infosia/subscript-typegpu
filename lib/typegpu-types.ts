@@ -162,9 +162,9 @@ export class Vec3f {
   eq(other: Vec3f): Vec3b { return new Vec3b(this.x === other.x, this.y === other.y, this.z === other.z); }
   ne(other: Vec3f): Vec3b { return new Vec3b(this.x !== other.x, this.y !== other.y, this.z !== other.z); }
   select(other: Vec3f, mask: Vec3b): Vec3f { return new Vec3f(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z); }
-  xy(): Vec2f { return new Vec2f(this.x, this.y); }
-  xz(): Vec2f { return new Vec2f(this.x, this.z); }
-  yz(): Vec2f { return new Vec2f(this.y, this.z); }
+  get xy(): Vec2f { return new Vec2f(this.x, this.y); }
+  get xz(): Vec2f { return new Vec2f(this.x, this.z); }
+  get yz(): Vec2f { return new Vec2f(this.y, this.z); }
 }
 
 @CStruct({ align: 16 })
@@ -247,16 +247,16 @@ export class Vec4f {
   eq(other: Vec4f): Vec4b { return new Vec4b(this.x === other.x, this.y === other.y, this.z === other.z, this.w === other.w); }
   ne(other: Vec4f): Vec4b { return new Vec4b(this.x !== other.x, this.y !== other.y, this.z !== other.z, this.w !== other.w); }
   select(other: Vec4f, mask: Vec4b): Vec4f { return new Vec4f(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z, mask.w ? other.w : this.w); }
-  xy(): Vec2f { return new Vec2f(this.x, this.y); }
-  xz(): Vec2f { return new Vec2f(this.x, this.z); }
-  xw(): Vec2f { return new Vec2f(this.x, this.w); }
-  yz(): Vec2f { return new Vec2f(this.y, this.z); }
-  yw(): Vec2f { return new Vec2f(this.y, this.w); }
-  zw(): Vec2f { return new Vec2f(this.z, this.w); }
-  xyz(): Vec3f { return new Vec3f(this.x, this.y, this.z); }
-  xyw(): Vec3f { return new Vec3f(this.x, this.y, this.w); }
-  xzw(): Vec3f { return new Vec3f(this.x, this.z, this.w); }
-  yzw(): Vec3f { return new Vec3f(this.y, this.z, this.w); }
+  get xy(): Vec2f { return new Vec2f(this.x, this.y); }
+  get xz(): Vec2f { return new Vec2f(this.x, this.z); }
+  get xw(): Vec2f { return new Vec2f(this.x, this.w); }
+  get yz(): Vec2f { return new Vec2f(this.y, this.z); }
+  get yw(): Vec2f { return new Vec2f(this.y, this.w); }
+  get zw(): Vec2f { return new Vec2f(this.z, this.w); }
+  get xyz(): Vec3f { return new Vec3f(this.x, this.y, this.z); }
+  get xyw(): Vec3f { return new Vec3f(this.x, this.y, this.w); }
+  get xzw(): Vec3f { return new Vec3f(this.x, this.z, this.w); }
+  get yzw(): Vec3f { return new Vec3f(this.y, this.z, this.w); }
 }
 
 @CStruct({ align: 8 })
@@ -315,9 +315,9 @@ export class Vec3i {
   eq(other: Vec3i): Vec3b { return new Vec3b(this.x === other.x, this.y === other.y, this.z === other.z); }
   ne(other: Vec3i): Vec3b { return new Vec3b(this.x !== other.x, this.y !== other.y, this.z !== other.z); }
   select(other: Vec3i, mask: Vec3b): Vec3i { return new Vec3i(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z); }
-  xy(): Vec2i { return new Vec2i(this.x, this.y); }
-  xz(): Vec2i { return new Vec2i(this.x, this.z); }
-  yz(): Vec2i { return new Vec2i(this.y, this.z); }
+  get xy(): Vec2i { return new Vec2i(this.x, this.y); }
+  get xz(): Vec2i { return new Vec2i(this.x, this.z); }
+  get yz(): Vec2i { return new Vec2i(this.y, this.z); }
 }
 
 @CStruct({ align: 16 })
@@ -350,16 +350,16 @@ export class Vec4i {
   eq(other: Vec4i): Vec4b { return new Vec4b(this.x === other.x, this.y === other.y, this.z === other.z, this.w === other.w); }
   ne(other: Vec4i): Vec4b { return new Vec4b(this.x !== other.x, this.y !== other.y, this.z !== other.z, this.w !== other.w); }
   select(other: Vec4i, mask: Vec4b): Vec4i { return new Vec4i(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z, mask.w ? other.w : this.w); }
-  xy(): Vec2i { return new Vec2i(this.x, this.y); }
-  xz(): Vec2i { return new Vec2i(this.x, this.z); }
-  xw(): Vec2i { return new Vec2i(this.x, this.w); }
-  yz(): Vec2i { return new Vec2i(this.y, this.z); }
-  yw(): Vec2i { return new Vec2i(this.y, this.w); }
-  zw(): Vec2i { return new Vec2i(this.z, this.w); }
-  xyz(): Vec3i { return new Vec3i(this.x, this.y, this.z); }
-  xyw(): Vec3i { return new Vec3i(this.x, this.y, this.w); }
-  xzw(): Vec3i { return new Vec3i(this.x, this.z, this.w); }
-  yzw(): Vec3i { return new Vec3i(this.y, this.z, this.w); }
+  get xy(): Vec2i { return new Vec2i(this.x, this.y); }
+  get xz(): Vec2i { return new Vec2i(this.x, this.z); }
+  get xw(): Vec2i { return new Vec2i(this.x, this.w); }
+  get yz(): Vec2i { return new Vec2i(this.y, this.z); }
+  get yw(): Vec2i { return new Vec2i(this.y, this.w); }
+  get zw(): Vec2i { return new Vec2i(this.z, this.w); }
+  get xyz(): Vec3i { return new Vec3i(this.x, this.y, this.z); }
+  get xyw(): Vec3i { return new Vec3i(this.x, this.y, this.w); }
+  get xzw(): Vec3i { return new Vec3i(this.x, this.z, this.w); }
+  get yzw(): Vec3i { return new Vec3i(this.y, this.z, this.w); }
 }
 
 @CStruct({ align: 8 })
@@ -416,9 +416,9 @@ export class Vec3u {
   eq(other: Vec3u): Vec3b { return new Vec3b(this.x === other.x, this.y === other.y, this.z === other.z); }
   ne(other: Vec3u): Vec3b { return new Vec3b(this.x !== other.x, this.y !== other.y, this.z !== other.z); }
   select(other: Vec3u, mask: Vec3b): Vec3u { return new Vec3u(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z); }
-  xy(): Vec2u { return new Vec2u(this.x, this.y); }
-  xz(): Vec2u { return new Vec2u(this.x, this.z); }
-  yz(): Vec2u { return new Vec2u(this.y, this.z); }
+  get xy(): Vec2u { return new Vec2u(this.x, this.y); }
+  get xz(): Vec2u { return new Vec2u(this.x, this.z); }
+  get yz(): Vec2u { return new Vec2u(this.y, this.z); }
 }
 
 @CStruct({ align: 16 })
@@ -450,16 +450,16 @@ export class Vec4u {
   eq(other: Vec4u): Vec4b { return new Vec4b(this.x === other.x, this.y === other.y, this.z === other.z, this.w === other.w); }
   ne(other: Vec4u): Vec4b { return new Vec4b(this.x !== other.x, this.y !== other.y, this.z !== other.z, this.w !== other.w); }
   select(other: Vec4u, mask: Vec4b): Vec4u { return new Vec4u(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z, mask.w ? other.w : this.w); }
-  xy(): Vec2u { return new Vec2u(this.x, this.y); }
-  xz(): Vec2u { return new Vec2u(this.x, this.z); }
-  xw(): Vec2u { return new Vec2u(this.x, this.w); }
-  yz(): Vec2u { return new Vec2u(this.y, this.z); }
-  yw(): Vec2u { return new Vec2u(this.y, this.w); }
-  zw(): Vec2u { return new Vec2u(this.z, this.w); }
-  xyz(): Vec3u { return new Vec3u(this.x, this.y, this.z); }
-  xyw(): Vec3u { return new Vec3u(this.x, this.y, this.w); }
-  xzw(): Vec3u { return new Vec3u(this.x, this.z, this.w); }
-  yzw(): Vec3u { return new Vec3u(this.y, this.z, this.w); }
+  get xy(): Vec2u { return new Vec2u(this.x, this.y); }
+  get xz(): Vec2u { return new Vec2u(this.x, this.z); }
+  get xw(): Vec2u { return new Vec2u(this.x, this.w); }
+  get yz(): Vec2u { return new Vec2u(this.y, this.z); }
+  get yw(): Vec2u { return new Vec2u(this.y, this.w); }
+  get zw(): Vec2u { return new Vec2u(this.z, this.w); }
+  get xyz(): Vec3u { return new Vec3u(this.x, this.y, this.z); }
+  get xyw(): Vec3u { return new Vec3u(this.x, this.y, this.w); }
+  get xzw(): Vec3u { return new Vec3u(this.x, this.z, this.w); }
+  get yzw(): Vec3u { return new Vec3u(this.y, this.z, this.w); }
 }
 
 @CStruct

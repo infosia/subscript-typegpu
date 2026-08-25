@@ -67,7 +67,7 @@ function textureKernel(
   settings: ParamsLayout,
   ctx: ComputeInvocation,
 ): void {
-  const params: SampleParams = settings.params.get();
+  const params: SampleParams = settings.params.$;
   if (ctx.globalId.x >= params.width || ctx.globalId.y >= params.height) return;
   const coords = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);
   const loaded: Vec4f = textures.source.load(coords, 0);

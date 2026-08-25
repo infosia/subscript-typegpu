@@ -114,8 +114,97 @@ that this side must read.
   decisions landed wider than it was asked, because the phase review
   measured a collision that needs no `$` at all.
 
-## Status
+## P13 — the sweep (2026-08-25)
 
-2026-08-25: R37 landed and the workspace pin moved to `a2228d9`.
-EG11 Rev 1, PI5 Rev 2, PI6, K20 Rev 2, and K27 Rev 2 carry the
-authored forms. The library and the sweep are the next step.
+`Uniform<T>` took the read accessor `$`. `PrivateVar<T>` and
+`WorkgroupVar<T>` took the read and the write accessor `$`. Every
+swizzle became a read accessor, 39 of them over six vector classes.
+The three index families did not move: their `get(i)` and
+`set(i, v)` are the accessors that the index signature needs.
+
+The emitter reads the new names at six sites in
+`crates/typegpu-gen/src/kernel.rs`: the host-block predicate, the
+global root, the wrapper reference, the private and workgroup arms,
+the uniform arm, and the barrier validator. One predicate changed
+shape. It read `name == "get" && args.len() <= 1`, which covered a
+scalar read and an array read together. It now reads
+`(name == "$" && args.is_empty()) || (name == "get" && args.len() ==
+1)`, which is the same set after the rename.
+
+The sweep moved 23 reads, 1 write, and 25 swizzle calls, as the
+consequence section predicted.
+
+Evidence: `tools/gate.sh --require-backend` green, 256 passed, 1
+ignored, 117 s. Every `programs/*.wgsl` and `programs/*.expected`
+file stayed byte-identical, so the checker rewrite fed the emitter
+the call HIR it already read. `tools/live.sh` on Metal (yawgpu)
+green, 67.36 s.
+
+## Phase review (2026-08-25)
+
+CRITICAL 0, MAJOR 5, MINOR 2.
+
+Four MAJOR findings were stale prose that the change made false: the
+uniform-read sentence and the swizzle sentence in
+`docs/from-typegpu.md`, "swizzles as properties" in that document's
+list of features with no equivalent, and K20 Rev 2, which named the
+method `x` where the accessor is `$`. The fifth MAJOR is open below.
+Both MINOR findings were in the same document: the `+=` difference
+was unlisted, and the bare word "accessors" now reads as two things.
+
+## Remaining defect, recorded not fixed
+
+`docs/from-typegpu.md` swizzle bullet now reads "Swizzles are read
+accessors: `v.xy` ... TypeGPU writes `v.xy`." The second sentence
+repeats the first, because the two spellings are equal now. The
+document had its verification pass and its fix pass, so CLAUDE.md
+"Two rounds" stops here.
+
+## Owner decision: the WebGPU layer moves (2026-08-25)
+
+The owner chose the accessor move over a restated reason. J14 is the
+contract and plan §8 P14 is the phase.
+
+## The finding that scoped P14
+
+`crates/webgpu-gen/policy.toml` holds 14 `attribute-method`
+deviations, and each one gives "user-defined accessors are
+unavailable" as its reason. The generator copies that reason into
+`lib/webgpu.ts`, so a shipped artifact carries it 14 times. R37
+makes the reason false.
+
+The members are `GPUDevice.queue`, `GPUBuffer.size`, `usage`, and
+`mapState`, `GPUTexture.width`, `height`, `depthOrArrayLayers`,
+`mipLevelCount`, `sampleCount`, `dimension`, `format`, and `usage`,
+and `GPUQuerySet.type` and `count`.
+
+Design invariant 8 says the WebGPU API layer follows the WebGPU
+JavaScript API in naming and shape, and that a deviation is a
+recorded policy deviation. The recorded cause is gone, so the
+deviation has no cause. Two answers exist. The layer moves to read
+accessors, which deletes all 14 rows and matches the JavaScript API.
+Or the rows keep a different and true cause. No true cause is known
+today.
+
+The move costs a generator change, a regeneration, and a sweep of
+about 200 call sites, most of them `device.queue()`. It is a phase,
+not a round. The owner decides.
+
+## A defect P14 must close
+
+`examples/matrix-next/main.ts` line 205 and
+`examples/dispatch/main.ts` line 123 bind an owned device's queue
+with `using`. The owned `GPUDevice` caches one `GPUQueue` and
+disposes it in its own `dispose()`, so the caller disposes a wrapper
+it does not own. `GPUQueue.dispose()` guards on a private flag, so
+the second disposal is silent, and neither example reads the queue
+after the scope ends. The defect is latent today.
+
+A property makes the misuse unwritable: `using queue = device.queue`
+has no method call to bind. P14 rewrites both lines to read the
+property at each use.
+
+`GPUHostOwnedDevice.queue()` is the opposite case and is correct
+today. It returns a new owned wrapper per call, and every windowed
+example binds it with `using`. J14 keeps it a method for that
+reason.

@@ -733,6 +733,44 @@ live lane green on one backend, and the record in
 `specs/tracking/p12-spelling.md`. A moved golden kills the slice and
 reopens the emission question.
 
+### P13 — the accessor spelling (small)
+
+subscript R37 landed a named accessor. P13 moves the TypeGPU layer
+to it: `Uniform` takes the read accessor `$`, `PrivateVar` and
+`WorkgroupVar` take the read and the write accessor `$`, and every
+swizzle becomes a read accessor. The index families do not move,
+because their `get(i)` and `set(i, v)` are the accessors that
+subscript's index signature needs. EG11 Rev 1 is the contract.
+
+Exit: the block revisions, the gate green, every `.wgsl` and
+`.expected` golden byte-identical, the live lane green on one
+backend, and the record in `specs/tracking/accessor-request.md`.
+
+### P14 — the API layer's attributes (small)
+
+The P13 review measured a false claim in a shipped artifact. Every
+one of 14 `attribute-method` deviation rows gives "user-defined
+accessors are unavailable" as its cause, and the generator copies
+that text into `lib/webgpu.ts`. R37 removed the cause.
+
+Design invariant 8 says the WebGPU API layer follows the WebGPU
+JavaScript API in naming and shape. A deviation without a cause is
+not a deviation. P14 therefore deletes the rows and generates each
+attribute as a read accessor. J14 is the contract. The owner chose
+this over a restated reason on 2026-08-25, because no true cause
+remains.
+
+The work: the attribute plan emits an accessor, the generator
+rejects the retired pattern name, `lib/webgpu.ts` regenerates, the
+14 rows leave `policy.toml`, and about 190 call sites move, 161 of
+them `device.queue()`. `GPUHostOwnedDevice.queue()` stays a method
+under its own row, because it returns a new owned wrapper per call
+and every windowed example binds it with `using`.
+
+Exit: `tools/regen.sh` reproduces `lib/webgpu.ts` byte for byte, the
+deviation trichotomy of J9 holds with 14 fewer rows, the gate green,
+the live lane green on one backend, and the budgets recorded.
+
 ## 9. Risk register
 
 | Id | Risk | Mitigation / trigger |

@@ -557,7 +557,7 @@ export class Uniform<T> {
     this.values = [value];
   }
 
-  get(): T {
+  get $(): T {
     return this.values[0];
   }
 }
@@ -607,11 +607,11 @@ export class PrivateVar<T> {
     this.value = value;
   }
 
-  get(): T {
+  get $(): T {
     return this.value;
   }
 
-  set(value: T): void {
+  set $(value: T) {
     this.value = value;
   }
 }
@@ -623,11 +623,11 @@ export class WorkgroupVar<T> {
     this.values = [];
   }
 
-  get(): T {
+  get $(): T {
     return this.values[0];
   }
 
-  set(value: T): void {
+  set $(value: T) {
     if (this.values.length === 0) {
       this.values.push(value);
     } else {

@@ -46,16 +46,16 @@ const sharedValues: WorkgroupArray<u32> = workgroupArray<u32>(4);
 const sharedCounter: WorkgroupVar<AtomicU32> = workgroupVar<AtomicU32>();
 
 function workgroupKernel(res: WorkgroupLayout, ctx: ComputeInvocation): void {
-  privateOffset.set(privateOffset.get() + 1);
-  sharedValues[ctx.localIndex] = ctx.localIndex + privateOffset.get();
+  privateOffset.$ = privateOffset.$ + 1;
+  sharedValues[ctx.localIndex] = ctx.localIndex + privateOffset.$;
   if (ctx.localIndex === 0) {
-    sharedCounter.get().store(0);
+    sharedCounter.$.store(0);
   }
   workgroupBarrier();
-  sharedCounter.get().add(sharedValues[ctx.localIndex]);
+  sharedCounter.$.add(sharedValues[ctx.localIndex]);
   workgroupBarrier();
   if (ctx.localIndex === 0) {
-    res.counters[ctx.workgroupId.x].total.add(sharedCounter.get().load());
+    res.counters[ctx.workgroupId.x].total.add(sharedCounter.$.load());
   }
 }
 

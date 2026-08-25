@@ -144,7 +144,7 @@ fn cl6_written_private_variable_alone_is_not_host_runnable() {
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, PrivateVar, computePipeline, privateVar } from "./typegpu";
 class Layout { output!: MutStorage<u32>; }
 const state: PrivateVar<u32> = privateVar<u32>(1);
-function kernel(res: Layout, ctx: ComputeInvocation): void { state.set(state.get() + 1); }
+function kernel(res: Layout, ctx: ComputeInvocation): void { state.$ = state.$ + 1; }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
         false,
@@ -158,7 +158,7 @@ fn cl6_workgroup_variable_alone_is_not_host_runnable() {
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, WorkgroupVar, computePipeline, workgroupVar } from "./typegpu";
 class Layout { output!: MutStorage<u32>; }
 const shared: WorkgroupVar<u32> = workgroupVar<u32>();
-function kernel(res: Layout, ctx: ComputeInvocation): void { shared.set(1); }
+function kernel(res: Layout, ctx: ComputeInvocation): void { shared.$ = 1; }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
         false,
@@ -172,7 +172,7 @@ fn cl6_read_private_variable_alone_is_host_runnable() {
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, PrivateVar, computePipeline, privateVar } from "./typegpu";
 class Layout { output!: MutStorage<u32>; }
 const state: PrivateVar<u32> = privateVar<u32>(1);
-function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = state.get(); }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = state.$; }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
         true,
@@ -216,9 +216,9 @@ import { ComputeInvocation, ComputePipelineSpec, MutStorage, Uniform, computePip
 @CStruct class Result { local: u32; reread: u32; constructor(local: u32, reread: u32) { this.local = local; this.reread = reread; } }
 class Layout { params!: Uniform<Params>; output!: MutStorage<Result>; }
 function shadow(res: Layout, ctx: ComputeInvocation): void {
-  let params: Params = res.params.get();
+  let params: Params = res.params.$;
   params.value = params.value + 1;
-  const reread: Params = res.params.get();
+  const reread: Params = res.params.$;
   res.output[0] = new Result(params.value, reread.value);
 }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(shadow, { name: "pipeline", workgroupSize: [1, 1, 1] });
@@ -420,11 +420,11 @@ const privateState: PrivateVar<Initial> = privateVar<Initial>(new Initial(BASE))
 const sharedValue: WorkgroupVar<u32> = workgroupVar<u32>();
 const sharedValues: WorkgroupArray<u32> = workgroupArray<u32>(4);
 function variables(res: Layout, ctx: ComputeInvocation): void {
-  privateState.set(new Initial(privateState.get().value + ctx.workgroupId.x + ctx.numWorkgroups.x));
-  sharedValue.set(ctx.localId.x);
-  sharedValues[ctx.localIndex] = sharedValue.get();
+  privateState.$ = new Initial(privateState.$.value + ctx.workgroupId.x + ctx.numWorkgroups.x);
+  sharedValue.$ = ctx.localId.x;
+  sharedValues[ctx.localIndex] = sharedValue.$;
   workgroupBarrier();
-  res.output[ctx.globalId.x] = new Item(sharedValues[(sharedValues.length() - 1)] + privateState.get().value);
+  res.output[ctx.globalId.x] = new Item(sharedValues[(sharedValues.length() - 1)] + privateState.$.value);
 }
 export const variablePipeline: ComputePipelineSpec = computePipeline<Layout>(variables, { name: "variablePipeline", workgroupSize: [4, 1, 1] });
 "#,
@@ -455,7 +455,7 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, St
 class Layout { params!: Uniform<Item>; input!: Storage<Item>; output!: MutStorage<Item>; }
 const hist: WorkgroupArray<u32> = workgroupArray<u32>(4);
 function kernel(res: Layout, ctx: ComputeInvocation): void {
-  if (res.params.get().value > 0 && res.input.length() > 0) { workgroupBarrier(); }
+  if (res.params.$.value > 0 && res.input.length() > 0) { workgroupBarrier(); }
   const firstRead: u32 = hist[ctx.localIndex];
   const secondRead: u32 = hist[ctx.localIndex];
   res.output[0] = new Item(firstRead + secondRead);
@@ -526,8 +526,8 @@ function atomics(res: Layout, ctx: ComputeInvocation): void {
   res.counters[0].unsigned.min(2);
   res.counters[0].unsigned.max(3);
   res.counters[0].unsigned.exchange(4);
-  localCounter.get().store(ctx.localIndex);
-  localCounter.get().add(1);
+  localCounter.$.store(ctx.localIndex);
+  localCounter.$.add(1);
   res.counters[0].signed.add(-1);
   res.counters[0].signed.store(-2147483648);
   storageBarrier();
@@ -636,7 +636,7 @@ import { ComputeInvocation, computePipeline2, ComputePipelineSpec, Storage, Unif
 class First { params!: Uniform<Vec4f>; }
 class Second { values!: Storage<Vec4f>; }
 function groups(a: First, b: Second, ctx: ComputeInvocation): void {
-  const params: Vec4f = a.params.get();
+  const params: Vec4f = a.params.$;
   const value: Vec4f = b.values[0];
 }
 

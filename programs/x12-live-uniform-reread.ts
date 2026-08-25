@@ -54,9 +54,9 @@ class ShadowLayout {
 }
 
 function shadowKernel(res: ShadowLayout, ctx: ComputeInvocation): void {
-  let params: Params = res.params.get();
+  let params: Params = res.params.$;
   params.value = params.value + 7;
-  const reread: Params = res.params.get();
+  const reread: Params = res.params.$;
   res.output[0] = new ShadowResult(params.value, reread.value);
 }
 

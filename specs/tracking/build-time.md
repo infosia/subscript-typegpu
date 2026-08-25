@@ -60,6 +60,7 @@ row: `tools/gate.sh --measure --yes` with
 | 2026-08-24 | Emitter parenthesizes mixed logical chains | 49 s | 0 s | 216 s | 213 s | 7 |
 | 2026-08-24 | T18 bounded worker pool: differential 154.5 s → 43.2 s, coverage 112.3 s → 33.9 s, simulate 95.1 s → 26.6 s, c_layout 31.1 s → 10.5 s; full gate 214 s → 106 s | 49 s | 0 s | — | 106 s | 7 |
 | 2026-08-25 | Windows W5, the pixel-oracle fix (`24ca42e`), the tree at `bea7da5` | 49 s | 0 s | 112 s | 120 s | 7 |
+| 2026-08-25 | P13 close: subscript re-pinned to `a2228d9`, the tree at `a753747` plus the accessor sweep | 51 s | 0 s | 186 s | 183 s | 7 |
 
 Row 1: the planner, before T12 Rev 1 fixed the order (the cold build
 excluded the ship-tier release build, and the codegen-change gate
@@ -88,3 +89,23 @@ closes only, and a green round's gate is not re-run on the same
 tree — only the lanes the coding agent cannot run (live, window).
 Proposed and pending the owner's go: a bounded parallel program
 loop in the differential suite.
+
+## The P13 row's spread (2026-08-25)
+
+The two gate columns rose from 112 s and 120 s to 186 s and 183 s.
+The budget is 240 s, so the row is not red. The rise is not in the
+diff.
+
+Evidence: the harness executable ran the same 35 tests three times
+on the same day. It took 94.91 s in the `--require-backend` gate on
+the P13 tree, 122.70 s in the `--require-backend` gate on the
+re-pinned tree with no source change, and 159.32 s inside the
+measurement. The measurement runs four gates after a `cargo clean`,
+so the machine is hot by the last one. The same tree therefore
+produced 94.91 s and 159.32 s within one hour.
+
+The new test of P12, T20, is not the cause. It checks every program
+and every example and takes 4.79 s.
+
+Read the row as the hot-machine bound and the `--require-backend`
+runs as the warm bound.

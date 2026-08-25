@@ -24,11 +24,11 @@ export function main(): void {
   const mutable: MutStorage<u32> = new MutStorage<u32>([4, 5]);
   mutable[0] = storage[0];
   mutable.set(1, 9);
-  print(`runtime=${uniform.get()},${storage.get(1)},${storage.length()},${mutable.get(1)},${mutable.length()},${mutable[0]}`);
+  print(`runtime=${uniform.$},${storage.get(1)},${storage.length()},${mutable.get(1)},${mutable.length()},${mutable[0]}`);
   const privateValue: PrivateVar<u32> = privateVar<u32>(6);
-  privateValue.set(privateValue.get() + 1);
+  privateValue.$ = privateValue.$ + 1;
   const workgroupValue: WorkgroupVar<u32> = workgroupVar<u32>();
-  workgroupValue.set(8);
+  workgroupValue.$ = 8;
   const workgroupValues: WorkgroupArray<u32> = workgroupArray<u32>(2);
   workgroupValues.set(0, 9);
   workgroupValues.set(1, 10);
@@ -36,7 +36,7 @@ export function main(): void {
   const indexedWorkgroupValue: u32 = workgroupValues[0];
   workgroupBarrier();
   storageBarrier();
-  print(`variables=${privateValue.get()},${workgroupValue.get()},${workgroupValues.get(0)},${workgroupValues.get(1)},${workgroupValues.length()},${indexedWorkgroupValue}`);
+  print(`variables=${privateValue.$},${workgroupValue.$},${workgroupValues.get(0)},${workgroupValues.get(1)},${workgroupValues.length()},${indexedWorkgroupValue}`);
   const unsigned: AtomicU32 = new AtomicU32(10);
   const signed: AtomicI32 = new AtomicI32(-2);
   print(`atomic=${unsigned.add(5)},${unsigned.sub(3)},${unsigned.min(20)},${unsigned.max(20)},${unsigned.exchange(7)},${unsigned.load()}`);

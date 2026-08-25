@@ -30,7 +30,32 @@ first-party rules. The API generator, the `[api]` policy section, and
   of concept numbered this rule H15. H2, H3, and H5 are adapter rules
   in `facade-generator.md`, so the number moved.)
 
-## 4. What is not a rule here
+## 4. Attributes
+
+- **J14 — An IDL attribute generates as a read accessor.** Rev 0,
+  2026-08-25. subscript R37 gives a class a read accessor, so the
+  API layer spells an IDL attribute the way the WebGPU JavaScript
+  API spells it. A program writes `buffer.size`, `texture.format`,
+  and `device.queue`. The generator emits `get name(): T { ... }`
+  from the attribute plan, and the body is the body it emits today.
+
+  The `attribute-method` pattern and its 14 deviation rows leave the
+  policy. A faithful attribute is a generated member under J9 and
+  needs no row. The generator rejects the retired pattern name, so a
+  stale row fails loudly.
+
+  `GPUHostOwnedDevice` is a policy class, not an IDL class. Its
+  `queue()` stays a method, because it returns a new owned wrapper
+  on every call, and a property read that allocates hides that cost.
+  Its existing `host-owned-wrapper` row already states the shape.
+  The owned `GPUDevice` caches its queue, so its `queue` is an
+  accessor like every other attribute.
+
+  A write accessor does not appear. Every covered IDL attribute is
+  read-only in this subset, and subscript R37 forbids a write
+  accessor on a value class.
+
+## 5. What is not a rule here
 
 The proof of concept ran the API layer as slices named E1 through E8.
 Those names are schedule labels. E1, E4, and E6 mean the encoder-area

@@ -109,7 +109,7 @@ function smokeFragment(
   input: Varyings,
   ctx: FragmentInvocation,
 ): Vec4f {
-  const frame: FrameData = res.frame.get();
+  const frame: FrameData = res.frame.$;
   const field: f32 = smokeField(input.uv, frame.motion.x) * frame.motion.y;
   let smoke: f32 = 0.5 + field;
   if (smoke < 0.0) smoke = 0.0;

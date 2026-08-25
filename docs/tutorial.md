@@ -64,7 +64,7 @@ The kernel reads the uniform value and writes one storage element.
 
 ```ts program=programs/b04-particles.ts
 function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
-  const settings: SimParams = res.params.get();
+  const settings: SimParams = res.params.$;
   const i: u32 = ctx.globalId.x;
   if (i < settings.count) {
     res.particles[i] = integrate(res.particles[i], settings.dt);

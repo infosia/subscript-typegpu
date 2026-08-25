@@ -78,7 +78,7 @@ class RenderLayout {
 }
 
 function vert(res: RenderLayout, value: Vertex, ctx: VertexInvocation): Varyings {
-  const offset: Offset = res.params.get();
+  const offset: Offset = res.params.$;
   return new Varyings(
     new Vec4f(
       value.position.x + offset.value.x,

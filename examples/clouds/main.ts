@@ -116,7 +116,7 @@ function cloudFragment(
   input: Varyings,
   ctx: FragmentInvocation,
 ): Vec4f {
-  const frame: CloudFrame = res.frame.get();
+  const frame: CloudFrame = res.frame.$;
   const screen = new Vec2f(
     (input.uv.x - 0.5) * frame.aspect + 0.5,
     input.uv.y,

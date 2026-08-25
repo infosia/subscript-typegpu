@@ -135,7 +135,7 @@ function sceneFragment(
   input: Varyings,
   ctx: FragmentInvocation,
 ): Vec4f {
-  const frame: FrameData = res.frame.get();
+  const frame: FrameData = res.frame.$;
   const screen = new Vec2f(
     (input.uv.x * 2.0 - 1.0) * frame.aspect,
     input.uv.y * 2.0 - 1.0,

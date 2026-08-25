@@ -274,10 +274,9 @@ Differences:
   read-write storage. TypeGPU writes the same choice as `access:
   'mutable'`.
 - A kernel reads each binding through its layout parameter.
-  `res.params.get()` reads a uniform. `res.items[i]` reads one element,
+  `res.params.$` reads a uniform. `res.items[i]` reads one element,
   and `res.items[i] = v` writes one element of a `MutStorage`. TypeGPU
-  writes `layout.$.params` and `layout.$.items[i]`. subscript has no
-  user-defined accessors, so a uniform read uses a method call.
+  writes `layout.$.params` and `layout.$.items[i]`.
 - A layout class is a parameter. A kernel with two layout parameters
   uses two bind groups, group 0 and group 1, in parameter order.
   `b11-texture` declares `computePipeline2<TextureLayout, ParamsLayout>`.
@@ -333,7 +332,7 @@ function integrate(particle: Particle, dt: f32): Particle {
 }
 
 function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
-  const settings: SimParams = res.params.get();
+  const settings: SimParams = res.params.$;
   const i: u32 = ctx.globalId.x;
   if (i < settings.count) {
     res.particles[i] = integrate(res.particles[i], settings.dt);
@@ -399,8 +398,8 @@ Differences:
 - The free factories are `vec2f` through `vec4h` and take their
   components in order. TypeGPU writes `d.vec3f(x, y, z)`. `Vec3f` is
   the type annotation. `new Vec3f(x, y, z)` builds the same value.
-- Swizzles are methods, because subscript has no user-defined
-  accessors: `v.xy()`, `v.xyz()`, and the other in-order subsets.
+- Swizzles are read accessors: `v.xy`, `v.xyz`, and the other in-order
+  subsets.
   TypeGPU writes `v.xy`. Mixed constructors are free functions:
   `vec4fFrom3(v, w)`, `vec3fFrom2(v, z)`, `vec3fSplat(s)`, and the same
   shapes for the integer families. TypeGPU writes `d.vec4f(v, w)`.
@@ -513,22 +512,24 @@ const sharedValues: WorkgroupArray<u32> = workgroupArray<u32>(4);
 const sharedCounter: WorkgroupVar<AtomicU32> = workgroupVar<AtomicU32>();
 
 function workgroupKernel(res: WorkgroupLayout, ctx: ComputeInvocation): void {
-  privateOffset.set(privateOffset.get() + 1);
-  sharedValues[ctx.localIndex] = ctx.localIndex + privateOffset.get();
+  privateOffset.$ = privateOffset.$ + 1;
+  sharedValues[ctx.localIndex] = ctx.localIndex + privateOffset.$;
   if (ctx.localIndex === 0) {
-    sharedCounter.get().store(0);
+    sharedCounter.$.store(0);
   }
   workgroupBarrier();
-  sharedCounter.get().add(sharedValues[ctx.localIndex]);
+  sharedCounter.$.add(sharedValues[ctx.localIndex]);
   workgroupBarrier();
   if (ctx.localIndex === 0) {
-    res.counters[ctx.workgroupId.x].total.add(sharedCounter.get().load());
+    res.counters[ctx.workgroupId.x].total.add(sharedCounter.$.load());
   }
 }
 ```
 
 Differences:
 
+- A read-modify-write uses one statement: `x.$ = x.$ + 1`.
+  subscript rejects `x.$ += 1`.
 - Atomic operations are methods: `load`, `store`, `add`, `sub`, `min`,
   `max`, and `exchange`. TypeGPU uses `std.atomicAdd` and the others.
 - `workgroupBarrier()` and `storageBarrier()` are functions with empty
@@ -803,11 +804,11 @@ These TypeGPU features have no equivalent.
   `d.size`, `d.Infer`.
 - Fixed resources and the catch-all bind group: `root.createUniform`,
   `root.createReadonly`, `root.createMutable`.
-- `tgpu.resolve`, `tgpu.const`, slots, derived values, accessors.
+- `tgpu.resolve`, `tgpu.const`, slots, derived values, and
+  `tgpu.accessor`.
 - Default workgroup sizes.
 - `buffer.clear`, `buffer.copyFrom`, `common.writeSoA`.
-- Operators on vectors, `std` as a namespace, `tsover`, and swizzles
-  as properties.
+- Operators on vectors, `std` as a namespace, and `tsover`.
 - The derivative builtins `dpdx`, `dpdy`, `fwidth` and the pack and
   unpack builtins are not in the library yet.
 - Integer and depth textures, texture dimensions other than 2D, sampler

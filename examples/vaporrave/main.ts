@@ -108,7 +108,7 @@ function vaporNormal(point: Vec3f, time: f32): Vec3f {
 // pattern through a slot and rebuilds the pipeline.
 function retroSurface(point: Vec3f, normal: Vec3f, time: f32): Vec3f {
   if (point.y < 0.025) {
-    const cell: Vec2f = point.xz().fract();
+    const cell: Vec2f = point.xz.fract();
     let xEdge: f32 = cell.x;
     if (1.0 - cell.x < xEdge) xEdge = 1.0 - cell.x;
     let yEdge: f32 = cell.y;
@@ -140,7 +140,7 @@ function vaporFragment(
   input: Varyings,
   ctx: FragmentInvocation,
 ): Vec4f {
-  const frame: FrameData = res.frame.get();
+  const frame: FrameData = res.frame.$;
   const screen = new Vec2f(
     (input.uv.x * 2.0 - 1.0) * frame.aspect,
     input.uv.y * 2.0 - 1.0,
