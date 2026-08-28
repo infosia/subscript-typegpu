@@ -1,4 +1,4 @@
-# lowering-request — two LIR defects block the pin `c45d164`
+# lowering-request — the re-pin from `a2228d9` to `2a65724`
 
 The workspace pin is `a2228d9`. The candidate pin is `c45d164`,
 committed 2026-08-28. Between the two, subscript §68 made LIR the one
@@ -109,7 +109,7 @@ L1 and L2 are closed. subscript selects `LoadAddress` for a by-value
 receiver, and the reaching-version pass now collects the known
 predecessor versions instead of waiting for every one of them.
 
-R1 is fixed here. The fixture renames its second `storage` to
+R1 is closed here. The fixture renames its second `storage` to
 `storageTexture`.
 
 Two findings remain.
@@ -151,10 +151,10 @@ here, not a subscript defect.
 
 ## Closed at `2a65724`, 2026-08-28
 
-L3 was two defects in one. `root_storage.rs` typed an address as zero
-root slots, so no address kept its base alive, and §68.2 rule 8 had
-made the storage scope the live range. subscript computes borrowed
-bases as one fixed point, and both tiers read the one plan. The escape
+`root_storage.rs` typed an address as zero root slots, so no address
+kept its base alive. §68.2 rule 8 made the storage scope the live
+range, and the base then died under a live address. subscript computes
+borrowed bases as one fixed point, and both tiers read the one plan. The escape
 rule the round first proposed was withdrawn on measurement, so no new
 rejection reaches this repository.
 
@@ -163,7 +163,18 @@ emitted C spelling is not an interface, because a class name carries a
 class-table index. The probe now names only the types and members of
 `crates/facade/subscript-typegpu.h`, and takes the other side from
 `subscript_codegen::value_class_layouts`, which is keyed by source
-names. That check covers the ABI L3 broke.
+names. The check compares sizes, alignments, and member offsets of the
+52 mirror structs. It cannot see L3, which wrote zeros at correct
+offsets. The differential suite sees L3: every render program aborted
+at `24e772e` and prints `PASS` at `2a65724`.
+
+The rewrite drops one check. The old probe compiled each program's
+emitted C and read the offsets of every schema struct in it. No test
+here reads emitted C now. Two gates hold the property: the
+differential suite runs every program under both tiers against one
+golden, so a ship-tier struct that disagrees with the engine moves the
+bytes a program writes and reads. subscript's `a153` corpus entry
+round-trips a nested `@CStruct` array through both tiers.
 
 ## Status
 

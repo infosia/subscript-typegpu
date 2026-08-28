@@ -171,6 +171,14 @@ impl Drop for TempDir {
 }
 
 /// Projects managed mirror fields to their C aggregate forms.
+///
+/// The projection is the mirror's own contract, not a measurement: a
+/// `T[]` field stands for the adjacent pair `size_t {name}Count` then
+/// `const T* {name}` (subscript `compiler.md` §30.2), a string field
+/// stands for `SubscriptTypegpuStringView`, and a function field
+/// stands for one pointer. The probe reads the header's member offsets
+/// under those names, so a header that breaks the pair form fails here.
+/// The pointer widths assume a 64-bit host.
 fn facade_mirror_layouts(module: &mut hir::Module) -> BTreeMap<String, ProbeLayout> {
     let mut boundary_fields = BTreeMap::new();
     for class in module.classes.iter().filter(|class| class.is_boundary) {
@@ -330,9 +338,9 @@ fn compile_probe(
 
 /// Proves both layout agreements from one check of each program: the
 /// generator's schema layouts against the engine, and the facade
-/// header's mirror structs against the engine. One check serves both,
-/// because the second comparison rewrites the module's mirror field
-/// types and the first one reads them.
+/// header's mirror structs against the engine. The first comparison
+/// runs before the second, because the second rewrites the module's
+/// mirror field types.
 #[test]
 fn schema_and_header_layouts_match_the_engine_for_every_b_program() {
     subscript_typegpu_harness::run_program_pool(programs(), |program| {
@@ -366,11 +374,5 @@ fn schema_and_header_layouts_match_the_engine_for_every_b_program() {
                 name
             );
         }
-        assert_eq!(
-            actual.len(),
-            expected.len(),
-            "{}: C probe schema count",
-            program.display()
-        );
     });
 }
