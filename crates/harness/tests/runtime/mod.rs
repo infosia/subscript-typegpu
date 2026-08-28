@@ -277,8 +277,8 @@ export function main(): void {
   const loaded = texture.load(new Vec2i(1, 0), 0);
   const sampled = texture.sample(sampler, new Vec2f(0.25, 0.5));
   const storagePixels: Vec4f[] = [new Vec4f(0.0, 0.0, 0.0, 0.0)];
-  const storage = new StorageTexture2d<Rgba8unorm>(storagePixels, 1, 1);
-  storage.store(new Vec2i(0, 0), sampled);
+  const storageTexture = new StorageTexture2d<Rgba8unorm>(storagePixels, 1, 1);
+  storageTexture.store(new Vec2i(0, 0), sampled);
   print(`texture=${dimensions.x},${dimensions.y},${loaded.x},${loaded.y},${sampled.x},${sampled.y},${storagePixels[0].x},nearest=${sampler.isNearest()}`);
 }
 

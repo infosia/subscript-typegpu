@@ -97,14 +97,59 @@ as `StorageTexture2d<Rgba8unorm>`. The candidate pin reports
 same shape. subscript §67 is right, and the fixture is wrong. The fix
 belongs here, and it holds at both pins.
 
-## What stays open
+## What stayed open, and what it hid
 
-L1 and L2 stop lowering before most sources reach a run, so more
-rejections of the R1 class can hide behind them. The full list needs
-a build with L1 and L2 closed.
+L1 and L2 stopped lowering before most sources reached a run, so the
+list of rejections behind them was unknown. Two findings came out
+when subscript closed them.
+
+## The pin `24e772e`, measured 2026-08-28
+
+L1 and L2 are closed. subscript selects `LoadAddress` for a by-value
+receiver, and the reaching-version pass now collects the known
+predecessor versions instead of waiting for every one of them.
+
+R1 is fixed here. The fixture renames its second `storage` to
+`storageTexture`.
+
+Two findings remain.
+
+### L3 — a nullable nested boundary struct arrives zeroed
+
+Every program that creates a render pipeline fails: `a03`, `a05`,
+`b06`, `b07`, `b08`, `b16`, `b17`, `b19`, and `b21`. yawgpu panics
+with `WGPUShaderModule must not be null`. The panic crosses a C ABI,
+so the process aborts with `SIGABRT` and the run prints nothing.
+
+A temporary probe in the facade printed the fields the facade reads
+from one descriptor. Same probe, same program
+(`programs/b06-render.ts`), both pins:
+
+| Field | `a2228d9` | `24e772e` |
+|---|---|---|
+| `vertex.module` | non-null | non-null |
+| `vertex.entryPoint` length | 4 | 4 |
+| `fragment.module` | non-null | 0 |
+| `fragment.entryPoint` length | 4 | 0 |
+| `fragment.targets` count | 1 | 0 |
+
+`vertex` is a boundary value class that the descriptor holds by
+value, and it reads correctly. `fragment` is the same kind of class,
+nullable, and the descriptor holds it as `*const`. Its first 32 bytes
+read as zero, and two pointers sit at offset 32 and offset 48.
+
+The dev tier and the ship tier fail the same way, so the defect sits
+below the tier split.
+
+### R2 — the emitted C identifiers changed
+
+`c_layout` compiles a C probe that names subscript's emitted structs
+and fields. At `a2228d9` a class was `Sub_{id}_{name}` and a field
+kept its source name. At `24e772e` a class is `SubC{id}` and a field
+is `d{id}`. The probe must follow the new spelling. This is a fix
+here, not a subscript defect.
 
 ## Status
 
-The pin stays at `a2228d9`. `Cargo.toml` and `Cargo.lock` carry no
-change. The owner decides the order: subscript closes L1 and L2, then
-this repository re-pins and re-measures the gate.
+The pin stays at `a2228d9`, and the gate is green there: 258 passed,
+1 ignored, 121.13 s. The re-pin waits for L3.
