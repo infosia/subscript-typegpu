@@ -6,12 +6,11 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use subscript_codegen::{
-    add_c11_optimized_flags, add_executable_output, add_object_directory, emit_c_without_main,
-    host_c_compiler, include_directory_arg, runtime_system_libraries, tool_output_report,
-    value_class_layouts,
+    add_c11_optimized_flags, add_executable_output, add_object_directory, host_c_compiler,
+    include_directory_arg, tool_output_report, value_class_layouts,
 };
-use subscript_compiler::{hir, SourceFile};
-use subscript_typegpu_gen::{Generated, GeneratedLayout};
+use subscript_compiler::{hir, SourceFile, Type};
+use subscript_typegpu_gen::Generated;
 
 fn repository_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -171,60 +170,92 @@ impl Drop for TempDir {
     }
 }
 
-fn c_type(module: &hir::Module, expected: &GeneratedLayout, source: &str) -> String {
-    let index = module
-        .classes
-        .iter()
-        .position(|class| {
-            class.name == expected.name
-                && !matches!(
-                    class.pos.file.as_str(),
-                    "typegpu-types.ts" | "typegpu.ts" | "webgpu.ts"
-                )
-        })
-        .or_else(|| {
-            matches!(
-                expected.name.as_str(),
-                "DispatchIndirectArgs" | "DrawIndirectArgs" | "DrawIndexedIndirectArgs"
-            )
-            .then(|| {
-                module
-                    .classes
-                    .iter()
-                    .position(|class| {
-                        class.name == expected.name && class.pos.file == "typegpu-types.ts"
-                    })
-                    .unwrap_or_else(|| {
-                        panic!("PI17 schema `{}` is absent from the HIR", expected.name)
-                    })
-            })
-        })
-        .unwrap_or_else(|| panic!("emitted C cannot name schema `{}`", expected.name));
-    let name = format!("Sub_{index}_{}", expected.name);
+/// Projects managed mirror fields to their C aggregate forms.
+fn facade_mirror_layouts(module: &mut hir::Module) -> BTreeMap<String, ProbeLayout> {
+    let mut boundary_fields = BTreeMap::new();
+    for class in module.classes.iter().filter(|class| class.is_boundary) {
+        boundary_fields.insert(
+            class.name.clone(),
+            class
+                .fields
+                .iter()
+                .map(|field| (field.name.clone(), matches!(field.ty, Type::Array(_))))
+                .collect::<Vec<_>>(),
+        );
+    }
     assert!(
-        source.contains(&format!("typedef struct {name}")),
-        "emitted C does not contain schema `{}`",
-        expected.name
+        !boundary_fields.is_empty(),
+        "facade mirror class set is empty"
     );
-    name
+
+    for class in module.classes.iter_mut().filter(|class| class.is_boundary) {
+        for field in &mut class.fields {
+            field.ty = match &field.ty {
+                Type::Str | Type::Array(_) => Type::FixedArray(Box::new(Type::U64), 2),
+                Type::Func(_) => Type::U64,
+                other => other.clone(),
+            };
+        }
+    }
+
+    let layouts = value_class_layouts(module)
+        .expect("compute facade mirror C layouts")
+        .into_iter()
+        .map(|layout| (layout.name.clone(), layout))
+        .collect::<BTreeMap<_, _>>();
+    boundary_fields
+        .into_iter()
+        .map(|(name, fields)| {
+            let layout = layouts
+                .get(&name)
+                .unwrap_or_else(|| panic!("subscript layout lacks facade mirror `{name}`"));
+            assert_eq!(
+                layout.fields.len(),
+                fields.len(),
+                "{name}: facade mirror field count"
+            );
+            let fields = layout
+                .fields
+                .iter()
+                .zip(fields)
+                .flat_map(|(layout, (name, is_array))| {
+                    assert_eq!(layout.name, name, "facade mirror field name");
+                    let mut offsets = vec![(name.clone(), layout.offset)];
+                    if is_array {
+                        offsets[0].1 = layout
+                            .offset
+                            .checked_add(8)
+                            .expect("array pointer offset is within u32");
+                        offsets.push((format!("{name}Count"), layout.offset));
+                    }
+                    offsets
+                })
+                .collect();
+            (
+                name,
+                ProbeLayout {
+                    size: layout.size,
+                    align: layout.align,
+                    fields,
+                },
+            )
+        })
+        .collect()
 }
 
 fn compile_probe(
     program: &Path,
-    generated: &Generated,
-    module: &hir::Module,
+    expected: &BTreeMap<String, ProbeLayout>,
 ) -> BTreeMap<String, ProbeLayout> {
-    let mut source = emit_c_without_main(module)
-        .unwrap_or_else(|error| panic!("{}: emit C: {error}", program.display()))
-        .source;
-    source.push_str("\n#include <stddef.h>\n#include <stdio.h>\nint main(void) {\n");
-    for layout in &generated.layouts {
-        let c_type = c_type(module, layout, &source);
-        let mut format = format!("{}|%zu|%zu", layout.name);
-        let mut arguments = format!("sizeof({c_type}), _Alignof({c_type})");
-        for member in &layout.c.members {
-            format.push_str(&format!("|{}=%zu", member.name));
-            arguments.push_str(&format!(", offsetof({c_type}, {})", member.name));
+    let mut source = String::from(
+        "#include \"subscript-typegpu.h\"\n#include <stddef.h>\n#include <stdio.h>\nint main(void) {\n",
+    );
+    for (name, layout) in expected {
+        let mut format = format!("{name}|%zu|%zu");
+        let mut arguments = format!("sizeof({name}), _Alignof({name})");
+        for member in layout.fields.keys() {
+            format.push_str(&format!("|{member}=%zu"));
+            arguments.push_str(&format!(", offsetof({name}, {member})"));
         }
         source.push_str(&format!("  printf(\"{format}\\n\", {arguments});\n"));
     }
@@ -245,10 +276,7 @@ fn compile_probe(
             compiler.style(),
             &repository_root().join("crates/facade"),
         ))
-        .arg(&source_path)
-        .args(subscript_typegpu_harness::ship_link_inputs().expect("facade link inputs"))
-        .arg(subscript_typegpu_harness::ensure_runtime_staticlib().expect("runtime archive"))
-        .args(runtime_system_libraries(compiler.style()));
+        .arg(&source_path);
     add_executable_output(&mut command, &executable, compiler.style());
     let compiled = command.output().expect("run host C compiler");
     assert!(
@@ -300,58 +328,47 @@ fn compile_probe(
         .collect()
 }
 
+/// Proves both layout agreements from one check of each program: the
+/// generator's schema layouts against the engine, and the facade
+/// header's mirror structs against the engine. One check serves both,
+/// because the second comparison rewrites the module's mirror field
+/// types and the first one reads them.
 #[test]
-fn engine_c_layouts_match_subscript_codegen_for_every_b_program() {
+fn schema_and_header_layouts_match_the_engine_for_every_b_program() {
     subscript_typegpu_harness::run_program_pool(programs(), |program| {
-        let (generated, module) = checked(program);
+        let (generated, mut module) = checked(program);
         assert_language_layouts(program, &generated, &module);
-    });
-}
-
-#[test]
-fn emitted_c_layouts_match_the_engine_for_every_b_program() {
-    subscript_typegpu_harness::run_program_pool(programs(), |program| {
-        let (generated, module) = checked(program);
-        let actual = compile_probe(program, &generated, &module);
-        for expected in &generated.layouts {
-            let layout = actual.get(&expected.name).unwrap_or_else(|| {
-                panic!(
-                    "{}: C probe lacks schema `{}`",
-                    program.display(),
-                    expected.name
-                )
+        let expected = facade_mirror_layouts(&mut module);
+        let actual = compile_probe(program, &expected);
+        for (name, expected) in &expected {
+            let layout = actual.get(name).unwrap_or_else(|| {
+                panic!("{}: C probe lacks schema `{}`", program.display(), name)
             });
             assert_eq!(
                 layout.size,
-                expected.c.size,
+                expected.size,
                 "{}: {} C size",
                 program.display(),
-                expected.name
+                name
             );
             assert_eq!(
                 layout.align,
-                expected.c.align,
+                expected.align,
                 "{}: {} C align",
                 program.display(),
-                expected.name
+                name
             );
-            let offsets = expected
-                .c
-                .members
-                .iter()
-                .map(|member| (member.name.clone(), member.offset))
-                .collect::<BTreeMap<_, _>>();
             assert_eq!(
                 layout.fields,
-                offsets,
+                expected.fields,
                 "{}: {} C field offsets",
                 program.display(),
-                expected.name
+                name
             );
         }
         assert_eq!(
             actual.len(),
-            generated.layouts.len(),
+            expected.len(),
             "{}: C probe schema count",
             program.display()
         );

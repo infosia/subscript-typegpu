@@ -109,3 +109,22 @@ and every example and takes 4.79 s.
 
 Read the row as the hot-machine bound and the `--require-backend`
 runs as the warm bound.
+
+## The `2a65724` re-pin (2026-08-28)
+
+The warm `--require-backend` gate moved from 121.13 s at `a2228d9` to
+161.35 s at `2a65724`. The harness executable holds the change: 95.05 s
+before, 138.83 s after.
+
+The cause is not in this repository's diff. At the new pin, and before
+the `c_layout` probe changed, the same executable already took
+145.09 s while `c_layout` failed early. subscript's one-ordered-IR
+pipeline landed between the two pins.
+
+The probe rewrite pays part of it back. Two tests each ran the program
+pool, so every `b` program was checked twice. One test now does both
+comparisons from one check, which took the executable from 156.18 s to
+138.83 s.
+
+One run measured 288.63 s. A second full gate ran on the machine at
+the same time. Discard it.

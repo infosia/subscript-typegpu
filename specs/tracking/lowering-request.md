@@ -149,7 +149,24 @@ kept its source name. At `24e772e` a class is `SubC{id}` and a field
 is `d{id}`. The probe must follow the new spelling. This is a fix
 here, not a subscript defect.
 
+## Closed at `2a65724`, 2026-08-28
+
+L3 was two defects in one. `root_storage.rs` typed an address as zero
+root slots, so no address kept its base alive, and §68.2 rule 8 had
+made the storage scope the live range. subscript computes borrowed
+bases as one fixed point, and both tiers read the one plan. The escape
+rule the round first proposed was withdrawn on measurement, so no new
+rejection reaches this repository.
+
+R2 is closed here. subscript answered the question in §66.1: the
+emitted C spelling is not an interface, because a class name carries a
+class-table index. The probe now names only the types and members of
+`crates/facade/subscript-typegpu.h`, and takes the other side from
+`subscript_codegen::value_class_layouts`, which is keyed by source
+names. That check covers the ABI L3 broke.
+
 ## Status
 
-The pin stays at `a2228d9`, and the gate is green there: 258 passed,
-1 ignored, 121.13 s. The re-pin waits for L3.
+The pin is `2a65724`. `tools/gate.sh --require-backend` green, 257
+passed, 1 ignored, 161.35 s. The gate cost of the pin is recorded in
+`specs/tracking/build-time.md`.
