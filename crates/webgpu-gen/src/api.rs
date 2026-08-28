@@ -6342,7 +6342,9 @@ fn render_async_method(
     out.push_str("    while (status === 0) {\n");
     out.push_str("      subscript_typegpu_instance_process_events(this.instance);\n");
     out.push_str("      status = subscript_typegpu_future_status(this.instance, future);\n");
-    out.push_str("      await Context.suspend();\n");
+    out.push_str("      if (status === 0) {\n");
+    out.push_str("        await Context.suspend();\n");
+    out.push_str("      }\n");
     out.push_str("    }\n");
     if boolean_result {
         out.push_str(
@@ -6452,7 +6454,9 @@ fn render_error_scope_pop_method(
     out.push_str("      subscript_typegpu_instance_process_events(this.instance);\n");
     out.push_str("      status = subscript_typegpu_future_status(this.instance, future);\n");
     if !host_owned {
-        out.push_str("      await Context.suspend();\n");
+        out.push_str("      if (status === 0) {\n");
+        out.push_str("        await Context.suspend();\n");
+        out.push_str("      }\n");
     }
     out.push_str("    }\n");
     out.push_str(

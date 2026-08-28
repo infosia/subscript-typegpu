@@ -1985,7 +1985,9 @@ export class GPU {
     while (status === 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      await Context.suspend();
+      if (status === 0) {
+        await Context.suspend();
+      }
     }
     if (status !== 1) {
       subscript_typegpu_future_drop(this.instance, future);
@@ -2038,7 +2040,9 @@ export class GPUAdapter {
     while (status === 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      await Context.suspend();
+      if (status === 0) {
+        await Context.suspend();
+      }
     }
     if (status !== 1) {
       subscript_typegpu_future_drop(this.instance, future);
@@ -2140,7 +2144,9 @@ export class GPUDevice {
     while (status === 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      await Context.suspend();
+      if (status === 0) {
+        await Context.suspend();
+      }
     }
     if (status !== 1) {
       subscript_typegpu_future_drop(this.instance, future);
@@ -2155,7 +2161,9 @@ export class GPUDevice {
     while (status === 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      await Context.suspend();
+      if (status === 0) {
+        await Context.suspend();
+      }
     }
     if (status !== 1) {
       subscript_typegpu_future_drop(this.instance, future);
@@ -2202,7 +2210,9 @@ export class GPUDevice {
     while (status === 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      await Context.suspend();
+      if (status === 0) {
+        await Context.suspend();
+      }
     }
     if (status !== 1) {
       subscript_typegpu_future_drop(this.instance, future);
@@ -2316,7 +2326,9 @@ export class GPUHostOwnedDevice {
     while (status === 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      await Context.suspend();
+      if (status === 0) {
+        await Context.suspend();
+      }
     }
     if (status !== 1) {
       subscript_typegpu_future_drop(this.instance, future);
@@ -2331,7 +2343,9 @@ export class GPUHostOwnedDevice {
     while (status === 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      await Context.suspend();
+      if (status === 0) {
+        await Context.suspend();
+      }
     }
     if (status !== 1) {
       subscript_typegpu_future_drop(this.instance, future);
@@ -2436,7 +2450,9 @@ export class GPUBuffer {
     while (status === 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      await Context.suspend();
+      if (status === 0) {
+        await Context.suspend();
+      }
     }
     subscript_typegpu_future_drop(this.instance, future);
     return status === 1;
@@ -2515,7 +2531,9 @@ export class GPUQueue {
     while (status === 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      await Context.suspend();
+      if (status === 0) {
+        await Context.suspend();
+      }
     }
     subscript_typegpu_future_drop(this.instance, future);
     return status === 1;
