@@ -1962,7 +1962,7 @@ dependencies = [
 [[package]]
 name = "subscript-bindgen"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=c1a1d72#c1a1d7296eea1c94183979ab0ddcd82c6f0db806"
+source = "git+https://github.com/infosia/subscript.git?rev=8d64978#8d6497807790937e00d7c82b6b2b485ac0f51bc1"
 dependencies = [
  "clang-sys",
 ]
@@ -1970,7 +1970,7 @@ dependencies = [
 [[package]]
 name = "subscript-codegen"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=c1a1d72#c1a1d7296eea1c94183979ab0ddcd82c6f0db806"
+source = "git+https://github.com/infosia/subscript.git?rev=8d64978#8d6497807790937e00d7c82b6b2b485ac0f51bc1"
 dependencies = [
  "cc",
  "cranelift-codegen",
@@ -1987,7 +1987,7 @@ dependencies = [
 [[package]]
 name = "subscript-compiler"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=c1a1d72#c1a1d7296eea1c94183979ab0ddcd82c6f0db806"
+source = "git+https://github.com/infosia/subscript.git?rev=8d64978#8d6497807790937e00d7c82b6b2b485ac0f51bc1"
 dependencies = [
  "regress",
  "serde",
@@ -1999,7 +1999,7 @@ dependencies = [
 [[package]]
 name = "subscript-runtime"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=c1a1d72#c1a1d7296eea1c94183979ab0ddcd82c6f0db806"
+source = "git+https://github.com/infosia/subscript.git?rev=8d64978#8d6497807790937e00d7c82b6b2b485ac0f51bc1"
 dependencies = [
  "num-bigint",
  "num-traits",
