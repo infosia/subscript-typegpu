@@ -362,6 +362,10 @@ ran and quotes its wall time and test count.**
   committed.
 - `.gitignore`: `target/`, `node_modules/`, `.claude/`, `.cargo/`,
   local test transcripts.
+- No agent-session trailer in commit messages. A commit message
+  never carries a `Claude-Session:` line or any other link to the
+  conversation that produced it. The repository is public and its
+  history is an artifact.
 
 ### No local or sibling paths in committed files
 
