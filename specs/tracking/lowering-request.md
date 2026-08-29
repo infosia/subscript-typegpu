@@ -181,3 +181,30 @@ round-trips a nested `@CStruct` array through both tiers.
 The pin is `2a65724`. `tools/gate.sh --require-backend` green, 257
 passed, 1 ignored, 161.35 s. The gate cost of the pin is recorded in
 `specs/tracking/build-time.md`.
+
+## The pin `f43e3b2`, 2026-08-29
+
+Two findings, both closed here.
+
+**R3 — nine unreachable match arms.** subscript removed
+`#[non_exhaustive]` from `hir::Stmt`, `hir::Callee`, and
+`hir::ExprKind`. A wildcard arm after a complete enumeration is
+unreachable, and `clippy -D warnings` reports it. The nine arms in
+`crates/typegpu-gen/src/kernel.rs` and `pipeline.rs` are deleted. No
+variant was added, so no behaviour moved.
+
+**R4 — the K19 cycle case is unreachable.** subscript §67.1 rule 4c
+rejects a module initializer that reads a binding declared after it,
+and every constant cycle contains one such read. `tsc` rejects the
+same shape as TS2448. The fixture `k24-constant-cycle.ts` expected
+K19 and got `S100` from subscript first. K19 Rev 5 removes the cycle
+from its list, the fixture is deleted, and the generator's recursion
+guard reports through the internal generator form instead of K19.
+
+§33.5 replaced the address representation of `T | null` with a
+managed box, and S015 is deleted. `lib/webgpu.ts` needs no change.
+
+`tools/gate.sh --require-backend` green, 257 passed, 1 ignored,
+177.64 s on a quiet machine. One run measured 244.04 s while a second
+gate ran on the same machine. Discard it.
+

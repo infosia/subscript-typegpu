@@ -89,7 +89,6 @@ fn statement_pos(statement: &Stmt) -> Option<&Pos> {
         | Stmt::Continue(pos) => Some(pos),
         Stmt::Expr(expr) => Some(&expr.pos),
         Stmt::Block(body) => body.first().and_then(statement_pos),
-        _ => None,
     }
 }
 
@@ -277,7 +276,6 @@ fn global_names_stmt(statement: &Stmt, out: &mut BTreeSet<String>) {
             }
         }
         Stmt::Break(_) | Stmt::Continue(_) => {}
-        _ => {}
     }
 }
 
@@ -553,7 +551,6 @@ fn statements_block_host(module: &Module, statements: &[Stmt]) -> bool {
         }
         Stmt::Block(body) => statements_block_host(module, body),
         Stmt::Break(_) | Stmt::Continue(_) => false,
-        _ => false,
     })
 }
 
@@ -1122,8 +1119,7 @@ fn fold_global_constant(
         ));
     }
     if !visiting.insert(name.to_owned()) {
-        return Err(diagnostic(
-            "K19",
+        return Err(generator_diagnostic(
             format!("module constant cycle includes `{name}`"),
             global.pos.clone(),
         ));
@@ -2683,13 +2679,6 @@ impl<'a> Emitter<'a> {
                 }
                 Self::line(out, indent, "continue;");
             }
-            _ => {
-                return Err(diagnostic(
-                    "K7",
-                    "statement is outside the current kernel subset",
-                    Pos::new("", 1, 1),
-                ))
-            }
         }
         Ok(())
     }
@@ -3054,7 +3043,6 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                 }
                 Stmt::Block(body) => self.collect_statements(body, control.clone()),
                 Stmt::Return { .. } | Stmt::Break(_) | Stmt::Continue(_) => {}
-                _ => {}
             }
         }
     }
@@ -3216,7 +3204,6 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                     }
                 }
                 Stmt::Let { .. } => {}
-                _ => {}
             }
         }
         Ok(())
@@ -3445,7 +3432,6 @@ fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<String>) {
             }
         }
         Stmt::Break(_) | Stmt::Continue(_) => {}
-        _ => {}
     }
 }
 
@@ -3616,7 +3602,6 @@ fn collect_schema_stmt(
             }
         }
         Stmt::Break(_) | Stmt::Continue(_) => {}
-        _ => {}
     }
 }
 

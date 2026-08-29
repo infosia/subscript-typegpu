@@ -606,7 +606,6 @@ fn stmt_has_compute(module: &Module, stmt: &Stmt) -> bool {
         }
         Stmt::Block(body) => body.iter().any(|stmt| stmt_has_compute(module, stmt)),
         Stmt::Break(_) | Stmt::Continue(_) => false,
-        _ => false,
     }
 }
 

@@ -179,16 +179,21 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `break` and `continue` inside a `for`, `while`, or `switch` emit
   the WGSL statement of the same name. A `continue` inside a
   `switch` inside a loop targets the loop, as in WGSL.
-- **K19 — Module constants.** Rev 4. A module-level `const` of a
-  scalar, a library vector, or a library matrix type reaches a
-  kernel as a WGSL `const` of the same name when the generator folds
-  its initializer: a literal, a unary or binary expression of
-  literals and other module constants, or a vector factory of such.
-  The fold uses checked arithmetic in the constant's type. A
-  division by zero, an overflow, a cycle, any other initializer, and
-  a mutable global are K19 diagnostics when a kernel reads the
-  constant. A rejected `privateVar` initializer is a K20
-  diagnostic. Rev 4: a module-level `const` of a `FixedArray` of a
+- **K19 — Module constants.** Rev 5, 2026-08-29. A module-level
+  `const` of a scalar, a library vector, or a library matrix type
+  reaches a kernel as a WGSL `const` of the same name when the
+  generator folds its initializer: a literal, a unary or binary
+  expression of literals and other module constants, or a vector
+  factory of such. The fold uses checked arithmetic in the
+  constant's type. A division by zero, an overflow, any other
+  initializer, and a mutable global are K19 diagnostics when a
+  kernel reads the constant. A rejected `privateVar` initializer is
+  a K20 diagnostic. Rev 5: a cycle between module constants is not a
+  K19 case. subscript rejects a module initializer that reads a
+  binding declared after it (`compiler.md` §67.1 rule 4c, from pin
+  `f43e3b2`), and every cycle contains one such read. `tsc` rejects
+  the same shape as TS2448. The generator therefore never folds a
+  cycle, and it keeps no fixture for one. Rev 4: a module-level `const` of a `FixedArray` of a
   foldable scalar type reaches a kernel as a WGSL `const` array of
   the same name when every element folds under the same rules. The
   noise module's permutation tables are the first use.
