@@ -7,7 +7,8 @@ P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
 (K29–K31 WGSL shells), 2026-08-23. Rev 8 (K14 Rev 5 one order),
 2026-08-23. Rev 9 (K19 Rev 4 FixedArray constants), 2026-08-24. Rev 10 (K14
 Rev 6 literal suffixes), 2026-08-24. Rev 11 (K14 Rev 6 logic
-parentheses), 2026-08-24. Plan §3 D2, D3, D7, D9 and §4
+parentheses), 2026-08-24. Rev 12 (K5 Rev 1 `using`, absence test),
+2026-08-30. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -41,7 +42,13 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 - **K5 — Rejected types.** `string`, `T[]`, `Map`, `Set`, a reference
   class, `Nullable`, a function value, `f64`, `i64`, `u64`, `i8`,
   `u8`, `i16`, `u16`, `Date`, `RegExp`, `object`, a `Worker`. Each is
-  a diagnostic that names the construct and this rule.
+  a diagnostic that names the construct and this rule. Rev 1: a
+  `using` declaration in a kernel body (the HIR `Stmt::Let` with
+  `dispose` true) is a K5 rejection with a fixture. The HIR
+  `ExprKind::AbsenceTest` is a K5 rejection in the emitter without a
+  fixture: the checker emits the node only for a descriptor member,
+  and it rejects `undefined` on a kernel local first (`S012`, measured
+  2026-08-30).
 - **K6 — Literals are typed by context.** The HIR types every
   literal (subscript R26). The emitter writes the WGSL suffix from
   `Expr.ty`: `1u`, `1i`, `1.0f`. A `boolean` literal is `true` or

@@ -540,7 +540,7 @@ fn compute_arity(module: &Module, name: &str) -> Option<usize> {
 fn call_in_expr(module: &Module, expr: &Expr) -> bool {
     match &expr.kind {
         ExprKind::Call { callee: Callee::Func(name), .. } if compute_arity(module, name).is_some() => true,
-        ExprKind::Unary { operand, .. } | ExprKind::Cast(operand) | ExprKind::Length(operand) => call_in_expr(module, operand),
+        ExprKind::AbsenceTest { value: operand, .. } | ExprKind::Unary { operand, .. } | ExprKind::Cast(operand) | ExprKind::Length(operand) => call_in_expr(module, operand),
         ExprKind::Binary { left, right, .. } => call_in_expr(module, left) || call_in_expr(module, right),
         ExprKind::Assign { target, value, .. } => call_in_expr(module, target) || call_in_expr(module, value),
         ExprKind::Call { callee, args } => {

@@ -159,7 +159,8 @@ fn global_names_expr(expr: &Expr, out: &mut BTreeSet<String>) {
         out.insert(name.clone());
     }
     match &expr.kind {
-        ExprKind::Unary { operand, .. }
+        ExprKind::AbsenceTest { value: operand, .. }
+        | ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
         | ExprKind::Field { obj: operand, .. }
@@ -454,7 +455,8 @@ pub(crate) fn reached_render_global_names(
 
 fn expression_blocks_host(module: &Module, expression: &Expr) -> bool {
     match &expression.kind {
-        ExprKind::Unary { operand, .. }
+        ExprKind::AbsenceTest { value: operand, .. }
+        | ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
         | ExprKind::Field { obj: operand, .. }
@@ -1719,6 +1721,11 @@ impl<'a> Emitter<'a> {
                 "string local or expression in kernel",
                 expr.pos.clone(),
             )),
+            ExprKind::AbsenceTest { .. } => Err(diagnostic(
+                "K5",
+                "string local or expression in kernel",
+                expr.pos.clone(),
+            )),
             ExprKind::Local(name) => Ok(Snippet::atom(self.local_name(name))),
             ExprKind::Global(name) => {
                 if !self.globals.contains_key(name) {
@@ -2359,8 +2366,16 @@ impl<'a> Emitter<'a> {
                 ty,
                 mutable,
                 init,
+                dispose,
                 pos,
             } => {
+                if *dispose {
+                    return Err(diagnostic(
+                        "K5",
+                        "`using` declaration in kernel",
+                        pos.clone(),
+                    ));
+                }
                 if class_name(self.module, ty)
                     .is_some_and(|class| self.layout_names.contains(class))
                 {
@@ -2467,8 +2482,16 @@ impl<'a> Emitter<'a> {
                         ty,
                         mutable,
                         init,
+                        dispose,
                         pos,
                     }) => {
+                        if *dispose {
+                            return Err(diagnostic(
+                                "K5",
+                                "`using` declaration in kernel",
+                                pos.clone(),
+                            ));
+                        }
                         if class_name(self.module, ty)
                             .is_some_and(|class| self.layout_names.contains(class))
                         {
@@ -2759,7 +2782,8 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                     self.emitter.invocation_param
                 ))
             }
-            ExprKind::Unary { operand, .. }
+            ExprKind::AbsenceTest { value: operand, .. }
+            | ExprKind::Unary { operand, .. }
             | ExprKind::Cast(operand)
             | ExprKind::JsonResultValue(operand) => self.expression(operand),
             ExprKind::Length(operand) => {
@@ -3332,7 +3356,8 @@ fn called_functions_expr(expr: &Expr, out: &mut BTreeSet<String>) {
                 called_functions_expr(arg, out);
             }
         }
-        ExprKind::Unary { operand, .. }
+        ExprKind::AbsenceTest { value: operand, .. }
+        | ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
         | ExprKind::Field { obj: operand, .. }
@@ -3465,7 +3490,8 @@ fn collect_schema_expr(
 ) {
     collect_schema_type(module, &expr.ty, seen, out);
     match &expr.kind {
-        ExprKind::Unary { operand, .. }
+        ExprKind::AbsenceTest { value: operand, .. }
+        | ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
         | ExprKind::Field { obj: operand, .. }
