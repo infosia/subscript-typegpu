@@ -128,3 +128,13 @@ comparisons from one check, which took the executable from 156.18 s to
 
 One run measured 288.63 s. A second full gate ran on the machine at
 the same time. Discard it.
+
+## P15 (2026-09-01)
+
+The warm `--require-backend` gate across the phase: 157.50 s at
+the slice 1 tree, 174.37 s after the sort module, 172.65 s after
+the color module, and 178.79 s at the slice 4 tree. Verification
+runs on the same trees match within noise. The growth tracks the
+example count: the loader walk compiles 27 examples in 79.39 s
+against 20 examples in 59.57 s at the P14 close. No step doubles
+a previous row.
