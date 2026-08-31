@@ -100,3 +100,14 @@ runs print `window:frames=30` on Metal (yawgpu) with zero `FAIL`
 lines, read before this commit. Every `.wgsl` and `.expected`
 golden stays byte-identical. The owner's visual runs and the EX2
 comment review follow.
+
+## Slice 4 probe (2026-09-01)
+
+Question: do the layers and the backend accept
+`texture_storage_2d<rgba16float, write>` and compute-stage
+`textureSampleLevel` on an `rgba16float` sampled texture with a
+linear sampler? Probe: a scratch headless program through the
+public layers, six steps inside validation error scopes, not
+committed. Result: every step `ok` on yawgpu Noop and yawgpu
+Metal (Apple M2). The generator emits both forms. The Dawn run
+waits for the owner's gated lane. Verdict: slice 4 is unblocked.
