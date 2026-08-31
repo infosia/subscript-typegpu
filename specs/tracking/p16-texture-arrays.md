@@ -45,3 +45,14 @@ the slices:
 
 2026-09-01: the plan section, TX13, TX14, and this record written.
 Slice 1 (the probe, then the feature) is next.
+
+## Slice 1 probe (2026-09-01)
+
+Question: do the layers and the backend accept array-layer
+creation, single-layer `2d` views, a layer-indexed
+`texture_2d_array` load, and `texture_storage_2d_array` read and
+write? Probe: a scratch headless program with raw WGSL through
+the API layer, four steps inside validation error scopes, not
+committed. Result: every step `ok` on yawgpu Noop and yawgpu
+Metal (Apple M2). The API layer expresses every view, including
+the `2d-array` dimension. Verdict: slice 1 is unblocked.
