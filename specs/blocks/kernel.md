@@ -8,7 +8,7 @@ P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
 2026-08-23. Rev 9 (K19 Rev 4 FixedArray constants), 2026-08-24. Rev 10 (K14
 Rev 6 literal suffixes), 2026-08-24. Rev 11 (K14 Rev 6 logic
 parentheses), 2026-08-24. Rev 12 (K5 Rev 1 `using`, absence test),
-2026-08-30. Rev 13 (K14 Rev 7 bitwise parentheses), 2026-09-01. Plan §3 D2, D3, D7, D9 and §4
+2026-08-30. Rev 13 (K14 Rev 7 bitwise parentheses), 2026-09-01. Rev 14 (K14 Rev 8 bitwise pairs), 2026-09-01. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -113,7 +113,7 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 
 ## Emission
 
-- **K14 — The emitted WGSL is deterministic.** Rev 7. Declaration
+- **K14 — The emitted WGSL is deterministic.** Rev 8. Declaration
   order, the same for every module: `enable` directives, the raw
   declarations text (K30) when the program has one, the schema
   structs the module references in first-use order, shells (K29) in
@@ -139,7 +139,9 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   tie condition, the third measurement). The emitter also
   parenthesizes a bitwise operand that mixes with an arithmetic or
   a comparison operator in one chain (`mixing '&' and '-' requires
-  parenthesis`, the bitonic-sort measurement). Identifiers keep
+  parenthesis`, the bitonic-sort measurement), and an operand that
+  mixes two different bitwise operators, because the WGSL grammar
+  gives them no relative precedence *(docs)*. Identifiers keep
   their subscript names. A name that collides with a WGSL reserved
   word or a builtin function or type gets a `_` suffix, through one
   function applied to every identifier the emitter writes: struct
