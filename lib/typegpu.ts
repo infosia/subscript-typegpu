@@ -316,6 +316,108 @@ export class ReadWriteStorageTexture2d<F> {
   }
 }
 
+export class Texture2dArray<T> {
+  // The generator reads this zero-length marker to recover T from the typed HIR.
+  private values: T[];
+  private pixels: Vec4f[];
+  private width: u32;
+  private height: u32;
+  private layers: u32;
+
+  constructor(pixels: Vec4f[], width: u32, height: u32, layers: u32) {
+    this.values = [];
+    this.pixels = pixels;
+    this.width = width;
+    this.height = height;
+    this.layers = layers;
+  }
+
+  load(coords: Vec2i, layer: i32, level: u32): Vec4f {
+    if (level !== 0) {
+      authorTrap("TX3", "Texture2dArray.load", `level=${level} is not supported`);
+    }
+    if (coords.x < 0 || coords.y < 0 || layer < 0
+      || (coords.x as u32) >= this.width || (coords.y as u32) >= this.height
+      || (layer as u32) >= this.layers) {
+      return new Vec4f(0.0, 0.0, 0.0, 0.0);
+    }
+    const pixel: u32 = ((layer as u32) * this.height + (coords.y as u32)) * this.width
+      + (coords.x as u32);
+    return this.pixels[pixel as i32];
+  }
+}
+
+export class ReadStorageTexture2dArray<F> {
+  private values: Vec4f[];
+  // The generator reads this zero-length marker to recover F from the typed HIR.
+  private formats: F[];
+  private width: u32;
+  private height: u32;
+  private layers: u32;
+
+  constructor(values: Vec4f[], width: u32, height: u32, layers: u32) {
+    this.values = values;
+    this.formats = [];
+    this.width = width;
+    this.height = height;
+    this.layers = layers;
+  }
+
+  load(coords: Vec2i, layer: i32): Vec4f {
+    if (coords.x < 0 || coords.y < 0 || layer < 0
+      || (coords.x as u32) >= this.width || (coords.y as u32) >= this.height
+      || (layer as u32) >= this.layers) {
+      return new Vec4f(0.0, 0.0, 0.0, 0.0);
+    }
+    const pixel: i32 = (
+      ((layer as u32) * this.height + (coords.y as u32)) * this.width + (coords.x as u32)
+    ) as i32;
+    return this.values[pixel];
+  }
+
+  store(coords: Vec2i, layer: i32, value: Vec4f): void {
+    authorTrap("TX11", "ReadStorageTexture2dArray.store", "access=read-only");
+  }
+}
+
+export class WriteStorageTexture2dArray<F> {
+  private values: Vec4f[];
+  // The generator reads this zero-length marker to recover F from the typed HIR.
+  private formats: F[];
+  private width: u32;
+  private height: u32;
+  private layers: u32;
+
+  constructor(values: Vec4f[], width: u32, height: u32, layers: u32) {
+    this.values = values;
+    this.formats = [];
+    this.width = width;
+    this.height = height;
+    this.layers = layers;
+  }
+
+  load(coords: Vec2i, layer: i32): Vec4f {
+    authorTrap("TX11", "WriteStorageTexture2dArray.load", "access=write-only");
+    return new Vec4f(0.0, 0.0, 0.0, 0.0);
+  }
+
+  store(coords: Vec2i, layer: i32, value: Vec4f): void {
+    if (coords.x < 0 || coords.y < 0 || layer < 0
+      || (coords.x as u32) >= this.width || (coords.y as u32) >= this.height
+      || (layer as u32) >= this.layers) {
+      return;
+    }
+    const pixel: i32 = (
+      ((layer as u32) * this.height + (coords.y as u32)) * this.width + (coords.x as u32)
+    ) as i32;
+    if (pixel === this.values.length) {
+      this.values.push(value);
+    } else {
+      this.values[pixel] = value;
+    }
+  }
+}
+
 export class Buffer<T> {
   buffer: GPUBuffer;
   elementSize: u32;
@@ -1063,6 +1165,7 @@ export class BindGroupLayoutEntrySpec {
   sampleType?: GPUTextureSampleType = "float";
   format?: GPUTextureFormat;
   access?: GPUStorageTextureAccess = "write-only";
+  viewDimension?: GPUTextureViewDimension = "2d";
   samplerType?: GPUSamplerBindingType = "filtering";
 }
 
@@ -1419,14 +1522,22 @@ function nativeBindGroupLayoutEntries(
         entries.push({
           binding: source.binding,
           visibility: source.visibility,
-          texture: { sampleType: source.sampleType, viewDimension: "2d", multisampled: false },
+          texture: {
+            sampleType: source.sampleType,
+            viewDimension: source.viewDimension,
+            multisampled: false,
+          },
         });
       } else if (source.kind === "storageTexture") {
         if (source.format !== undefined) {
           entries.push({
             binding: source.binding,
             visibility: source.visibility,
-            storageTexture: { access: source.access, format: source.format, viewDimension: "2d" },
+            storageTexture: {
+              access: source.access,
+              format: source.format,
+              viewDimension: source.viewDimension,
+            },
           });
         } else {
           authorTrap("TX5", "storageTexture", `binding=${source.binding} has no format`);

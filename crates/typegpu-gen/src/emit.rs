@@ -27,7 +27,7 @@ fn resource_type(kind: BindingKind) -> &'static str {
         | BindingKind::Storage
         | BindingKind::MutStorage
         | BindingKind::Guard => "GPUBuffer",
-        BindingKind::Texture(_) | BindingKind::StorageTexture(_, _) => "GPUTextureView",
+        BindingKind::Texture(_, _) | BindingKind::StorageTexture(_, _, _) => "GPUTextureView",
         BindingKind::Sampler => "GPUSampler",
     }
 }
@@ -38,7 +38,7 @@ fn resource_factory(kind: BindingKind) -> &'static str {
         | BindingKind::Storage
         | BindingKind::MutStorage
         | BindingKind::Guard => "bufferResource",
-        BindingKind::Texture(_) | BindingKind::StorageTexture(_, _) => "textureResource",
+        BindingKind::Texture(_, _) | BindingKind::StorageTexture(_, _, _) => "textureResource",
         BindingKind::Sampler => "samplerResource",
     }
 }
@@ -289,12 +289,25 @@ fn emit_binding_entry(
             binding_size(module, schemas, &binding.item_ty, &binding.pos)?,
         ),
         BindingKind::Guard => "minBindingSize: 16".to_owned(),
-        BindingKind::Texture(sample) => {
-            format!("minBindingSize: 0, sampleType: \"{}\"", sample.webgpu(),)
-        }
-        BindingKind::StorageTexture(format, access) => {
+        BindingKind::Texture(sample, dimension) => {
+            let dimension = if dimension == crate::pipeline::TextureViewDimension::TwoD {
+                String::new()
+            } else {
+                format!(", viewDimension: \"{}\"", dimension.webgpu())
+            };
             format!(
-                "minBindingSize: 0, format: \"{}\", access: \"{}\"",
+                "minBindingSize: 0, sampleType: \"{}\"{dimension}",
+                sample.webgpu(),
+            )
+        }
+        BindingKind::StorageTexture(format, access, dimension) => {
+            let dimension = if dimension == crate::pipeline::TextureViewDimension::TwoD {
+                String::new()
+            } else {
+                format!(", viewDimension: \"{}\"", dimension.webgpu())
+            };
+            format!(
+                "minBindingSize: 0, format: \"{}\", access: \"{}\"{dimension}",
                 format.webgpu(),
                 access.webgpu(),
             )

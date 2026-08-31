@@ -56,3 +56,22 @@ the API layer, four steps inside validation error scopes, not
 committed. Result: every step `ok` on yawgpu Noop and yawgpu
 Metal (Apple M2). The API layer expresses every view, including
 the `2d-array` dimension. Verdict: slice 1 is unblocked.
+
+## Slice 1 (2026-09-01)
+
+Landed: `Texture2dArray<f32>`, `ReadStorageTexture2dArray<F>`, and
+`WriteStorageTexture2dArray<F>` with layer-indexed `load` and
+`store` and real host bodies, the generator emission of
+`texture_2d_array<f32>` and `texture_storage_2d_array<F, access>`
+with a view-dimension discriminator on the layout entry, two
+demonstrated-red access diagnostics, `b22-texture-array`
+byte-identical on both tiers, and `x23-live-texture-array`
+(a two-layer ping-pong read back through a single-layer `2d`
+view). TX13 and TX14 joined the rule-id registry after the round,
+so the two diagnostics cite TX11. The next round moves them to
+TX13.
+
+Evidence: gate green, 262 passed, 1 ignored, 190.54 s. Live lane
+on Metal (yawgpu): `live::every_x_program_passes_on_a_real_adapter`
+ok, 118.76 s, every x program through x23. Both new goldens
+validate under `naga`. No existing golden moved.

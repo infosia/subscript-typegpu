@@ -10,8 +10,12 @@ pub(crate) enum BindingKind {
     Uniform,
     Storage,
     MutStorage,
-    Texture(TextureSampleType),
-    StorageTexture(StorageTextureFormat, StorageTextureAccess),
+    Texture(TextureSampleType, TextureViewDimension),
+    StorageTexture(
+        StorageTextureFormat,
+        StorageTextureAccess,
+        TextureViewDimension,
+    ),
     Sampler,
     Guard,
 }
@@ -19,6 +23,28 @@ pub(crate) enum BindingKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TextureSampleType {
     Float,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TextureViewDimension {
+    TwoD,
+    TwoDArray,
+}
+
+impl TextureViewDimension {
+    pub(crate) fn wgsl(self) -> &'static str {
+        match self {
+            Self::TwoD => "2d",
+            Self::TwoDArray => "2d_array",
+        }
+    }
+
+    pub(crate) fn webgpu(self) -> &'static str {
+        match self {
+            Self::TwoD => "2d",
+            Self::TwoDArray => "2d-array",
+        }
+    }
 }
 
 impl TextureSampleType {
@@ -98,7 +124,7 @@ impl BindingKind {
             Self::Storage => "storage, read",
             Self::MutStorage => "storage, read_write",
             Self::Guard => "uniform",
-            Self::Texture(_) | Self::StorageTexture(_, _) | Self::Sampler => "",
+            Self::Texture(_, _) | Self::StorageTexture(_, _, _) | Self::Sampler => "",
         }
     }
 
@@ -107,8 +133,8 @@ impl BindingKind {
             Self::Uniform => "uniform",
             Self::Storage => "read-only-storage",
             Self::MutStorage => "storage",
-            Self::Texture(_) => "texture",
-            Self::StorageTexture(_, _) => "storageTexture",
+            Self::Texture(_, _) => "texture",
+            Self::StorageTexture(_, _, _) => "storageTexture",
             Self::Sampler => "sampler",
             Self::Guard => "guard",
         }
@@ -211,50 +237,61 @@ fn wrapper(
         BindingKind::Storage
     } else if class.name.starts_with("MutStorage<") {
         BindingKind::MutStorage
-    } else if class.name.starts_with("Texture2d<") {
+    } else if class.name.starts_with("Texture2d<") || class.name.starts_with("Texture2dArray<") {
         let Some(values) = class.fields.iter().find(|field| field.name == "values") else {
             return Err(generator_diagnostic(
-                "library Texture2d lost its typed marker field",
+                "library texture wrapper lost its typed marker field",
                 pos.clone(),
             ));
         };
         let Type::Array(item) = &values.ty else {
             return Err(generator_diagnostic(
-                "library Texture2d typed marker is not an array",
+                "library texture wrapper typed marker is not an array",
                 pos.clone(),
             ));
         };
         if item.as_ref() != &Type::F32 {
             return Err(diagnostic(
                 "TX1",
-                "Texture2d sample type must be f32",
+                "texture sample type must be f32",
                 pos.clone(),
             ));
         }
         return Ok(Some((
-            BindingKind::Texture(TextureSampleType::Float),
+            BindingKind::Texture(
+                TextureSampleType::Float,
+                if class.name.starts_with("Texture2dArray<") {
+                    TextureViewDimension::TwoDArray
+                } else {
+                    TextureViewDimension::TwoD
+                },
+            ),
             Type::F32,
         )));
     } else if class.name.starts_with("StorageTexture2d<")
         || class.name.starts_with("ReadStorageTexture2d<")
         || class.name.starts_with("ReadWriteStorageTexture2d<")
+        || class.name.starts_with("ReadStorageTexture2dArray<")
+        || class.name.starts_with("WriteStorageTexture2dArray<")
     {
         let access = if class.name.starts_with("ReadWriteStorageTexture2d<") {
             StorageTextureAccess::ReadWrite
-        } else if class.name.starts_with("ReadStorageTexture2d<") {
+        } else if class.name.starts_with("ReadStorageTexture2d<")
+            || class.name.starts_with("ReadStorageTexture2dArray<")
+        {
             StorageTextureAccess::Read
         } else {
             StorageTextureAccess::Write
         };
         let Some(formats) = class.fields.iter().find(|field| field.name == "formats") else {
             return Err(generator_diagnostic(
-                "library StorageTexture2d lost its format marker field",
+                "library storage texture wrapper lost its format marker field",
                 pos.clone(),
             ));
         };
         let Type::Array(item) = &formats.ty else {
             return Err(generator_diagnostic(
-                "library StorageTexture2d format marker is not an array",
+                "library storage texture wrapper format marker is not an array",
                 pos.clone(),
             ));
         };
@@ -268,12 +305,20 @@ fn wrapper(
         let Some(format) = marker else {
             return Err(diagnostic(
                 "TX1",
-                "StorageTexture2d format must be a float-channel library marker",
+                "storage texture format must be a float-channel library marker",
                 pos.clone(),
             ));
         };
         return Ok(Some((
-            BindingKind::StorageTexture(format, access),
+            BindingKind::StorageTexture(
+                format,
+                access,
+                if class.name.contains("Texture2dArray<") {
+                    TextureViewDimension::TwoDArray
+                } else {
+                    TextureViewDimension::TwoD
+                },
+            ),
             (**item).clone(),
         )));
     } else if class.name == "Sampler" {

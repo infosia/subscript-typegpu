@@ -1,0 +1,8 @@
+sampled.kind=texture
+source.kind=storageTexture
+source.access=read-only
+target.kind=storageTexture
+target.access=write-only
+textureArray_WGSL_LINES=20
+host:out=11,44
+PASS

@@ -1,0 +1,7 @@
+adapter:ready
+device:ready
+inputs:written
+pipelines:created
+dispatch:submitted
+readback:mapped
+pending: Noop backend does not execute compute

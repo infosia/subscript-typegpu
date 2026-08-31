@@ -179,3 +179,49 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { n
     }
     validate(wgsl);
 }
+
+#[test]
+fn array_textures_emit_layered_calls_dimensions_and_layout_access() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, ReadStorageTexture2dArray, Rgba16float, Texture2dArray, WriteStorageTexture2dArray, computePipeline } from "./typegpu";
+import { Vec2i } from "./typegpu-types";
+class Layout {
+  sampled!: Texture2dArray<f32>;
+  source!: ReadStorageTexture2dArray<Rgba16float>;
+  target!: WriteStorageTexture2dArray<Rgba16float>;
+}
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  const coords = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);
+  const layer = ctx.globalId.z as i32;
+  const sampled = res.sampled.load(coords, layer, 0);
+  const source = res.source.load(coords, layer);
+  res.target.store(coords, layer, sampled.add(source));
+}
+export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    for expected in [
+        "texture_2d_array<f32>",
+        "texture_storage_2d_array<rgba16float, read>",
+        "texture_storage_2d_array<rgba16float, write>",
+        "textureLoad(sampled, coords, layer, 0u)",
+        "textureLoad(source, coords, layer)",
+        "textureStore(target_, coords, layer, sampled_ + source_)",
+    ] {
+        assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
+    }
+    for expected in [
+        "kind: \"texture\", minBindingSize: 0, sampleType: \"float\", viewDimension: \"2d-array\"",
+        "kind: \"storageTexture\", minBindingSize: 0, format: \"rgba16float\", access: \"read-only\", viewDimension: \"2d-array\"",
+        "kind: \"storageTexture\", minBindingSize: 0, format: \"rgba16float\", access: \"write-only\", viewDimension: \"2d-array\"",
+    ] {
+        assert!(
+            generated.support_module.contains(expected),
+            "missing `{expected}` in support module:\n{}",
+            generated.support_module,
+        );
+    }
+    validate(wgsl);
+}

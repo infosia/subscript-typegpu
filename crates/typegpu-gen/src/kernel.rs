@@ -8,7 +8,9 @@ use subscript_compiler::hir::{
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 use crate::mapping::{self, MethodEmission};
-use crate::pipeline::{library_class, BindingKind, Pipeline, StorageTextureAccess};
+use crate::pipeline::{
+    library_class, BindingKind, Pipeline, StorageTextureAccess, TextureViewDimension,
+};
 use crate::render::RenderPipeline;
 use crate::schema::Schema;
 
@@ -696,12 +698,17 @@ fn binding_declaration(
             binding.kind.wgsl(),
             wgsl_type(module, &binding.item_ty, &binding.pos)?,
         ),
-        BindingKind::Texture(sample) => {
-            format!("var {name}: texture_2d<{}>;", sample.wgsl())
-        }
-        BindingKind::StorageTexture(format, access) => {
+        BindingKind::Texture(sample, dimension) => {
             format!(
-                "var {name}: texture_storage_2d<{}, {}>;",
+                "var {name}: texture_{}<{}>;",
+                dimension.wgsl(),
+                sample.wgsl()
+            )
+        }
+        BindingKind::StorageTexture(format, access, dimension) => {
+            format!(
+                "var {name}: texture_storage_{}<{}, {}>;",
+                dimension.wgsl(),
                 format.wgsl(),
                 access.wgsl(),
             )
@@ -2195,19 +2202,30 @@ impl<'a> Emitter<'a> {
                         (BindingKind::Storage | BindingKind::MutStorage, "length", []) => {
                             format!("arrayLength(&{})", binding.name)
                         }
-                        (BindingKind::Texture(_), "dimensions", []) => {
+                        (BindingKind::Texture(_, _), "dimensions", []) => {
                             format!("textureDimensions({})", binding.name)
                         }
-                        (BindingKind::Texture(_), "load", [coords, level]) => {
+                        (
+                            BindingKind::Texture(_, TextureViewDimension::TwoD),
+                            "load",
+                            [coords, level],
+                        ) => {
                             format!("textureLoad({}, {coords}, {level})", binding.name)
                         }
-                        (BindingKind::Texture(_), "sampleLevel", [sampler, uv, level]) => {
+                        (
+                            BindingKind::Texture(_, TextureViewDimension::TwoDArray),
+                            "load",
+                            [coords, layer, level],
+                        ) => {
+                            format!("textureLoad({}, {coords}, {layer}, {level})", binding.name)
+                        }
+                        (BindingKind::Texture(_, _), "sampleLevel", [sampler, uv, level]) => {
                             format!(
                                 "textureSampleLevel({}, {sampler}, {uv}, {level})",
                                 binding.name
                             )
                         }
-                        (BindingKind::Texture(_), "sample", [sampler, uv]) => {
+                        (BindingKind::Texture(_, _), "sample", [sampler, uv]) => {
                             if self.invocation_kind != InvocationKind::Fragment {
                                 return Err(diagnostic(
                                     "TX3",
@@ -2217,36 +2235,88 @@ impl<'a> Emitter<'a> {
                             }
                             format!("textureSample({}, {sampler}, {uv})", binding.name)
                         }
-                        (BindingKind::Texture(_), "store", _) => {
+                        (BindingKind::Texture(_, _), "store", _) => {
                             return Err(diagnostic(
                                 "TX3",
                                 "store is not legal on a sampled texture",
                                 expr.pos.clone(),
                             ));
                         }
-                        (BindingKind::StorageTexture(_, access), "dimensions", [])
+                        (BindingKind::StorageTexture(_, access, _), "dimensions", [])
                             if access.can_read() =>
                         {
                             format!("textureDimensions({})", binding.name)
                         }
-                        (BindingKind::StorageTexture(_, access), "load", [coords])
-                            if access.can_read() =>
-                        {
+                        (
+                            BindingKind::StorageTexture(_, access, TextureViewDimension::TwoD),
+                            "load",
+                            [coords],
+                        ) if access.can_read() => {
                             format!("textureLoad({}, {coords})", binding.name)
                         }
-                        (BindingKind::StorageTexture(_, access), "store", [coords, value])
-                            if access.can_write() =>
-                        {
+                        (
+                            BindingKind::StorageTexture(_, access, TextureViewDimension::TwoDArray),
+                            "load",
+                            [coords, layer],
+                        ) if access.can_read() => {
+                            format!("textureLoad({}, {coords}, {layer})", binding.name)
+                        }
+                        (
+                            BindingKind::StorageTexture(_, access, TextureViewDimension::TwoD),
+                            "store",
+                            [coords, value],
+                        ) if access.can_write() => {
                             format!("textureStore({}, {coords}, {value})", binding.name)
                         }
                         (
-                            BindingKind::StorageTexture(_, StorageTextureAccess::Write),
+                            BindingKind::StorageTexture(_, access, TextureViewDimension::TwoDArray),
+                            "store",
+                            [coords, layer, value],
+                        ) if access.can_write() => {
+                            format!("textureStore({}, {coords}, {layer}, {value})", binding.name)
+                        }
+                        (
+                            BindingKind::StorageTexture(
+                                _,
+                                StorageTextureAccess::Write,
+                                TextureViewDimension::TwoD,
+                            ),
                             "load",
                             _,
                         ) => {
                             return Err(diagnostic(
                                 "TX11",
                                 "load is not legal on a write-only storage texture",
+                                expr.pos.clone(),
+                            ));
+                        }
+                        (
+                            BindingKind::StorageTexture(
+                                _,
+                                StorageTextureAccess::Write,
+                                TextureViewDimension::TwoDArray,
+                            ),
+                            "load",
+                            _,
+                        ) => {
+                            return Err(diagnostic(
+                                "TX11",
+                                "load is not legal on a write-only array storage texture",
+                                expr.pos.clone(),
+                            ));
+                        }
+                        (
+                            BindingKind::StorageTexture(
+                                _,
+                                StorageTextureAccess::Read,
+                                TextureViewDimension::TwoDArray,
+                            ),
+                            "store",
+                            _,
+                        ) => {
+                            return Err(diagnostic(
+                                "TX11",
+                                "store is not legal on a read-only array storage texture",
                                 expr.pos.clone(),
                             ));
                         }
