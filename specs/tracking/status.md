@@ -149,3 +149,20 @@ explicit, and a test facade makes the release observable.
 
 Evidence: gate green, 258 passed, 1 ignored, 144 s; live green on
 Metal 89.70 s; four window smokes at `--frames 30`.
+
+## P15 — the example ports, round 2 (2026-09-01)
+
+Eight ports and two library modules: `trippy-raymarching`,
+`disco`, `perlin-noise`, `bitonic-sort` with `lib/typegpu-sort.ts`,
+`prefix-scan`, `oklab` and `box-raytracing` with
+`lib/typegpu-color.ts`, and `stable-fluid` behind the rgba16float
+probe. Kernels defined in a library module compile through
+`computePipeline` imports. The emitter gained two
+Tint-compatibility rules: K14 Rev 7 (bitwise-arithmetic
+parentheses, measured on Metal) and K14 Rev 8 (bitwise pairs, from
+the WGSL grammar *(docs)*). `specs/blocks/library.md` LB1-LB4
+holds the module contract. Phase review: 0 CRITICAL, 4 MAJOR, 20
+MINOR, all closed. Evidence: gate green, 261 passed, 1 ignored,
+186.25 s, `prefix-scan` byte-exact on Metal, every windowed port
+visually passed. Records: `specs/tracking/p15-examples.md`,
+`specs/tracking/build-time.md`.

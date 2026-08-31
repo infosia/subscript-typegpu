@@ -773,7 +773,7 @@ the live lane green on one backend, and the budgets recorded.
 
 ### P15 — the example ports, round 2 (after P14)
 
-The P10 survey left portable examples unported. P15 ports seven of
+The P10 survey left portable examples unported. P15 ports eight of
 them and adds two library modules. TypeGPU specializes kernels at
 run time through slots, accessors, and comptime closures. This
 project replaces each use with a committed constant, a K2 helper,

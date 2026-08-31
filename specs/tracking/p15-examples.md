@@ -157,3 +157,25 @@ literal, and the perlin wrap comment no longer claims a seamless
 loop. Two review questions stay recorded as questions: the
 upstream density square, and the dev-tier f32 assumption behind
 the byte-exact oracle claim (observed on Metal, not doubted).
+
+## Visual runs and close (2026-09-01, Metal)
+
+The owner ran every new windowed port: `trippy-raymarching` (531
+frames), `disco` (306 and 311), `perlin-noise` (214),
+`bitonic-sort` (1089), `oklab` (462, 2258, and 1025 — the static
+checker and the hue-driven gamut width are the intended behavior),
+`box-raytracing` (458 and 1716), and `stable-fluid` (870).
+Verdict: every port looks as intended.
+
+Correction: the slice 4 entry counts 27 examples. `examples/`
+holds 28 directories (20 before the phase plus 8 ports). The plan
+section counted 7 ports for the same reason and now reads 8.
+
+P15 COMPLETE 2026-09-01: eight ports (seven windowed with passed
+visual runs, one headless with byte-exact checks on Metal), the
+sort and color modules under LB1-LB4, K14 Rev 7 and Rev 8, and
+the phase review closed from 0 CRITICAL, 4 MAJOR, 20 MINOR. Open
+note: a windowed Dawn spot-check waits for a local Dawn build.
+The remaining upstream candidates keep the P10 close list:
+texture arrays, depth and the 3D set, multisample and the
+geometry set.
