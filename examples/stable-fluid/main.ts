@@ -278,6 +278,8 @@ function clampCell(value: i32): i32 {
   return result;
 }
 
+// While a button is down, a Gaussian of force and ink lands at the pointer.
+// An idle brush clears both transient fields.
 function brushSplatKernel(res: BrushLayout, ctx: ComputeInvocation): void {
   const params: BrushParams = res.params.$;
   const cell = new Vec2f(ctx.globalId.x as f32, ctx.globalId.y as f32);
@@ -302,6 +304,7 @@ function brushSplatKernel(res: BrushLayout, ctx: ComputeInvocation): void {
   );
 }
 
+// Adds the transient ink into the current field.
 function inkAddKernel(res: AddLayout, ctx: ComputeInvocation): void {
   const coords = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);
   const ink: Vec4f = res.source.load(coords, 0);
@@ -309,6 +312,7 @@ function inkAddKernel(res: AddLayout, ctx: ComputeInvocation): void {
   res.target.store(coords, ink.add(added));
 }
 
+// Applies the transient force to the velocity.
 function forceAddKernel(res: AddLayout, ctx: ComputeInvocation): void {
   const coords = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);
   const velocity: Vec4f = res.source.load(coords, 0);
@@ -324,6 +328,7 @@ function forceAddKernel(res: AddLayout, ctx: ComputeInvocation): void {
   );
 }
 
+// Semi-Lagrangian backtrace through the linear sampler. Borders stay zero.
 function advectVelocityKernel(res: VelocityAdvectionLayout, ctx: ComputeInvocation): void {
   const x: u32 = ctx.globalId.x;
   const y: u32 = ctx.globalId.y;
@@ -344,6 +349,7 @@ function advectVelocityKernel(res: VelocityAdvectionLayout, ctx: ComputeInvocati
   res.viscosityRhs.store(coords, value);
 }
 
+// One Jacobi step against the advected field as the fixed right-hand side.
 function viscosityJacobiKernel(res: ViscosityLayout, ctx: ComputeInvocation): void {
   const x: i32 = ctx.globalId.x as i32;
   const y: i32 = ctx.globalId.y as i32;
@@ -365,6 +371,7 @@ function viscosityJacobiKernel(res: ViscosityLayout, ctx: ComputeInvocation): vo
   );
 }
 
+// Centered divergence with edge-clamped neighbors.
 function divergenceKernel(res: DivergenceLayout, ctx: ComputeInvocation): void {
   const x: i32 = ctx.globalId.x as i32;
   const y: i32 = ctx.globalId.y as i32;
@@ -376,6 +383,7 @@ function divergenceKernel(res: DivergenceLayout, ctx: ComputeInvocation): void {
   res.target.store(new Vec2i(x, y), new Vec4f(value, 0.0, 0.0, 0.0));
 }
 
+// The Poisson solve starts from zero pressure every frame.
 function clearPressureKernel(res: ClearLayout, ctx: ComputeInvocation): void {
   res.target.store(
     new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32),
@@ -383,6 +391,7 @@ function clearPressureKernel(res: ClearLayout, ctx: ComputeInvocation): void {
   );
 }
 
+// One Jacobi step of the pressure Poisson solve.
 function pressureJacobiKernel(res: PressureLayout, ctx: ComputeInvocation): void {
   const x: i32 = ctx.globalId.x as i32;
   const y: i32 = ctx.globalId.y as i32;
@@ -395,6 +404,7 @@ function pressureJacobiKernel(res: PressureLayout, ctx: ComputeInvocation): void
   res.target.store(new Vec2i(x, y), new Vec4f(pressure, 0.0, 0.0, 0.0));
 }
 
+// Removes the pressure gradient, the projection to a divergence-free field.
 function gradientSubtractKernel(res: GradientLayout, ctx: ComputeInvocation): void {
   const x: i32 = ctx.globalId.x as i32;
   const y: i32 = ctx.globalId.y as i32;
@@ -414,6 +424,7 @@ function gradientSubtractKernel(res: GradientLayout, ctx: ComputeInvocation): vo
   );
 }
 
+// Carries the ink through the projected velocity.
 function advectInkKernel(res: AdvectionLayout, ctx: ComputeInvocation): void {
   const x: u32 = ctx.globalId.x;
   const y: u32 = ctx.globalId.y;
@@ -449,6 +460,7 @@ function imageVertex(
   );
 }
 
+// Key 1: the ink density tints the output.
 function inkFragment(
   res: FieldRenderLayout,
   input: Varyings,
@@ -465,6 +477,7 @@ function inkFragment(
   );
 }
 
+// Key 2: velocity direction and magnitude map to color.
 function velocityFragment(
   res: FieldRenderLayout,
   input: Varyings,
@@ -488,6 +501,7 @@ function velocityFragment(
   );
 }
 
+// Key 3: the ink gradient warps the background lookup, the upstream refraction.
 function imageFragment(
   res: ImageRenderLayout,
   input: Varyings,
