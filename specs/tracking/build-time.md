@@ -138,3 +138,12 @@ runs on the same trees match within noise. The growth tracks the
 example count: the loader walk compiles 27 examples in 79.39 s
 against 20 examples in 59.57 s at the P14 close. No step doubles
 a previous row.
+
+## P16 (2026-09-01)
+
+The warm `--require-backend` gate across the phase: 190.54 s at
+the slice 1 tree, 198.90 s, 200.03 s, and 204.29 s at the slice 4
+tree. Verification runs on the same trees match within noise. The
+growth tracks the example count (31 examples against 28 at the
+P15 close) and the two new goldens. No step doubles a previous
+row. The live lane with x23 runs 118.76 s on Metal.
