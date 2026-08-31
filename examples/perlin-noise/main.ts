@@ -93,6 +93,7 @@ function noiseFragment(
   ctx: FragmentInvocation,
 ): Vec4f {
   const time: f32 = res.frame.$.time;
+  // Wrap time over DEPTH so the z slice loops.
   const depthCycle: f32 = new Vec2f(time / DEPTH, time / DEPTH).floor().x;
   const tz: f32 = time - DEPTH * depthCycle;
   const n: f32 = perlin3d(new Vec3f(input.uv.x * GRID, input.uv.y * GRID, tz));
@@ -100,6 +101,7 @@ function noiseFragment(
     1.0 - SHARPNESS,
     1.0 - SHARPNESS,
   )).x;
+  // Signed-power sharpening, the upstream exponential curve.
   const n2: f32 = sign(n) * magnitude;
   const n01: f32 = n2 * 0.5 + 0.5;
   const color = new Vec3f(0.0, 0.2, 1.0).mix(new Vec3f(1.0, 0.3, 0.5), n01);

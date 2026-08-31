@@ -89,6 +89,7 @@ function cosinePalette(a: Vec3f, b: Vec3f, c: Vec3f, d: Vec3f, value: f32): Vec3
   return a.add(b.mul(c.scale(value).add(d).scale(6.28318).cos()));
 }
 
+// Twist about z, repeat on the sphere spacing, and clip to the tunnel bore.
 function trippyDistance(point: Vec3f, time: f32, pointer: Vec2f): f32 {
   const angle: f32 = point.z * TWIST_FACTOR + time * 0.2;
   const phases = new Vec2f(angle, angle);
@@ -162,6 +163,7 @@ function trippyFragment(
       frame.time,
       frame.pointer,
     );
+    // Every step feeds the glow, so near misses light the fog.
     glow += 0.015 / (0.01 + distance * distance);
     if (distance < 0.001) {
       hit = true;
@@ -284,6 +286,7 @@ export function frame(
   if (frameBuffer === null) return;
   if (group === null) return;
   frameCount += 1;
+  // Map the pointer to [-1, 1] per axis. (0, 0) stands for a pointer outside.
   let pointer = new Vec2f(0.0, 0.0);
   if (pointerX >= 0.0 && pointerY >= 0.0) {
     pointer = new Vec2f(

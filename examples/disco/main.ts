@@ -118,6 +118,7 @@ function discoVertex(res: DiscoLayout, value: Vertex, ctx: VertexInvocation): Va
   );
 }
 
+// Rings: rotated, scaled cells with a pulsed ring radius per iteration.
 function ringsFragment(
   res: DiscoLayout,
   input: Varyings,
@@ -147,6 +148,7 @@ function ringsFragment(
   return new Vec4f(color.x, color.y, color.z, 1.0);
 }
 
+// Swirl: a radius-driven rotation feeds a horizontal wave per iteration.
 function swirlFragment(
   res: DiscoLayout,
   input: Varyings,
@@ -177,6 +179,7 @@ function swirlFragment(
   return new Vec4f(color.x, color.y, color.z, 1.0);
 }
 
+// Kaleidoscope: mirrored folds cut the plane into diagonal cells.
 function kaleidoscopeFragment(
   res: DiscoLayout,
   input: Varyings,
@@ -328,6 +331,7 @@ export function frame(
   const vertices = activeVertices;
   const frameBuffer = activeFrameBuffer;
   const group = activeGroup;
+  // The key scalar cycles the three patterns.
   let pipeline = activeRings;
   if (key % 3 === 1) pipeline = activeSwirl;
   if (key % 3 === 2) pipeline = activeKaleidoscope;
