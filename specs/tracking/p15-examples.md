@@ -179,3 +179,10 @@ note: a windowed Dawn spot-check waits for a local Dawn build.
 The remaining upstream candidates keep the P10 close list:
 texture arrays, depth and the 3D set, multisample and the
 geometry set.
+
+## Dawn spot-check (2026-09-01)
+
+The seven windowed ports ran at `--frames 30` on Dawn
+(`SUBSCRIPT_TYPEGPU_BACKEND=default`, the infosia/dawn build):
+every run prints `window:frames=30` with zero `FAIL` lines. The
+close entry's open note is closed.
