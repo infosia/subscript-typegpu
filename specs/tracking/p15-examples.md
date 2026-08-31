@@ -111,3 +111,24 @@ public layers, six steps inside validation error scopes, not
 committed. Result: every step `ok` on yawgpu Noop and yawgpu
 Metal (Apple M2). The generator emits both forms. The Dawn run
 waits for the owner's gated lane. Verdict: slice 4 is unblocked.
+
+## Slice 4 (2026-09-01)
+
+Landed: `stable-fluid` — nine 256x256 `rgba16float` fields with
+host-side pair swaps, ten compute passes per frame (brush splat,
+ink add, force add, velocity advection, ten viscosity Jacobi
+iterations, divergence, pressure clear, ten pressure Jacobi
+iterations, gradient subtraction, ink advection), native
+compute-stage linear sampling for both advections, a 512-square
+procedural Perlin background (EX6), keys 1, 2, and 3 for the
+display modes, and the pointer brush. Twenty-seven examples
+compile in the gate.
+
+Measured rejections recorded: a non-literal compute workgroup
+size (PI1), a scalar `Math.exp` through an `f64` cast (K12), and
+a cast in a module constant initializer (K19).
+
+Evidence: gate green, 261 passed, 1 ignored, 178.79 s. The smoke
+run prints `window:frames=30` on Metal (yawgpu) with zero `FAIL`
+lines, read before this commit. No golden moved. The owner's
+visual run and the EX2 comment pass follow.
