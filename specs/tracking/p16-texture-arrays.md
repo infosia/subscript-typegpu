@@ -75,3 +75,18 @@ Evidence: gate green, 262 passed, 1 ignored, 190.54 s. Live lane
 on Metal (yawgpu): `live::every_x_program_passes_on_a_real_adapter`
 ok, 118.76 s, every x program through x23. Both new goldens
 validate under `naga`. No existing golden moved.
+
+## Slice 2 (2026-09-01)
+
+Landed: the two array access diagnostics moved from TX11 to TX13
+with both reds re-quoted, and `examples/jump-flood-voronoi` — a
+512-square two-layer ping-pong (color, seed coordinate) over the
+TX13 wrappers, seeds from the noise module at the committed
+0.999 threshold, one halving step per frame from offset 256, keys
+1 and 2 for the upstream buttons, and a single-layer `2d` render
+view. Twenty-nine examples compile in the gate.
+
+Evidence: gate green, 262 passed, 1 ignored, 198.90 s. The smoke
+run prints `window:frames=30` on Metal (yawgpu) with zero `FAIL`
+lines, read before this commit. No golden moved. The owner's
+visual run follows.

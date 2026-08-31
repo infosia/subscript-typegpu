@@ -1,4 +1,4 @@
-// expected-rule: TX11
+// expected-rule: TX13
 // expected-message: read-only array storage texture
 import { ComputeInvocation, ComputePipelineSpec, ReadStorageTexture2dArray, Rgba16float, computePipeline } from "./typegpu";
 import { Vec2i, Vec4f } from "./typegpu-types";

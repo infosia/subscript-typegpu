@@ -2300,7 +2300,7 @@ impl<'a> Emitter<'a> {
                             _,
                         ) => {
                             return Err(diagnostic(
-                                "TX11",
+                                "TX13",
                                 "load is not legal on a write-only array storage texture",
                                 expr.pos.clone(),
                             ));
@@ -2315,7 +2315,7 @@ impl<'a> Emitter<'a> {
                             _,
                         ) => {
                             return Err(diagnostic(
-                                "TX11",
+                                "TX13",
                                 "store is not legal on a read-only array storage texture",
                                 expr.pos.clone(),
                             ));
