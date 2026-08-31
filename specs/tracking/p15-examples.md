@@ -31,3 +31,19 @@ Findings that shape the slices:
 ## Status
 
 2026-08-31: the plan section and this record written. Slice 1 next.
+
+## Slice 1 (2026-08-31)
+
+Landed: `trippy-raymarching` (a twisted, repeated sphere-lattice
+raymarch, the upstream slider defaults committed, the pointer
+drives the lattice scroll), `disco` (three committed patterns —
+rings, swirl, kaleidoscope — cycled on the key scalar), and
+`perlin-noise` (the noise module's `perlin3d` over a committed
+grid, one committed sharpening function, no compute pass).
+Twenty-three examples compile in the gate.
+
+Evidence: `tools/gate.sh --require-backend` green, 257 passed, 1
+ignored, 157.50 s (the coding agent's timed run, counts confirmed
+by a second run). The three smoke runs print `window:frames=30`
+on Metal (yawgpu) with zero `FAIL` lines, read before this
+commit. The EX2 comment pass and the owner's visual runs follow.
