@@ -3,6 +3,7 @@
 // The upstream nested 3D array is flattened to x * 49 + y * 7 + z. Its mat4.aim
 // camera reduces to host-computed origin/right/up/forward basis vectors. A zero-alpha
 // fragment replaces upstream discard because the kernel subset has no discard.
+// The upstream sliders and pointer do not port; the camera orbits on the frame count.
 // Ported from TypeGPU's box-raytracing example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -244,6 +245,7 @@ function boxFragment(
     1.0 / inverseColor.y,
     1.0 / inverseColor.z,
   ));
+  // The second encode follows the upstream shader's deliberate wash.
   const corrected: Vec3f = srgb.pow(new Vec3f(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2));
   const alpha: f32 = scalarMin(densitySum, 1.0);
   return new Vec4f(
@@ -331,10 +333,14 @@ export function init(
       for (let z: u32 = 0; z < GRID_SIZE; z += 1) {
         const index: u32 = x * 49 + y * 7 + z;
         const active: u32 = 7 - x + y + (7 - z) > 6 ? 1 : 0;
+        // The clamp keeps the reciprocal finite.
         const albedo: Vec3f = srgbToLinear(new Vec3f(
-          (x as f32) / 7.0,
-          (y as f32) / 7.0,
-          ((z as f32) / 7.0) * 0.8 + 0.1 + (((7 - x) as f32) / 7.0) * 0.6,
+          scalarMax(0.004, (x as f32) / 7.0),
+          scalarMax(0.004, (y as f32) / 7.0),
+          scalarMax(
+            0.004,
+            ((z as f32) / 7.0) * 0.8 + 0.1 + (((7 - x) as f32) / 7.0) * 0.6,
+          ),
         ));
         queue.writeBuffer(
           cells,
@@ -429,6 +435,7 @@ export function frame(
 }
 
 export function shutdown(): void {
+  if (activeGroup !== null) activeGroup.dispose();
   if (activeCamera !== null) activeCamera.dispose();
   if (activeCells !== null) activeCells.dispose();
   if (activeVertices !== null) activeVertices.dispose();
@@ -439,4 +446,5 @@ export function shutdown(): void {
   activePipeline = null;
   activeGroup = null;
   activeDevice = null;
+  frameCount = 0;
 }

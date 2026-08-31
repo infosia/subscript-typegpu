@@ -1,8 +1,8 @@
 // example: oklab
 // Renders one hue slice of the Oklab color solid with adaptive gamut clipping.
 // The upstream fwidth projection lines reduce to an out-of-gamut checker because the
-// kernel subset has no derivatives. Keys 1 and 2 step hue once when the pressed key
-// changes. The upstream CSS probe dot reduces to a bright fragment-shader ring.
+// kernel subset has no derivatives. Keys 1 and 2 step hue for each key press.
+// The upstream CSS probe dot reduces to a bright fragment-shader ring.
 // Ported from TypeGPU's oklab example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -82,6 +82,8 @@ class OklabLayout {
   uniforms!: Uniform<OklabUniforms>;
 }
 
+const GAMUT_CLIP_ALPHA: f32 = 0.05;
+
 function oklabVertex(res: OklabLayout, value: Vertex, ctx: VertexInvocation): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -99,7 +101,7 @@ function oklabFragment(
   const y: f32 = input.uv.y * 2.0 - 1.0;
   const position = new Vec2f(0.3 * x, (y * 1.2 + 1.0) * 0.5);
   const hueVector = new Vec2f(uniforms.hue, uniforms.hue);
-  // The slice: lightness rises with y, chroma grows with |x| along one hue.
+  // Lightness rises with y; negative x shows the opposite hue.
   const lab = new Vec3f(
     position.y,
     hueVector.cos().x * position.x,
@@ -138,7 +140,6 @@ let activeVertices: GPUBuffer | null = null;
 let activeUniforms: GPUBuffer | null = null;
 let activeGroup: GPUBindGroup | null = null;
 let hue: f32 = 0.0;
-let lastKey: u32 = 0;
 
 export function init(
   instance: SubscriptTypegpuInstance,
@@ -169,7 +170,11 @@ export function init(
   queue.writeBuffer(
     uniforms,
     0,
-    Context.bytesOf<OklabUniforms>(new OklabUniforms(hue, 0.05, new Vec2f(-10.0, -10.0))),
+    Context.bytesOf<OklabUniforms>(new OklabUniforms(
+      hue,
+      GAMUT_CLIP_ALPHA,
+      new Vec2f(-10.0, -10.0),
+    )),
   );
   hostDevice.pushErrorScope("validation");
   const pipeline = createRenderPipelineHost(
@@ -222,11 +227,8 @@ export function frame(
   if (vertices === null) return;
   if (uniforms === null) return;
   if (group === null) return;
-  if (key !== lastKey) {
-    if (key === 49) hue -= 0.1;
-    if (key === 50) hue += 0.1;
-  }
-  lastKey = key;
+  if (key === 49) hue -= 0.1;
+  if (key === 50) hue += 0.1;
   let pointer = new Vec2f(-10.0, -10.0);
   if (pointerX >= 0.0 && pointerY >= 0.0) {
     pointer = new Vec2f(pointerX / (width as f32), 1.0 - pointerY / (height as f32));
@@ -235,7 +237,7 @@ export function frame(
   queue.writeBuffer(
     uniforms,
     0,
-    Context.bytesOf<OklabUniforms>(new OklabUniforms(hue, 0.05, pointer)),
+    Context.bytesOf<OklabUniforms>(new OklabUniforms(hue, GAMUT_CLIP_ALPHA, pointer)),
   );
   const target = new GPUTextureView(view);
   using encoder = device.createCommandEncoderDefault();
@@ -257,6 +259,7 @@ export function frame(
 }
 
 export function shutdown(): void {
+  if (activeGroup !== null) activeGroup.dispose();
   if (activeUniforms !== null) activeUniforms.dispose();
   if (activeVertices !== null) activeVertices.dispose();
   if (activePipeline !== null) activePipeline.dispose();

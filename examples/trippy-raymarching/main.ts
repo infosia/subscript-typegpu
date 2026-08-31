@@ -84,6 +84,7 @@ const WAVE_FREQUENCY_X: f32 = 2.0;
 const WAVE_FREQUENCY_Y: f32 = 2.0;
 const WAVE_AMPLITUDE: f32 = 0.2;
 const TWIST_FACTOR: f32 = 0.01;
+const TUNNEL_RADIUS: f32 = 0.697;
 
 function cosinePalette(a: Vec3f, b: Vec3f, c: Vec3f, d: Vec3f, value: f32): Vec3f {
   return a.add(b.mul(c.scale(value).add(d).scale(6.28318).cos()));
@@ -120,7 +121,7 @@ function trippyDistance(point: Vec3f, time: f32, pointer: Vec2f): f32 {
   ).cos().x;
   const sphereDistance: f32 = repeated.length() - SPHERE_RADIUS
     + WAVE_AMPLITUDE * waveX * waveY;
-  const tunnelDistance: f32 = 0.697 - twisted.xy.length();
+  const tunnelDistance: f32 = TUNNEL_RADIUS - twisted.xy.length();
   if (sphereDistance > tunnelDistance) return sphereDistance;
   return tunnelDistance;
 }
@@ -324,6 +325,7 @@ export function frame(
 }
 
 export function shutdown(): void {
+  if (activeGroup !== null) activeGroup.dispose();
   if (activeFrameBuffer !== null) activeFrameBuffer.dispose();
   if (activeVertices !== null) activeVertices.dispose();
   if (activePipeline !== null) activePipeline.dispose();
@@ -332,4 +334,5 @@ export function shutdown(): void {
   activePipeline = null;
   activeGroup = null;
   activeDevice = null;
+  frameCount = 0;
 }

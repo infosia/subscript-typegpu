@@ -93,7 +93,7 @@ function noiseFragment(
   ctx: FragmentInvocation,
 ): Vec4f {
   const time: f32 = res.frame.$.time;
-  // Wrap time over DEPTH so the z slice loops.
+  // Bound time to DEPTH so the sampled z coordinate does not grow without limit.
   const depthCycle: f32 = new Vec2f(time / DEPTH, time / DEPTH).floor().x;
   const tz: f32 = time - DEPTH * depthCycle;
   const n: f32 = perlin3d(new Vec3f(input.uv.x * GRID, input.uv.y * GRID, tz));
@@ -226,6 +226,7 @@ export function frame(
 }
 
 export function shutdown(): void {
+  if (activeGroup !== null) activeGroup.dispose();
   if (activeFrameBuffer !== null) activeFrameBuffer.dispose();
   if (activeVertices !== null) activeVertices.dispose();
   if (activePipeline !== null) activePipeline.dispose();
@@ -234,4 +235,5 @@ export function shutdown(): void {
   activePipeline = null;
   activeGroup = null;
   activeDevice = null;
+  frameCount = 0;
 }

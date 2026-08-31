@@ -766,9 +766,11 @@ class Layout { values!: MutStorage<u32>; }
 function bitwise(res: Layout, ctx: ComputeInvocation): void {
   const a: u32 = ctx.globalId.x;
   const b: u32 = res.values[0];
+  const c: u32 = res.values[1];
   const masked: u32 = a & (b - 1);
   const combined: u32 = (a + 1) | (b * 2);
-  res.values[0] = masked + combined;
+  const grouped: u32 = a & (b | c);
+  res.values[0] = masked + combined + grouped;
 }
 
 export const bitwisePipeline: ComputePipelineSpec = computePipeline<Layout>(bitwise, { name: "bitwisePipeline", workgroupSize: [1, 1, 1] });
@@ -778,6 +780,7 @@ export const bitwisePipeline: ComputePipelineSpec = computePipeline<Layout>(bitw
     for expected in [
         "let masked = a & (b - 1u);",
         "let combined = (a + 1u) | (b * 2u);",
+        "let grouped = a & (b | c);",
     ] {
         assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
     }

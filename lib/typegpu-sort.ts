@@ -37,7 +37,7 @@ export class BitonicSortResources {
   pass!: Uniform<BitonicSortPass>;
 }
 
-export function bitonicSortStride(jShift: u32): u32 {
+function bitonicSortStride(jShift: u32): u32 {
   let stride: u32 = 1;
   let shift: u32 = 0;
   while (shift < jShift) {
@@ -91,8 +91,9 @@ export function bitonicSortPass(length: u32, passIndex: u32): BitonicSortPass {
   return new BitonicSortPass(0, 0);
 }
 
-// One invocation owns one comparator pair. Committing the ascending comparator here
-// replaces the upstream comparator slot while retaining each bitonic merge direction.
+// Dispatch length / 2 threads because one invocation owns one comparator pair.
+// Committing the ascending comparator here replaces the upstream comparator slot while
+// retaining each bitonic merge direction.
 export function bitonicSortStep(
   resources: BitonicSortResources,
   invocation: ComputeInvocation,

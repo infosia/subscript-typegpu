@@ -1,7 +1,7 @@
 // example: disco
 // Cycles three animated fullscreen patterns from one shared palette.
-// TypeGPU ships seven selectable patterns; this port commits three and maps the
-// window host's key scalar to rings, swirl, and kaleidoscope variants.
+// Keys 1, 2, and 3 select rings, swirl, and kaleidoscope.
+// TypeGPU ships seven selectable patterns. This port commits three.
 // Ported from TypeGPU's disco example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -34,6 +34,7 @@ import {
   Vertex_STRIDE,
   kaleidoscope_FRAGMENT_ENTRY,
   kaleidoscope_LAYOUT0,
+  kaleidoscope_TARGET_FORMAT,
   kaleidoscope_VERTEX_ENTRY,
   kaleidoscope_VERTEX_LAYOUT0,
   kaleidoscope_WGSL,
@@ -45,6 +46,7 @@ import {
   rings_WGSL,
   swirl_FRAGMENT_ENTRY,
   swirl_LAYOUT0,
+  swirl_TARGET_FORMAT,
   swirl_VERTEX_ENTRY,
   swirl_VERTEX_LAYOUT0,
   swirl_WGSL,
@@ -232,13 +234,18 @@ let activeVertices: GPUBuffer | null = null;
 let activeFrameBuffer: GPUBuffer | null = null;
 let activeGroup: GPUBindGroup | null = null;
 let frameCount: u32 = 0;
+let patternIndex: u32 = 0;
 
 export function init(
   instance: SubscriptTypegpuInstance,
   device: SubscriptTypegpuDevice,
   format: GPUTextureFormat,
 ): void {
-  if (format !== rings_TARGET_FORMAT) {
+  if (
+    format !== rings_TARGET_FORMAT
+    || format !== swirl_TARGET_FORMAT
+    || format !== kaleidoscope_TARGET_FORMAT
+  ) {
     print(`FAIL format expected=${rings_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -331,10 +338,12 @@ export function frame(
   const vertices = activeVertices;
   const frameBuffer = activeFrameBuffer;
   const group = activeGroup;
-  // The key scalar cycles the three patterns.
+  if (key === 49) patternIndex = 0;
+  if (key === 50) patternIndex = 1;
+  if (key === 51) patternIndex = 2;
   let pipeline = activeRings;
-  if (key % 3 === 1) pipeline = activeSwirl;
-  if (key % 3 === 2) pipeline = activeKaleidoscope;
+  if (patternIndex === 1) pipeline = activeSwirl;
+  if (patternIndex === 2) pipeline = activeKaleidoscope;
   if (device === null) return;
   if (pipeline === null) return;
   if (vertices === null) return;
@@ -370,6 +379,7 @@ export function frame(
 }
 
 export function shutdown(): void {
+  if (activeGroup !== null) activeGroup.dispose();
   if (activeFrameBuffer !== null) activeFrameBuffer.dispose();
   if (activeVertices !== null) activeVertices.dispose();
   if (activeKaleidoscope !== null) activeKaleidoscope.dispose();
@@ -382,4 +392,6 @@ export function shutdown(): void {
   activeRings = null;
   activeGroup = null;
   activeDevice = null;
+  frameCount = 0;
+  patternIndex = 0;
 }

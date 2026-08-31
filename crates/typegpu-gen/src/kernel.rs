@@ -788,8 +788,9 @@ fn mixed_bitwise_chain(parent: BinOp, operand: &Expr) -> bool {
     let ExprKind::Binary { op: child, .. } = &operand.kind else {
         return false;
     };
-    (is_bitwise_operator(parent) && is_arithmetic_or_comparison_operator(*child))
-        || (is_arithmetic_or_comparison_operator(parent) && is_bitwise_operator(*child))
+    is_bitwise_operator(parent)
+        && (is_arithmetic_or_comparison_operator(*child)
+            || (is_bitwise_operator(*child) && parent != *child))
 }
 
 fn binary_operand(value: &Snippet, parent: u8, right: bool, mixed_bitwise: bool) -> String {

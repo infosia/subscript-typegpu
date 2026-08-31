@@ -132,3 +132,28 @@ Evidence: gate green, 261 passed, 1 ignored, 178.79 s. The smoke
 run prints `window:frames=30` on Metal (yawgpu) with zero `FAIL`
 lines, read before this commit. No golden moved. The owner's
 visual run and the EX2 comment pass follow.
+
+## Phase review (2026-09-01)
+
+A fresh no-context reviewer read the cumulative diff. Findings:
+0 CRITICAL, 4 MAJOR, 20 MINOR. The MAJOR set: the disco pattern
+selection did not survive the host's per-frame key clear, the
+box-raytracing fragment divided by a zero albedo channel, its
+double gamma encode read as an error, and the sort module's trap
+id `SORT1` existed in no block and outside the diagnostics sweep.
+
+Closures: disco stores a pattern index on keys 1 to 3. The host
+clamps every albedo channel to at least 0.004. A comment records
+the upstream's deliberate double encode. `specs/blocks/library.md`
+Rev 0 (LB1-LB4) documents the module set, the trap table, and the
+module test duties, and the diagnostics sweep now covers every
+library module. The trap has a demonstrated red
+(`SORT1 bitonicSortPassCount length=3`). K14 Rev 8 parenthesizes
+two different bitwise operators in one chain, from the WGSL
+grammar *(docs)*, with an emission regression. The MINOR set
+closed in the same round: headers gained the EX7 reductions,
+five shutdowns dispose the bind group, the seeds lost the date
+literal, and the perlin wrap comment no longer claims a seamless
+loop. Two review questions stay recorded as questions: the
+upstream density square, and the dev-tier f32 assumption behind
+the byte-exact oracle claim (observed on Metal, not doubted).

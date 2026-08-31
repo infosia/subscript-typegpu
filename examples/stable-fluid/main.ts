@@ -1,8 +1,8 @@
 // example: stable-fluid
 // Advances a stable-fluid velocity and ink field through texture-backed compute passes.
 // The upstream photo is reduced to a 512-square host-generated Perlin image (EX6).
-// The Noop and Metal probes accept compute-stage textureSampleLevel on filtered rgba16float,
-// so both semi-Lagrangian advection passes keep native linear sampling without a reduction.
+// EX7 keeps both advections sampling through the linear filter in compute.
+// Keys 1, 2, and 3 select display modes, and the pointer drives the brush.
 // Ported from TypeGPU's stable-fluid example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -1015,6 +1015,7 @@ export function init(
       textureResource(views[TEXTURE_VELOCITY_A]),
       textureResource(views[TEXTURE_DIVERGENCE]),
     ]),
+    // The divergence texture doubles as the viscosity right-hand side before its overwrite.
     bindCompute(hostDevice, compute[COMPUTE_VISCOSITY], viscosityJacobi_LAYOUT0, [
       textureResource(views[TEXTURE_DIVERGENCE]),
       textureResource(views[TEXTURE_VELOCITY_A]),
@@ -1046,6 +1047,7 @@ export function init(
       textureResource(views[TEXTURE_DIVERGENCE]),
       textureResource(views[TEXTURE_PRESSURE_A]),
     ]),
+    // Ten pressure iterations are even, so pressure A is current after the loop.
     bindCompute(hostDevice, compute[COMPUTE_GRADIENT], gradientSubtract_LAYOUT0, [
       textureResource(views[TEXTURE_VELOCITY_A]),
       textureResource(views[TEXTURE_PRESSURE_A]),

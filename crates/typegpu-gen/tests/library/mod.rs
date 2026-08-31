@@ -1,3 +1,7 @@
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
 use subscript_compiler::SourceFile;
 
 use crate::support;
@@ -11,6 +15,24 @@ fn validate(wgsl: &str) {
     )
     .validate(&module)
     .unwrap_or_else(|error| panic!("WGSL validation failed: {error:?}\n{wgsl}"));
+}
+
+fn dependency_rlib(directory: &Path, crate_name: &str) -> PathBuf {
+    let prefix = format!("lib{crate_name}-");
+    std::fs::read_dir(directory)
+        .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()))
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with(&prefix) && name.ends_with(".rlib"))
+        })
+        .max_by_key(|path| {
+            path.metadata()
+                .and_then(|metadata| metadata.modified())
+                .ok()
+        })
+        .unwrap_or_else(|| panic!("missing {crate_name} rlib in {}", directory.display()))
 }
 
 #[test]
@@ -243,9 +265,73 @@ export const scanApply: ComputePipelineSpec = computePipeline<PrefixScanApplyRes
 
 #[test]
 fn bitonic_non_power_of_two_length_has_the_named_red_trap() {
-    let source = support::read(&support::root().join("lib/typegpu-sort.ts"));
-    assert!(source.contains("length === 0 || (length & (length - 1)) !== 0"));
-    assert!(source
-        .contains("sortTrap(\"bitonicSortPassCount\", `length=${length} is not a power of two`)"));
-    assert!(source.contains("print(`SORT1 ${method} ${values} (author)`);"));
+    let dependencies = std::env::current_exe()
+        .expect("current test executable")
+        .parent()
+        .expect("test executable has a dependency directory")
+        .to_path_buf();
+    let harness = dependency_rlib(&dependencies, "subscript_typegpu_harness");
+    let scratch = std::env::temp_dir().join(format!(
+        "subscript-typegpu-sort-trap-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&scratch)
+        .unwrap_or_else(|error| panic!("create {}: {error}", scratch.display()));
+    let source_path = scratch.join("runner.rs");
+    let binary_path = scratch.join("runner");
+    let mut source = std::fs::File::create(&source_path)
+        .unwrap_or_else(|error| panic!("create {}: {error}", source_path.display()));
+    source
+        .write_all(
+            br#"
+use std::io::Write;
+use std::path::Path;
+use subscript_typegpu_harness::{ReloadSession, facade_library, program_files};
+
+fn main() {
+    let fixture = std::env::args_os().nth(1).expect("fixture argument");
+    let files = program_files(Path::new(&fixture)).expect("load fixture");
+    let libraries = [facade_library()];
+    let mut session = ReloadSession::new_with_native_libraries(&files, &libraries)
+        .expect("compile fixture");
+    let mut trapped = session.call_main().is_err();
+    while !trapped && session.async_pending() != 0 {
+        trapped = session.async_step().is_err();
+    }
+    std::io::stdout().write_all(&session.take_output()).expect("write output");
+    assert!(trapped, "fixture unexpectedly passed");
+}
+"#,
+        )
+        .expect("write runner source");
+    let compile = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
+        .arg("--edition=2021")
+        .arg(&source_path)
+        .arg("-L")
+        .arg(format!("dependency={}", dependencies.display()))
+        .arg("--extern")
+        .arg(format!("subscript_typegpu_harness={}", harness.display()))
+        .arg("-o")
+        .arg(&binary_path)
+        .output()
+        .expect("compile trap runner");
+    assert!(
+        compile.status.success(),
+        "compile trap runner:\n{}",
+        String::from_utf8_lossy(&compile.stderr),
+    );
+    let fixture = support::root().join("crates/typegpu-gen/tests/library/bitonic-sort-trap.ts");
+    let run = Command::new(&binary_path)
+        .arg(&fixture)
+        .output()
+        .expect("run trap fixture");
+    let stdout = String::from_utf8(run.stdout).expect("trap output is UTF-8");
+    assert!(run.status.success(), "trap runner failed:\n{stdout}");
+    assert!(
+        stdout.contains("SORT1 bitonicSortPassCount length=3 is not a power of two (author)"),
+        "trap output lacks SORT1 message:\n{stdout}",
+    );
+    println!("observed red: {}", stdout.trim_end());
+    std::fs::remove_dir_all(&scratch)
+        .unwrap_or_else(|error| panic!("remove {}: {error}", scratch.display()));
 }

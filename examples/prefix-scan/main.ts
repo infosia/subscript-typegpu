@@ -58,7 +58,7 @@ export const prefixScanApplyPipeline: ComputePipelineSpec = computePipeline<
   workgroupSize: [256, 1, 1],
 });
 
-let randomState: u32 = randSeed(20260831);
+let randomState: u32 = randSeed(7);
 
 function appendScanBytes(target: u8[], source: u8[]): void {
   let index: i32 = 0;

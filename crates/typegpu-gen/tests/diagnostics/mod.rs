@@ -190,17 +190,60 @@ fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
         );
     }
 
+    let library_spec = read(&root.join("specs/blocks/library.md"));
+    for module in [
+        "typegpu.ts",
+        "typegpu-types.ts",
+        "typegpu-color.ts",
+        "typegpu-noise.ts",
+        "typegpu-sdf.ts",
+        "typegpu-sort.ts",
+    ] {
+        let path = root.join("lib").join(module);
+        let source = read(&path);
+        let trap_count = source.matches("unreachable();").count();
+        match module {
+            "typegpu.ts" => {
+                assert_eq!(
+                    trap_count,
+                    1,
+                    "{} traps must go through authorTrap",
+                    path.display()
+                );
+                assert!(
+                    source.contains("function authorTrap(rule: string, method: string, values: string): void {\n  print(`${rule} ${method} ${values} (author)`);\n  unreachable();\n}"),
+                    "{} trap helper must lead with its documented rule id",
+                    path.display(),
+                );
+            }
+            "typegpu-sort.ts" => {
+                assert_eq!(
+                    trap_count,
+                    1,
+                    "{} traps must go through sortTrap",
+                    path.display()
+                );
+                assert!(
+                    source.contains("function sortTrap(method: string, values: string): void {\n  print(`SORT1 ${method} ${values} (author)`);\n  unreachable();\n}"),
+                    "{} trap helper must lead with SORT1",
+                    path.display(),
+                );
+                assert!(
+                    library_spec.contains("`SORT1` —"),
+                    "SORT1 trap lacks a library rule-table entry",
+                );
+            }
+            _ => assert_eq!(
+                trap_count,
+                0,
+                "{} has a trap outside a helper",
+                path.display()
+            ),
+        }
+    }
+
     let runtime = root.join("lib/typegpu.ts");
     let source = read(&runtime);
-    assert!(
-        source.contains("function authorTrap(") && source.contains("(author)"),
-        "runtime trap helper lacks the author owner",
-    );
-    assert_eq!(
-        source.matches("unreachable();").count(),
-        1,
-        "runtime trap sites must go through authorTrap",
-    );
     for (line_index, line) in source.lines().enumerate() {
         if !line.contains("authorTrap(") || line.contains("function authorTrap(") {
             continue;
