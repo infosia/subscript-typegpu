@@ -38,6 +38,7 @@ pub(crate) fn program_files(program: &Path) -> Vec<SourceFile> {
         SourceFile::new("typegpu.ts", read(&root.join("lib/typegpu.ts"))),
         SourceFile::new("typegpu-noise.ts", read(&root.join("lib/typegpu-noise.ts"))),
         SourceFile::new("typegpu-sdf.ts", read(&root.join("lib/typegpu-sdf.ts"))),
+        SourceFile::new("typegpu-sort.ts", read(&root.join("lib/typegpu-sort.ts"))),
         SourceFile::new(name, read(program)),
     ]
 }

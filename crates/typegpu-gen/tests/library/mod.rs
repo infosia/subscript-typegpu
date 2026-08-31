@@ -153,3 +153,51 @@ export const noise: ComputePipelineSpec = computePipeline<Layout>(noiseKernel, {
     }
     validate(wgsl);
 }
+
+#[test]
+fn sort_library_kernels_emit_and_validate_from_imports() {
+    let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
+    files.pop();
+    files.push(SourceFile::new(
+        "sort-library-test.ts",
+        r#"
+import { ComputePipelineSpec, computePipeline } from "./typegpu";
+import { BitonicSortResources, PrefixScanApplyResources, PrefixScanBlockResources, bitonicSortStep, prefixScanApplyF32, prefixScanBlockF32 } from "./typegpu-sort";
+export const bitonic: ComputePipelineSpec = computePipeline<BitonicSortResources>(bitonicSortStep, { name: "bitonic", workgroupSize: [256, 1, 1] });
+export const scanBlock: ComputePipelineSpec = computePipeline<PrefixScanBlockResources>(prefixScanBlockF32, { name: "scanBlock", workgroupSize: [256, 1, 1] });
+export const scanApply: ComputePipelineSpec = computePipeline<PrefixScanApplyResources>(prefixScanApplyF32, { name: "scanApply", workgroupSize: [256, 1, 1] });
+"#,
+    ));
+    let generated = subscript_typegpu_gen::generate(&files)
+        .unwrap_or_else(|diagnostics| panic!("generate imported sort kernels: {diagnostics:?}"));
+    assert_eq!(generated.pipelines.len(), 3);
+    let pipeline = |name: &str| {
+        generated
+            .pipelines
+            .iter()
+            .find(|(pipeline, _)| pipeline == name)
+            .map(|(_, wgsl)| wgsl.as_str())
+            .unwrap_or_else(|| panic!("missing generated pipeline {name}"))
+    };
+    let bitonic = pipeline("bitonic");
+    assert!(bitonic.contains("fn bitonicSortStride("));
+    assert!(bitonic.contains("fn bitonicSortStep("));
+    assert!(bitonic.contains("let below = thread & (stride - 1u);"));
+    let block = pipeline("scanBlock");
+    assert!(block.contains("var<workgroup> prefixScanShared: array<f32, 256u>;"));
+    assert!(block.contains("fn prefixScanBlockF32("));
+    let apply = pipeline("scanApply");
+    assert!(apply.contains("fn prefixScanApplyF32("));
+    for (_, wgsl) in &generated.pipelines {
+        validate(wgsl);
+    }
+}
+
+#[test]
+fn bitonic_non_power_of_two_length_has_the_named_red_trap() {
+    let source = support::read(&support::root().join("lib/typegpu-sort.ts"));
+    assert!(source.contains("length === 0 || (length & (length - 1)) !== 0"));
+    assert!(source
+        .contains("sortTrap(\"bitonicSortPassCount\", `length=${length} is not a power of two`)"));
+    assert!(source.contains("print(`SORT1 ${method} ${values} (author)`);"));
+}

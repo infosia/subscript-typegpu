@@ -47,3 +47,34 @@ ignored, 157.50 s (the coding agent's timed run, counts confirmed
 by a second run). The three smoke runs print `window:frames=30`
 on Metal (yawgpu) with zero `FAIL` lines, read before this
 commit. The EX2 comment pass and the owner's visual runs follow.
+
+## Slice 2 (2026-09-01)
+
+Landed: `lib/typegpu-sort.ts` (an ascending `u32` bitonic step
+kernel with a host pass enumerator that traps on a
+non-power-of-two length, and a 256-lane exclusive `f32` Blelloch
+scan pair with a one-level host driver, limit 65536, host oracle
+included), `bitonic-sort` (windowed, one comparator step per
+frame, keys 1 and 2), and `prefix-scan` (headless, three lengths
+against the host oracle byte for byte). Kernels defined in a
+library module compile through `computePipeline` imports — the
+measured answer to the slice's design question. Registration
+touches four Rust files, the `typegpu-noise` pattern.
+
+Measured rejections recorded: compound assignment through an index
+signature, shifts outside K9 (the module computes the stride with
+a loop), and a duplicate function name across checked modules.
+
+The fourth acceptance gap: Tint requires parentheses when a
+bitwise operator mixes with an arithmetic operator, and `naga`
+does not. The Metal smoke caught `mixing '&' and '-' requires
+parenthesis` in the bitonic module before the commit. K14 Rev 7
+parenthesizes mixed bitwise chains, with a red-then-green
+regression. No committed golden carries such a chain.
+
+Evidence: gate green, 260 passed, 1 ignored, 171.51 s. On Metal
+(yawgpu): `check:scan8 pass`, `check:scan123 pass`,
+`check:scan4096 pass` (byte-exact), and the bitonic smoke prints
+`window:frames=30` with zero `FAIL` lines after the fix. On Noop
+the three checks print `noop`. The owner's visual run of
+`bitonic-sort` and the EX2 comment review follow.
