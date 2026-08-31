@@ -760,9 +760,45 @@ fn binary_precedence(op: BinOp) -> u8 {
     }
 }
 
-fn binary_operand(value: &Snippet, parent: u8, right: bool) -> String {
+fn is_bitwise_operator(op: BinOp) -> bool {
+    matches!(
+        op,
+        BinOp::BitAnd | BinOp::BitOr | BinOp::BitXor | BinOp::Shl | BinOp::Shr | BinOp::UShr
+    )
+}
+
+fn is_arithmetic_or_comparison_operator(op: BinOp) -> bool {
+    matches!(
+        op,
+        BinOp::Add
+            | BinOp::Sub
+            | BinOp::Mul
+            | BinOp::Div
+            | BinOp::Rem
+            | BinOp::Eq
+            | BinOp::Ne
+            | BinOp::Lt
+            | BinOp::Le
+            | BinOp::Gt
+            | BinOp::Ge
+    )
+}
+
+fn mixed_bitwise_chain(parent: BinOp, operand: &Expr) -> bool {
+    let ExprKind::Binary { op: child, .. } = &operand.kind else {
+        return false;
+    };
+    (is_bitwise_operator(parent) && is_arithmetic_or_comparison_operator(*child))
+        || (is_arithmetic_or_comparison_operator(parent) && is_bitwise_operator(*child))
+}
+
+fn binary_operand(value: &Snippet, parent: u8, right: bool, mixed_bitwise: bool) -> String {
     let mixed_logical = matches!((parent, value.precedence), (1, 2) | (2, 1));
-    if mixed_logical || value.precedence < parent || (right && value.precedence == parent) {
+    if mixed_logical
+        || mixed_bitwise
+        || value.precedence < parent
+        || (right && value.precedence == parent)
+    {
         format!("({})", value.text)
     } else {
         value.text.clone()
@@ -1187,14 +1223,16 @@ fn constant_snippet(
                     expr.pos.clone(),
                 )
             })?;
+            let left_mixed = mixed_bitwise_chain(*op, left);
+            let right_mixed = mixed_bitwise_chain(*op, right);
             let left = constant_snippet(module, globals, left)?;
             let right = constant_snippet(module, globals, right)?;
             let precedence = binary_precedence(*op);
             Ok(Snippet::new(
                 format!(
                     "{} {spelling} {}",
-                    binary_operand(&left, precedence, false),
-                    binary_operand(&right, precedence, true)
+                    binary_operand(&left, precedence, false, left_mixed),
+                    binary_operand(&right, precedence, true, right_mixed)
                 ),
                 precedence,
             ))
@@ -1665,13 +1703,15 @@ impl<'a> Emitter<'a> {
                         expr.pos.clone(),
                     ));
                 };
+                let left_mixed = mixed_bitwise_chain(*op, left);
+                let right_mixed = mixed_bitwise_chain(*op, right);
                 let left = self.fround_argument(left)?;
                 let right = self.fround_argument(right)?;
                 let precedence = binary_precedence(*op);
                 let text = format!(
                     "{} {spelling} {}",
-                    binary_operand(&left, precedence, false),
-                    binary_operand(&right, precedence, true)
+                    binary_operand(&left, precedence, false, left_mixed),
+                    binary_operand(&right, precedence, true, right_mixed)
                 );
                 let mut prelude = left.prelude;
                 prelude.extend(right.prelude);
@@ -1769,13 +1809,15 @@ impl<'a> Emitter<'a> {
                         expr.pos.clone(),
                     ));
                 };
+                let left_mixed = mixed_bitwise_chain(*op, left);
+                let right_mixed = mixed_bitwise_chain(*op, right);
                 let left = self.snippet(left)?;
                 let right = self.snippet(right)?;
                 let precedence = binary_precedence(*op);
                 let text = format!(
                     "{} {spelling} {}",
-                    binary_operand(&left, precedence, false),
-                    binary_operand(&right, precedence, true)
+                    binary_operand(&left, precedence, false, left_mixed),
+                    binary_operand(&right, precedence, true, right_mixed)
                 );
                 let mut prelude = left.prelude;
                 prelude.extend(right.prelude);
@@ -2260,8 +2302,8 @@ impl<'a> Emitter<'a> {
                             "<" | "<=" | ">" | ">=" | "==" | "!=" => 5,
                             _ => 0,
                         };
-                        let recv = binary_operand(&recv_value, precedence, false);
-                        let arg = binary_operand(&arg_values[0], precedence, true);
+                        let recv = binary_operand(&recv_value, precedence, false, false);
+                        let arg = binary_operand(&arg_values[0], precedence, true, false);
                         (format!("{recv} {op} {arg}"), precedence)
                     }
                     MethodEmission::Builtin(builtin) if arg_values.is_empty() => {

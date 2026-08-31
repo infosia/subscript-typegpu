@@ -758,6 +758,32 @@ export const logicalPipeline: ComputePipelineSpec = computePipeline<Layout>(logi
 }
 
 #[test]
+fn mixed_bitwise_chains_parenthesize_arithmetic_operands() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
+class Layout { values!: MutStorage<u32>; }
+function bitwise(res: Layout, ctx: ComputeInvocation): void {
+  const a: u32 = ctx.globalId.x;
+  const b: u32 = res.values[0];
+  const masked: u32 = a & (b - 1);
+  const combined: u32 = (a + 1) | (b * 2);
+  res.values[0] = masked + combined;
+}
+
+export const bitwisePipeline: ComputePipelineSpec = computePipeline<Layout>(bitwise, { name: "bitwisePipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    for expected in [
+        "let masked = a & (b - 1u);",
+        "let combined = (a + 1u) | (b * 2u);",
+    ] {
+        assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
+    }
+}
+
+#[test]
 fn every_k10_and_k11_mapping_reaches_the_emitter() {
     let generated = generate(
         r#"
