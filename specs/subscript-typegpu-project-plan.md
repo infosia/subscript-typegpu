@@ -771,6 +771,62 @@ Exit: `tools/regen.sh` reproduces `lib/webgpu.ts` byte for byte, the
 deviation trichotomy of J9 holds with 14 fewer rows, the gate green,
 the live lane green on one backend, and the budgets recorded.
 
+### P15 — the example ports, round 2 (after P14)
+
+The P10 survey left portable examples unported. P15 ports seven of
+them and adds two library modules. TypeGPU specializes kernels at
+run time through slots, accessors, and comptime closures. This
+project replaces each use with a committed constant, a K2 helper,
+or one emitted variant per choice (invariant 9). EX1–EX7 govern
+every port, and the input reductions follow EX7.
+
+Slice 1 — no new library surface. Three windowed ports.
+`trippy-raymarching`: a raymarch through a twisted, repeated
+sphere lattice, with the upstream sliders committed as constants.
+The pointer drives the lattice scroll. `disco`: three of the
+upstream seven fragment patterns, one pipeline each, cycled on the
+key scalar. `perlin-noise`: the noise module's `perlin3d` sampled
+over a committed grid, with time as the z axis and one committed
+sharpening function. The upstream gradient cache and its compute
+pass do not port, because this `perlin3d` reads committed tables.
+
+Slice 2 — the sort module and its two ports. `lib/typegpu-sort.ts`
+holds an ascending `u32` bitonic sort and an exclusive `f32`
+prefix scan, both at workgroup size 256. The host drives the
+bitonic (k, j) pass sequence and the scan's block recursion, the
+P10 pattern for host-driven pass order. Upstream comparators are
+slot closures, and the module commits the ascending compare. The
+bitonic sort requires a power-of-two length and traps otherwise.
+A generator test compiles and `naga`-validates a kernel per module
+entry point, the P10 slice 2 pattern. Ports: `bitonic-sort`
+(windowed, the array rendered as a grayscale grid, reshuffle and
+sort on keys) and `prefix-scan` (headless, `check:` lines against
+a host reference).
+
+Slice 3 — the color module and its two ports. `lib/typegpu-color.ts`
+holds the sRGB transfer pair, the HSV pair, the Oklab pair, and
+the adaptive-L0.5 gamut clip, from the published Oklab constants.
+Ports: `oklab` (the color-solid slice at a key-driven hue, the
+pointer as the probe, the checker out-of-gamut pattern) and
+`box-raytracing` (volumetric ray-box accumulation over a committed
+cell grid, the aim matrix computed in script code, blending
+through the RenderPipelineSpec blend member). The kernel subset
+has no `discard`. The port returns alpha zero, which the
+premultiplied blend leaves invisible.
+
+Slice 4 — the stable fluid. Nine compute passes over
+double-buffered fields: brush, ink add, force add, velocity
+advect, Jacobi diffusion, divergence, Jacobi pressure, project,
+ink advect. Upstream stores the fields as `rgba16float` storage
+textures and samples them in compute. The slice starts with a
+backend probe of that combination, the P11 slice 3 procedure. The
+background photo reduces to a procedural image (EX6), the display
+mode moves to keys, and the pointer drives the brush.
+
+Exit per slice: the P10 exits (EX4 in the gate, the windowed smoke
+runs, the `check:` lines, the owner's visual runs, budgets
+recorded). The record is `specs/tracking/p15-examples.md`.
+
 ## 9. Risk register
 
 | Id | Risk | Mitigation / trigger |
