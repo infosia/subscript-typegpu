@@ -88,6 +88,7 @@ function equalBytes(left: u8[], right: u8[]): boolean {
   return true;
 }
 
+// The xorshift chain from the noise module feeds every length deterministically.
 function randomValues(length: u32): f32[] {
   const values: f32[] = [];
   let index: u32 = 0;
@@ -183,6 +184,7 @@ async function checkLength(
   device.queue.submit([command]);
   const actualBytes: u8[] = await values.read(device, 0, length);
   const inputBytes: u8[] = f32Bytes(input);
+  // A backend that ran no compute returns the written input, the Noop signature.
   if (equalBytes(actualBytes, inputBytes)) return "noop";
   return equalBytes(actualBytes, f32Bytes(expected)) ? "pass" : "fail";
 }

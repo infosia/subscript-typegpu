@@ -99,6 +99,7 @@ function oklabFragment(
   const y: f32 = input.uv.y * 2.0 - 1.0;
   const position = new Vec2f(0.3 * x, (y * 1.2 + 1.0) * 0.5);
   const hueVector = new Vec2f(uniforms.hue, uniforms.hue);
+  // The slice: lightness rises with y, chroma grows with |x| along one hue.
   const lab = new Vec3f(
     position.y,
     hueVector.cos().x * position.x,
@@ -111,11 +112,13 @@ function oklabFragment(
   let color: Vec3f = linearToSrgb(
     oklabToLinearRgb(oklabGamutClipAdaptiveL05(lab, uniforms.alpha)),
   );
+  // Out-of-gamut regions keep the clipped color, dimmed by the checker.
   if (outOfGamut) {
     const cell = input.uv.scale(24.0).floor();
     const checker: f32 = (((cell.x as i32) + (cell.y as i32)) & 1) === 0 ? 0.0 : 1.0;
     color = color.scale(0.1 + 0.9 * checker);
   }
+  // A thin bright ring marks the pointer probe.
   const probeDistance: f32 = input.uv.distance(uniforms.pointer);
   if (probeDistance > 0.018 && probeDistance < 0.026) {
     color = color.mix(new Vec3f(1.0, 1.0, 1.0), 0.8);

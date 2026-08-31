@@ -95,6 +95,7 @@ function displayVertex(
   );
 }
 
+// Each pixel maps to one of the 4096 values. Brightness is the value itself.
 function displayFragment(
   resources: BitonicDisplayResources,
   input: DisplayVaryings,
@@ -271,6 +272,7 @@ export function frame(
   if (vertices === null) return;
 
   using queue = device.queue();
+  // Key 1 reshuffles. Key 2 restarts the sort from pass zero.
   if (key === 49) {
     queue.writeBuffer(values, 0, shuffledValueBytes());
     sortActive = false;
@@ -280,6 +282,7 @@ export function frame(
     sortPassIndex = 0;
   }
   using encoder = device.createCommandEncoderDefault();
+  // One comparator pass per frame keeps the convergence visible.
   if (sortActive) {
     const currentPass: BitonicSortPass = bitonicSortPass(VALUE_COUNT, sortPassIndex);
     queue.writeBuffer(passBuffer, 0, Context.bytesOf<BitonicSortPass>(currentPass));

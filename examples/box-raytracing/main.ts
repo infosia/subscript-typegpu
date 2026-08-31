@@ -133,6 +133,7 @@ function scalarMax(a: f32, b: f32): f32 {
   return a > b ? a : b;
 }
 
+// Slab test per axis. A negative tMin clamps to the camera plane.
 function intersectBox(
   origin: Vec3f,
   direction: Vec3f,
@@ -225,6 +226,7 @@ function boxFragment(
       minimum.add(new Vec3f(BOX_SIZE, BOX_SIZE, BOX_SIZE)),
     );
     if (intersection.hit === 0) continue;
+    // The traversed length through each box adds density and inverse albedo.
     const boxDensity: f32 = scalarMax(0.0, intersection.tMax - intersection.tMin)
       * MATERIAL_DENSITY * MATERIAL_DENSITY;
     densitySum += boxDensity;
@@ -236,6 +238,7 @@ function boxFragment(
     hitAny = true;
   }
   if (!hitAny) return new Vec4f(0.0, 0.0, 0.0, 0.0);
+  // The reciprocal turns the accumulated inverse albedo back into a color.
   const srgb: Vec3f = linearToSrgb(new Vec3f(
     1.0 / inverseColor.x,
     1.0 / inverseColor.y,
