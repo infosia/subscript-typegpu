@@ -36,6 +36,7 @@ pub(crate) fn program_files(program: &Path) -> Vec<SourceFile> {
         SourceFile::new("webgpu.ts", read(&root.join("lib/webgpu.ts"))),
         SourceFile::new("typegpu-types.ts", read(&root.join("lib/typegpu-types.ts"))),
         SourceFile::new("typegpu.ts", read(&root.join("lib/typegpu.ts"))),
+        SourceFile::new("typegpu-color.ts", read(&root.join("lib/typegpu-color.ts"))),
         SourceFile::new("typegpu-noise.ts", read(&root.join("lib/typegpu-noise.ts"))),
         SourceFile::new("typegpu-sdf.ts", read(&root.join("lib/typegpu-sdf.ts"))),
         SourceFile::new("typegpu-sort.ts", read(&root.join("lib/typegpu-sort.ts"))),

@@ -27,6 +27,7 @@ fn program_files_have_the_required_order_names_and_modes() {
             "webgpu.ts",
             "typegpu-types.ts",
             "typegpu.ts",
+            "typegpu-color.ts",
             "typegpu-noise.ts",
             "typegpu-sdf.ts",
             "typegpu-sort.ts",
@@ -35,7 +36,7 @@ fn program_files_have_the_required_order_names_and_modes() {
     );
     assert_eq!(
         files.iter().map(|file| file.dts).collect::<Vec<_>>(),
-        vec![true, true, false, false, false, false, false, false, false]
+        vec![true, true, false, false, false, false, false, false, false, false]
     );
 }
 
@@ -55,6 +56,7 @@ fn typegpu_program_files_end_with_generated_support() {
             "webgpu.ts",
             "typegpu-types.ts",
             "typegpu.ts",
+            "typegpu-color.ts",
             "typegpu-noise.ts",
             "typegpu-sdf.ts",
             "typegpu-sort.ts",

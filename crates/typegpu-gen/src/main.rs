@@ -50,6 +50,7 @@ fn run() -> Result<(), String> {
         SourceFile::new("webgpu.ts", read(&library.join("webgpu.ts"))?),
         SourceFile::new("typegpu-types.ts", read(&library.join("typegpu-types.ts"))?),
         SourceFile::new("typegpu.ts", read(&library.join("typegpu.ts"))?),
+        SourceFile::new("typegpu-color.ts", read(&library.join("typegpu-color.ts"))?),
         SourceFile::new("typegpu-noise.ts", read(&library.join("typegpu-noise.ts"))?),
         SourceFile::new("typegpu-sdf.ts", read(&library.join("typegpu-sdf.ts"))?),
         SourceFile::new("typegpu-sort.ts", read(&library.join("typegpu-sort.ts"))?),

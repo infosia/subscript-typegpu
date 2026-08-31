@@ -123,6 +123,7 @@ fn is_library_file(name: &str) -> bool {
         "webgpu.ts"
             | "typegpu-types.ts"
             | "typegpu.ts"
+            | "typegpu-color.ts"
             | "typegpu-noise.ts"
             | "typegpu-sdf.ts"
             | "typegpu-sort.ts"

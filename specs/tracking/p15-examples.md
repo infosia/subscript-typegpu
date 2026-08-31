@@ -78,3 +78,25 @@ Evidence: gate green, 260 passed, 1 ignored, 171.51 s. On Metal
 `window:frames=30` with zero `FAIL` lines after the fix. On Noop
 the three checks print `noop`. The owner's visual run of
 `bitonic-sort` and the EX2 comment review follow.
+
+## Slice 3 (2026-09-01)
+
+Landed: `lib/typegpu-color.ts` (the sRGB transfer pair, the HSV
+pair, the Oklab matrix pair with a signed cube root, the
+compositions, and the adaptive-L0.5 gamut clip with its private
+cusp and intersection helpers, host bodies real), `oklab`
+(windowed, hue on keys 1 and 2, the pointer as a probe ring, the
+out-of-gamut checker — the kernel subset has no `fwidth`), and
+`box-raytracing` (windowed, 343 flattened cells, a host look-at
+basis instead of `mat4.aim`, zero alpha under the premultiplied
+blend instead of `discard`). Registration follows the
+`typegpu-sort` pattern, color ordered before noise.
+
+Measured rejection recorded: a mutable kernel local requires an
+initializer (S100, two sites in the gamut helpers).
+
+Evidence: gate green, 261 passed, 1 ignored, 172.65 s. Both smoke
+runs print `window:frames=30` on Metal (yawgpu) with zero `FAIL`
+lines, read before this commit. Every `.wgsl` and `.expected`
+golden stays byte-identical. The owner's visual runs and the EX2
+comment review follow.

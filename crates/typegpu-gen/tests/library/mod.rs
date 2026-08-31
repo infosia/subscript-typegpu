@@ -155,6 +155,54 @@ export const noise: ComputePipelineSpec = computePipeline<Layout>(noiseKernel, {
 }
 
 #[test]
+fn color_library_helpers_emit_and_validate() {
+    let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
+    files.pop();
+    files.push(SourceFile::new(
+        "color-library-test.ts",
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+import { Vec3f } from "./typegpu-types";
+import { hsvToRgb, linearRgbToOklab, linearToSrgb, oklabGamutClipAdaptiveL05, oklabToLinearRgb, oklabToRgb, rgbToHsv, rgbToOklab, srgbToLinear } from "./typegpu-color";
+class Layout { output!: MutStorage<Vec3f>; }
+function colorKernel(res: Layout, ctx: ComputeInvocation): void {
+  const input = new Vec3f(0.25, 0.5, 0.75);
+  res.output[0] = linearToSrgb(input);
+  res.output[1] = srgbToLinear(input);
+  res.output[2] = hsvToRgb(input);
+  res.output[3] = rgbToHsv(input);
+  res.output[4] = linearRgbToOklab(input);
+  res.output[5] = oklabToLinearRgb(input);
+  res.output[6] = rgbToOklab(input);
+  res.output[7] = oklabToRgb(input);
+  res.output[8] = oklabGamutClipAdaptiveL05(input, 0.2);
+}
+export const color: ComputePipelineSpec = computePipeline<Layout>(colorKernel, { name: "color", workgroupSize: [1, 1, 1] });
+"#,
+    ));
+    let generated = subscript_typegpu_gen::generate(&files)
+        .unwrap_or_else(|diagnostics| panic!("generate color library kernel: {diagnostics:?}"));
+    let wgsl = &generated.pipelines[0].1;
+    for expected in [
+        "fn linearToSrgb(",
+        "fn srgbToLinear(",
+        "fn hsvToRgb(",
+        "fn rgbToHsv(",
+        "fn linearRgbToOklab(",
+        "fn oklabToLinearRgb(",
+        "fn rgbToOklab(",
+        "fn oklabToRgb(",
+        "fn oklabGamutClipAdaptiveL05(",
+        "fn computeMaxSaturation(",
+        "fn findCusp(",
+        "fn findGamutIntersection(",
+    ] {
+        assert!(wgsl.contains(expected), "missing `{expected}`:\n{wgsl}");
+    }
+    validate(wgsl);
+}
+
+#[test]
 fn sort_library_kernels_emit_and_validate_from_imports() {
     let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
     files.pop();
