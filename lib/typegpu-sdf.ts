@@ -17,6 +17,19 @@ function sdfMax3(a: f32, b: f32, c: f32): f32 {
   return sdfMax(a, sdfMax(b, c));
 }
 
+// Returns the signed distance from `p` to a disk centered at `center`.
+export function sdDisk(p: Vec2f, center: Vec2f, radius: f32): f32 {
+  return p.sub(center).length() - radius;
+}
+
+// Returns the exact signed distance from `p` to a 2D axis-aligned box.
+export function sdBox2d(p: Vec2f, center: Vec2f, half: Vec2f): f32 {
+  const offset: Vec2f = p.sub(center).abs().sub(half);
+  const outside: Vec2f = offset.max(new Vec2f(0.0, 0.0));
+  const inside: f32 = sdfMin(sdfMax(offset.x, offset.y), 0.0);
+  return outside.length() + inside;
+}
+
 // Returns the signed distance from `p` to a sphere of the given radius at the origin.
 export function sdSphere(p: Vec3f, radius: f32): f32 {
   return p.length() - radius;

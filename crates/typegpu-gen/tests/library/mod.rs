@@ -102,11 +102,13 @@ fn sdf_library_helpers_emit_and_validate() {
         "sdf-library-test.ts",
         r#"
 import { Vec2f, Vec3f } from "./typegpu-types";
-import { sdSphere, sdBox, sdBoxFrame, sdPlane, sdLine, opUnion, opSmoothUnion } from "./typegpu-sdf";
+import { sdDisk, sdBox2d, sdSphere, sdBox, sdBoxFrame, sdPlane, sdLine, opUnion, opSmoothUnion } from "./typegpu-sdf";
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
 class Layout { output!: MutStorage<f32>; }
 function sdfKernel(res: Layout, ctx: ComputeInvocation): void {
-  let value: f32 = sdSphere(new Vec3f(1.0, 2.0, 3.0), 1.0);
+  let value: f32 = sdDisk(new Vec2f(1.0, 2.0), new Vec2f(0.5, 0.5), 0.25);
+  value += sdBox2d(new Vec2f(1.0, 2.0), new Vec2f(0.5, 0.5), new Vec2f(0.25, 0.75));
+  value += sdSphere(new Vec3f(1.0, 2.0, 3.0), 1.0);
   value += sdBox(new Vec3f(1.0, 2.0, 3.0), new Vec3f(0.5, 0.5, 0.5));
   value += sdBoxFrame(new Vec3f(1.0, 2.0, 3.0), new Vec3f(0.5, 0.5, 0.5), 0.1);
   value += sdPlane(new Vec3f(1.0, 2.0, 3.0), new Vec3f(0.0, 1.0, 0.0), 0.25);
@@ -122,6 +124,8 @@ export const sdf: ComputePipelineSpec = computePipeline<Layout>(sdfKernel, { nam
         .unwrap_or_else(|diagnostics| panic!("generate SDF library kernel: {diagnostics:?}"));
     let wgsl = &generated.pipelines[0].1;
     for helper in [
+        "sdDisk",
+        "sdBox2d",
         "sdSphere",
         "sdBox",
         "sdBoxFrame",
@@ -129,6 +133,53 @@ export const sdf: ComputePipelineSpec = computePipeline<Layout>(sdfKernel, { nam
         "sdLine",
         "opUnion",
         "opSmoothUnion",
+    ] {
+        assert!(
+            wgsl.contains(&format!("fn {helper}(")),
+            "missing {helper}:\n{wgsl}"
+        );
+    }
+    validate(wgsl);
+}
+
+#[test]
+fn radiance_cascade_library_helpers_emit_and_validate() {
+    let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
+    files.pop();
+    files.push(SourceFile::new(
+        "radiance-cascade-library-test.ts",
+        r#"
+import { Vec2f, Vec2u, Vec4f } from "./typegpu-types";
+import { cascadeRaysStored, cascadeProbesAt, cascadeIntervalStart, cascadeIntervalEnd, cascadeRayAngle, cascadeMergeUv, radianceGatherUv } from "./typegpu-radiance-cascades";
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { output!: MutStorage<Vec4f>; }
+function cascadeKernel(res: Layout, ctx: ComputeInvocation): void {
+  const layer: u32 = ctx.globalId.x;
+  const stored: u32 = cascadeRaysStored(layer);
+  const probes: u32 = cascadeProbesAt(256, layer);
+  const start: f32 = cascadeIntervalStart(0.01, layer);
+  const end: f32 = cascadeIntervalEnd(0.01, layer);
+  const angle: f32 = cascadeRayAngle(new Vec2u(1, 0), stored * 2);
+  const merged: Vec2f = cascadeMergeUv(new Vec2u(1, 0), probes, new Vec2f(0.5, 0.5), 512.0);
+  const gathered: Vec2f = radianceGatherUv(layer % 4, merged, 256.0, 512.0);
+  res.output[layer] = new Vec4f(gathered.x, gathered.y, angle + start, end);
+}
+export const cascade: ComputePipelineSpec = computePipeline<Layout>(cascadeKernel, { name: "cascade", workgroupSize: [1, 1, 1] });
+"#,
+    ));
+    let generated = subscript_typegpu_gen::generate(&files).unwrap_or_else(|diagnostics| {
+        panic!("generate radiance cascade library kernel: {diagnostics:?}")
+    });
+    let wgsl = &generated.pipelines[0].1;
+    for helper in [
+        "cascadePow2",
+        "cascadeRaysStored",
+        "cascadeProbesAt",
+        "cascadeIntervalStart",
+        "cascadeIntervalEnd",
+        "cascadeRayAngle",
+        "cascadeMergeUv",
+        "radianceGatherUv",
     ] {
         assert!(
             wgsl.contains(&format!("fn {helper}(")),

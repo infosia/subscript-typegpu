@@ -90,3 +90,24 @@ Evidence: gate green, 262 passed, 1 ignored, 198.90 s. The smoke
 run prints `window:frames=30` on Metal (yawgpu) with zero `FAIL`
 lines, read before this commit. No golden moved. The owner's
 visual run follows.
+
+## Slice 3 (2026-09-01)
+
+Landed: `lib/typegpu-radiance-cascades.ts` (the CPU sizing and
+ping-pong rule, seven kernel-subset helpers for the tiling, the
+interval schedule, the ray angle, and the merge and gather sample
+positions — powers of two by loop, K9 has no shifts),
+`sdDisk` and `sdBox2d` in `lib/typegpu-sdf.ts`, and
+`examples/radiance-cascades` — six cascade layers over two array
+textures through per-layer single-layer views, a 64-step
+sphere-trace of the uniform scene, the top-down merge, the
+field build, the ACES render, and pointer dragging of the
+nearest scene element. Thirty examples compile in the gate.
+
+Measured rejection recorded: scalar trigonometry through an
+`f64` cast (K12) — the mapped vector methods carry it.
+
+Evidence: gate green, 263 passed, 1 ignored, 200.03 s. The smoke
+run prints `window:frames=30` on Metal (yawgpu) with zero `FAIL`
+lines, read before this commit. No golden moved. The owner's
+visual run follows.
