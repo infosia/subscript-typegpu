@@ -111,3 +111,19 @@ Evidence: gate green, 263 passed, 1 ignored, 200.03 s. The smoke
 run prints `window:frames=30` on Metal (yawgpu) with zero `FAIL`
 lines, read before this commit. No golden moved. The owner's
 visual run follows.
+
+## Slice 4 (2026-09-01)
+
+Landed: `examples/radiance-cascades-drawing` — painted strokes at
+a committed radius into a 512-square scene, a full jump-flood
+halving sequence per changed frame over the two-layer payload
+pair with per-step immutable parameter buffers, derived SDF and
+color textures, the slice 3 cascade kernel at the upstream
+quarter resolution (128, five layers), and keys 1 and 2 for the
+lit and signed-distance views. Thirty-one examples compile in the
+gate.
+
+Evidence: gate green, 263 passed, 1 ignored, 204.29 s. The smoke
+run prints `window:frames=30` on Metal (yawgpu) with zero `FAIL`
+lines, read before this commit. No golden moved. The phase
+review and the owner's visual runs follow.
