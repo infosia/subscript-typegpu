@@ -2,7 +2,8 @@
 
 P5 contract. Rev 0, 2026-08-23. Rev 1 (TX1, TX2, TX3, TX8),
 Rev 2 (TX9, TX10 upload), 2026-08-24. Rev 3 (TX11, TX12 read
-access), 2026-08-24.
+access), 2026-08-24. Rev 4 (TX13, TX14 array textures),
+2026-09-01.
 2026-08-23. Plan §8 P5 governs this block.
 Kernels are `kernel.md`, pipelines `pipeline.md`, render `render.md`.
 
@@ -124,3 +125,25 @@ Kernels are `kernel.md`, pipelines `pipeline.md`, render `render.md`.
   two dispatches and compares against `simulateCompute`. Rejection
   fixtures: a `Vec*b`-style misuse stays with SC5, a `load` on the
   write-only wrapper (the TX11 diagnostic), red.
+
+- **TX13 — Array texture wrappers.** Rev 0, 2026-09-01. An
+  `rgba16float` texture can carry array layers. The API layer
+  passes `depthOrArrayLayers`, `baseArrayLayer`, `arrayLayerCount`,
+  and the `2d-array` view dimension through unchanged.
+  `Texture2dArray<f32>` emits `var name: texture_2d_array<f32>`
+  with `load(coords, layer, level)`. `ReadStorageTexture2dArray<F>`
+  and `WriteStorageTexture2dArray<F>` emit
+  `texture_storage_2d_array<F, read>` and `<F, write>` with a
+  layer-indexed `load(coords, layer)` and `store(coords, layer,
+  value)`. A single-layer `2d` view over an array texture binds to
+  the existing 2d wrappers. Host bodies carry the layer the way
+  the TX11 bodies carry the plane. A `store` on the read wrapper
+  and a `load` on the write wrapper are diagnostics, red.
+- **TX14 — The array programs.** `b22-texture-array` binds the
+  three array wrappers, copies a two-layer payload through a
+  kernel, prints the layout entry kinds and access by name, and
+  runs the host lane. `x23-live-texture-array` ping-pongs a
+  two-layer payload (color, coordinate) over two dispatches, reads
+  one single-layer `2d` view of the result back, and compares
+  against the host lane. The backend probe precedes the
+  implementation, the P11 slice 3 procedure.

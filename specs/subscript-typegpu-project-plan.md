@@ -827,6 +827,56 @@ Exit per slice: the P10 exits (EX4 in the gate, the windowed smoke
 runs, the `check:` lines, the owner's visual runs, budgets
 recorded). The record is `specs/tracking/p15-examples.md`.
 
+### P16 — texture arrays and the radiance cascades (after P15)
+
+The owner ordered the texture-array leg first. Measured base: the
+API layer already passes `depthOrArrayLayers`, `baseArrayLayer`,
+`arrayLayerCount`, and the `2d-array` view dimension through
+unchanged. The upstream radiance-cascades path writes its array
+textures through single-layer `2d` views. The kernel-side array
+types therefore serve two sites: the voronoi two-layer payload and
+a debug overlay read.
+
+Slice 1 — the array feature, behind a probe. The probe (the P11
+slice 3 procedure) checks on yawgpu Noop and Metal: creation with
+array layers, single-layer `2d` views bound as storage and
+sampled, a full-array `texture_2d_array` view with a layer-indexed
+load, and `texture_storage_2d_array` read and write. Then TX13 and
+TX14: the three array wrappers, the generator emission, the layer
+diagnostics, `b22-texture-array`, and `x23-live-texture-array`.
+
+Slice 2 — `jump-flood-voronoi`. Seeds come from the noise module.
+The 3x3 jump-flood step reads and writes a two-layer payload array
+(color, seed coordinate) over a ping-pong pair. One halving step
+runs per frame, so the convergence is visible. Keys reseed and
+run. The density and the range commit.
+
+Slice 3 — the radiance-cascades module and its port.
+`lib/typegpu-radiance-cascades.ts` holds the cascade sizing on the
+host, the direction-tile math, the interval schedule, and the
+merge-sample helpers as K2 functions, plus the host pass driver
+(the top-down layer loop over per-layer bind groups and views).
+The upstream package injects the scene through slots at run time.
+Here every example authors its own kernel and calls the module
+helpers next to its own scene functions, which the generator
+resolves at compile time (invariant 9). The upstream
+`radiance-cascades` example itself carries no slot: its scene is a
+uniform struct. Port: `radiance-cascades` — the drag scene on the
+pointer, the overlay on a key, and edge smoothing from a committed
+width, because the kernel subset has no `fwidth`.
+
+Slice 4 — `radiance-cascades-drawing`, after slice 3. The brush
+scene, a jump-flood SDF from the slice 2 technique, and
+quarter-resolution lighting.
+
+Dropped: `rc-docs-examples` exercises the upstream package's slot
+API. This architecture replaces that API at compile time, so the
+port would test nothing this library ships. The drop is recorded
+in the tracking file.
+
+Exit per slice: the P10 exits. The record is
+`specs/tracking/p16-texture-arrays.md`.
+
 ## 9. Risk register
 
 | Id | Risk | Mitigation / trigger |
