@@ -854,8 +854,9 @@ run. The density and the range commit.
 Slice 3 — the radiance-cascades module and its port.
 `lib/typegpu-radiance-cascades.ts` holds the cascade sizing on the
 host, the direction-tile math, the interval schedule, and the
-merge-sample helpers as K2 functions, plus the host pass driver
-(the top-down layer loop over per-layer bind groups and views).
+merge-sample helpers as K2 functions, plus the ping-pong side
+rule. The layer loop stays with each example, because the example
+owns its bind-group table (recorded at the phase review).
 The upstream package injects the scene through slots at run time.
 Here every example authors its own kernel and calls the module
 helpers next to its own scene functions, which the generator

@@ -6,7 +6,8 @@ govern the module set. Kernel-subset rules are `kernel.md`
 
 - **LB1 — The module set is registered.** The script-facing library
   modules are `typegpu.ts`, `typegpu-types.ts`, `typegpu-color.ts`,
-  `typegpu-noise.ts`, `typegpu-sdf.ts`, `typegpu-sort.ts`, and the
+  `typegpu-noise.ts`, `typegpu-radiance-cascades.ts`,
+  `typegpu-sdf.ts`, `typegpu-sort.ts`, and the
   generated mirrors. The generator and the harness register every
   module by name, in the harness load order.
 - **LB2 — Module GPU code is kernel-subset code with real host
