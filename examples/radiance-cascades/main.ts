@@ -484,14 +484,6 @@ function nearestElement(scene: Scene, point: Vec2f): i32 {
   return selected;
 }
 
-function moveElement(scene: Scene, element: i32, point: Vec2f): void {
-  if (element < 4) {
-    scene.disks[element].pos = point;
-  } else {
-    scene.boxes[element - 4].pos = point;
-  }
-}
-
 export function init(
   instance: SubscriptTypegpuInstance,
   device: SubscriptTypegpuDevice,
@@ -716,7 +708,12 @@ export function frame(
     if (active.draggedElement < 0) {
       active.draggedElement = nearestElement(active.scene, point);
     }
-    moveElement(active.scene, active.draggedElement, point);
+    // Keep the write on the stored field chain so it lands in the scene the uniform serializes.
+    if (active.draggedElement < 4) {
+      active.scene.disks[active.draggedElement].pos = point;
+    } else {
+      active.scene.boxes[active.draggedElement - 4].pos = point;
+    }
     active.dirty = true;
   } else {
     active.draggedElement = -1;
