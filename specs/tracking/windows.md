@@ -311,3 +311,17 @@ field order is load-bearing for the drop order of workers and JIT
 modules. No measurement covered a move or a drop on another thread, and
 the gate does not cover this binary. The accepted fix keeps the
 compile, the event loop, and the drop on one thread.
+
+## Reference-machine check of cdfe09a (2026-09-02)
+
+Machine: Apple M2, macOS 26.6.2, rustc 1.95.0. Backend: the yawgpu
+macOS release build with the default Noop backend.
+
+`tools/gate.sh --require-backend` at `cdfe09a` exits 0 and prints
+`gate: green` with zero pending. The run has 265 passed and 1 ignored in
+seven executables, and takes 223 s. The run includes the rebuild after
+the pull of `cdfe09a`.
+
+`run_on_compiler_stack` now wraps the harness `run` on every platform.
+The harness executable passes 36 and ignores 1, the same result as at
+`5b0a7f0`. This check did not run `tools/live.sh`.
