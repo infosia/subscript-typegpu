@@ -1,6 +1,6 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 
 use subscript_compiler::SourceFile;
 
@@ -33,6 +33,106 @@ fn dependency_rlib(directory: &Path, crate_name: &str) -> PathBuf {
                 .ok()
         })
         .unwrap_or_else(|| panic!("missing {crate_name} rlib in {}", directory.display()))
+}
+
+fn native_search_paths(dependencies: &Path) -> Vec<PathBuf> {
+    let Some(profile) = dependencies.parent() else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(profile.join("build")) else {
+        return Vec::new();
+    };
+    let mut paths = Vec::new();
+    for output in entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path().join("output"))
+    {
+        let Ok(contents) = std::fs::read_to_string(output) else {
+            continue;
+        };
+        paths.extend(contents.lines().filter_map(|line| {
+            line.strip_prefix("cargo:rustc-link-search=native=")
+                .map(PathBuf::from)
+        }));
+    }
+    paths.sort();
+    paths
+}
+
+fn run_host_fixture(runner_body: &str, fixture: &Path) -> Output {
+    let dependencies = std::env::current_exe()
+        .expect("current test executable")
+        .parent()
+        .expect("test executable has a dependency directory")
+        .to_path_buf();
+    let harness = dependency_rlib(&dependencies, "subscript_typegpu_harness");
+    let fixture_name = fixture
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .expect("fixture has a UTF-8 file stem");
+    let scratch = std::env::temp_dir().join(format!(
+        "subscript-typegpu-host-{fixture_name}-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&scratch)
+        .unwrap_or_else(|error| panic!("create {}: {error}", scratch.display()));
+    let source_path = scratch.join("runner.rs");
+    let binary_path = scratch.join(if cfg!(windows) {
+        "runner.exe"
+    } else {
+        "runner"
+    });
+    let mut source = std::fs::File::create(&source_path)
+        .unwrap_or_else(|error| panic!("create {}: {error}", source_path.display()));
+    let source_text = format!(
+        r#"
+use std::io::Write;
+use std::path::Path;
+use subscript_typegpu_harness::{{ReloadSession, facade_library, program_files, run_on_compiler_stack}};
+
+fn main() {{
+    let fixture = std::env::args_os().nth(1).expect("fixture argument");
+    let output = run_on_compiler_stack(move || {{
+        let files = program_files(Path::new(&fixture)).expect("load fixture");
+        let libraries = [facade_library()];
+        let mut session = ReloadSession::new_with_native_libraries(&files, &libraries)
+            .expect("compile fixture");
+{runner_body}
+        session.take_output()
+    }});
+    std::io::stdout().write_all(&output).expect("write output");
+}}
+"#
+    );
+    source
+        .write_all(source_text.as_bytes())
+        .expect("write runner source");
+    let mut command = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()));
+    command
+        .arg("--edition=2021")
+        .arg(&source_path)
+        .arg("-L")
+        .arg(format!("dependency={}", dependencies.display()))
+        .arg("--extern")
+        .arg(format!("subscript_typegpu_harness={}", harness.display()))
+        .arg("-o")
+        .arg(&binary_path);
+    for path in native_search_paths(&dependencies) {
+        command.arg("-L").arg(format!("native={}", path.display()));
+    }
+    let compile = command.output().expect("compile host runner");
+    assert!(
+        compile.status.success(),
+        "compile host runner:\n{}",
+        String::from_utf8_lossy(&compile.stderr),
+    );
+    let run = Command::new(&binary_path)
+        .arg(fixture)
+        .output()
+        .expect("run host fixture");
+    std::fs::remove_dir_all(&scratch)
+        .unwrap_or_else(|error| panic!("remove {}: {error}", scratch.display()));
+    run
 }
 
 #[test]
@@ -191,65 +291,14 @@ export const cascade: ComputePipelineSpec = computePipeline<Layout>(cascadeKerne
 
 #[test]
 fn radiance_cascade_host_helpers_return_committed_dimensions_and_sides() {
-    let dependencies = std::env::current_exe()
-        .expect("current test executable")
-        .parent()
-        .expect("test executable has a dependency directory")
-        .to_path_buf();
-    let harness = dependency_rlib(&dependencies, "subscript_typegpu_harness");
-    let scratch = std::env::temp_dir().join(format!(
-        "subscript-typegpu-radiance-cascade-host-{}",
-        std::process::id()
-    ));
-    std::fs::create_dir_all(&scratch)
-        .unwrap_or_else(|error| panic!("create {}: {error}", scratch.display()));
-    let source_path = scratch.join("runner.rs");
-    let binary_path = scratch.join("runner");
-    let mut source = std::fs::File::create(&source_path)
-        .unwrap_or_else(|error| panic!("create {}: {error}", source_path.display()));
-    source
-        .write_all(
-            br#"
-use std::io::Write;
-use std::path::Path;
-use subscript_typegpu_harness::{ReloadSession, facade_library, program_files};
-
-fn main() {
-    let fixture = std::env::args_os().nth(1).expect("fixture argument");
-    let files = program_files(Path::new(&fixture)).expect("load fixture");
-    let libraries = [facade_library()];
-    let mut session = ReloadSession::new_with_native_libraries(&files, &libraries)
-        .expect("compile fixture");
-    session.call_main().expect("run fixture");
-    while session.async_pending() != 0 {
-        session.async_step().expect("step fixture");
-    }
-    std::io::stdout().write_all(&session.take_output()).expect("write output");
-}
-"#,
-        )
-        .expect("write runner source");
-    let compile = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
-        .arg("--edition=2021")
-        .arg(&source_path)
-        .arg("-L")
-        .arg(format!("dependency={}", dependencies.display()))
-        .arg("--extern")
-        .arg(format!("subscript_typegpu_harness={}", harness.display()))
-        .arg("-o")
-        .arg(&binary_path)
-        .output()
-        .expect("compile host runner");
-    assert!(
-        compile.status.success(),
-        "compile host runner:\n{}",
-        String::from_utf8_lossy(&compile.stderr),
-    );
     let fixture = support::root().join("crates/typegpu-gen/tests/library/radiance-cascade-host.ts");
-    let run = Command::new(&binary_path)
-        .arg(&fixture)
-        .output()
-        .expect("run host fixture");
+    let run = run_host_fixture(
+        r#"        session.call_main().expect("run fixture");
+        while session.async_pending() != 0 {
+            session.async_step().expect("step fixture");
+        }"#,
+        &fixture,
+    );
     let stdout = String::from_utf8(run.stdout).expect("host output is UTF-8");
     assert!(run.status.success(), "host runner failed:\n{stdout}");
     for expected in [
@@ -267,8 +316,6 @@ fn main() {
         "host output contains FAIL:\n{stdout}"
     );
     println!("observed host:\n{}", stdout.trim_end());
-    std::fs::remove_dir_all(&scratch)
-        .unwrap_or_else(|error| panic!("remove {}: {error}", scratch.display()));
 }
 
 #[test]
@@ -398,66 +445,20 @@ export const scanApply: ComputePipelineSpec = computePipeline<PrefixScanApplyRes
 
 #[test]
 fn bitonic_non_power_of_two_length_has_the_named_red_trap() {
-    let dependencies = std::env::current_exe()
-        .expect("current test executable")
-        .parent()
-        .expect("test executable has a dependency directory")
-        .to_path_buf();
-    let harness = dependency_rlib(&dependencies, "subscript_typegpu_harness");
-    let scratch = std::env::temp_dir().join(format!(
-        "subscript-typegpu-sort-trap-{}",
-        std::process::id()
-    ));
-    std::fs::create_dir_all(&scratch)
-        .unwrap_or_else(|error| panic!("create {}: {error}", scratch.display()));
-    let source_path = scratch.join("runner.rs");
-    let binary_path = scratch.join("runner");
-    let mut source = std::fs::File::create(&source_path)
-        .unwrap_or_else(|error| panic!("create {}: {error}", source_path.display()));
-    source
-        .write_all(
-            br#"
-use std::io::Write;
-use std::path::Path;
-use subscript_typegpu_harness::{ReloadSession, facade_library, program_files};
-
-fn main() {
-    let fixture = std::env::args_os().nth(1).expect("fixture argument");
-    let files = program_files(Path::new(&fixture)).expect("load fixture");
-    let libraries = [facade_library()];
-    let mut session = ReloadSession::new_with_native_libraries(&files, &libraries)
-        .expect("compile fixture");
-    let mut trapped = session.call_main().is_err();
-    while !trapped && session.async_pending() != 0 {
-        trapped = session.async_step().is_err();
-    }
-    std::io::stdout().write_all(&session.take_output()).expect("write output");
-    assert!(trapped, "fixture unexpectedly passed");
-}
-"#,
-        )
-        .expect("write runner source");
-    let compile = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
-        .arg("--edition=2021")
-        .arg(&source_path)
-        .arg("-L")
-        .arg(format!("dependency={}", dependencies.display()))
-        .arg("--extern")
-        .arg(format!("subscript_typegpu_harness={}", harness.display()))
-        .arg("-o")
-        .arg(&binary_path)
-        .output()
-        .expect("compile trap runner");
-    assert!(
-        compile.status.success(),
-        "compile trap runner:\n{}",
-        String::from_utf8_lossy(&compile.stderr),
-    );
     let fixture = support::root().join("crates/typegpu-gen/tests/library/bitonic-sort-trap.ts");
-    let run = Command::new(&binary_path)
-        .arg(&fixture)
-        .output()
-        .expect("run trap fixture");
+    let run = run_host_fixture(
+        r#"        let mut trapped = session.call_main().is_err();
+        while !trapped && session.async_pending() != 0 {
+            trapped = session.async_step().is_err();
+        }
+        if !trapped {
+            std::io::stdout()
+                .write_all(&session.take_output())
+                .expect("write output");
+            panic!("fixture unexpectedly passed");
+        }"#,
+        &fixture,
+    );
     let stdout = String::from_utf8(run.stdout).expect("trap output is UTF-8");
     assert!(run.status.success(), "trap runner failed:\n{stdout}");
     assert!(
@@ -465,6 +466,4 @@ fn main() {
         "trap output lacks SORT1 message:\n{stdout}",
     );
     println!("observed red: {}", stdout.trim_end());
-    std::fs::remove_dir_all(&scratch)
-        .unwrap_or_else(|error| panic!("remove {}: {error}", scratch.display()));
 }

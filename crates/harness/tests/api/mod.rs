@@ -12,6 +12,15 @@ fn repository_root() -> PathBuf {
 }
 
 #[test]
+fn compiler_stack_returns_the_body_value_from_a_different_thread() {
+    let caller = std::thread::current().id();
+    let (value, body_thread) =
+        subscript_typegpu_harness::run_on_compiler_stack(move || (42, std::thread::current().id()));
+    assert_eq!(value, 42);
+    assert_ne!(body_thread, caller);
+}
+
+#[test]
 fn program_files_have_the_required_order_names_and_modes() {
     let program = repository_root().join("programs/a01-smoke.ts");
     let files = subscript_typegpu_harness::program_files(&program).expect("load program files");

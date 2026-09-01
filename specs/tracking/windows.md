@@ -214,3 +214,100 @@ x22-live-blend.ts:180: literal 0.9 has product 229.5 with 255 and violates RN21
 Both fixtures were restored. Evidence: `tools/gate.sh
 --require-backend` green, 254 passed and 1 ignored, 106 s. The tree
 gained one test function and no test executable.
+
+## Re-check at 5b0a7f0 (2026-09-02)
+
+The tree gained P12 to P16 after the last re-check. This run measures
+the port again on windows-msvc.
+
+Machine: Windows 11, `x86_64-pc-windows-msvc`, rustc 1.95.0, Git Bash.
+Backend: a yawgpu Windows release build with the default Noop backend.
+
+The first run was red. `cargo test --offline --workspace` gave 10
+failures in two executables. Two port defects caused all 10. The
+backend is not implicated. No test result on macOS changes.
+
+After the fixes below, `tools/gate.sh --require-backend` exits 0 and
+prints `gate: green` with zero pending. The run has 265 passed and 1
+ignored in seven executables, and takes 196 s. This number is not a
+reference-machine measurement.
+
+The tree holds 266 `#[test]` attributes and one `#[ignore]`, the live
+lane. The gate runs 265 and ignores the live lane, so windows-msvc
+skips no test.
+
+W1 to W5 hold.
+
+### W6 The host runner link missed the native search paths
+
+Two tests in `crates/typegpu-gen/tests/library/mod.rs` write a Rust
+source file, compile it with a direct `rustc` call, and run the
+result. The call passed `-L dependency=<deps>` alone.
+
+Evidence: both tests printed
+`LINK : fatal error LNK1181: cannot open input file 'windows.0.52.0.lib'`.
+
+`windows.0.52.0.lib` and `windows.0.53.0.lib` come from the
+`windows_x86_64_msvc` crates. Their build scripts emit
+`cargo:rustc-link-search=native=<crate>/lib`. Cargo passes that path to
+`rustc`. A direct `rustc` call receives nothing. Unix has no equivalent
+library, so the tests passed there.
+
+Fix: a helper reads `<target>/<profile>/build/*/output`, takes every
+line with the prefix `cargo:rustc-link-search=native=`, and passes each
+remainder to `rustc` as `-L native=<path>`. The helper ignores a
+missing directory and an unreadable file, so no other platform changes.
+The same helper now holds the runner source, the compile, and the run
+for both tests.
+
+### W7 The Windows main thread stack is 1 MB
+
+The dev tier compiles a program in the calling process on Windows. W1
+records the cause. The Unix main thread holds 8 MB and the Windows main
+thread holds 1 MB, so only Windows overflows.
+
+Evidence: eight `crates/harness` tests failed. Every one spawns
+`subscript-typegpu-harness` and reads its output. The child printed one
+line and exited with 127:
+
+```
+target/debug/subscript-typegpu-harness dev programs/a01-smoke.ts --coverage
+thread 'main' has overflowed its stack
+```
+
+The `differential` message `dev lacks the coverage separator` is a
+symptom of that crash. The child dies before it prints the separator.
+
+The window binary carries the same defect:
+
+```
+target/debug/subscript-typegpu-window examples/window-triangle/main.ts --frames 1
+thread 'main' has overflowed its stack
+```
+
+Measurement: a probe called `run_dev_with_coverage` on a thread of a
+chosen size. 2 MiB compiles and runs `programs/a01-smoke.ts`,
+`programs/b22-texture-array.ts`, `examples/stable-fluid/main.ts`, and
+`examples/radiance-cascades-drawing/main.ts`. 1 MB overflows on every
+one. The cause of the increase since `8a25831` is not measured.
+
+Fix: `subscript_typegpu_harness::run_on_compiler_stack` runs a closure
+on a thread with an 8 MiB stack, and resumes a panic in the caller. The
+value is the Unix main-thread size, so both platforms compile with the
+same stack. `crates/harness/src/main.rs` wraps `run`. Both runner
+sources in `crates/typegpu-gen/tests/library/mod.rs` wrap their body.
+
+`crates/window/src/main.rs` wraps `run` on Windows alone, and builds
+the event loop with `EventLoopBuilderExtWindows::with_any_thread(true)`
+there. macOS requires the event loop on the main thread, so no other
+platform changes. The window binary then prints `window:surface lost`
+in a shell with no GPU, and no stack overflow.
+
+Review finding, fixed before the gate ran: the first fix moved a
+`ReloadSession` from the compiler thread to the main thread under an
+`unsafe impl Send`. `ReloadSession` holds `Box<Context>`,
+`Vec<JITModule>`, and `Vec<*const u8>`, and its own comment states that
+field order is load-bearing for the drop order of workers and JIT
+modules. No measurement covered a move or a drop on another thread, and
+the gate does not cover this binary. The accepted fix keeps the
+compile, the event loop, and the drop on one thread.

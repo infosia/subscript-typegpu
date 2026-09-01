@@ -32,6 +32,20 @@ fn repository_root() -> PathBuf {
 const PROGRAM_WORKER_COUNT: usize = 4;
 static PROGRAM_POOL_LOCK: Mutex<()> = Mutex::new(());
 
+/// Runs `body` on a thread with the stack that the subscript compiler needs.
+/// The dev tier compiles in the calling process on Windows, where the main
+/// thread holds 1 MB. This function gives every platform the same stack.
+pub fn run_on_compiler_stack<T: Send + 'static>(body: impl FnOnce() -> T + Send + 'static) -> T {
+    let thread = std::thread::Builder::new()
+        .stack_size(8 * 1024 * 1024)
+        .spawn(body)
+        .unwrap_or_else(|error| panic!("spawn compiler thread: {error}"));
+    match thread.join() {
+        Ok(value) => value,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
+}
+
 fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
     if let Some(message) = payload.downcast_ref::<String>() {
         return message.clone();

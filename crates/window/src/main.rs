@@ -621,6 +621,18 @@ fn arguments() -> Result<(PathBuf, Option<u64>), String> {
     Ok((program, frame_limit))
 }
 
+#[cfg(windows)]
+fn event_loop() -> Result<EventLoop<()>, winit::error::EventLoopError> {
+    use winit::platform::windows::EventLoopBuilderExtWindows;
+
+    EventLoop::builder().with_any_thread(true).build()
+}
+
+#[cfg(not(windows))]
+fn event_loop() -> Result<EventLoop<()>, winit::error::EventLoopError> {
+    EventLoop::new()
+}
+
 fn run() -> Result<(), WindowError> {
     let (program, frame_limit) = arguments()?;
     let session =
@@ -629,7 +641,7 @@ fn run() -> Result<(), WindowError> {
     if instance.is_null() {
         return Err("instance creation returned null".to_owned().into());
     }
-    let event_loop = EventLoop::new().map_err(|error| format!("event loop: {error}"))?;
+    let event_loop = event_loop().map_err(|error| format!("event loop: {error}"))?;
     let mut host = Host::new(session, instance, frame_limit);
     event_loop
         .run_app(&mut host)
@@ -639,7 +651,11 @@ fn run() -> Result<(), WindowError> {
 }
 
 fn main() {
-    match run() {
+    #[cfg(windows)]
+    let result = subscript_typegpu_harness::run_on_compiler_stack(run);
+    #[cfg(not(windows))]
+    let result = run();
+    match result {
         Ok(()) => {}
         Err(WindowError::Compile(error)) => {
             if let Some(diagnostics) = error.diagnostics() {
