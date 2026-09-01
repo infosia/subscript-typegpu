@@ -17,7 +17,7 @@ export class CascadeDimensions {
   }
 }
 
-// The host sizing keeps the nearest power of two explicitly, avoiding a dependency on
+// The host sizing keeps the nearest power of two explicit. This avoids a dependency on
 // logarithm rounding at the exact midpoint between two supported probe counts.
 export function cascadeDimensions(outputSize: u32): CascadeDimensions {
   const wanted: f64 = (outputSize as f64) * Math.sqrt(2.0) * 0.35;
@@ -79,7 +79,7 @@ export function cascadeRayAngle(dirActual: Vec2u, raysDimActual: u32): f32 {
 }
 
 // Each direction owns one square tile. The half-probe clamp keeps filtered samples
-// inside that tile while preserving bilinear interpolation between upper probes.
+// inside that tile. It preserves bilinear interpolation between upper probes.
 export function cascadeMergeUv(
   dirActual: Vec2u,
   probesUpper: u32,

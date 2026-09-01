@@ -127,3 +127,30 @@ Evidence: gate green, 263 passed, 1 ignored, 204.29 s. The smoke
 run prints `window:frames=30` on Metal (yawgpu) with zero `FAIL`
 lines, read before this commit. No golden moved. The phase
 review and the owner's visual runs follow.
+
+## Phase review (2026-09-01)
+
+A fresh no-context reviewer read the cumulative diff. Findings:
+0 CRITICAL, 4 MAJOR, 9 MINOR. The MAJOR set: the two array host
+traps still cited TX11, LB1 and the trap sweep lagged the
+radiance-cascades registration, the ACES denominator read 0.01
+for Narkowicz's 0.14, and the module's two host functions had no
+direct test.
+
+Closures: the host traps cite TX13. LB1 lists the module and the
+sweep scans it. Both examples carry the 0.14 constant. Direct
+host tests pin `cascadeDimensions` (512 gives 256/512/6, 128
+gives 64/128/5) and the `cascadeWriteSide` parity. The MINOR set
+closed in the same round: the ninth flood candidate assigns its
+distance, the program headers cite TX13 and TX14, key 0 joined
+the drawing header, the `sample` arms exclude array receivers
+with a new red pair, `Texture2dArray` gained the trapping `store`
+and `dimensions`, the parity coupling and the vector-trigonometry
+sites carry comments, and the style items closed. The plan's
+layer-loop sentence now matches the module: the loop stays with
+each example's bind-group table.
+
+Evidence: gate green, 264 passed, 1 ignored, 205.48 s. The three
+smoke runs print `window:frames=30` on Metal (yawgpu) with zero
+`FAIL` lines, read before this commit. No golden moved. The
+owner's visual runs close the phase.

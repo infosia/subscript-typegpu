@@ -190,6 +190,88 @@ export const cascade: ComputePipelineSpec = computePipeline<Layout>(cascadeKerne
 }
 
 #[test]
+fn radiance_cascade_host_helpers_return_committed_dimensions_and_sides() {
+    let dependencies = std::env::current_exe()
+        .expect("current test executable")
+        .parent()
+        .expect("test executable has a dependency directory")
+        .to_path_buf();
+    let harness = dependency_rlib(&dependencies, "subscript_typegpu_harness");
+    let scratch = std::env::temp_dir().join(format!(
+        "subscript-typegpu-radiance-cascade-host-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&scratch)
+        .unwrap_or_else(|error| panic!("create {}: {error}", scratch.display()));
+    let source_path = scratch.join("runner.rs");
+    let binary_path = scratch.join("runner");
+    let mut source = std::fs::File::create(&source_path)
+        .unwrap_or_else(|error| panic!("create {}: {error}", source_path.display()));
+    source
+        .write_all(
+            br#"
+use std::io::Write;
+use std::path::Path;
+use subscript_typegpu_harness::{ReloadSession, facade_library, program_files};
+
+fn main() {
+    let fixture = std::env::args_os().nth(1).expect("fixture argument");
+    let files = program_files(Path::new(&fixture)).expect("load fixture");
+    let libraries = [facade_library()];
+    let mut session = ReloadSession::new_with_native_libraries(&files, &libraries)
+        .expect("compile fixture");
+    session.call_main().expect("run fixture");
+    while session.async_pending() != 0 {
+        session.async_step().expect("step fixture");
+    }
+    std::io::stdout().write_all(&session.take_output()).expect("write output");
+}
+"#,
+        )
+        .expect("write runner source");
+    let compile = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
+        .arg("--edition=2021")
+        .arg(&source_path)
+        .arg("-L")
+        .arg(format!("dependency={}", dependencies.display()))
+        .arg("--extern")
+        .arg(format!("subscript_typegpu_harness={}", harness.display()))
+        .arg("-o")
+        .arg(&binary_path)
+        .output()
+        .expect("compile host runner");
+    assert!(
+        compile.status.success(),
+        "compile host runner:\n{}",
+        String::from_utf8_lossy(&compile.stderr),
+    );
+    let fixture = support::root().join("crates/typegpu-gen/tests/library/radiance-cascade-host.ts");
+    let run = Command::new(&binary_path)
+        .arg(&fixture)
+        .output()
+        .expect("run host fixture");
+    let stdout = String::from_utf8(run.stdout).expect("host output is UTF-8");
+    assert!(run.status.success(), "host runner failed:\n{stdout}");
+    for expected in [
+        "cascadeDimensions 512 probes=256 dim=512 count=6",
+        "cascadeDimensions 128 probes=64 dim=128 count=5",
+        "cascadeWriteSide side A when count - 1 - layer is even",
+    ] {
+        assert!(
+            stdout.contains(expected),
+            "host output lacks `{expected}`:\n{stdout}"
+        );
+    }
+    assert!(
+        !stdout.contains("FAIL"),
+        "host output contains FAIL:\n{stdout}"
+    );
+    println!("observed host:\n{}", stdout.trim_end());
+    std::fs::remove_dir_all(&scratch)
+        .unwrap_or_else(|error| panic!("remove {}: {error}", scratch.display()));
+}
+
+#[test]
 fn noise_library_helpers_emit_and_validate() {
     let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
     files.pop();

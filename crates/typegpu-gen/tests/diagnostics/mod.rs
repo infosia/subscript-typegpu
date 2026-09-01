@@ -196,6 +196,7 @@ fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
         "typegpu-types.ts",
         "typegpu-color.ts",
         "typegpu-noise.ts",
+        "typegpu-radiance-cascades.ts",
         "typegpu-sdf.ts",
         "typegpu-sort.ts",
     ] {

@@ -194,9 +194,12 @@ class Layout {
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   const coords = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);
   const layer = ctx.globalId.z as i32;
+  const dimensions = res.sampled.dimensions();
   const sampled = res.sampled.load(coords, layer, 0);
   const source = res.source.load(coords, layer);
-  res.target.store(coords, layer, sampled.add(source));
+  if (ctx.globalId.x < dimensions.x && ctx.globalId.y < dimensions.y) {
+    res.target.store(coords, layer, sampled.add(source));
+  }
 }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
@@ -206,6 +209,7 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { n
         "texture_2d_array<f32>",
         "texture_storage_2d_array<rgba16float, read>",
         "texture_storage_2d_array<rgba16float, write>",
+        "textureDimensions(sampled)",
         "textureLoad(sampled, coords, layer, 0u)",
         "textureLoad(source, coords, layer)",
         "textureStore(target_, coords, layer, sampled_ + source_)",

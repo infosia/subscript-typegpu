@@ -1,6 +1,6 @@
 // program: x23-live-texture-array
 // purpose: ping-pong a two-layer color/coordinate payload and read one layer through a 2d view
-// exercises: BF9, CL1, CL3, CL4, CL5, PI14, T4, T15, TX4, TX5, TX11
+// exercises: BF9, CL1, CL3, CL4, CL5, PI14, T4, T15, TX4, TX5, TX13, TX14
 // questions: none
 
 import {

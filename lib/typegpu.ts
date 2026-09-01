@@ -345,6 +345,24 @@ export class Texture2dArray<T> {
       + (coords.x as u32);
     return this.pixels[pixel as i32];
   }
+
+  sampleLevel(sampler: Sampler, uv: Vec2f, level: f32): Vec4f {
+    authorTrap("TX3", "Texture2dArray.sampleLevel", "is not legal on an array sampled texture");
+    return new Vec4f(0.0, 0.0, 0.0, 0.0);
+  }
+
+  sample(sampler: Sampler, uv: Vec2f): Vec4f {
+    authorTrap("TX3", "Texture2dArray.sample", "is not legal on an array sampled texture");
+    return new Vec4f(0.0, 0.0, 0.0, 0.0);
+  }
+
+  store(coords: Vec2i, layer: i32, value: Vec4f): void {
+    authorTrap("TX3", "Texture2dArray.store", "is not legal on a sampled texture");
+  }
+
+  dimensions(): Vec2u {
+    return new Vec2u(this.width, this.height);
+  }
 }
 
 export class ReadStorageTexture2dArray<F> {
@@ -376,7 +394,7 @@ export class ReadStorageTexture2dArray<F> {
   }
 
   store(coords: Vec2i, layer: i32, value: Vec4f): void {
-    authorTrap("TX11", "ReadStorageTexture2dArray.store", "access=read-only");
+    authorTrap("TX13", "ReadStorageTexture2dArray.store", "access=read-only");
   }
 }
 
@@ -397,7 +415,7 @@ export class WriteStorageTexture2dArray<F> {
   }
 
   load(coords: Vec2i, layer: i32): Vec4f {
-    authorTrap("TX11", "WriteStorageTexture2dArray.load", "access=write-only");
+    authorTrap("TX13", "WriteStorageTexture2dArray.load", "access=write-only");
     return new Vec4f(0.0, 0.0, 0.0, 0.0);
   }
 

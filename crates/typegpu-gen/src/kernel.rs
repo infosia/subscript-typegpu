@@ -2219,13 +2219,21 @@ impl<'a> Emitter<'a> {
                         ) => {
                             format!("textureLoad({}, {coords}, {layer}, {level})", binding.name)
                         }
-                        (BindingKind::Texture(_, _), "sampleLevel", [sampler, uv, level]) => {
+                        (
+                            BindingKind::Texture(_, TextureViewDimension::TwoD),
+                            "sampleLevel",
+                            [sampler, uv, level],
+                        ) => {
                             format!(
                                 "textureSampleLevel({}, {sampler}, {uv}, {level})",
                                 binding.name
                             )
                         }
-                        (BindingKind::Texture(_, _), "sample", [sampler, uv]) => {
+                        (
+                            BindingKind::Texture(_, TextureViewDimension::TwoD),
+                            "sample",
+                            [sampler, uv],
+                        ) => {
                             if self.invocation_kind != InvocationKind::Fragment {
                                 return Err(diagnostic(
                                     "TX3",
@@ -2234,6 +2242,17 @@ impl<'a> Emitter<'a> {
                                 ));
                             }
                             format!("textureSample({}, {sampler}, {uv})", binding.name)
+                        }
+                        (
+                            BindingKind::Texture(_, TextureViewDimension::TwoDArray),
+                            "sample" | "sampleLevel",
+                            _,
+                        ) => {
+                            return Err(diagnostic(
+                                "TX3",
+                                "sampling is not legal on an array sampled texture",
+                                expr.pos.clone(),
+                            ));
                         }
                         (BindingKind::Texture(_, _), "store", _) => {
                             return Err(diagnostic(

@@ -1,6 +1,6 @@
 // program: b22-texture-array
 // purpose: prove sampled, read-storage, and write-storage 2d-array bindings and host layers
-// exercises: CL1, CL3, CL4, CL5, PI14, TX4, TX5, TX11
+// exercises: CL1, CL3, CL4, CL5, PI14, TX4, TX5, TX13, TX14
 // questions: none
 
 import {

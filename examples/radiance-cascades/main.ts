@@ -1,7 +1,7 @@
 // example: radiance-cascades
 // Builds a layered radiance field for an interactive signed-distance scene.
 // Output and cascade storage commit to 512 square pixels, so resize stretches the final
-// field instead of rebuilding it. The upstream overlay and layer slider are dropped.
+// field instead of rebuilding it. This drops the upstream overlay and layer slider.
 // Its derivative-sized surface edge becomes a fixed 0.002 field-space width because the
 // kernel subset has no fwidth. Pointer dragging keeps the nearest-element interaction.
 // Ported from TypeGPU's radiance-cascades example (https://github.com/software-mansion/TypeGPU).
@@ -242,6 +242,7 @@ function cascadeKernel(res: CascadeLayout, ctx: ComputeInvocation): void {
       dirStored.y * 2 + quadrant / 2,
     );
     const angle: f32 = cascadeRayAngle(dirActual, raysStored * 2);
+    // The shared vector carries the scalar sine and cosine in the kernel subset's form.
     const cosine: f32 = new Vec2f(angle, angle).cos().x;
     const sine: f32 = new Vec2f(angle, angle).sin().x;
     const rayDirection = new Vec2f(
@@ -326,7 +327,7 @@ function radianceVertex(
 
 function acesChannel(value: f32): f32 {
   return clamp(
-    (value * (value * 2.51 + 0.03)) / (value * (value * 2.43 + 0.59) + 0.01),
+    (value * (value * 2.51 + 0.03)) / (value * (value * 2.43 + 0.59) + 0.14),
     0.0,
     1.0,
   );

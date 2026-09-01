@@ -1,8 +1,9 @@
 // example: radiance-cascades-drawing
 // Turns painted emissive strokes into a jump-flood SDF and a cascade-lit scene.
-// The scene and flood commit to 512 square pixels; lighting commits to the upstream
+// The scene and flood commit to 512 square pixels. Lighting commits to the upstream
 // quarter resolution of 128, and resize stretches the result. The light color commits
-// to warm orange and the brush radius to 0.03. Keys 1 and 2 select the lit and SDF views.
+// to warm orange and the brush radius to 0.03. Key 0 clears; keys 1 and 2 select the lit
+// and SDF views.
 // The upstream color pickers, animated color, and brush-size slider are dropped.
 // Ported from TypeGPU's radiance-cascades-drawing example (https://github.com/software-mansion/TypeGPU).
 
@@ -365,6 +366,7 @@ function floodStepKernel(res: FloodStepLayout, ctx: ComputeInvocation): void {
     const seed: Vec4f = res.source.load(se, 1);
     const distance: f32 = seedDistance(point, seed);
     if (distance < bestDistance) {
+      bestDistance = distance;
       bestSeed = seed;
       bestColor = res.source.load(se, 0);
     }
@@ -424,6 +426,7 @@ function cascadeKernel(res: CascadeLayout, ctx: ComputeInvocation): void {
       dirStored.y * 2 + quadrant / 2,
     );
     const angle: f32 = cascadeRayAngle(dirActual, raysStored * 2);
+    // The shared vector carries the scalar sine and cosine in the kernel subset's form.
     const cosine: f32 = new Vec2f(angle, angle).cos().x;
     const sine: f32 = new Vec2f(angle, angle).sin().x;
     const rayDirection = new Vec2f(cosine, -sine);
@@ -504,7 +507,7 @@ function absolute(value: f32): f32 {
 
 function acesChannel(value: f32): f32 {
   return clamp(
-    (value * (value * 2.51 + 0.03)) / (value * (value * 2.43 + 0.59) + 0.01),
+    (value * (value * 2.51 + 0.03)) / (value * (value * 2.43 + 0.59) + 0.14),
     0.0,
     1.0,
   );
@@ -532,6 +535,7 @@ function drawingFragment(
       -80.0 * absolute(distance),
       -80.0 * absolute(distance),
     ).exp().x;
+    // The shared vector carries the scalar cosine in the kernel subset's form.
     const bands: f32 = 0.8 + 0.2 * new Vec2f(
       150.0 * distance,
       150.0 * distance,
@@ -970,6 +974,7 @@ export function init(
     ]));
     index += 1;
   }
+  // FLOOD_STEPS is odd, so the A-to-B first step leaves the final payload on side B.
   const deriveGroup = createBindGroupHost(hostDevice, deriveLayout, floodDerive_LAYOUT0, [
     textureResource(floodArrayB),
     textureResource(sceneView),

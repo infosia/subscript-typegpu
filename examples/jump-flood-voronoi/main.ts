@@ -1,7 +1,7 @@
 // example: jump-flood-voronoi
 // Floods random color seeds across a grid with one visible jump-flood step per frame.
 // The canvas-sized textures commit to a 512-square grid.
-// Key 1 replaces the Random Seeds button and stops; key 2 replaces Run Algorithm.
+// Key 1 replaces the Random Seeds button and stops. Key 2 replaces Run Algorithm.
 // Seed density commits to threshold 0.999, step delay to one frame, and range to 100%.
 // Ported from TypeGPU's jump-flood-voronoi example (https://github.com/software-mansion/TypeGPU).
 
@@ -274,6 +274,7 @@ function stepKernel(res: StepLayout, ctx: ComputeInvocation): void {
     const color: Vec4f = res.source.load(se, 0);
     const distance: f32 = seedDistance(x as f32, y as f32, seed);
     if (distance < bestDistance) {
+      bestDistance = distance;
       bestSeed = seed;
       bestColor = color;
     }
