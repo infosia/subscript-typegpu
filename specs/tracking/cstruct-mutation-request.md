@@ -20,3 +20,13 @@ The request: a checker diagnostic on an assignment whose target
 chain roots in a copy-bound `@CStruct`. Reads stay legal. The
 owner decides between the diagnostic and a larger move to
 reference semantics.
+
+## R38 landed (2026-09-01)
+
+subscript closed the request as W004 (compiler contract §81, the
+diagnostic at `f993d60`, the review record at `22619be`): a write
+through a `@CStruct` value copy that nothing reads is a named
+diagnostic, with shadowing, for-of bindings, index roots, and
+synthetic locals excluded by review. This tree compiles under the
+new pin with no W004 finding, which matches the scan: the one
+copy-write site left at `01fa15e`. The request is closed.
