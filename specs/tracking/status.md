@@ -166,3 +166,23 @@ MINOR, all closed. Evidence: gate green, 261 passed, 1 ignored,
 186.25 s, `prefix-scan` byte-exact on Metal, every windowed port
 visually passed. Records: `specs/tracking/p15-examples.md`,
 `specs/tracking/build-time.md`.
+
+## P16 — texture arrays and the radiance cascades (2026-09-01)
+
+TX13 and TX14 behind a probe: three array wrappers, the generator
+emission, layer diagnostics with demonstrated reds,
+`b22-texture-array`, and `x23-live-texture-array` in the live
+lane. Three ports: `jump-flood-voronoi` (a two-layer payload
+ping-pong), `radiance-cascades` with
+`lib/typegpu-radiance-cascades.ts` (the sizing, tiling, interval,
+and merge math as K2 helpers — the upstream slots resolve at
+compile time), and `radiance-cascades-drawing` (brush to
+jump-flood SDF to cascade lighting). Phase review: 0 CRITICAL, 4
+MAJOR, 9 MINOR, all closed. The owner's visual run found one
+defect the gates cannot see: a `@CStruct` parameter binds by
+copy, so a drag helper edited a copy — fixed on the stored field
+chain, and escalated as R38. Evidence: gate green, 264 passed, 1
+ignored, 202.71 s, every port visually passed. Records:
+`specs/tracking/p16-texture-arrays.md`,
+`specs/tracking/cstruct-mutation-request.md`,
+`specs/tracking/build-time.md`.

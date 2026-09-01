@@ -168,3 +168,22 @@ and program found no second site: only `moveElement` writes
 through a `@CStruct` parameter. The fix writes through
 `active.scene.disks[element].pos` at the call site. Read-only
 parameter passing stays legal and unchanged.
+
+## Visual runs and close (2026-09-01, Metal)
+
+The owner ran the three ports: `jump-flood-voronoi` (988 frames,
+no finding), `radiance-cascades` (1573, 942, and 2630 frames —
+the second run found the drag defect recorded above, and the
+run after the fix confirmed the drag), and
+`radiance-cascades-drawing` (1272 frames). Verdict: both cascade
+ports look as intended, and the voronoi run raised no finding.
+
+P16 COMPLETE 2026-09-01: the texture-array feature (TX13, TX14,
+probe-first, `b22` and `x23` with live coverage), three ports,
+the radiance-cascades module under LB1-LB4, the phase review
+closed from 0 CRITICAL, 4 MAJOR, 13 MINOR (the drag defect
+joined the count after the owner's run), and the R38 escalation
+(`specs/tracking/cstruct-mutation-request.md`). Thirty-one
+examples. The remaining feature legs keep the plan's order:
+r32uint storage, Mat4x4f, depth, shadows, stencil, MSAA with the
+geometry module, 3D textures, cube maps.
