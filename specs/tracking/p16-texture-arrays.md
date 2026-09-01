@@ -154,3 +154,17 @@ Evidence: gate green, 264 passed, 1 ignored, 205.48 s. The three
 smoke runs print `window:frames=30` on Metal (yawgpu) with zero
 `FAIL` lines, read before this commit. No golden moved. The
 owner's visual runs close the phase.
+
+## The drag defect and the measured value semantics (2026-09-01)
+
+The owner's visual run of `radiance-cascades` found that no
+element drags. Measured cause (a scratch probe on the dev tier,
+not committed): a `@CStruct` value bound to a function parameter
+or to a local is a copy, and only a write through the stored
+field chain mutates the held value. `moveElement(scene: Scene,
+element, point)` therefore edited a copy, and the uniform
+serialized the pristine scene. A scan of every example, module,
+and program found no second site: only `moveElement` writes
+through a `@CStruct` parameter. The fix writes through
+`active.scene.disks[element].pos` at the call site. Read-only
+parameter passing stays legal and unchanged.
