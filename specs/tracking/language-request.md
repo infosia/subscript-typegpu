@@ -61,3 +61,60 @@ no sweep today. R39.4 changes citations in `specs/tracking/` only.
 
 The two false `policy.toml` reasons and the factory sweep are a phase
 on this side, the same shape as P14 after R37. Not started.
+
+## R39 landed (2026-09-02), re-pin (2026-09-03)
+
+subscript decided the nine items at `25c9437` (contract §82) and
+landed six of them by `d45c0c1`. The record is subscript's
+`specs/tracking/r39-six-requests.md` and
+`specs/tracking/r39-overloads-deferred.md`.
+
+| Item | Decision |
+|---|---|
+| R39.1 `Ref<T>` | deferred (owner). Zero downstream sites |
+| R39.2 operators | withdrawn |
+| R39.3 compound assignment sugar | landed, §82.1 |
+| R39.4 three codes | landed, §82.2: S016 unknown name, S017 duplicate declaration, S018 unknown member |
+| R39.5 `??`, `?.` | landed narrowed, §82.3. `?.` is legal as the whole left operand of `??` and as a call statement only, because `tsc` types a chain as `T \| undefined` |
+| R39.6 method type parameters | landed, §82.4, instance and static. Type arguments are explicit |
+| R39.7 downstream tool | landed, subscript `tools/downstream.sh` |
+| R39.8 static read accessor | landed, §82.5 |
+| R39.9 overloads | deferred (owner). The request's resolution rule 4 fails for two numeric signatures: `i32` and `f32` are one `number` to `tsc`. The narrowed shape (signatures differ by a kind `tsc` cannot assign across) is recorded there |
+
+### The re-pin
+
+The workspace moved from `e1c2be1` to `d45c0c1`. Two fixtures moved
+their expected code, and each move was measured against the
+`d45c0c1` CLI before the gate ran:
+
+| Fixture | From | To | Measured message |
+|---|---|---|---|
+| `k28-half-builtin` | S100 | S018 | `` `Vec3h` has no method `abs` `` |
+| `pi4-invocation-field` | S100 | S018 | `` `Ctx` has no member `unknown` `` |
+
+A correction. The four `sc3-*` fixtures import a constant that the
+rejected schema never emits, and the missing-export diagnostic is
+S016 at `d45c0c1`. They were moved to S016 and the gate went red: the
+first diagnostic of each fixture is the value-class field whitelist
+message, which stays S100, and the harness matches the first
+diagnostic. The four fixtures stay at S100.
+
+Every `.wgsl` and `.expected` golden is byte-identical across the
+re-pin. subscript's downstream run stopped at `k28`, the first
+mismatch, so `pi4` was found here.
+
+Evidence at `d45c0c1`: `tools/gate.sh` green, 265 passed, 1 ignored,
+146.5 s wall. `tools/gate.sh --require-backend` with yawgpu Noop
+green, 265 passed, 1 ignored, 215.7 s wall.
+
+### Downstream work opened by R39, not started
+
+- One `x.$ = x.$ + v` site can become `x.$ += v` (R39.3).
+- The `S100` citations in this directory for "unknown type name",
+  "duplicate declaration", and "has no method" name S016, S017, and
+  S018 at `d45c0c1`. They stay as written, because each names the pin
+  it was measured at.
+- The two false `policy.toml` reasons and the factory sweep (§71,
+  recorded above).
+- A `Root`-shaped class with `create<T>` is now possible (R39.6). It
+  is a design decision for `specs/blocks/library.md` first.
