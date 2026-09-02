@@ -1,4 +1,4 @@
-// expected-rule: S100
+// expected-rule: S018
 // expected-owner: checker
 // expected-message: `Vec3h` has no method `abs`
 import { Vec3h } from "./typegpu-types";

@@ -1,4 +1,4 @@
-// expected-rule: S100
+// expected-rule: S018
 // expected-owner: checker
 import { ComputeInvocation, computePipeline, ComputePipelineSpec } from "./typegpu";
 class Layout {}
