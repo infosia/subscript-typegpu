@@ -118,3 +118,10 @@ green, 265 passed, 1 ignored, 215.7 s wall.
   recorded above).
 - A `Root`-shaped class with `create<T>` is now possible (R39.6). It
   is a design decision for `specs/blocks/library.md` first.
+
+### Two more re-pins (2026-09-03)
+
+The workspace moved from `d45c0c1` to `db3449d`, then to `587d6da`.
+Both re-pins carry subscript changes that this project did not ask
+for. No fixture and no golden moved. `specs/tracking/windows.md`
+records the gate evidence at `ada9e24`.

@@ -325,3 +325,34 @@ the pull of `cdfe09a`.
 `run_on_compiler_stack` now wraps the harness `run` on every platform.
 The harness executable passes 36 and ignores 1, the same result as at
 `5b0a7f0`. This check did not run `tools/live.sh`.
+
+## Re-check at ada9e24 (2026-09-05)
+
+The workspace pin moved three times after the last re-check: `e1c2be1`
+to `d45c0c1`, then to `db3449d`, then to `587d6da`. This run measures
+the port again on windows-msvc.
+
+Machine: Windows 11, `x86_64-pc-windows-msvc`, rustc 1.95.0, Git Bash.
+Backend: a yawgpu Windows release build with the default Noop backend.
+
+`tools/gate.sh --require-backend` exits 0 and prints `gate: green` with
+zero pending. The run has 265 passed and 1 ignored in seven executables,
+and takes 239 s. This number is not a reference-machine measurement.
+
+`tools/gate.sh` with no backend library prints `gate: green, pending 1`
+and takes 210 s. The pending line names the backend library. The test
+counts match the backend run.
+
+The tree holds 266 `#[test]` attributes and one `#[ignore]`, the live
+lane. The gate runs 265 and ignores the live lane, so windows-msvc
+skips no test.
+
+The port needed no source change. W1 to W7 hold. The working tree is
+clean after both runs, so every golden is byte-identical across the
+three pins.
+
+The `d45c0c1` re-pin moved two fixture codes, and
+`specs/tracking/language-request.md` records it. The `db3449d` and
+`587d6da` re-pins carry subscript changes that this project did not
+ask for. subscript's own records name them §83 and §84
+(https://github.com/infosia/subscript).
