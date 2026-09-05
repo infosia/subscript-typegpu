@@ -28,7 +28,7 @@ passed, 1 ignored, 159.1 s wall. Review findings, fixed in round 2:
 the generated header carried the pin as a Rust constant, and `begin()`
 allocated new arrays each frame.
 
-### U1 round 2 (2026-09-05, next commit)
+### U1 round 2 (2026-09-05, `1527f0f`)
 
 Containers, widgets, `programs/b23-ui-core.ts` (637 golden lines,
 13 frames), the `UIT2` and `UIT3` reds, the header pin read from the
