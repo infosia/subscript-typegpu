@@ -306,6 +306,8 @@ tiers with no GPU. The renderer is the only GPU code.
   call outside `begin()` and `end()`, an `end*` call without its
   `begin*`, a second `begin()` inside a frame, `beginPanel` with
   `UI_OPT_CLOSED`, or `currentContainer()` with no open container. `UIT3` — `layoutRow` received more than 16 widths.
+  The `UIT1` reds create a renderer and therefore run in the backend
+  lane of the gate (`--require-backend`). The other reds run headless.
   `UIT4` — a frame needed a 49th container or tree node, so the
   pool had no slot to evict. Each trap has a demonstrated red.
 
