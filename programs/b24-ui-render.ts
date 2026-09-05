@@ -9,8 +9,8 @@ import { gpu, GPUAdapter, GPUDevice, GPUTextureUsage } from "./webgpu";
 import { Vec2f } from "./typegpu-types";
 import { RenderPipelineSpec, renderPipelineL } from "./typegpu";
 import {
-  UiVertex_STRIDE, UiViewport_STRIDE, uiPipeline_WGSL, uiPipeline_VERTEX_ENTRY,
-  uiPipeline_FRAGMENT_ENTRY, uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, uiPipeline_TARGET_FORMAT,
+  uiPipeline_WGSL, uiPipeline_VERTEX_ENTRY,
+  uiPipeline_FRAGMENT_ENTRY, uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0,
 } from "./b24-ui-render.typegpu";
 
 export const uiPipeline: RenderPipelineSpec = renderPipelineL<UiRenderLayout, UiVertex, UiVarying>(
@@ -24,7 +24,7 @@ function checkColorClip(renderer: UiRenderer, name: string, color: u32, x: i32, 
   for (let q: u32 = 0; q < renderer.quadCount; q += 1) {
     const vertex: UiVertex = Context.fromBytes<UiVertex>(renderer.vertexBytes, q * 4 * stride);
     if (vertex.color !== color) continue;
-    for (let i: i32 = 0; i < renderer.ranges.length; i += 1) {
+    for (let i: i32 = 0; i < renderer.rangeCount; i += 1) {
       const range = renderer.ranges[i];
       if (q * 6 < range.first || q * 6 >= range.first + range.count) continue;
       check(name, x >= range.clip.x && x < range.clip.x + range.clip.w
@@ -47,7 +47,7 @@ function checkFrames(renderer: UiRenderer): void {
     && ui.commands[2].kind === 1 && ui.commands[2].w === 16777216);
   renderer.build(ui);
   check("clip exit counts", renderer.quadCount === 2 && renderer.indexCount === 12);
-  check("clip exit ranges", renderer.ranges.length === 2 && renderer.ranges[0].clip.w === 10);
+  check("clip exit ranges", renderer.rangeCount === 2 && renderer.ranges[0].clip.w === 10);
   checkColorClip(renderer, "clip exit", 0xff000002, 25, 5);
 
   ui.begin();
@@ -85,10 +85,24 @@ function checkFrames(renderer: UiRenderer): void {
   checkColorClip(renderer, "panel exit", 0xff000002, 155, 105);
   checkColorClip(renderer, "second window", 0xff000003, 255, 105);
 
+  const bytes = renderer.vertexBytes;
+  const ranges = renderer.ranges;
+  const firstRange = renderer.ranges[0];
+  const byteCapacity: i32 = bytes.length;
+  const rangeCapacity: i32 = ranges.length;
   ui.begin(); ui.end();
   renderer.build(ui);
   check("empty frame counts", renderer.quadCount === 0 && renderer.indexCount === 0);
-  check("empty frame storage", renderer.vertexBytes.length === 0 && renderer.ranges.length === 0);
+  check("empty frame storage", renderer.vertexBytes.length === byteCapacity && renderer.ranges.length === rangeCapacity
+    && renderer.rangeCount === 0);
+  ui.begin(); ui.drawRect(new UiRect(2, 3, 4, 5), 0xff000007); ui.end();
+  renderer.build(ui);
+  const reused: UiVertex = Context.fromBytes<UiVertex>(bytes, 0);
+  check("frame storage reuse", renderer.vertexBytes.length === byteCapacity
+    && ranges.length === rangeCapacity && renderer.ranges[0] === firstRange && renderer.rangeCount === 1
+    && renderer.ranges[0].first === 0 && renderer.ranges[0].count === 6
+    && renderer.quadCount === 1 && renderer.indexCount === 6
+    && reused.position.x === 2.0 && reused.color === 0xff000007);
 }
 
 export async function main(): Promise<void> {
@@ -114,23 +128,11 @@ export async function main(): Promise<void> {
     device.pushErrorScope("validation");
     const facts: UiPipelineFacts = new UiPipelineFacts(
       uiPipeline_WGSL, uiPipeline_VERTEX_ENTRY, uiPipeline_FRAGMENT_ENTRY,
-      uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, UiVertex_STRIDE, UiViewport_STRIDE, uiPipeline_TARGET_FORMAT,
+      uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, uiPipeline,
     );
-    using renderer = new UiRenderer(device, facts);
+    using renderer = new UiRenderer(device, facts, 64);
     const error = await device.popErrorScope();
     if (error !== null) { print("pipeline:invalid"); print("FAIL"); return; }
-    renderer.build(ui);
-    print(`quads ${renderer.quadCount}`);
-    print(`indices ${renderer.indexCount}`);
-    for (let i: i32 = 0; i < renderer.ranges.length; i += 1) {
-      const range = renderer.ranges[i];
-      print(`range ${range.first} ${range.count} clip ${range.clip.x} ${range.clip.y} ${range.clip.w} ${range.clip.h}`);
-    }
-    let checksum: u32 = 2166136261;
-    for (let i: i32 = 0; i < renderer.vertexBytes.length; i += 1) {
-      checksum = (checksum ^ (renderer.vertexBytes[i] as u32)) * 16777619;
-    }
-    print(`vertices fnv1a ${checksum}`);
     if (uiPipeline_WGSL.length === 0) { print("FAIL shader"); return; }
     using target = device.createTexture({
       label: "b24-target", size: { width: 256, height: 256 }, format: "rgba8unorm",
@@ -142,6 +144,22 @@ export async function main(): Promise<void> {
       view, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: "clear", storeOp: "store",
     }] });
     renderer.render(ui, pass, 256, 256);
+    print(`quads ${renderer.quadCount}`);
+    print(`indices ${renderer.indexCount}`);
+    for (let i: i32 = 0; i < renderer.rangeCount; i += 1) {
+      const range = renderer.ranges[i];
+      print(`range ${range.first} ${range.count} clip ${range.clip.x} ${range.clip.y} ${range.clip.w} ${range.clip.h}`);
+    }
+    let checksum: u32 = 2166136261;
+    const stride: u32 = Context.bytesOf<UiVertex>(new UiVertex(new Vec2f(0, 0), new Vec2f(0, 0), 0)).length as u32;
+    const byteCount: i32 = (renderer.quadCount * 4 * stride) as i32;
+    for (let i: i32 = 0; i < byteCount; i += 1) {
+      checksum = (checksum ^ (renderer.vertexBytes[i] as u32)) * 16777619;
+    }
+    print(`vertices fnv1a ${checksum}`);
+    ui.begin(); ui.end();
+    renderer.render(ui, pass, 256, 256);
+    check("empty render", renderer.quadCount === 0 && renderer.indexCount === 0 && renderer.rangeCount === 0);
     pass.end();
     using command = encoder.finishDefault();
     device.queue.submit([command]);

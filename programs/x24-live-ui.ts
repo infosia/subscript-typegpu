@@ -8,8 +8,8 @@ import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice, GPUMapMode, GPUTextureUsage
 
 import { RenderPipelineSpec, renderPipelineL } from "./typegpu";
 import {
-  UiVertex_STRIDE, UiViewport_STRIDE, uiPipeline_WGSL, uiPipeline_VERTEX_ENTRY,
-  uiPipeline_FRAGMENT_ENTRY, uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, uiPipeline_TARGET_FORMAT,
+  uiPipeline_WGSL, uiPipeline_VERTEX_ENTRY,
+  uiPipeline_FRAGMENT_ENTRY, uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0,
 } from "./x24-live-ui.typegpu";
 
 export const uiPipeline: RenderPipelineSpec = renderPipelineL<UiRenderLayout, UiVertex, UiVarying>(
@@ -34,9 +34,9 @@ export async function main(): Promise<void> {
     device.pushErrorScope("validation");
     const facts: UiPipelineFacts = new UiPipelineFacts(
       uiPipeline_WGSL, uiPipeline_VERTEX_ENTRY, uiPipeline_FRAGMENT_ENTRY,
-      uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, UiVertex_STRIDE, UiViewport_STRIDE, uiPipeline_TARGET_FORMAT,
+      uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, uiPipeline,
     );
-    using renderer = new UiRenderer(device, facts);
+    using renderer = new UiRenderer(device, facts, 64);
     const error = await device.popErrorScope();
     if (error !== null) { print(`FAIL validation ${error.message.split("\n")[0]}`); return; }
     if (uiPipeline_WGSL.length === 0) { print("FAIL shader"); return; }

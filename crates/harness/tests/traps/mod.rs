@@ -192,6 +192,14 @@ fn ui_runtime_traps_are_named_and_numbered() {
                 "UIT1 UiRenderer capacity=0 maximum=16384 (author)",
             ),
             (
+                "stripTopology",
+                "UIT1 UiRenderer topology=triangle-strip (author)",
+            ),
+            (
+                "wideIndexFormat",
+                "UIT1 UiRenderer indexFormat=uint32 (author)",
+            ),
+            (
                 "excessiveCapacity",
                 "UIT1 UiRenderer capacity=16385 maximum=16384 (author)",
             ),

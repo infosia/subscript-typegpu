@@ -38,6 +38,8 @@ export class UiRect {
   }
 }
 
+const UI_UNCLIPPED: UiRect = new UiRect(0, 0, 16777216, 16777216);
+
 export class UiCommand {
   kind: i32;
   x: i32;
@@ -158,8 +160,8 @@ class UiLayout {
   y: i32 = 0;
   indent: i32 = 0;
   nextRow: i32 = 0;
-  maxX: i32 = -16777216;
-  maxY: i32 = -16777216;
+  maxX: i32 = -UI_UNCLIPPED.w;
+  maxY: i32 = -UI_UNCLIPPED.w;
   next: UiRect = new UiRect(0, 0, 0, 0);
   nextType: i32 = 0;
   column: boolean = false;
@@ -233,7 +235,7 @@ export class UiContext {
   private nextHoverZ: i32 = -2147483647;
   private updatedFocus: boolean = false;
   private ids: u32[] = [];
-  private clips: UiRect[] = [new UiRect(0, 0, 16777216, 16777216)];
+  private clips: UiRect[] = [uiCopy(UI_UNCLIPPED)];
   private layouts: UiLayout[] = [];
   private order: i32[] = [];
   private commandRoots: i32[] = [];
@@ -411,7 +413,7 @@ export class UiContext {
     const partial: boolean = visible.x !== rect.x || visible.y !== rect.y || visible.w !== rect.w || visible.h !== rect.h;
     if (partial) this.append(1, visible);
     this.append(kind, rect, color, id, text);
-    if (partial) this.append(1, new UiRect(0, 0, 16777216, 16777216));
+    if (partial) this.append(1, uiCopy(UI_UNCLIPPED));
   }
   drawRect(rect: UiRect, color: u32): void { this.emit(2, rect, color); }
   drawIcon(icon: i32, rect: UiRect, color: u32): void { this.emit(4, rect, color, icon); }
@@ -440,7 +442,7 @@ export class UiContext {
     layout.body = new UiRect(body.x - scrollX, body.y - scrollY, body.w, body.h);
     layout.widths[0] = 0; layout.widthCount = 1; layout.height = 0;
     layout.item = 0; layout.x = 0; layout.y = 0; layout.indent = 0; layout.nextRow = 0;
-    layout.maxX = -16777216; layout.maxY = -16777216; layout.nextType = 0; layout.column = false;
+    layout.maxX = -UI_UNCLIPPED.w; layout.maxY = -UI_UNCLIPPED.w; layout.nextType = 0; layout.column = false;
     this.layoutCount += 1;
   }
   popLayout(): UiRect {
@@ -827,7 +829,7 @@ export class UiContext {
     if (record.rect.w === 0) record.rect = rect;
     this.pushContainer(slot, 1);
     this.beginRoot(record);
-    this.pushClipValue(new UiRect(0, 0, 16777216, 16777216));
+    this.pushClipValue(uiCopy(UI_UNCLIPPED));
     rect = record.rect;
     let body: UiRect = rect;
     if ((opt & UI_OPT_NO_FRAME) === 0) this.drawFrame(rect, UI_COLOR_WINDOW_BG);
@@ -960,7 +962,7 @@ export function uiFragment(res: UiRenderLayout, input: UiVarying, ctx: FragmentI
 
 export const UI_BLEND: GPUBlendState = {
   color: { operation: "add", srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha" },
-  alpha: { operation: "add", srcFactor: "one", dstFactor: "one" },
+  alpha: { operation: "add", srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha" },
 };
 
 export class UiPipelineFacts {
@@ -969,15 +971,13 @@ export class UiPipelineFacts {
   fragmentEntry: string;
   layout: BindGroupLayoutSpec;
   vertexLayout: VertexBufferLayoutSpec;
-  vertexStride: u32;
-  viewportStride: u32;
-  format: GPUTextureFormat;
+  spec: RenderPipelineSpec;
   constructor(wgsl: string, vertexEntry: string, fragmentEntry: string,
     layout: BindGroupLayoutSpec, vertexLayout: VertexBufferLayoutSpec,
-    vertexStride: u32, viewportStride: u32, format: GPUTextureFormat) {
+    spec: RenderPipelineSpec) {
     this.wgsl = wgsl; this.vertexEntry = vertexEntry; this.fragmentEntry = fragmentEntry;
     this.layout = layout; this.vertexLayout = vertexLayout;
-    this.vertexStride = vertexStride; this.viewportStride = viewportStride; this.format = format;
+    this.spec = spec;
   }
 }
 
@@ -992,6 +992,7 @@ export class UiRenderer {
   readonly capacity: u32;
   quadCount: u32 = 0;
   indexCount: u32 = 0;
+  rangeCount: i32 = 0;
   vertexBytes: u8[] = [];
   ranges: UiDrawRange[] = [];
   private device: GPUDevice;
@@ -1003,16 +1004,24 @@ export class UiRenderer {
   private viewport: Buffer<UiViewport>;
   private group: GPUBindGroup;
   private pipeline: RenderPipeline;
-  private clip: UiRect = new UiRect(0, 0, 16777216, 16777216);
+  private clip: UiRect = uiCopy(UI_UNCLIPPED);
 
   constructor(device: GPUDevice, facts: UiPipelineFacts, capacity: u32 = 16384) {
     // A uint16 index addresses at most 65,536 vertices.
     if (capacity === 0 || capacity > 16384) {
       uiTrap("UIT1", "UiRenderer", `capacity=${capacity} maximum=16384`);
     }
+    if (facts.spec.topology !== "triangle-list") {
+      uiTrap("UIT1", "UiRenderer", `topology=${facts.spec.topology}`);
+    }
+    if (facts.spec.indexFormat !== "uint16") {
+      uiTrap("UIT1", "UiRenderer", `indexFormat=${facts.spec.indexFormat}`);
+    }
+    const vertexStride: u32 = Context.bytesOf<UiVertex>(new UiVertex(new Vec2f(0, 0), new Vec2f(0, 0), 0)).length as u32;
+    const viewportStride: u32 = Context.bytesOf<UiViewport>(new UiViewport(0, 0)).length as u32;
     this.device = device;
     this.capacity = capacity;
-    this.vertices = createBuffer<UiVertex>(device, facts.vertexStride, capacity * 4,
+    this.vertices = createBuffer<UiVertex>(device, vertexStride, capacity * 4,
       GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST, "ui-vertices");
     this.indices = createBuffer<u16>(device, 2, capacity * 6,
       GPUBufferUsage.INDEX + GPUBufferUsage.COPY_DST, "ui-indices");
@@ -1039,13 +1048,10 @@ export class UiRenderer {
       UI_ATLAS_WIDTH as u32, UI_ATLAS_HEIGHT as u32);
     this.atlasView = this.atlas.createView();
     this.nearest = device.createSampler({ minFilter: "nearest", magFilter: "nearest" });
-    this.viewport = createBuffer<UiViewport>(device, facts.viewportStride, 1,
+    this.viewport = createBuffer<UiViewport>(device, viewportStride, 1,
       GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST, "ui-viewport");
-    const spec: RenderPipelineSpec = {
-      format: facts.format, indexFormat: "uint16", blend: UI_BLEND,
-    };
     this.pipeline = createRenderPipeline(device, facts.wgsl, facts.vertexEntry,
-      facts.fragmentEntry, [facts.layout], [facts.vertexLayout], spec);
+      facts.fragmentEntry, [facts.layout], [facts.vertexLayout], facts.spec);
     using layout = this.pipeline.bindGroupLayout(0);
     this.group = createBindGroup(device, layout, facts.layout, [
       bufferResource(this.viewport.handle()), textureResource(this.atlasView), samplerResource(this.nearest),
@@ -1066,18 +1072,25 @@ export class UiRenderer {
       new UiVertex(new Vec2f(x as f32, (y + h) as f32), new Vec2f(u, bottom), color),
     ];
     const bytes: u8[] = Context.bytesOf<FixedArray<UiVertex, 4>>(values);
-    for (let i: i32 = 0; i < bytes.length; i += 1) this.vertexBytes.push(bytes[i]);
-    if (this.ranges.length === 0) this.ranges.push(new UiDrawRange(this.indexCount, this.clip));
-    this.ranges[this.ranges.length - 1].count += 6;
+    const offset: i32 = (this.quadCount as i32) * bytes.length;
+    for (let i: i32 = 0; i < bytes.length; i += 1) {
+      if (offset + i === this.vertexBytes.length) this.vertexBytes.push(bytes[i]);
+      else this.vertexBytes[offset + i] = bytes[i];
+    }
+    if (this.rangeCount === 0) this.startRange(this.clip);
+    this.ranges[this.rangeCount - 1].count += 6;
     this.quadCount = count;
     this.indexCount += 6;
   }
 
   private startRange(clip: UiRect): void {
     this.clip = uiCopy(clip);
-    if (this.ranges.length > 0 && this.ranges[this.ranges.length - 1].count === 0) {
-      this.ranges[this.ranges.length - 1].clip = uiCopy(clip);
-    } else this.ranges.push(new UiDrawRange(this.indexCount, clip));
+    if (this.rangeCount === 0 || this.ranges[this.rangeCount - 1].count !== 0) {
+      if (this.rangeCount === this.ranges.length) this.ranges.push(new UiDrawRange(this.indexCount, clip));
+      this.rangeCount += 1;
+    }
+    const range: UiDrawRange = this.ranges[this.rangeCount - 1];
+    range.first = this.indexCount; range.count = 0; range.clip = uiCopy(clip);
   }
 
   private commands(context: UiContext, start: i32, end: i32): void {
@@ -1111,31 +1124,32 @@ export class UiRenderer {
 
   build(context: UiContext): void {
     this.quadCount = 0; this.indexCount = 0;
-    this.vertexBytes = []; this.ranges = [];
-    this.clip = new UiRect(0, 0, 16777216, 16777216);
+    this.rangeCount = 0;
+    this.clip = uiCopy(UI_UNCLIPPED);
     const order: i32[] = context.drawOrder();
     if (context.rootCount === 0) this.commands(context, 0, context.commandCount);
     for (let i: i32 = 0; i < order.length; i += 1) {
       const root: UiRoot = context.roots[order[i]];
       this.commands(context, root.start, root.end);
     }
-    if (this.ranges.length > 0 && this.ranges[this.ranges.length - 1].count === 0) this.ranges.pop();
+    if (this.rangeCount > 0 && this.ranges[this.rangeCount - 1].count === 0) this.rangeCount -= 1;
   }
 
   render(context: UiContext, pass: GPURenderPassEncoder, width: u32, height: u32): void {
     this.build(context);
     this.viewport.write(this.device.queue, 0, Context.bytesOf<UiViewport>(new UiViewport(width as f32, height as f32)));
-    if (this.quadCount === 0) return;
+    if (this.quadCount === 0) { pass.setScissorRect(0, 0, width, height); return; }
     this.vertices.write(this.device.queue, 0, this.vertexBytes);
     this.pipeline.bind(pass, [this.group], [this.vertices.handle()]);
     this.pipeline.setIndexBuffer(pass, this.indices.handle());
-    for (let i: i32 = 0; i < this.ranges.length; i += 1) {
+    for (let i: i32 = 0; i < this.rangeCount; i += 1) {
       const range: UiDrawRange = this.ranges[i];
       const clip: UiRect = uiIntersection(range.clip, new UiRect(0, 0, width as i32, height as i32));
       if (clip.w === 0 || clip.h === 0) continue;
       pass.setScissorRect(clip.x as u32, clip.y as u32, clip.w as u32, clip.h as u32);
       pass.drawIndexed(range.count, 1, range.first, 0, 0);
     }
+    pass.setScissorRect(0, 0, width, height);
   }
 
   dispose(): void {

@@ -123,6 +123,7 @@ fn visit_expr(
                 callee: AsyncCallee::Method { receiver, name, .. },
                 ..
             } if is_device_creation(module, receiver, name) => calls.push(ProgramCall::Creation),
+            // A library class whose constructor creates a pipeline is a creation site.
             ExprKind::New { .. }
                 if matches!(&expression.ty, Type::Class(id)
                     if module.classes[id.0].name == "UiRenderer"
