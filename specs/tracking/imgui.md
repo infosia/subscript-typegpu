@@ -52,9 +52,9 @@ A fresh Opus reviewer over `ee2e20a..91d1b11`, with execution of the
 atlas and trap tests. CRITICAL 0, MAJOR 3, MINOR 14.
 
 MAJOR, all fixed in the fix round: the tree node pool had no
-exhaustion guard and evicted a live slot; `updateControl` focused on
+exhaustion guard and evicted a live slot. `updateControl` focused on
 a press over the widget where microui requires an earlier hover
-frame, so a drag applied the press frame's whole pointer delta; the
+frame, so a drag applied the press frame's whole pointer delta. The
 scrollbars had no golden and the thumb drag no test.
 
 MINOR fixed: the grouping sort runs only when an owner order
@@ -166,13 +166,13 @@ P16 row. U3 opens.
 
 Landed at the commit above `bb65ae2`: the window host queues wheel,
 key, and text events and delivers them before `frame` through the
-entries the script exports (W2 Rev 3, W3 Rev 2); the signature test
+entries the script exports (W2 Rev 3, W3 Rev 2). The signature test
 accepts the three required entries and any subset of the four
-optional ones and names an unexpected export (W13 Rev 2);
+optional ones and names an unexpected export (W13 Rev 2).
 `UiRenderer.create` and `UiRenderer.createHost` (UI15 Rev 3, the
 host-owned device blocked the first delivery and the contract took
-the two factories on the `createRenderPipelineHost` precedent);
-`examples/ui-demo/main.ts`, a port of microui's demo windows with the
+the two factories on the `createRenderPipelineHost` precedent).
+`examples/ui-demo/main.ts` is a port of microui's demo windows with the
 style editor omitted.
 
 Evidence on this host: `tools/gate.sh --require-backend` green, 275
@@ -195,7 +195,7 @@ MINOR 15.
 MAJOR, fixed in the fix round: the public `UiRenderer` constructor
 was a third creation path with no validation (now private, and the
 validation-scope lint rejects a direct `new UiRenderer` with a
-fixture red); EX2 had no form for a port of another project (EX2
+fixture red). EX2 had no form for a port of another project (EX2
 Rev 2, the header cites microui at the pinned commit).
 
 MINOR fixed: `currentContainer()` (UI8 Rev 1) replaces the reach

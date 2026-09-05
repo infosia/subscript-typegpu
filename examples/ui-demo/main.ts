@@ -1,6 +1,6 @@
 // example: ui-demo
 // Two interactive windows show widgets, a text log, and background color controls.
-// The style editor is omitted.
+// This port omits the style editor.
 // Ported from microui's demo (https://github.com/rxi/microui/blob/0850aba860959c3e75fb3e97120ca92957f9d057/demo/main.c).
 
 import {
@@ -15,8 +15,8 @@ import {
   uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, uiPipeline_TARGET_FORMAT,
 } from "./main.typegpu";
 
-// The program declares the pipeline that draws the UI, so the generator emits
-// its WGSL and layout facts beside this file and the renderer receives them.
+// The program declares the pipeline that draws the UI. The generator emits its
+// WGSL and layout facts beside this file, and the renderer receives them.
 export const uiPipeline: RenderPipelineSpec = renderPipelineL<UiRenderLayout, UiVertex, UiVarying>(
   uiVertex, uiFragment, { format: "bgra8unorm", indexFormat: "uint16", blend: UI_BLEND },
 );
@@ -215,7 +215,7 @@ export function frame(
   const y: i32 = pointerY as i32;
   ui.inputMouseMove(x, y);
   // The host reports buttons as level state. microui's SDL loop receives press
-  // and release events, so the edges are derived here.
+  // and release events, so this loop derives the edges.
   for (let bit: u32 = 1; bit <= 4; bit *= 2) {
     if ((buttons & bit) !== 0 && (previousButtons & bit) === 0) ui.inputMouseDown(x, y, bit);
     if ((buttons & bit) === 0 && (previousButtons & bit) !== 0) ui.inputMouseUp(x, y, bit);

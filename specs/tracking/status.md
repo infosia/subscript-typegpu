@@ -1,6 +1,6 @@
 # Project status
 
-Updated 2026-08-25.
+Updated 2026-09-05.
 
 | Phase | Status | Close |
 |---|---|---|

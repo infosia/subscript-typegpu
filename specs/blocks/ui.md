@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Rev 9 (branch review: UI4 Rev 3, UI9 Rev 1, UI11, UI12 Rev 2, UI15 Rev 5, UI18, UI20), 2026-09-05. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -55,8 +55,11 @@ tiers with no GPU. The renderer is the only GPU code.
   `begin()` and `end()` traps `UIT2`. Rev 2: the context keeps its
   command records, root records, and layout records across frames
   and overwrites them in place. Storage grows when a frame exceeds
-  every earlier frame's count, and it stays at that size. A steady
-  frame allocates only the strings of its text commands.
+  every earlier frame's count, and it stays at that size. Rev 3: the
+  retained arrays do not grow in a steady frame. A steady frame
+  allocates the strings of its text commands, the array that
+  `drawOrder()` returns, and the lines that `dumpCommands()`
+  returns.
   Nothing in the context depends on `Context.collect()`.
 - **UI5 — Input is pushed as plain values, before `begin()`.**
   `inputMouseMove(x: i32, y: i32)`, `inputMouseDown(x, y, button:
@@ -112,16 +115,24 @@ tiers with no GPU. The renderer is the only GPU code.
   Options are bits named `UI_OPT_*`, one per microui option.
   Containers live in a pool keyed by id, with least-recent
   eviction, sized as microui's pools. A scrollbar of width 12
-  appears when the content exceeds the body on an axis; its thumb is
-  at least 8 pixels; a wheel event scrolls the container under the
-  pointer; a drag on the thumb scrolls in proportion.
+  appears when the content exceeds the body on an axis. Its thumb is
+  at least 8 pixels. A wheel event scrolls the container under the
+  pointer. A drag on the thumb scrolls in proportion.
 
 ## Widgets
 
-- **UI9 — The widget set, version 1.** State crosses in holders,
-  because subscript has no pointers: `UiState<T>` is a reference
-  class with one field `value: T`. Every widget returns a `u32`
-  response bit set: 1 active, 2 submit, 4 change.
+- **UI9 — The widget set, version 1.** Rev 1. State crosses in
+  holders, because subscript has no pointers: `UiState<T>` is a
+  reference class with one field `value: T`. Each stateful widget
+  (`button`, `buttonIcon`, `checkbox`, `slider`, `number`, `textbox`,
+  `header`, `beginTreenode`) returns a `u32` response bit set: 1
+  active, 2 submit, 4 change. `beginWindow` and `beginPopup` return
+  `UI_RES_ACTIVE` when the container is open and 0 when it is
+  closed. `label`, `text`, `beginPanel`, `openPopup`, and every
+  `end*` call return nothing. Responses and options are `u32` bit
+  sets under `UI_*` names, because the module has no namespace
+  object and a bit set crosses every subscript boundary as one
+  integer.
   `button(label, opt = 0)`, `buttonIcon(icon, opt = 0)`,
   `checkbox(label, state: UiState<boolean>)`,
   `slider(label, state: UiState<f32>, low, high, step = 0, opt = 0)`,
@@ -165,7 +176,9 @@ tiers with no GPU. The renderer is the only GPU code.
   ranges in draw order. `UiRoot`, `beginRoot`, and `endRoot` are the
   public root primitive: a program can open a root container of its
   own, and the suite programs use them to pin the range rules.
-- **UI12 — Clipping.** Rev 1. A clip stack starts at the unbounded rect.
+  `beginRoot` does not push the unbounded clip. `beginWindow` pushes
+  it, as microui's `begin_root_container` does for a window.
+- **UI12 — Clipping.** Rev 2. A clip stack starts at the unbounded rect.
   `pushClip(r)` intersects, `popClip()` restores. A rect or icon
   outside the clip emits nothing. A rect partly inside emits a clip
   command for the intersection, the rect, then a clip command for
@@ -174,9 +187,17 @@ tiers with no GPU. The renderer is the only GPU code.
   with no scissor). Text partly inside emits the same pair around
   the text command. A rect or text whose visible part has a zero
   width or height emits nothing. A container body pushes its clip
-  for its widgets. Two divergences from microui are deliberate:
-  microui emits a zero-sized command, and microui emits the
-  intersected rect with no clip pair for a partly clipped rect.
+  for its widgets. Rev 2. The divergences from microui, each
+  deliberate: microui emits a zero-sized command, and this module
+  emits none. microui emits the intersected rect with no clip pair
+  for a partly clipped rect, and this module emits the pair. The
+  first clip command of a pair carries the intersection, where
+  microui's carries the current clip. `popLayout` clamps the extent
+  at 0, where microui's `pop_container` keeps the sentinel. A slider
+  with `high` equal to `low` places its thumb at 0, where microui
+  divides by zero. The icon indices start at 0 (`UI_ICON_CLOSE`),
+  where microui starts at 1 with 0 as no icon, so `buttonIcon` draws
+  every icon.
 - **UI13 — The golden form.** Rev 1. `dumpCommands(): string[]`
   renders one line per command in draw order. With no root container
   in the frame, the order is the call order. With a root container
@@ -241,9 +262,15 @@ tiers with no GPU. The renderer is the only GPU code.
   glyph advanced by glyph width, and a clip command ends the current
   draw range and starts one with the new scissor. The builder keeps
   its vertex byte array and its range records across frames and
-  overwrites them in place, as UI4 states for the context.
+  overwrites them in place, as UI4 states for the context. Rev 5:
+  the retained arrays do not grow in a steady frame, and each quad
+  allocates the bytes that `Context.bytesOf` returns.
+  `UiPipelineFacts` exists because LB2 places the pipeline
+  declaration in the program, so the program hands the generated
+  facts to the library.
   `render(context, pass, width, height)` calls `build`, writes the
-  viewport and the vertex bytes through `Buffer<T>.write`, then for
+  viewport and the live vertex bytes (four vertices per quad in the
+  frame, not the retained tail) through `Buffer<T>.write`, then for
   each range calls `setScissorRect` with the clip intersected with the
   viewport (an empty intersection skips the range) and
   `drawIndexed(indexCount, 1, firstIndex, 0, 0)`. After the last
@@ -276,10 +303,53 @@ tiers with no GPU. The renderer is the only GPU code.
   (a frame over the quad capacity, a capacity of 0 or above 16,384, a
   topology other than `triangle-list`, an index format other than
   `uint16`). `UIT2` — a widget or layout
-  call outside `begin()` and `end()`, or an `end*` call without its
-  `begin*`. `UIT3` — `layoutRow` received more than 16 widths.
+  call outside `begin()` and `end()`, an `end*` call without its
+  `begin*`, a second `begin()` inside a frame, `beginPanel` with
+  `UI_OPT_CLOSED`, or `currentContainer()` with no open container. `UIT3` — `layoutRow` received more than 16 widths.
   `UIT4` — a frame needed a 49th container or tree node, so the
   pool had no slot to evict. Each trap has a demonstrated red.
+
+## The public surface
+
+- **UI20 — The exported names.** The module exports these names and
+  no other. Constants: `UI_OPT_ALIGN_CENTER` 1, `UI_OPT_ALIGN_RIGHT`
+  2, `UI_OPT_NO_INTERACT` 4, `UI_OPT_NO_FRAME` 8, `UI_OPT_NO_RESIZE`
+  16, `UI_OPT_NO_SCROLL` 32, `UI_OPT_NO_CLOSE` 64, `UI_OPT_NO_TITLE`
+  128, `UI_OPT_HOLD_FOCUS` 256, `UI_OPT_AUTO_SIZE` 512,
+  `UI_OPT_POPUP` 1024, `UI_OPT_CLOSED` 2048, `UI_OPT_EXPANDED` 4096
+  (microui's option order). `UI_MOUSE_LEFT` 1, `UI_MOUSE_RIGHT` 2,
+  `UI_MOUSE_MIDDLE` 4. `UI_KEY_SHIFT` 1, `UI_KEY_CTRL` 2,
+  `UI_KEY_ALT` 4, `UI_KEY_BACKSPACE` 8, `UI_KEY_RETURN` 16.
+  `UI_RES_ACTIVE` 1, `UI_RES_SUBMIT` 2, `UI_RES_CHANGE` 4.
+  `UI_ICON_CLOSE` 0, `UI_ICON_CHECK` 1, `UI_ICON_COLLAPSED` 2,
+  `UI_ICON_EXPANDED` 3 (the atlas table indices, UI2). The fourteen
+  `UI_COLOR_*` indices in microui's color order, `UI_COLOR_TEXT` 0
+  to `UI_COLOR_SCROLL_THUMB` 13. `UI_BLEND`. Classes: `UiContext`,
+  `UiState<T>`, `UiRect`, `UiCommand`, `UiRoot`, `UiStyle` (`width`,
+  `height`, `padding`, `spacing`, `indent`, `titleHeight`,
+  `scrollbarSize`, `thumbSize`, `colors: u32[]`), `UiVertex`,
+  `UiViewport`, `UiVarying`, `UiRenderLayout`, `UiPipelineFacts`,
+  `UiDrawRange`, `UiRenderer`. Functions: `uiVertex`, `uiFragment`,
+  `uiNumberText`. The custom-widget surface of `UiContext` is the set
+  microui exposes for the same purpose: `getId`, `setFocus`,
+  `mouseOver`, `updateControl`, `getClip`, `pushClip`, `popClip`,
+  `pushLayout`, `popLayout`, `layoutRow`, `layoutNext`,
+  `layoutSetNext`, `layoutBeginColumn`, `layoutEndColumn`,
+  `drawRect`, `drawIcon`, `drawText`, `textWidth`, `drawFrame`,
+  `drawControlFrame`, `drawControlText`, `currentContainer`,
+  `beginRoot`, `endRoot`, `drawOrder`, `dumpCommands`, and the
+  readable state `style`, `hover`, `focus`, `lastId`, `lastRect`,
+  `mouseX`, `mouseY`, `mouseDeltaX`, `mouseDeltaY`, `mouseDown`,
+  `mousePressed`, `keyDown`, `keyPressed`, `scrollX`, `scrollY`,
+  `textInput`, `frame`, `hoverRoot`, `currentRoot`, `commandCount`,
+  `rootCount`, `commands`, `roots`. A program writes `style` and
+  nothing else of that state. `UiRoot` exposes `id`, `rect`, `body`,
+  `contentWidth`, `contentHeight`, `open`, `lastUpdate`, `scrollX`,
+  `scrollY`, `zindex`, `start`, `end`. `UiRenderer` exposes
+  `create`, `createHost`, `capacity`, `quadCount`, `indexCount`,
+  `rangeCount`, `ranges`, `vertexBytes`, `build`, `render`,
+  `dispose`. A name outside this rule is a defect, in the code or in
+  the rule.
 
 ## Tests
 

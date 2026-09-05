@@ -99,7 +99,10 @@ question (P2 review M6), and the diagnostic sweep.
   scans `README.md` with `docs/*.md`.
 
 - **EG10 — The pipeline helpers accept a host-owned device.** Rev 0,
-  2026-08-24. `lib/typegpu.ts` exports `createRenderPipelineHost`
+  2026-08-24. Rev 1, 2026-09-05: `createBufferHost<T>` joins them
+  with the signature of BF1 and a `GPUHostOwnedDevice` first
+  parameter. It creates the buffer through the host device and owns
+  no queue. `lib/typegpu.ts` exports `createRenderPipelineHost`
   and `createComputePipelineHost` with the signatures of RN11 and
   PI9 and a `GPUHostOwnedDevice` first parameter, because subscript
   has no common interface over the two device classes and a windowed

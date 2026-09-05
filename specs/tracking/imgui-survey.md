@@ -48,7 +48,7 @@ Consequences here:
 
 - Invariant 7 (Rust only, generated C only) and the build-time rules
   exclude a C++ library in the tree. A run-time-loaded shared library
-  is possible in principle, as the backend is, but the UI would be
+  is possible in principle, as the backend is, but the UI is then
   invisible to the differential gate: no subscript source, no
   goldens, no headless run, because Noop draws nothing.
 - Invariant 1 (the bindable C subset) rejects varargs and callbacks
@@ -106,10 +106,11 @@ from it is copied.
 
 ## Route C — rejected
 
-The GUI logic would live in Rust in the host, not in scripts. The
+Under this route the GUI logic lives in Rust in the host, not in
+scripts. The
 project's product is script-facing libraries. Route C also adds a
 large Rust dependency to the one workspace, against the build-time
-rules, and the renderer would be written twice (egui's renderer
+rules, and the renderer is written twice (egui's renderer
 targets wgpu-rs, not webgpu.h).
 
 ## Route B — the decision
