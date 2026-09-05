@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -159,11 +159,13 @@ tiers with no GPU. The renderer is the only GPU code.
   `drawOrder(): i32[]`, the root containers by ascending z-index.
   There is no jump command: the renderer and the golden walk the
   ranges in draw order.
-- **UI12 — Clipping.** A clip stack starts at the unbounded rect.
+- **UI12 — Clipping.** Rev 1. A clip stack starts at the unbounded rect.
   `pushClip(r)` intersects, `popClip()` restores. A rect or icon
   outside the clip emits nothing. A rect partly inside emits a clip
   command for the intersection, the rect, then a clip command for
-  the current clip. Text partly inside emits the same pair around
+  the unbounded rect (Rev 1: microui's `mu_set_clip(unclipped_rect)`,
+  so that a later command that is fully visible under any clip draws
+  with no scissor). Text partly inside emits the same pair around
   the text command. A rect or text whose visible part has a zero
   width or height emits nothing. A container body pushes its clip
   for its widgets. Two divergences from microui are deliberate:
@@ -181,33 +183,43 @@ tiers with no GPU. The renderer is the only GPU code.
 
 ## The renderer
 
-- **UI14 — One pipeline.** `UiVertex` is `@CStruct { position:
-  Vec2f; uv: Vec2f; color: u32 }`. `UiViewport` is `@CStruct {
-  width: f32; height: f32 }`. `UiRenderLayout` has `viewport:
-  Uniform<UiViewport>`, `atlas: Texture2d<f32>`, and `nearest:
-  Sampler`. `uiPipeline` is `renderPipelineL<UiRenderLayout,
-  UiVertex, UiVarying>` with `triangle-list`, `uint16` indices, no
-  culling, and blend color `src-alpha` over `one-minus-src-alpha`,
-  alpha `one` plus `one`, operation `add` (the pair RN21 models). The
+- **UI14 — One pipeline.** Rev 1. `UiVertex` is `@CStruct {
+  position: Vec2f; uv: Vec2f; color: u32 }`. `UiViewport` is
+  `@CStruct { width: f32; height: f32 }`. `UiRenderLayout` has
+  `viewport: Uniform<UiViewport>`, `atlas: Texture2d<f32>`, and
+  `nearest: Sampler`. The module exports the kernels `uiVertex` and
+  `uiFragment` and the blend state `UI_BLEND` (color `src-alpha`
+  over `one-minus-src-alpha`, alpha `one` plus `one`, operation
+  `add`, the pair RN21 models). The program declares the pipeline,
+  as LB2 states for every module kernel:
+  `renderPipelineL<UiRenderLayout, UiVertex, UiVarying>(uiVertex,
+  uiFragment, { format, indexFormat: "uint16", blend: UI_BLEND })`,
+  and the generator emits the program's `.wgsl` golden and facts. The
   vertex kernel maps pixels to clip space (`x * 2 / width - 1`,
   `1 - y * 2 / height`) and unpacks the color with division and
   modulo by 256 (K9 has no shifts). The fragment kernel returns the
   color with its alpha multiplied by the atlas sample's red channel.
   The atlas texture is `rgba8unorm`, every channel the alpha byte,
-  uploaded once at `init` through `writeTextureBytes`.
-- **UI15 — The frame builder.** `UiRenderer` is created at `init`
-  with a quad capacity, default 16,384, and owns a vertex buffer of
-  four vertices per quad, a `u16` index buffer of six indices per
-  quad, the atlas texture, the sampler, the viewport uniform, and
-  one bind group. `render(context, pass, width, height)` walks the
-  command list in draw order: a rect is one quad at the white atlas
-  rect, an icon is one quad at its atlas rect centered in the
-  command rect, text is one quad per glyph advanced by glyph width,
-  and a clip command ends the current draw range and starts one
-  with the new scissor. The builder writes the vertex and index
-  bytes once per frame through `Buffer<T>.write`, then for each
-  range calls `setScissorRect` with the clip intersected with the
-  viewport (an empty intersection skips the range) and
+  uploaded once through `writeTextureBytes`. No library module
+  imports a generated support module.
+- **UI15 — The frame builder.** Rev 1. `UiRenderer` is created with
+  the device, the program's pipeline facts (`UiPipelineFacts`: the
+  WGSL, the two entry names, the bind group layout, the vertex
+  buffer layout, the two strides), and a quad capacity, default
+  16,384. A capacity of 0 or above 16,384 traps `UIT1`, because a
+  `u16` index addresses 65,536 vertices. The renderer owns a vertex
+  buffer of four vertices per quad, a `u16` index buffer of six
+  indices per quad written once at creation, the atlas texture, the
+  sampler, the viewport uniform, one bind group, and the pipeline.
+  `build(context)` walks the command list in draw order: a rect is
+  one quad at the white atlas rect, an icon is one quad at its atlas
+  rect centered in the command rect, text is one quad per glyph
+  advanced by glyph width, and a clip command ends the current draw
+  range and starts one with the new scissor. `render(context, pass,
+  width, height)` calls `build`, writes the viewport and the vertex
+  bytes through `Buffer<T>.write`, then for each range calls
+  `setScissorRect` with the clip intersected with the viewport (an
+  empty intersection skips the range) and
   `drawIndexed(indexCount, 1, firstIndex, 0, 0)`. A frame that
   exceeds the quad capacity traps `UIT1` with the capacity and the
   count.
