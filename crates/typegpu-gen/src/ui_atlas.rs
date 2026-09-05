@@ -14,13 +14,19 @@ fn initializer<'a>(source: &'a str, name: &str) -> Result<&'a str, String> {
 /// Read the pinned atlas and return its subscript module.
 pub fn generate_ui_atlas(root: &Path) -> Result<String, String> {
     let submodule = root.join("third_party/microui");
-    let gitfile = std::fs::read_to_string(submodule.join(".git"))
-        .map_err(|error| format!("read microui gitfile: {error}"))?;
-    let gitdir = gitfile
-        .trim()
-        .strip_prefix("gitdir: ")
-        .ok_or("microui gitfile lacks gitdir")?;
-    let gitdir = submodule.join(gitdir);
+    let gitpath = submodule.join(".git");
+    let gitdir = if gitpath.is_dir() {
+        gitpath
+    } else {
+        let gitfile = std::fs::read_to_string(&gitpath)
+            .map_err(|error| format!("read microui gitfile: {error}"))?;
+        let gitdir = gitfile
+            .trim()
+            .strip_prefix("gitdir:")
+            .ok_or("microui gitfile lacks gitdir")?
+            .trim();
+        submodule.join(gitdir)
+    };
     let head = std::fs::read_to_string(gitdir.join("HEAD"))
         .map_err(|error| format!("read microui HEAD: {error}"))?;
     let commit = if let Some(reference) = head.trim().strip_prefix("ref: ") {

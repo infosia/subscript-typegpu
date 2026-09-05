@@ -126,12 +126,15 @@ fn window_example_has_exact_host_entry_signatures() {
             let (_session, exports) =
                 subscript_typegpu_harness::load_program_with_exports(&program)
                     .unwrap_or_else(|error| panic!("compile {}: {error}", program.display()));
-            let expected = module
-                .functions
-                .iter()
-                .filter(|function| function.exported && function.pos.file == "main.ts")
-                .map(|function| function.name.clone())
-                .collect::<Vec<_>>();
+            let expected = [
+                "init",
+                "wheel",
+                "keyDown",
+                "keyUp",
+                "textInput",
+                "frame",
+                "shutdown",
+            ];
             assert_eq!(exports, expected, "{} checked exports", program.display());
         }
     }
