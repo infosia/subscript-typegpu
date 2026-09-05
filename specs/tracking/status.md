@@ -16,6 +16,7 @@ Updated 2026-09-05.
 | U1 the ui core and `b23-ui-core` (branch `imgui`) | COMPLETE | 2026-09-05, `specs/tracking/imgui.md` |
 | U2 the ui renderer, `b24-ui-render`, `x24-live-ui` (branch `imgui`) | COMPLETE | `b5a4e1b`, 2026-09-05 |
 | U3 optional input entries, `examples/ui-demo` (branch `imgui`) | COMPLETE | 2026-09-05, `specs/tracking/imgui.md` |
+| U4 documents, comments, the whole-branch review (branch `imgui`) | COMPLETE | `b0922c7`, 2026-09-05 |
 
 Numbers at `42ecb7f`: 233 tests in six executables, 28 programs
 (`a01`–`a05`, `b01`–`b11`, `x01`–`x12`), 157 facade exports all

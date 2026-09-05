@@ -176,3 +176,13 @@ After the fix, at `b5a4e1b`: the warm `--require-backend` gate 244.3 s
 remainder over the P16 row is the three ui programs and the seven
 ui trap fixtures. One program, medians of three runs by the coding
 agent: dev `b04-particles` 4.52 s to 2.51 s, ship 3.97 s to 1.72 s.
+
+## The `imgui` branch close (2026-09-05)
+
+The warm `--require-backend` gate at `b0922c7`: 285.2 s on this host
+(276 tests), with 233.2 s and 255.6 s measured by the coding agent on
+the same tree. The P16 row is 204.29 s. The growth is the three ui
+programs, the seven ui trap fixtures, the two window rejection
+suites, and the loader tests. No step doubles a previous row after
+the LB1 Rev 2 fix. The live lane: Metal 120.6 s, Dawn 118.0 s, with
+`x24` in the set (P16: 118.76 s on Metal without it).

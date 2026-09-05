@@ -225,3 +225,58 @@ narrowed scope: the contract items the plan listed for U4 (textbox
 editing, wheel scroll, popups) landed in U1 to U3. U4 holds the
 example's EX2 comments, the README and `docs/from-typegpu.md`
 entries, and the whole-branch review.
+
+## U4 (2026-09-05)
+
+The document entries landed at `2f3f8b5` (README, `docs/from-typegpu.md`)
+and the example's divergence comments at `7fb607e`, both before this
+section.
+
+### Whole-branch review
+
+A fresh Opus reviewer over `cbbab21..7fb607e` (30 commits), with
+execution of the atlas, library, trap, and api tests and the hygiene
+check. CRITICAL 0, MAJOR 3, MINOR 18.
+
+MAJOR, all in the record, all fixed: `createBufferHost` had no block
+rule (EG10 Rev 1); U4 had no tracking section (this one); `ui.md` did
+not list the module's exported names (UI20, and the code matches it:
+59 exports, none missing on either side).
+
+MINOR fixed in the contract: UI9 Rev 1 scopes the response rule and
+records the `u32` bit sets, UI4 Rev 3 and UI15 Rev 5 state the
+allocations a steady frame makes, UI12 Rev 2 collects six microui
+divergences (the zero-sized command, the clip pair, the clip rect of
+the pair, the extent clamp, the slider guard, the icon renumbering),
+UI11 states that `beginRoot` pushes no clip, UI18 lists every `UIT2`
+site and the lane of the `UIT1` reds, UI2 records the C zero-fill of
+the atlas initializer, the ui revision lines join `rule-ids.txt`,
+semicolons and "would" left the tracking and the survey, the example
+comments are active and under 25 words, `status.md` carries its date.
+MINOR fixed in code (`b0922c7`): the program loader returns an error
+instead of a panic, the atlas generator accepts both submodule `.git`
+forms and names both commits on a regeneration mismatch, the ui-demo
+export parity asserts the literal list.
+
+Two review items were withdrawn after measurement: an exact
+16,384-byte atlas initializer (the C source names 10,584 bytes and C
+zero-fills the rest), and an upload of the live vertex bytes only (a
+per-frame copy allocates, and the retained tail costs less than that
+in a runtime with no collector). Both reasons are in UI2 and UI15.
+
+### Evidence at `b0922c7`
+
+`tools/gate.sh --require-backend` green, 276 passed, 1 ignored,
+285.2 s wall (the coding agent measured 233.2 s and 255.6 s on the
+same tree). `tools/live.sh` green on yawgpu Metal, 120.6 s, and on
+Dawn, 118.0 s. `tools/window.sh --frames 30` at `530bf5a`: `ui-demo`
+and `window-triangle` print `window:frames=30` with no `FAIL`; no
+script changed after that run.
+
+## U4 closed, the branch is ready (2026-09-05)
+
+Exit met: no open CRITICAL or MAJOR. Open for the owner: the visual
+run of `examples/ui-demo` and the decision to merge `imgui` into
+`main`. Recorded for a later phase, not for this branch: number
+editing by shift-click, a proportional font atlas, a `Root`-shaped
+API over the renderer facts.
