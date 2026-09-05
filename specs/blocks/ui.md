@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -52,7 +52,11 @@ tiers with no GPU. The renderer is the only GPU code.
   `end()` orders the root containers by z-index, clears the
   press, key-press, and text-input edge state, and stores the
   pointer position for the next delta. A widget call outside
-  `begin()` and `end()` traps `UIT2`.
+  `begin()` and `end()` traps `UIT2`. Rev 1: the context keeps its
+  command records, root records, and layout records across frames
+  and overwrites them in place, so that a frame allocates only the
+  strings of its text commands. Nothing in the context depends on
+  `Context.collect()`.
 - **UI5 — Input is pushed as plain values, before `begin()`.**
   `inputMouseMove(x: i32, y: i32)`, `inputMouseDown(x, y, button:
   u32)`, `inputMouseUp(x, y, button)`, `inputScroll(dx: i32, dy:
@@ -152,8 +156,9 @@ tiers with no GPU. The renderer is the only GPU code.
   the current clip. Text partly inside emits the same pair around
   the text command. A container body pushes its clip for its
   widgets.
-- **UI13 — The golden form.** `dumpCommands(): string[]` renders one
-  line per command in draw order: `clip x y w h`, `rect x y w h
+- **UI13 — The golden form.** Rev 1. `dumpCommands(): string[]`
+  renders one line per command in draw order (with no root container
+  in the frame, every command in call order): `clip x y w h`, `rect x y w h
   #rrggbbaa`, `text x y #rrggbbaa "text"`, `icon n x y w h
   #rrggbbaa`, and after them one line per root container in draw
   order: `container id x y w h scrollX scrollY zindex`. A `b`
