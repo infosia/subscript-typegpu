@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -97,7 +97,11 @@ tiers with no GPU. The renderer is the only GPU code.
   `layoutSetNext(rect, relative)` places the next item explicitly.
   The layout tracks the content extent for scroll and autosize, and
   an extent with no item is 0 by 0. More than 16 widths trap `UIT3`.
-- **UI8 — Containers.** A window is a root container: it has a
+- **UI8 — Containers.** Rev 1. `currentContainer(): UiRoot` returns
+  the innermost open container's record, whose `rect`, `body`,
+  `scrollX`, `scrollY`, `contentWidth`, and `contentHeight` a program
+  reads and writes, as microui's `mu_get_current_container`. A call
+  with no open container traps `UIT2`. A window is a root container: it has a
   rect, a z-index, and a scroll offset, and a press inside it brings
   it to the front. The title bar (height 24) drags the window, the
   close box closes it, the resize handle at the bottom-right
@@ -219,7 +223,10 @@ tiers with no GPU. The renderer is the only GPU code.
   creates the resources through its device class, takes the queue
   once (`device.queue` for a `GPUDevice`, `device.queue()` for a
   host-owned device, which the renderer then owns and disposes), and
-  hands them to the constructor. `render` writes through that queue. `UiPipelineFacts` holds the WGSL, the two entry
+  hands them to the constructor. The constructor is private: the
+  factories are the only creation path, and the validation-scope
+  lint rejects a direct `new UiRenderer`. `render` writes through
+  that queue. `UiPipelineFacts` holds the WGSL, the two entry
   names, the bind group layout, the vertex buffer layout, and the
   program's `RenderPipelineSpec`. The renderer derives the two
   strides itself from `Context.bytesOf`. A capacity of 0 or above

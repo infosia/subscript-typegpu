@@ -314,3 +314,6 @@ UIT4
 W2 Rev 3
 W3 Rev 2
 W13 Rev 2
+W3 Rev 3
+W13 Rev 3
+EX2 Rev 2

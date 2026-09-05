@@ -4,7 +4,8 @@ P9 contract. Rev 0, 2026-08-23. Rev 1 (W2, W6, W11 from the phase
 review), 2026-08-23. Rev 2 (W8, W13 after the first `--frames` run),
 2026-08-23. Rev 3 (W8 Rev 2 exiting path, W9 Rev 1 sRGB), 2026-08-24. Rev 4
 (W2 Rev 2, W3 Rev 1 pointer input), 2026-08-24. Rev 5 (W2 Rev 3, W3
-Rev 2, W13 Rev 2 optional input entries), 2026-09-05. Plan §8 P9 and
+Rev 2, W13 Rev 2 optional input entries), 2026-09-05. Rev 6 (W3 Rev 3, W13
+Rev 3 from the U3 review), 2026-09-05. Plan §8 P9 and
 §8 U3 govern this block. The
 facade side is `facade.md` L14 and `facade-generator.md` F23. The
 script side is the API layer (`api-layer.md`) and the TypeGPU layer.
@@ -66,7 +67,11 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   carries each Unicode scalar of the character to `textInput`, and
   the space key carries 32. The `key` parameter of `frame` keeps its
   Rev 1 meaning. An event kind whose entry the script does not
-  export is dropped.
+  export is dropped. Rev 3: the text of a key press comes from the
+  produced text of the key event, not from its logical key, so a
+  control chord produces no text. A skipped frame (W5 `Timeout` or
+  `Outdated`) delivers nothing, and the queue survives to the next
+  presented frame.
 - **W4 — One instance.** The host creates the instance through the
   facade's `subscript_typegpu_create_instance` with the L13 backend
   request, creates the surface on it, and requests the adapter and
@@ -148,9 +153,13 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
 
 ## Gates
 
-- **W13 — What the headless gate holds.** Rev 2. The regeneration
+- **W13 — What the headless gate holds.** Rev 3. The regeneration
   gate over the F23 host-only declarations, the W2 signature test
-  over the example (Rev 2: the optional entries by exact signature), a harness test that compiles the example on the
+  over the example (Rev 2: the optional entries by exact signature;
+  Rev 3: a headless example exports `main` and nothing else, and the
+  test carries a demonstrated red for an unexpected export, a
+  missing required entry, a wrong `frame` signature, a zero-arity
+  optional entry, and an `async` optional entry), a harness test that compiles the example on the
   dev tier through the same path the host uses (support module
   generated in memory, every `lib/` file loaded) without a device,
   `cargo build --offline -p subscript-typegpu-window`, and `cargo

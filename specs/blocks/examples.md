@@ -18,7 +18,14 @@ plan's P10 list.
   bottom as a teaching artifact for a reader who knows TypeGPU. The
   header comment states: the example name, one sentence on what it
   shows, and the upstream sentence `Ported from TypeGPU's <name>
-  example (https://github.com/software-mansion/TypeGPU).` Comments
+  example (https://github.com/software-mansion/TypeGPU).` Rev 2: an
+  example that ports another project names that project and its
+  repository URL in the same position, and a port of a pinned
+  submodule names the pinned commit in the URL
+  (`Ported from microui's demo
+  (https://github.com/rxi/microui/blob/<commit>/demo/main.c).`). The
+  header form is the `// example: <name>` line form every example
+  uses, with the citation last. Comments
   through the file explain what the code does, and, where the shape
   differs from TypeGPU, one comment states the difference in one or
   two sentences at the point of divergence. A comment never
