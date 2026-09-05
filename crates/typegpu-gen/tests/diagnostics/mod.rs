@@ -221,9 +221,28 @@ fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
             }
             "typegpu-ui.ts" => {
                 assert_eq!(trap_count, 1, "UI traps must use uiTrap");
-                assert!(source.contains("function uiTrap(rule: string, method: string, values: string): void {\n  print(`${rule} ${method} ${values} (author)`);\n  unreachable();\n}"));
-                for rule in ["UIT1", "UIT2", "UIT3"] {
-                    assert!(library_spec.contains(&format!("`{rule}`")));
+                assert!(source.contains("function uiTrap(rule: string, method: string, values: string): void {\n  print(`${rule} ${method} ${values} (author)`);\n  unreachable();\n}"), "UI trap helper must lead with its documented rule id");
+                for rule in ["UIT1", "UIT2", "UIT3", "UIT4"] {
+                    assert!(
+                        library_spec.contains(&format!("`{rule}`")),
+                        "{rule} trap lacks a library rule-table entry"
+                    );
+                    // UIT1 has no fixture because the renderer does not exist yet.
+                    if rule != "UIT1" {
+                        assert_site(&path, 1, rule, &allowed, &fixtures);
+                    }
+                }
+                for (line_index, line) in source.lines().enumerate() {
+                    if line.contains("uiTrap(") && !line.contains("function uiTrap(") {
+                        let rule = quoted_argument(line).unwrap_or_else(|| {
+                            panic!(
+                                "{}:{} trap rule is not a string literal",
+                                path.display(),
+                                line_index + 1
+                            )
+                        });
+                        assert_site(&path, line_index + 1, rule, &allowed, &fixtures);
+                    }
                 }
             }
             "typegpu-sort.ts" => {

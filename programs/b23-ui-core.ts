@@ -1,8 +1,15 @@
 // program: b23-ui-core
 // purpose: Exercise host UI commands and input across consecutive frames.
-// exercises: UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10 UI11 UI12 UI13 UI19
+// exercises: UI2, UI3, UI4, UI5, UI6, UI7, UI8, UI9, UI10, UI11, UI12, UI13, UI19
 // questions: none
-import { uiNumberText } from "./typegpu-ui";
+
+import { uiNumberText, UiContext, UiRect, UiRoot, UiCommand, UiState, UiStyle,
+  UI_OPT_ALIGN_CENTER, UI_OPT_ALIGN_RIGHT, UI_OPT_HOLD_FOCUS, UI_OPT_NO_INTERACT, UI_MOUSE_LEFT, UI_MOUSE_RIGHT,
+  UI_KEY_SHIFT, UI_KEY_RETURN, UI_ICON_CHECK, UI_COLOR_TEXT } from "./typegpu-ui";
+import { uiAtlasAlpha, UI_ATLAS_ALPHA_HEX, UI_ATLAS_WIDTH, UI_ATLAS_HEIGHT,
+  UI_ATLAS_RECT_X, UI_ATLAS_RECT_Y, UI_ATLAS_RECT_W, UI_ATLAS_RECT_H,
+  UI_ATLAS_FONT, UI_ATLAS_WHITE, UI_TEXT_HEIGHT } from "./typegpu-ui-atlas.generated";
+
 
 export function main(): void {
   verifyCore();
@@ -14,20 +21,23 @@ export function main(): void {
   const text: UiState<string> = new UiState<string>("");
   const widths: i32[] = [-1];
   const window: UiRect = new UiRect(10, 10, 300, 400);
-  for (let frame: i32 = 1; frame <= 13; frame += 1) {
+  for (let frame: i32 = 1; frame <= 16; frame += 1) {
     if (frame === 1) ui.inputMouseMove(0, 0);
     if (frame === 2) ui.inputMouseMove(30, 49);
     if (frame === 3) ui.inputMouseDown(30, 49, UI_MOUSE_LEFT);
     if (frame === 4) ui.inputMouseUp(30, 49, UI_MOUSE_LEFT);
-    if (frame === 5) ui.inputMouseDown(44, 97, UI_MOUSE_LEFT);
-    if (frame === 6) ui.inputMouseMove(54, 97);
-    if (frame === 7) ui.inputMouseMove(64, 97);
-    if (frame === 8) ui.inputMouseUp(64, 97, UI_MOUSE_LEFT);
-    if (frame === 9) ui.inputMouseDown(35, 174, UI_MOUSE_LEFT);
-    if (frame === 10) ui.inputMouseUp(35, 174, UI_MOUSE_LEFT);
-    if (frame === 11) ui.inputText(65);
-    if (frame === 12) ui.inputMouseDown(35, 145, UI_MOUSE_LEFT);
-    if (frame === 13) ui.inputMouseUp(35, 145, UI_MOUSE_LEFT);
+    if (frame === 5) ui.inputMouseMove(44, 97);
+    if (frame === 6) ui.inputMouseDown(44, 97, UI_MOUSE_LEFT);
+    if (frame === 7) ui.inputMouseMove(54, 97);
+    if (frame === 8) ui.inputMouseMove(64, 97);
+    if (frame === 9) ui.inputMouseUp(64, 97, UI_MOUSE_LEFT);
+    if (frame === 10) ui.inputMouseMove(35, 174);
+    if (frame === 11) ui.inputMouseDown(35, 174, UI_MOUSE_LEFT);
+    if (frame === 12) ui.inputMouseUp(35, 174, UI_MOUSE_LEFT);
+    if (frame === 13) ui.inputText(65);
+    if (frame === 14) ui.inputMouseMove(35, 145);
+    if (frame === 15) ui.inputMouseDown(35, 145, UI_MOUSE_LEFT);
+    if (frame === 16) ui.inputMouseUp(35, 145, UI_MOUSE_LEFT);
     ui.begin();
     let button: u32 = 0;
     let checkbox: u32 = 0;
@@ -55,15 +65,10 @@ export function main(): void {
     for (let i: i32 = 0; i < lines.length; i += 1) print(lines[i]);
     print(`state button=${button} checkbox=${checked.value} slider=${uiNumberText(slider.value)} text="${text.value}" tree=${tree} checkboxResponse=${checkbox} sliderResponse=${slide} textboxResponse=${textbox}`);
   }
+  verifyScrollbars();
   print("PASS");
 }
 
-import { UiContext, UiRect, UiRoot, UiCommand, UiState, UiStyle,
-  UI_OPT_HOLD_FOCUS, UI_OPT_NO_INTERACT, UI_MOUSE_LEFT, UI_MOUSE_RIGHT,
-  UI_KEY_SHIFT, UI_KEY_RETURN, UI_ICON_CHECK, UI_COLOR_TEXT } from "./typegpu-ui";
-import { uiAtlasAlpha, UI_ATLAS_ALPHA_HEX, UI_ATLAS_WIDTH, UI_ATLAS_HEIGHT,
-  UI_ATLAS_RECT_X, UI_ATLAS_RECT_Y, UI_ATLAS_RECT_W, UI_ATLAS_RECT_H,
-  UI_ATLAS_FONT, UI_ATLAS_WHITE, UI_TEXT_HEIGHT } from "./typegpu-ui-atlas.generated";
 
 function check(value: boolean, name: string): void {
   if (!value) { print(`FAIL ${name}`); unreachable(); }
@@ -194,9 +199,23 @@ function verifyCore(): void {
   context.inputMouseDown(20, 20, UI_MOUSE_LEFT);
   context.begin(); context.beginRoot(front);
   context.updateControl(300, new UiRect(10, 10, 30, 30), UI_OPT_HOLD_FOCUS);
-  check(context.focus === 300, "direct press");
+  check(context.focus === 0, "press without hover");
   context.endRoot(); context.end();
   context.inputMouseUp(20, 20, UI_MOUSE_LEFT);
+  context.begin(); context.beginRoot(front);
+  context.updateControl(300, new UiRect(10, 10, 30, 30), UI_OPT_HOLD_FOCUS);
+  context.endRoot(); context.end();
+  context.inputMouseDown(20, 20, UI_MOUSE_LEFT);
+  context.begin(); context.beginRoot(front);
+  context.updateControl(300, new UiRect(10, 10, 30, 30), UI_OPT_HOLD_FOCUS);
+  check(context.focus === 300, "press after hover");
+  context.endRoot(); context.end();
+  context.inputMouseUp(20, 20, UI_MOUSE_LEFT);
+  context.inputMouseMove(60, 60);
+  context.begin(); context.beginRoot(front);
+  context.updateControl(300, new UiRect(10, 10, 30, 30), UI_OPT_HOLD_FOCUS);
+  check(context.focus === 300 && context.hover === 0, "hold focus after pointer leaves");
+  context.endRoot(); context.end();
   context.inputMouseDown(60, 60, UI_MOUSE_LEFT);
   context.begin(); context.beginRoot(front);
   context.updateControl(300, new UiRect(10, 10, 30, 30), UI_OPT_HOLD_FOCUS);
@@ -217,15 +236,21 @@ function verifyWidgets(): void {
   const root: UiRoot = new UiRoot(1, new UiRect(0, 0, 200, 200), 1);
   ui.inputMouseMove(10, 10);
   ui.begin(); ui.beginRoot(root); ui.endRoot(); ui.end();
-  ui.inputMouseDown(10, 10, UI_MOUSE_LEFT);
-  ui.begin(); ui.beginRoot(root); ui.pushLayout(root.rect);
-  ui.layoutSetNext(new UiRect(0, 0, 100, 20), false);
-  check(ui.checkbox("check", checked) === 4 && checked.value, "checkbox press");
-  ui.layoutSetNext(new UiRect(0, 0, 100, 20), false);
-  check(ui.buttonIcon(UI_ICON_CHECK) === 2, "icon press");
-  ui.layoutSetNext(new UiRect(0, 0, 100, 20), false);
-  check(ui.number("number", value, 0.5) === 0, "number initial delta");
-  ui.popLayout(); ui.endRoot(); ui.end();
+  for (let frame: i32 = 0; frame < 6; frame += 1) {
+    if (frame % 2 === 0) ui.inputMouseUp(10, 10, UI_MOUSE_LEFT);
+    else ui.inputMouseDown(10, 10, UI_MOUSE_LEFT);
+    ui.begin(); ui.beginRoot(root); ui.pushLayout(root.rect);
+    ui.layoutSetNext(new UiRect(0, 0, 100, 20), false);
+    if (frame < 2) {
+      const response: u32 = ui.checkbox("check", checked);
+      check(response === ((frame === 1 ? 4 : 0) as u32) && checked.value === (frame === 1), "checkbox press");
+    } else if (frame < 4) {
+      check(ui.buttonIcon(UI_ICON_CHECK) === ((frame === 3 ? 2 : 0) as u32), "icon press");
+    } else {
+      check(ui.number("number", value, 0.5) === 0 && value.value === 1, "number initial delta");
+    }
+    ui.popLayout(); ui.endRoot(); ui.end();
+  }
   ui.inputMouseMove(20, 10);
   ui.begin(); ui.beginRoot(root); ui.pushLayout(root.rect);
   ui.layoutSetNext(new UiRect(0, 0, 100, 20), false);
@@ -259,6 +284,19 @@ function verifyWidgets(): void {
     if (lines[i].includes("\"one two\"") || lines[i].includes("\"three\"") || lines[i].includes("\"four\"")) wrapped += 1;
   }
   check(center && right && wrapped === 3, "aligned and wrapped text");
+  ui.begin(); ui.beginRoot(root); ui.pushLayout(root.rect);
+  for (let alignment: i32 = 0; alignment < 3; alignment += 1) {
+    const opt: u32 = alignment === 0 ? 0 : alignment === 1 ? UI_OPT_ALIGN_CENTER : UI_OPT_ALIGN_RIGHT;
+    ui.layoutSetNext(new UiRect(0, 0, 100, 20), false);
+    ui.number("aligned number", value, 0.5, opt);
+    const numberText: UiCommand = ui.commands[ui.commandCount - 1];
+    check(numberText.kind === 3 && numberText.x === (alignment === 2 ? 74 : 39), "number alignment");
+    ui.layoutSetNext(new UiRect(0, 0, 100, 20), false);
+    ui.slider("aligned slider", value, 0, 100, 0, opt);
+    const sliderText: UiCommand = ui.commands[ui.commandCount - 1];
+    check(sliderText.kind === 3 && sliderText.x === (alignment === 2 ? 74 : 39), "slider alignment");
+  }
+  ui.popLayout(); ui.endRoot(); ui.end();
   const commands: UiCommand[] = ui.commands;
   const roots: UiRoot[] = ui.roots;
   const first: UiCommand = commands[0];
@@ -281,12 +319,15 @@ function verifyContainers(): void {
   ui.begin();
   check(ui.beginWindow("Window", bounds) === 1, "window active");
   ui.label("content"); ui.endWindow(); ui.end();
+  ui.begin(); ui.beginWindow("Window", bounds); ui.label("content"); ui.endWindow(); ui.end();
   ui.inputMouseDown(30, 20, UI_MOUSE_LEFT);
   ui.begin(); ui.beginWindow("Window", bounds); ui.label("content"); ui.endWindow(); ui.end();
   ui.inputMouseMove(40, 30);
   ui.begin(); ui.beginWindow("Window", bounds); ui.label("content"); ui.endWindow(); ui.end();
   check(ui.roots[0].rect.x === 20 && ui.roots[0].rect.y === 20, "title drag");
   ui.inputMouseUp(40, 30, UI_MOUSE_LEFT);
+  ui.begin(); ui.beginWindow("Window", bounds); ui.label("content"); ui.endWindow(); ui.end();
+  ui.inputMouseMove(205, 155);
   ui.begin(); ui.beginWindow("Window", bounds); ui.label("content"); ui.endWindow(); ui.end();
   ui.inputMouseDown(205, 155, UI_MOUSE_LEFT);
   ui.begin(); ui.beginWindow("Window", bounds); ui.label("content"); ui.endWindow(); ui.end();
@@ -298,6 +339,8 @@ function verifyContainers(): void {
   ui.inputMouseUp(215, 165, UI_MOUSE_LEFT);
   ui.begin(); ui.beginWindow("Window", bounds); ui.label("content"); ui.endWindow(); ui.end();
   const closeX: i32 = ui.roots[0].rect.x + ui.roots[0].rect.w - 12;
+  ui.inputMouseMove(closeX, 30);
+  ui.begin(); ui.beginWindow("Window", bounds); ui.label("content"); ui.endWindow(); ui.end();
   ui.inputMouseDown(closeX, 30, UI_MOUSE_LEFT);
   ui.begin(); ui.beginWindow("Window", bounds); ui.label("content"); ui.endWindow(); ui.end();
   ui.inputMouseUp(closeX, 30, UI_MOUSE_LEFT);
@@ -344,4 +387,28 @@ function verifyContainers(): void {
   pool.beginWindow("pool49", bounds);
   check(pool.header("tree", 4096) === 1, "tree default");
   pool.endWindow(); pool.end();
+}
+
+function verifyScrollbars(): void {
+  const ui: UiContext = new UiContext();
+  const bounds: UiRect = new UiRect(10, 10, 200, 150);
+  ui.inputMouseMove(30, 50);
+  for (let frame: i32 = 0; frame < 7; frame += 1) {
+    if (frame === 2) ui.inputScroll(10, 20);
+    if (frame === 3) ui.inputMouseMove(204, 50);
+    if (frame === 4) ui.inputMouseDown(204, 50, UI_MOUSE_LEFT);
+    if (frame === 5) ui.inputMouseMove(204, 60);
+    if (frame === 6) ui.inputMouseUp(204, 60, UI_MOUSE_LEFT);
+    ui.begin(); ui.beginWindow("Scrollbars", bounds);
+    ui.layoutRow([250], 300); ui.label("large");
+    ui.endWindow(); ui.end();
+    if (frame >= 1) {
+      print(`scrollbar frame ${frame}`);
+      const lines: string[] = ui.dumpCommands();
+      for (let i: i32 = 0; i < lines.length; i += 1) print(lines[i]);
+    }
+    if (frame >= 2) check(ui.roots[0].scrollX === 10, "horizontal wheel");
+    if (frame >= 2 && frame <= 4) check(ui.roots[0].scrollY === 20, "wheel and thumb press");
+    if (frame >= 5) check(ui.roots[0].scrollY === 47, "vertical thumb drag");
+  }
 }

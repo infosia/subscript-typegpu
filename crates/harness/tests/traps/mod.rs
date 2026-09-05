@@ -178,6 +178,14 @@ fn runtime_traps_are_named_and_numbered() {
 fn ui_runtime_traps_are_named_and_numbered() {
     let directory = repository_root().join("crates/harness/tests/fixtures/trap");
     for (name, expected) in [
+        (
+            "ui-container-pool.ts",
+            "UIT4 container slots=48 available=0 (author)",
+        ),
+        (
+            "ui-tree-pool.ts",
+            "UIT4 treeHeader slots=48 available=0 (author)",
+        ),
         ("ui-end-window.ts", "UIT2 endWindow depth=0 (author)"),
         (
             "ui-row-widths.ts",
@@ -185,6 +193,5 @@ fn ui_runtime_traps_are_named_and_numbered() {
         ),
     ] {
         assert_trap(&directory.join(name), expected);
-        println!("{expected}");
     }
 }

@@ -224,6 +224,7 @@ export class UiContext {
   private layouts: UiLayout[] = [];
   private order: i32[] = [];
   private commandRoots: i32[] = [];
+  private groupCommands: boolean = false;
   private rootStack: i32[] = [];
   private rootDepth: i32 = 0;
 
@@ -242,6 +243,7 @@ export class UiContext {
     this.active = true;
     this.frame += 1;
     this.commandCount = 0;
+    this.groupCommands = false;
     this.rootCount = 0;
     this.orderCount = 0;
     this.scrollTarget = -1;
@@ -255,7 +257,7 @@ export class UiContext {
   end(): void {
     this.requireFrame("end");
     if (this.idCount !== 0 || this.layoutCount !== 0 || this.clipCount !== 1 || this.currentRoot !== 0 || this.containerDepth !== 0 || this.treeCount !== 0) {
-      uiTrap("UIT2", "end", `ids=${this.idCount} layouts=${this.layoutCount} clips=${this.clipCount} root=${this.currentRoot}`);
+      uiTrap("UIT2", "end", `ids=${this.idCount} layouts=${this.layoutCount} clips=${this.clipCount} root=${this.currentRoot} containers=${this.containerDepth} trees=${this.treeCount}`);
     }
     if (!this.updatedFocus) this.focus = 0;
     this.updatedFocus = false;
@@ -271,14 +273,16 @@ export class UiContext {
       }
     }
     // Group nested root commands into contiguous ranges without new records.
-    for (let i: i32 = 1; i < this.commandCount; i += 1) {
-      let j: i32 = i;
-      while (j > 0 && this.commandRoots[j - 1] > this.commandRoots[j]) {
-        const command: UiCommand = this.commands[j - 1];
-        this.commands[j - 1] = this.commands[j]; this.commands[j] = command;
-        const owner: i32 = this.commandRoots[j - 1];
-        this.commandRoots[j - 1] = this.commandRoots[j]; this.commandRoots[j] = owner;
-        j -= 1;
+    if (this.groupCommands) {
+      for (let i: i32 = 1; i < this.commandCount; i += 1) {
+        let j: i32 = i;
+        while (j > 0 && this.commandRoots[j - 1] > this.commandRoots[j]) {
+          const command: UiCommand = this.commands[j - 1];
+          this.commands[j - 1] = this.commands[j]; this.commands[j] = command;
+          const owner: i32 = this.commandRoots[j - 1];
+          this.commandRoots[j - 1] = this.commandRoots[j]; this.commandRoots[j] = owner;
+          j -= 1;
+        }
       }
     }
     let cursor: i32 = 0;
@@ -356,11 +360,11 @@ export class UiContext {
     if ((opt & UI_OPT_NO_INTERACT) !== 0) return;
     const over: boolean = this.mouseOver(rect);
     if (over && this.mouseDown === 0) this.hover = id;
-    if (over && this.mousePressed !== 0) this.setFocus(id);
     if (this.focus === id) {
       if ((this.mouseDown === 0 && (opt & UI_OPT_HOLD_FOCUS) === 0) || (this.mousePressed !== 0 && !over)) this.setFocus(0);
     }
-    if (!over && this.hover === id) this.hover = 0;
+    if (this.hover === id && this.mousePressed !== 0) this.setFocus(id);
+    if (this.hover === id && this.mousePressed === 0 && !over) this.hover = 0;
   }
   getClip(): UiRect { this.requireFrame("getClip"); return uiCopy(this.clips[this.clipCount - 1]); }
   pushClip(rect: UiRect): void { this.requireFrame("pushClip"); this.pushClipValue(uiIntersection(this.getClip(), rect)); }
@@ -381,6 +385,7 @@ export class UiContext {
     command.x = rect.x; command.y = rect.y; command.w = rect.w; command.h = rect.h;
     command.color = color; command.id = id; command.text = text;
     const owner: i32 = this.rootDepth === 0 ? -1 : this.rootStack[this.rootDepth - 1];
+    if (this.commandCount > 0 && owner < this.commandRoots[this.commandCount - 1]) this.groupCommands = true;
     if (this.commandCount === this.commandRoots.length) this.commandRoots.push(owner);
     else this.commandRoots[this.commandCount] = owner;
     this.commandCount += 1;
@@ -498,14 +503,13 @@ export class UiContext {
     parent.maxY = uiMax(parent.maxY, child.maxY);
   }
 
-  // Container code records each root through these range boundaries.
+  // Each root retains its command owner index.
   beginRoot(root: UiRoot): void {
     this.requireFrame("beginRoot");
     if (this.rootDepth === this.rootStack.length) this.rootStack.push(this.rootCount);
     else this.rootStack[this.rootDepth] = this.rootCount;
     this.rootDepth += 1;
     this.currentRoot = root.id;
-    root.start = this.commandCount;
     if (this.rootCount === this.roots.length) this.roots.push(root);
     else this.roots[this.rootCount] = root;
     this.rootCount += 1;
@@ -517,7 +521,6 @@ export class UiContext {
   endRoot(): void {
     this.requireFrame("endRoot");
     if (this.currentRoot === 0) uiTrap("UIT2", "endRoot", "root=0");
-    this.roots[this.rootStack[this.rootDepth - 1]].end = this.commandCount;
     this.rootDepth -= 1;
     this.currentRoot = this.rootDepth === 0 ? 0 : this.roots[this.rootStack[this.rootDepth - 1]].id;
   }
@@ -618,7 +621,8 @@ export class UiContext {
     this.drawControlFrame(id, rect, UI_COLOR_BASE, opt);
     const x: i32 = high === low ? 0 : ((state.value - low) * ((rect.w - this.style.thumbSize) as f32) / (high - low)) as i32;
     this.drawControlFrame(id, new UiRect(rect.x + x, rect.y, this.style.thumbSize, rect.h), UI_COLOR_BUTTON, opt);
-    this.drawControlText(uiNumberText(state.value), rect, UI_COLOR_TEXT, opt);
+    this.drawControlText(uiNumberText(state.value), rect, UI_COLOR_TEXT,
+      (opt & (UI_OPT_ALIGN_CENTER | UI_OPT_ALIGN_RIGHT)) === 0 ? opt | UI_OPT_ALIGN_CENTER : opt);
     return old !== state.value ? UI_RES_CHANGE : 0;
   }
   number(label: string, state: UiState<f32>, step: f32, opt: u32 = 0): u32 {
@@ -628,7 +632,8 @@ export class UiContext {
     const old: f32 = state.value;
     if (this.focus === id && this.mouseDown === UI_MOUSE_LEFT) state.value += (this.mouseDeltaX as f32) * step;
     this.drawControlFrame(id, rect, UI_COLOR_BASE, opt);
-    this.drawControlText(uiNumberText(state.value), rect, UI_COLOR_TEXT, opt);
+    this.drawControlText(uiNumberText(state.value), rect, UI_COLOR_TEXT,
+      (opt & (UI_OPT_ALIGN_CENTER | UI_OPT_ALIGN_RIGHT)) === 0 ? opt | UI_OPT_ALIGN_CENTER : opt);
     return old !== state.value ? UI_RES_CHANGE : 0;
   }
   textbox(label: string, state: UiState<string>, opt: u32 = 0): u32 {
@@ -684,10 +689,11 @@ export class UiContext {
   private treeHeader(label: string, opt: u32, tree: boolean): u32 {
     const id: u32 = this.getId(label);
     let slot: i32 = -1;
-    let oldest: i32 = 0;
+    let oldest: i32 = -1;
+    let age: i32 = this.frame;
     for (let i: i32 = 0; i < 48; i += 1) {
       if (this.treeIds[i] === id) slot = i;
-      if (this.treeFrames[i] < this.treeFrames[oldest]) oldest = i;
+      if (this.treeFrames[i] < age) { age = this.treeFrames[i]; oldest = i; }
     }
     let active: boolean = slot >= 0;
     const expanded: boolean = (opt & UI_OPT_EXPANDED) !== 0 ? !active : active;
@@ -696,7 +702,10 @@ export class UiContext {
     this.updateControl(id, rect);
     if (this.focus === id && this.mousePressed === UI_MOUSE_LEFT) active = !active;
     if (active) {
-      if (slot < 0) slot = oldest;
+      if (slot < 0) {
+        if (oldest < 0) uiTrap("UIT4", "treeHeader", "slots=48 available=0");
+        slot = oldest;
+      }
       this.treeIds[slot] = id; this.treeFrames[slot] = this.frame;
     } else if (slot >= 0) { this.treeIds[slot] = 0; this.treeFrames[slot] = 0; }
     if (!tree) this.drawControlFrame(id, rect, UI_COLOR_BUTTON);
@@ -739,7 +748,7 @@ export class UiContext {
     }
     if ((opt & UI_OPT_CLOSED) !== 0) return -1;
     // The pool retains every container that the current frame uses.
-    if (oldest < 0) uiTrap("UIT2", "container", "slots=48 available=0");
+    if (oldest < 0) uiTrap("UIT4", "container", "slots=48 available=0");
     const record: UiRoot = this.containers[oldest];
     record.id = id; record.rect = new UiRect(0, 0, 0, 0); record.body = record.rect;
     record.scrollX = 0; record.scrollY = 0; record.contentWidth = 0; record.contentHeight = 0;
