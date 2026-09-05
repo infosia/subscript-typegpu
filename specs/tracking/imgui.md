@@ -185,3 +185,43 @@ Open for U4, from the example: the core exposes no
 `currentContainer()` (the example reaches into `roots`), and no
 scroll setter for a panel (microui's demo scrolls the log to its
 end). The phase review follows.
+
+### U3 phase review (2026-09-05)
+
+A fresh Opus reviewer over `bb65ae2..9edcd77`, with execution of the
+window and scopes tests and the host build. CRITICAL 0, MAJOR 2,
+MINOR 15.
+
+MAJOR, fixed in the fix round: the public `UiRenderer` constructor
+was a third creation path with no validation (now private, and the
+validation-scope lint rejects a direct `new UiRenderer` with a
+fixture red); EX2 had no form for a port of another project (EX2
+Rev 2, the header cites microui at the pinned commit).
+
+MINOR fixed: `currentContainer()` (UI8 Rev 1) replaces the reach
+into `roots` and scrolls the log to its end as microui does, the
+log is capped at 8,000 bytes, fractional wheel deltas keep their
+remainder, the host takes text from the key event's produced text
+(W3 Rev 3), `deliver_input` iterates the taken queue, the rejection
+test runs under a silent panic hook and gains two reds (W13 Rev 3),
+the duplicate `checked_example` is gone, the export filter asserts
+one file name, `createBufferHost` joins `lib/typegpu.ts` and the two
+factories share a resource helper. MINOR recorded: the per-frame
+`using queue` allocation is the pattern every windowed example uses.
+MINOR unverified and closed by construction: the nested `@CStruct`
+field write in the example is gone (whole-struct assignment).
+
+Fix round evidence on this host: `tools/gate.sh --require-backend`
+green, 276 passed, 1 ignored, 240.4 s wall. `tools/window.sh
+--frames 30` on yawgpu Metal: `ui-demo` and `window-triangle` print
+`window:frames=30` with no `FAIL`.
+
+## U3 closed (2026-09-05)
+
+Exit met: the 30-frame smoke is green, every existing example is
+untouched, the review has no open CRITICAL or MAJOR. The visual
+result of `ui-demo` waits for the owner's run. U4 opens with a
+narrowed scope: the contract items the plan listed for U4 (textbox
+editing, wheel scroll, popups) landed in U1 to U3. U4 holds the
+example's EX2 comments, the README and `docs/from-typegpu.md`
+entries, and the whole-branch review.

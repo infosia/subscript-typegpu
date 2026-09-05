@@ -900,7 +900,9 @@ rejected routes. `specs/blocks/ui.md` is the contract.
   change, `examples/ui-demo/main.ts`. Exit: a 30-frame smoke run
   green, every existing example untouched.
 - **U4** — textbox editing, wheel scroll, popups, the phase review.
-  Exit: no open CRITICAL or MAJOR.
+  Exit: no open CRITICAL or MAJOR. (2026-09-05: the three features
+  landed in U1 to U3. U4 holds the example's comments, the document
+  entries, and the whole-branch review.)
 
 The record is `specs/tracking/imgui.md`.
 
