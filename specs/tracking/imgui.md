@@ -78,3 +78,45 @@ tree node.
 
 Exit met: the `b23` golden is byte-identical on both tiers, the gate
 is within budget, the review has no open CRITICAL or MAJOR. U2 opens.
+
+## U2 (2026-09-05)
+
+### Round 1 and the design correction
+
+The first delivery made `lib/typegpu-ui.ts` import a generated
+support module of its own (`typegpu-ui.typegpu`), which the harness
+generated on every program load through a ui-specific generator path
+(`generate_ui_support`, a poison entry, a render-definition filter,
+a `resource_helpers` flag). The gate rose from 180 s to 255 s on this
+host, and LB2 places pipeline declarations in the program. The
+correction: the program declares `uiPipeline` with `renderPipelineL`
+and passes its generated facts to `UiRenderer` through
+`UiPipelineFacts` (UI14 Rev 1, UI15 Rev 1). The generator and the
+harness carry no ui-specific path. The same delivery kept a
+per-command clip snapshot array to protect the renderer from a stale
+scissor after a container exit. The correction follows microui's
+`mu_set_clip(unclipped_rect)`: a partly clipped command ends with a
+clip command for the unbounded rect (UI12 Rev 1), and the renderer
+splits draw ranges at clip commands only. The two `b23` clip lines and
+the `b24` ranges moved with it.
+
+### Landed at `f40d04a`
+
+`UiVertex`, `UiViewport`, `UiRenderLayout`, `UiVarying`, `uiVertex`,
+`uiFragment`, `UI_BLEND`, `UiPipelineFacts`, `UiRenderer` (indices
+written once, capacity 1 to 16,384), `programs/b24-ui-render.ts`
+(31 quads, 186 indices, two ranges, a vertex checksum, twelve printed
+checks over clip exits, nested roots, root order, orphan commands,
+panel exits, a second window, and the empty frame), its `.wgsl`
+golden, `programs/x24-live-ui.ts` (1,664 pixels in three patches,
+exact packed colors), the `UIT1` reds (a frame over capacity, a
+capacity of 0, a capacity of 16,385), and a generator test that
+reaches both kernels from a program import and validates the WGSL.
+
+Evidence on this host: `tools/gate.sh` green, 269 passed, 1 ignored,
+218.6 s wall. `tools/live.sh` green on yawgpu Metal, 210.9 s, and on
+Dawn, 206.2 s, with `x24` in the set. Every golden other than `b23`,
+`b24`, and `x24` is byte-identical.
+
+Deviation kept: UI15 said the index bytes are written per frame. They
+are written once at creation. UI15 Rev 1 states it.
