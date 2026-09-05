@@ -7,7 +7,7 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use subscript_typegpu_harness::{native as facade, EntryArg, ProgramLoadError, ReloadSession};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
-use winit::event::{ElementState, MouseButton, WindowEvent};
+use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
@@ -203,7 +203,16 @@ impl FutureKind {
     }
 }
 
+enum InputEvent {
+    Wheel(f32, f32),
+    KeyDown(u32),
+    KeyUp(u32),
+    Text(u32),
+}
+
 struct Host {
+    input_exports: Vec<String>,
+    input_events: Vec<InputEvent>,
     session: ReloadSession,
     instance: facade::SubscriptTypegpuInstance,
     surface: surface::WGPUSurface,
@@ -227,10 +236,13 @@ struct Host {
 impl Host {
     fn new(
         session: ReloadSession,
+        input_exports: Vec<String>,
         instance: facade::SubscriptTypegpuInstance,
         frame_limit: Option<u64>,
     ) -> Self {
         Self {
+            input_exports,
+            input_events: Vec::new(),
             session,
             instance,
             surface: std::ptr::null_mut(),
@@ -404,6 +416,25 @@ impl Host {
         output
     }
 
+    fn deliver_input(&mut self) -> Result<(), String> {
+        let mut events = std::mem::take(&mut self.input_events);
+        let result = events.drain(..).try_for_each(|event| {
+            let (name, args) = match event {
+                InputEvent::Wheel(x, y) => ("wheel", vec![EntryArg::F32(x), EntryArg::F32(y)]),
+                InputEvent::KeyDown(key) => ("keyDown", vec![EntryArg::U32(key)]),
+                InputEvent::KeyUp(key) => ("keyUp", vec![EntryArg::U32(key)]),
+                InputEvent::Text(point) => ("textInput", vec![EntryArg::U32(point)]),
+            };
+            if self.input_exports.iter().any(|entry| entry == name) {
+                self.call_entry(name, &args)?;
+            }
+            Ok(())
+        });
+        events.clear();
+        self.input_events = events;
+        result
+    }
+
     fn frame(&mut self) -> Result<(), String> {
         let table = surface::table()?;
         // SAFETY: zero is the webgpu.h initializer for the out structure.
@@ -439,18 +470,20 @@ impl Host {
             facade::subscript_typegpu_texture_release(acquired.texture);
             return Err("surface texture view creation returned null".to_owned());
         }
-        let called = self.call_entry(
-            "frame",
-            &[
-                EntryArg::Handle(view.cast::<c_void>()),
-                EntryArg::U32(self.width),
-                EntryArg::U32(self.height),
-                EntryArg::U32(self.key),
-                EntryArg::F32(self.pointer_x),
-                EntryArg::F32(self.pointer_y),
-                EntryArg::U32(self.buttons),
-            ],
-        );
+        let called = self.deliver_input().and_then(|()| {
+            self.call_entry(
+                "frame",
+                &[
+                    EntryArg::Handle(view.cast::<c_void>()),
+                    EntryArg::U32(self.width),
+                    EntryArg::U32(self.height),
+                    EntryArg::U32(self.key),
+                    EntryArg::F32(self.pointer_x),
+                    EntryArg::F32(self.pointer_y),
+                    EntryArg::U32(self.buttons),
+                ],
+            )
+        });
         if let Err(error) = called {
             facade::subscript_typegpu_texture_view_release(view);
             facade::subscript_typegpu_texture_release(acquired.texture);
@@ -553,12 +586,50 @@ impl ApplicationHandler for Host {
                     self.fail(event_loop, error);
                 }
             }
-            WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
-                self.key = match event.logical_key {
-                    Key::Character(value) => value.chars().next().map_or(0, u32::from),
-                    Key::Named(NamedKey::Space) => u32::from(' '),
-                    _ => 0,
+            WindowEvent::KeyboardInput { event, .. } => {
+                let pressed = event.state == ElementState::Pressed;
+                if pressed {
+                    self.key = match &event.logical_key {
+                        Key::Character(value) => value.chars().next().map_or(0, u32::from),
+                        Key::Named(NamedKey::Space) => u32::from(' '),
+                        _ => 0,
+                    };
+                }
+                let bit = match &event.logical_key {
+                    Key::Named(NamedKey::Shift) => Some(1),
+                    Key::Named(NamedKey::Control) => Some(2),
+                    Key::Named(NamedKey::Alt) => Some(4),
+                    Key::Named(NamedKey::Backspace) => Some(8),
+                    Key::Named(NamedKey::Enter) => Some(16),
+                    _ => None,
                 };
+                if let Some(bit) = bit {
+                    self.input_events.push(if pressed {
+                        InputEvent::KeyDown(bit)
+                    } else {
+                        InputEvent::KeyUp(bit)
+                    });
+                }
+                if pressed {
+                    match &event.logical_key {
+                        Key::Character(value) => self.input_events.extend(
+                            value
+                                .chars()
+                                .map(|point| InputEvent::Text(u32::from(point))),
+                        ),
+                        Key::Named(NamedKey::Space) => self.input_events.push(InputEvent::Text(32)),
+                        _ => {}
+                    }
+                }
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                let (x, y) = match delta {
+                    MouseScrollDelta::LineDelta(x, y) => (x * 30.0, y * 30.0),
+                    MouseScrollDelta::PixelDelta(position) => {
+                        (position.x as f32, position.y as f32)
+                    }
+                };
+                self.input_events.push(InputEvent::Wheel(x, y));
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.pointer_x = position.x as f32;
@@ -635,14 +706,14 @@ fn event_loop() -> Result<EventLoop<()>, winit::error::EventLoopError> {
 
 fn run() -> Result<(), WindowError> {
     let (program, frame_limit) = arguments()?;
-    let session =
-        subscript_typegpu_harness::load_program(&program).map_err(WindowError::Compile)?;
+    let (session, exports) = subscript_typegpu_harness::load_program_with_exports(&program)
+        .map_err(WindowError::Compile)?;
     let instance = facade::subscript_typegpu_create_instance();
     if instance.is_null() {
         return Err("instance creation returned null".to_owned().into());
     }
     let event_loop = event_loop().map_err(|error| format!("event loop: {error}"))?;
-    let mut host = Host::new(session, instance, frame_limit);
+    let mut host = Host::new(session, exports, instance, frame_limit);
     event_loop
         .run_app(&mut host)
         .map_err(|error| format!("event loop: {error}"))?;

@@ -411,12 +411,25 @@ fn load_program_with_library(
     program: &Path,
     library: NativeLibrary,
 ) -> Result<ReloadSession, ProgramLoadError> {
+    load_program_with_exports_and_library(program, library).map(|(session, _)| session)
+}
+
+fn load_program_with_exports_and_library(
+    program: &Path,
+    library: NativeLibrary,
+) -> Result<(ReloadSession, Vec<String>), ProgramLoadError> {
     let files = prepare_program(program)?;
-    if let Err(diagnostics) = subscript_compiler::check_program(&files) {
-        return Err(ProgramLoadError::rejected(&files, diagnostics));
-    }
+    let module = subscript_compiler::check_program(&files)
+        .map_err(|diagnostics| ProgramLoadError::rejected(&files, diagnostics))?;
+    let entry_file = program.file_name().unwrap_or_default().to_string_lossy();
+    let exports = module
+        .functions
+        .iter()
+        .filter(|function| function.exported && function.pos.file == entry_file)
+        .map(|function| function.name.clone())
+        .collect();
     match ReloadSession::new_with_native_libraries(&files, &[library]) {
-        Ok(session) => Ok(session),
+        Ok(session) => Ok((session, exports)),
         Err(RunError::Rejected(diagnostics)) => {
             Err(ProgramLoadError::rejected(&files, diagnostics))
         }
@@ -427,6 +440,13 @@ fn load_program_with_library(
 /// Generates, checks, and compiles one program into a development session.
 pub fn load_program(program: &Path) -> Result<ReloadSession, ProgramLoadError> {
     load_program_with_library(program, facade_library())
+}
+
+/// Loads a development session and returns its checked entry function names.
+pub fn load_program_with_exports(
+    program: &Path,
+) -> Result<(ReloadSession, Vec<String>), ProgramLoadError> {
+    load_program_with_exports_and_library(program, facade_library())
 }
 
 fn run_session(mut session: ReloadSession) -> Result<Vec<u8>, String> {

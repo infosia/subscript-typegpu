@@ -20,7 +20,7 @@ async function exercise(capacity: u32, spec: RenderPipelineSpec): Promise<void> 
     uiPipeline_WGSL, uiPipeline_VERTEX_ENTRY, uiPipeline_FRAGMENT_ENTRY,
     uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, spec,
   );
-  using renderer = new UiRenderer(device, facts, capacity);
+  using renderer = UiRenderer.create(device, facts, capacity);
   const ui: UiContext = new UiContext();
   ui.begin();
   ui.drawRect(new UiRect(0, 0, 10, 10), 0xffffffff);

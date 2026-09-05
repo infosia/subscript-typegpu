@@ -68,11 +68,15 @@ fn is_validation_filter(module: &Module, expression: &Expr) -> bool {
 }
 
 fn is_library_creation(module: &Module, name: &str) -> bool {
-    matches!(name, "createComputePipeline" | "createRenderPipeline")
-        && module
-            .functions
-            .iter()
-            .any(|function| function.name == name && function.pos.file == "typegpu.ts")
+    let file = match name {
+        "createComputePipeline" | "createRenderPipeline" => "typegpu.ts",
+        "UiRenderer.create" | "UiRenderer.createHost" => "typegpu-ui.ts",
+        _ => return false,
+    };
+    module
+        .functions
+        .iter()
+        .any(|function| function.name == name && function.pos.file == file)
 }
 
 fn is_device_creation(module: &Module, receiver: &Expr, name: &str) -> bool {
@@ -123,14 +127,6 @@ fn visit_expr(
                 callee: AsyncCallee::Method { receiver, name, .. },
                 ..
             } if is_device_creation(module, receiver, name) => calls.push(ProgramCall::Creation),
-            // A library class whose constructor creates a pipeline is a creation site.
-            ExprKind::New { .. }
-                if matches!(&expression.ty, Type::Class(id)
-                    if module.classes[id.0].name == "UiRenderer"
-                        && module.classes[id.0].pos.file == "typegpu-ui.ts") =>
-            {
-                calls.push(ProgramCall::Creation);
-            }
             _ => {}
         }
     }

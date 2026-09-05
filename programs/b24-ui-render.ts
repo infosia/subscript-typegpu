@@ -130,7 +130,7 @@ export async function main(): Promise<void> {
       uiPipeline_WGSL, uiPipeline_VERTEX_ENTRY, uiPipeline_FRAGMENT_ENTRY,
       uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, uiPipeline,
     );
-    using renderer = new UiRenderer(device, facts, 64);
+    using renderer = UiRenderer.create(device, facts, 64);
     const error = await device.popErrorScope();
     if (error !== null) { print("pipeline:invalid"); print("FAIL"); return; }
     if (uiPipeline_WGSL.length === 0) { print("FAIL shader"); return; }

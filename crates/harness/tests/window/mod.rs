@@ -33,8 +33,16 @@ fn checked_example(program: &PathBuf) -> hir::Module {
 #[test]
 fn window_example_compiles_through_the_host_loader_without_a_device() {
     for program in example_programs() {
-        let session = subscript_typegpu_harness::load_program(&program)
+        let (session, exports) = subscript_typegpu_harness::load_program_with_exports(&program)
             .unwrap_or_else(|error| panic!("compile {}: {error}", program.display()));
+        let module = checked_example(&program);
+        let expected = module
+            .functions
+            .iter()
+            .filter(|function| function.exported && function.pos.file == "main.ts")
+            .map(|function| function.name.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(exports, expected, "{} checked exports", program.display());
         drop(session);
     }
 }
@@ -51,8 +59,7 @@ fn type_name(module: &hir::Module, ty: &Type) -> String {
     }
 }
 
-#[test]
-fn window_example_has_the_three_host_entry_signatures() {
+fn check_host_signatures(module: &hir::Module) {
     let expected = [
         (
             "init",
@@ -75,43 +82,102 @@ fn window_example_has_the_three_host_entry_signatures() {
             ],
         ),
         ("shutdown", Vec::new()),
+        ("wheel", vec![("deltaX", "f32"), ("deltaY", "f32")]),
+        ("keyDown", vec![("key", "u32")]),
+        ("keyUp", vec![("key", "u32")]),
+        ("textInput", vec![("codePoint", "u32")]),
     ];
-    for program in example_programs() {
-        let module = checked_example(&program);
-        let entries = module
-            .functions
-            .iter()
-            .filter(|function| function.exported && function.pos.file == "main.ts")
-            .collect::<Vec<_>>();
-        if entries.iter().any(|function| function.name == "main") {
+    let entries = module
+        .functions
+        .iter()
+        .filter(|function| function.exported && function.pos.file == "main.ts")
+        .collect::<Vec<_>>();
+    if entries.len() == 1 && entries[0].name == "main" {
+        return;
+    }
+    for function in &entries {
+        assert!(
+            expected.iter().any(|(name, _)| *name == function.name),
+            "unexpected export {}",
+            function.name
+        );
+    }
+    for (index, (name, params)) in expected.iter().enumerate() {
+        let function = entries.iter().find(|function| function.name == *name);
+        if index >= 3 && function.is_none() {
             continue;
         }
-        assert_eq!(
-            entries.len(),
-            expected.len(),
-            "{} exported entry count",
-            program.display(),
-        );
-        for (name, params) in &expected {
-            let function = entries
-                .iter()
-                .find(|function| function.name == *name)
-                .unwrap_or_else(|| panic!("{} missing exported {name}", program.display()));
-            if *name != "init" {
-                assert!(!function.is_async, "{name} must be synchronous");
-            }
-            assert_eq!(type_name(&module, &function.ret), "void", "{name} return");
-            let actual = function
-                .params
-                .iter()
-                .map(|parameter| (parameter.name.as_str(), type_name(&module, &parameter.ty)))
-                .collect::<Vec<_>>();
-            let wanted = params
-                .iter()
-                .map(|(parameter, ty)| (*parameter, (*ty).to_owned()))
-                .collect::<Vec<_>>();
-            assert_eq!(actual, wanted, "{} {name} signature", program.display());
+        let function = function.unwrap_or_else(|| panic!("missing exported {name}"));
+        if *name != "init" {
+            assert!(!function.is_async, "{name} must be synchronous");
         }
+        assert_eq!(type_name(&module, &function.ret), "void", "{name} return");
+        let actual = function
+            .params
+            .iter()
+            .map(|parameter| (parameter.name.as_str(), type_name(&module, &parameter.ty)))
+            .collect::<Vec<_>>();
+        let wanted = params
+            .iter()
+            .map(|(parameter, ty)| (*parameter, (*ty).to_owned()))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, wanted, "{name} signature");
+    }
+}
+
+#[test]
+fn window_example_has_exact_host_entry_signatures() {
+    for program in example_programs() {
+        check_host_signatures(&checked_example(&program));
+    }
+}
+
+#[test]
+fn host_signature_rejections_name_the_invalid_entry() {
+    let program = root().join("examples/window-triangle/main.ts");
+    let mut module = checked_example(&program);
+    let template = module
+        .functions
+        .iter()
+        .find(|function| function.exported && function.name == "shutdown")
+        .unwrap()
+        .clone();
+    for (name, params, is_async) in [
+        ("unexpectedInput", 0, false),
+        ("wheel", 0, false),
+        ("keyDown", 0, false),
+        ("keyUp", 0, false),
+        ("textInput", 0, false),
+        ("wheel", 2, true),
+    ] {
+        let mut invalid = template.clone();
+        invalid.name = name.to_owned();
+        invalid.is_async = is_async;
+        if params != 0 {
+            let frame = module
+                .functions
+                .iter()
+                .find(|function| function.name == "frame")
+                .unwrap();
+            invalid.params = frame.params[4..6].to_vec();
+            invalid.params[0].name = "deltaX".to_owned();
+            invalid.params[1].name = "deltaY".to_owned();
+        }
+        module.functions.push(invalid);
+        let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            check_host_signatures(&module)
+        }))
+        .expect_err("invalid host export must fail");
+        let message = failure
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| failure.downcast_ref::<&str>().copied())
+            .unwrap_or("");
+        assert!(
+            message.contains(name),
+            "diagnostic must name {name}: {message}"
+        );
+        module.functions.pop();
     }
 }
 
