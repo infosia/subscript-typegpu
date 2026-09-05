@@ -9,4 +9,5 @@ mod naga_offsets;
 mod render;
 mod support;
 mod texture;
+mod ui_atlas;
 mod vectors;

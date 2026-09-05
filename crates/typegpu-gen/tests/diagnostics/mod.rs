@@ -199,6 +199,8 @@ fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
         "typegpu-radiance-cascades.ts",
         "typegpu-sdf.ts",
         "typegpu-sort.ts",
+        "typegpu-ui-atlas.generated.ts",
+        "typegpu-ui.ts",
     ] {
         let path = root.join("lib").join(module);
         let source = read(&path);
@@ -216,6 +218,13 @@ fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
                     "{} trap helper must lead with its documented rule id",
                     path.display(),
                 );
+            }
+            "typegpu-ui.ts" => {
+                assert_eq!(trap_count, 1, "UI traps must use uiTrap");
+                assert!(source.contains("function uiTrap(rule: string, method: string, values: string): void {\n  print(`${rule} ${method} ${values} (author)`);\n  unreachable();\n}"));
+                for rule in ["UIT1", "UIT2", "UIT3"] {
+                    assert!(library_spec.contains(&format!("`{rule}`")));
+                }
             }
             "typegpu-sort.ts" => {
                 assert_eq!(

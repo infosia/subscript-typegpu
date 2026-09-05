@@ -44,6 +44,11 @@ pub(crate) fn program_files(program: &Path) -> Vec<SourceFile> {
         ),
         SourceFile::new("typegpu-sdf.ts", read(&root.join("lib/typegpu-sdf.ts"))),
         SourceFile::new("typegpu-sort.ts", read(&root.join("lib/typegpu-sort.ts"))),
+        SourceFile::new(
+            "typegpu-ui-atlas.generated.ts",
+            read(&root.join("lib/typegpu-ui-atlas.generated.ts")),
+        ),
+        SourceFile::new("typegpu-ui.ts", read(&root.join("lib/typegpu-ui.ts"))),
         SourceFile::new(name, read(program)),
     ]
 }

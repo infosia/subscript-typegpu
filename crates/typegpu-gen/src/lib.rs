@@ -8,6 +8,9 @@ mod pipeline;
 mod render;
 mod schema;
 mod shell;
+mod ui_atlas;
+
+pub use ui_atlas::generate_ui_atlas;
 
 use std::collections::BTreeSet;
 
@@ -128,6 +131,8 @@ fn is_library_file(name: &str) -> bool {
             | "typegpu-radiance-cascades.ts"
             | "typegpu-sdf.ts"
             | "typegpu-sort.ts"
+            | "typegpu-ui-atlas.generated.ts"
+            | "typegpu-ui.ts"
             | "subscript-typegpu.generated.d.ts"
             | "wire-enum-aliases.generated.d.ts"
     )

@@ -11,6 +11,8 @@ cargo run --offline -p subscript-typegpu-webgpu-gen -- "$(pwd)"
 scratch_dir=$(mktemp -d "${TMPDIR:-/tmp}/subscript-typegpu-regen.XXXXXX")
 trap 'rm -rf -- "$scratch_dir"' EXIT HUP INT TERM
 
+cargo run --offline -p subscript-typegpu-gen -- ui-atlas "$repo_root"
+
 for program in programs/[bx]*.ts; do
   case "$program" in
     *.typegpu.ts) continue ;;

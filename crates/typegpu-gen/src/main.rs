@@ -10,7 +10,21 @@ fn read(path: &Path) -> Result<String, String> {
 fn run() -> Result<(), String> {
     const USAGE: &str = "usage: subscript-typegpu-gen gen <program.ts> --lib <dir> -o <dir>";
     let mut arguments = std::env::args_os().skip(1);
-    if arguments.next().as_deref() != Some(std::ffi::OsStr::new("gen")) {
+    let command = arguments.next();
+    if command.as_deref() == Some(std::ffi::OsStr::new("ui-atlas")) {
+        let root = arguments
+            .next()
+            .map(PathBuf::from)
+            .ok_or("usage: subscript-typegpu-gen ui-atlas <repo-root>")?;
+        if arguments.next().is_some() {
+            return Err("usage: subscript-typegpu-gen ui-atlas <repo-root>".to_owned());
+        }
+        let module = subscript_typegpu_gen::generate_ui_atlas(&root)?;
+        let destination = root.join("lib/typegpu-ui-atlas.generated.ts");
+        return std::fs::write(&destination, module)
+            .map_err(|error| format!("write {}: {error}", destination.display()));
+    }
+    if command.as_deref() != Some(std::ffi::OsStr::new("gen")) {
         return Err(USAGE.to_owned());
     }
     let program = arguments
@@ -58,6 +72,11 @@ fn run() -> Result<(), String> {
         ),
         SourceFile::new("typegpu-sdf.ts", read(&library.join("typegpu-sdf.ts"))?),
         SourceFile::new("typegpu-sort.ts", read(&library.join("typegpu-sort.ts"))?),
+        SourceFile::new(
+            "typegpu-ui-atlas.generated.ts",
+            read(&library.join("typegpu-ui-atlas.generated.ts"))?,
+        ),
+        SourceFile::new("typegpu-ui.ts", read(&library.join("typegpu-ui.ts"))?),
         SourceFile::new(program_name, read(&program)?),
     ];
     let generated = subscript_typegpu_gen::generate(&files)

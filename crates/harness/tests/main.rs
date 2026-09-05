@@ -77,3 +77,4 @@ fn facade_symbol_table_matches_no_mangle_exports() {
         panic!("symbol table name missing from facade exports: {name}");
     }
 }
+mod ui;
