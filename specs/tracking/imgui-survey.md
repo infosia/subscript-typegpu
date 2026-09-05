@@ -64,6 +64,46 @@ reference for the renderer design below: vertices with position, uv,
 and a packed color, `u16` indices, and draw commands split by clip
 rect and texture.
 
+## Existing WebGPU or TypeScript immediate-mode GUIs — measured
+
+Question from the owner, 2026-09-05: does an immediate-mode GUI with a
+WebGPU renderer exist in TypeScript, so that the port starts closer to
+subscript? Search and source reads *(docs)*, nothing run.
+
+| Candidate | What it is | Renderer | License | Fit |
+|---|---|---|---|---|
+| jsimgui (`@mori2003/jsimgui`) | Dear ImGui compiled to wasm with JS bindings | WebGL or WebGPU, selectable | MIT | wasm, no portable source |
+| `@zephyr3d/imgui` | Dear ImGui through Emscripten inside the Zephyr3D engine | the engine's device layer, WebGL or WebGPU | MIT | wasm, no portable source |
+| imgui-njs | a hand port of Dear ImGui about 1.70 to JavaScript, "work in progress", mixin-composed small files | Canvas 2D | MIT | Dear ImGui size, dynamic JavaScript idioms |
+| `@thi.ng/imgui` | a functional immediate-mode GUI that emits hiccup-canvas shapes | Canvas 2D through hiccup, WebGL "early stages, unpublished" | Apache-2.0 | nine `@thi.ng` dependencies, functional style |
+| microui-ts (jamesWalker55) | a TypeScript port of microui, about 1,350 lines, `Context` class, `Command[]` discriminated union, FNV-1a over `charCodeAt` | Canvas 2D demo with `measureText` | no license file in the repository | source unusable; the mapping decisions are readable |
+
+Two findings decide the question.
+
+1. **No TypeScript immediate-mode GUI with a WebGPU renderer exists
+   as portable source.** The two WebGPU-capable packages are Dear
+   ImGui in wasm. The TypeScript-source libraries render through
+   Canvas 2D.
+2. **The renderer is not the porting cost.** In every immediate-mode
+   GUI the renderer is a few hundred lines against one draw-data
+   contract: vertices with position, uv, and color, `u16` indices,
+   and clip rects. Here the renderer is TypeGPU-shaped by design (a
+   `@CStruct` vertex schema, kernels in the K subset, RN rules), so
+   it is written once regardless of the source library. The porting
+   cost is the core logic, and there the semantic distance counts,
+   not the syntax. microui-ts uses generators for `iterCommands`,
+   `structuredClone`, spread, destructuring, a discriminated union of
+   command objects (S011 rejects a value union), `Record<Id,
+   Container>` dynamic objects, and `toFixed`. Idiomatic TypeScript
+   sits farther from subscript's accepted subset than microui's ANSI
+   C, which has static arrays, explicit ids, no closures, and no
+   dynamic maps.
+
+Decision: the port source stays microui (C). microui-ts is a reading
+reference for two mapping decisions this port also makes, pointer ids
+to string labels and callbacks to constructor parameters, and nothing
+from it is copied.
+
 ## Route C — rejected
 
 The GUI logic would live in Rust in the host, not in scripts. The
