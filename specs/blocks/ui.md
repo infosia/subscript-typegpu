@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -158,7 +158,9 @@ tiers with no GPU. The renderer is the only GPU code.
   own range and keeps the call order inside the range. `end()` publishes
   `drawOrder(): i32[]`, the root containers by ascending z-index.
   There is no jump command: the renderer and the golden walk the
-  ranges in draw order.
+  ranges in draw order. `UiRoot`, `beginRoot`, and `endRoot` are the
+  public root primitive: a program can open a root container of its
+  own, and the suite programs use them to pin the range rules.
 - **UI12 — Clipping.** Rev 1. A clip stack starts at the unbounded rect.
   `pushClip(r)` intersects, `popClip()` restores. A rect or icon
   outside the clip emits nothing. A rect partly inside emits a clip
@@ -183,46 +185,58 @@ tiers with no GPU. The renderer is the only GPU code.
 
 ## The renderer
 
-- **UI14 — One pipeline.** Rev 1. `UiVertex` is `@CStruct {
+- **UI14 — One pipeline.** Rev 2. `UiVertex` is `@CStruct {
   position: Vec2f; uv: Vec2f; color: u32 }`. `UiViewport` is
-  `@CStruct { width: f32; height: f32 }`. `UiRenderLayout` has
+  `@CStruct { width: f32; height: f32 }`. `UiVarying` is `@CStruct {
+  position: Vec4f; uv: Vec2f; color: Vec4f }`. `UiRenderLayout` has
   `viewport: Uniform<UiViewport>`, `atlas: Texture2d<f32>`, and
   `nearest: Sampler`. The module exports the kernels `uiVertex` and
-  `uiFragment` and the blend state `UI_BLEND` (color `src-alpha`
-  over `one-minus-src-alpha`, alpha `one` plus `one`, operation
-  `add`, the pair RN21 models). The program declares the pipeline,
-  as LB2 states for every module kernel:
+  `uiFragment` and the blend state `UI_BLEND`: color `src-alpha` over
+  `one-minus-src-alpha` and alpha `src-alpha` over
+  `one-minus-src-alpha`, operation `add`, the pair microui's demo
+  renderer sets and the host oracle models (RN21). The program
+  declares the pipeline, as LB2 states for every module kernel:
   `renderPipelineL<UiRenderLayout, UiVertex, UiVarying>(uiVertex,
   uiFragment, { format, indexFormat: "uint16", blend: UI_BLEND })`,
   and the generator emits the program's `.wgsl` golden and facts. The
-  vertex kernel maps pixels to clip space (`x * 2 / width - 1`,
-  `1 - y * 2 / height`) and unpacks the color with division and
-  modulo by 256 (K9 has no shifts). The fragment kernel returns the
-  color with its alpha multiplied by the atlas sample's red channel.
-  The atlas texture is `rgba8unorm`, every channel the alpha byte,
-  uploaded once through `writeTextureBytes`. No library module
-  imports a generated support module.
-- **UI15 — The frame builder.** Rev 1. `UiRenderer` is created with
-  the device, the program's pipeline facts (`UiPipelineFacts`: the
-  WGSL, the two entry names, the bind group layout, the vertex
-  buffer layout, the two strides), and a quad capacity, default
-  16,384. A capacity of 0 or above 16,384 traps `UIT1`, because a
-  `u16` index addresses 65,536 vertices. The renderer owns a vertex
-  buffer of four vertices per quad, a `u16` index buffer of six
-  indices per quad written once at creation, the atlas texture, the
-  sampler, the viewport uniform, one bind group, and the pipeline.
-  `build(context)` walks the command list in draw order: a rect is
-  one quad at the white atlas rect, an icon is one quad at its atlas
-  rect centered in the command rect, text is one quad per glyph
-  advanced by glyph width, and a clip command ends the current draw
-  range and starts one with the new scissor. `render(context, pass,
-  width, height)` calls `build`, writes the viewport and the vertex
-  bytes through `Buffer<T>.write`, then for each range calls
-  `setScissorRect` with the clip intersected with the viewport (an
-  empty intersection skips the range) and
-  `drawIndexed(indexCount, 1, firstIndex, 0, 0)`. A frame that
-  exceeds the quad capacity traps `UIT1` with the capacity and the
-  count.
+  renderer reads that spec (UI15) and requires `triangle-list` and
+  `uint16`, because its index pattern reaches index 65535, which a
+  strip topology reads as the restart value. The vertex kernel maps
+  pixels to clip space (`x * 2 / width - 1`, `1 - y * 2 / height`) and
+  unpacks the color with division and modulo by 256 (K9 has no
+  shifts). The fragment kernel returns the color with its alpha
+  multiplied by the atlas sample's red channel. The atlas texture is
+  `rgba8unorm`, every channel the alpha byte, uploaded once through
+  `writeTextureBytes`. No library module imports a generated support
+  module.
+- **UI15 — The frame builder.** Rev 2. `UiRenderer` is created with
+  the device, the program's pipeline facts, and a quad capacity,
+  default 16,384. `UiPipelineFacts` holds the WGSL, the two entry
+  names, the bind group layout, the vertex buffer layout, and the
+  program's `RenderPipelineSpec`. The renderer derives the two
+  strides itself from `Context.bytesOf`. A capacity of 0 or above
+  16,384, a spec whose topology is not `triangle-list`, or a spec
+  whose index format is not `uint16` traps `UIT1`. The renderer owns
+  a vertex buffer of four vertices per quad, a `u16` index buffer of
+  six indices per quad written once at creation, the atlas texture,
+  the sampler, the viewport uniform, one bind group, and the
+  pipeline. `build(context)` walks the command list in draw order: a
+  rect is one quad at the white atlas rect, an icon is one quad at
+  its atlas rect centered in the command rect, text is one quad per
+  glyph advanced by glyph width, and a clip command ends the current
+  draw range and starts one with the new scissor. The builder keeps
+  its vertex byte array and its range records across frames and
+  overwrites them in place, as UI4 states for the context.
+  `render(context, pass, width, height)` calls `build`, writes the
+  viewport and the vertex bytes through `Buffer<T>.write`, then for
+  each range calls `setScissorRect` with the clip intersected with the
+  viewport (an empty intersection skips the range) and
+  `drawIndexed(indexCount, 1, firstIndex, 0, 0)`. After the last
+  range it sets the scissor to the full viewport, so a caller that
+  draws next in the same pass is not clipped. A frame that exceeds
+  the quad capacity traps `UIT1` with the capacity and the count.
+  The unbounded rect that the core and the renderer share is one
+  named constant.
 - **UI16 — The pixel oracle.** A live program draws one window
   with microui's default colors into an offscreen `rgba8unorm`
   target and reads back pixels inside filled rects, where alpha is
@@ -242,8 +256,11 @@ tiers with no GPU. The renderer is the only GPU code.
 
 ## Traps
 
-- **UI18 — The trap table** (LB3). Rev 1. `UIT1` — a frame
-  exceeded the renderer's quad capacity. `UIT2` — a widget or layout
+- **UI18 — The trap table** (LB3). Rev 1. `UIT1` — the
+  renderer's capacity, pipeline spec, or frame is outside its domain
+  (a frame over the quad capacity, a capacity of 0 or above 16,384, a
+  topology other than `triangle-list`, an index format other than
+  `uint16`). `UIT2` — a widget or layout
   call outside `begin()` and `end()`, or an `end*` call without its
   `begin*`. `UIT3` — `layoutRow` received more than 16 widths.
   `UIT4` — a frame needed a 49th container or tree node, so the
