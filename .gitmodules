@@ -4,3 +4,6 @@
 [submodule "third_party/gpuweb"]
 	path = third_party/gpuweb
 	url = https://github.com/gpuweb/gpuweb
+[submodule "third_party/microui"]
+	path = third_party/microui
+	url = https://github.com/rxi/microui
