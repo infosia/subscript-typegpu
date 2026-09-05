@@ -878,6 +878,32 @@ in the tracking file.
 Exit per slice: the P10 exits. The record is
 `specs/tracking/p16-texture-arrays.md`.
 
+### U0–U4 — the immediate-mode GUI (branch `imgui`, after P16)
+
+Owner decision 2026-09-05: an immediate-mode GUI authored in
+subscript, a port of microui over the TypeGPU layer.
+`specs/tracking/imgui-survey.md` records the route decision and the
+rejected routes. `specs/blocks/ui.md` is the contract.
+
+- **U0** — the survey and the contract. Exit: the owner accepts
+  `ui.md`.
+- **U1** — the microui pin, the atlas tool and generated module,
+  `lib/typegpu-ui.ts` core, `programs/b23-ui-core.ts`. Exit: the
+  golden byte-identical on both tiers, the gate within budget. Kill:
+  if the command list cannot be byte-identical on both tiers, the
+  route stops here.
+- **U2** — the renderer in `lib/typegpu-ui.ts`,
+  `programs/b24-ui-render.ts` with its `.wgsl` golden,
+  `programs/x24-live-ui.ts`. Exit: `x24` green on Metal (yawgpu) and
+  Dawn.
+- **U3** — `window.md` W2 Rev 3 (optional input entries), the host
+  change, `examples/ui-demo/main.ts`. Exit: a 30-frame smoke run
+  green, every existing example untouched.
+- **U4** — textbox editing, wheel scroll, popups, the phase review.
+  Exit: no open CRITICAL or MAJOR.
+
+The record is `specs/tracking/imgui.md`.
+
 ## 9. Risk register
 
 | Id | Risk | Mitigation / trigger |
