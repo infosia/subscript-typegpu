@@ -15,6 +15,8 @@ import {
   uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, uiPipeline_TARGET_FORMAT,
 } from "./main.typegpu";
 
+// The program declares the pipeline that draws the UI, so the generator emits
+// its WGSL and layout facts beside this file and the renderer receives them.
 export const uiPipeline: RenderPipelineSpec = renderPipelineL<UiRenderLayout, UiVertex, UiVarying>(
   uiVertex, uiFragment, { format: "bgra8unorm", indexFormat: "uint16", blend: UI_BLEND },
 );
@@ -23,6 +25,7 @@ const ui: UiContext = new UiContext();
 const red: UiState<f32> = new UiState<f32>(90);
 const green: UiState<f32> = new UiState<f32>(95);
 const blue: UiState<f32> = new UiState<f32>(100);
+// Widget state crosses in holders. microui passes a pointer to the value.
 const checks: UiState<boolean>[] = [
   new UiState<boolean>(true), new UiState<boolean>(false), new UiState<boolean>(true),
 ];
@@ -165,6 +168,8 @@ export function init(
   device: SubscriptTypegpuDevice,
   format: GPUTextureFormat,
 ): void {
+  // The pipeline declares its format literally. A surface with another format
+  // ends the example before any draw.
   if (format !== uiPipeline_TARGET_FORMAT) {
     print(`FAIL format expected=${uiPipeline_TARGET_FORMAT} actual=${format}`);
     return;
@@ -209,6 +214,8 @@ export function frame(
   const x: i32 = pointerX as i32;
   const y: i32 = pointerY as i32;
   ui.inputMouseMove(x, y);
+  // The host reports buttons as level state. microui's SDL loop receives press
+  // and release events, so the edges are derived here.
   for (let bit: u32 = 1; bit <= 4; bit *= 2) {
     if ((buttons & bit) !== 0 && (previousButtons & bit) === 0) ui.inputMouseDown(x, y, bit);
     if ((buttons & bit) === 0 && (previousButtons & bit) !== 0) ui.inputMouseUp(x, y, bit);
