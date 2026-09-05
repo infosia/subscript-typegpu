@@ -169,5 +169,10 @@ The harness and the generator load every `lib/` module for every
 program, so the ui module (about 1,100 lines and a 32 KiB atlas
 string) compiles into every program on both tiers, into every
 example, and into every fixture. The fix is LB1 Rev 2: a program
-compiles with the core set and the modules its imports reach. The
-row after the fix follows.
+compiles with the core set and the modules its imports reach.
+
+After the fix, at `b5a4e1b`: the warm `--require-backend` gate 244.3 s
+(274 tests), the live lane on Metal 135.9 s and on Dawn 118.1 s. The
+remainder over the P16 row is the three ui programs and the seven
+ui trap fixtures. One program, medians of three runs by the coding
+agent: dev `b04-particles` 4.52 s to 2.51 s, ship 3.97 s to 1.72 s.

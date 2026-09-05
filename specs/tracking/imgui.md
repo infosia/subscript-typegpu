@@ -120,3 +120,44 @@ Dawn, 206.2 s, with `x24` in the set. Every golden other than `b23`,
 
 Deviation kept: UI15 said the index bytes are written per frame. They
 are written once at creation. UI15 Rev 1 states it.
+
+### U2 phase review (2026-09-05)
+
+A fresh Opus reviewer over `523a667..fc30ffc`, with execution of the
+generator, trap, diagnostics, and WGSL golden tests. CRITICAL 0,
+MAJOR 2, MINOR 13.
+
+MAJOR, fixed in fix round 2 (`a8ee882`): `UiRenderer` rebuilt its own
+pipeline spec and ignored the program's declaration, and UI15's
+facts list did not match the class. The renderer now takes the
+program's `RenderPipelineSpec` in `UiPipelineFacts`, derives its two
+strides from `Context.bytesOf`, and traps `UIT1` on a topology other
+than `triangle-list` or an index format other than `uint16`.
+
+MINOR fixed: `UI_BLEND` alpha is `src-alpha` over
+`one-minus-src-alpha` as microui's renderer sets it, one unclipped
+constant, the scissor is restored to the viewport after `render`, the
+builder reuses its vertex bytes and range records, `b24` renders an
+empty frame and creates the renderer at capacity 64, the scopes-lint
+arm states its criterion, two spec reds. MINOR recorded in the
+contract: `UiVarying` (UI14), `UiRoot` and the root methods as the
+public root primitive (UI11), the topology justification (UI14).
+
+### Build time and the loader fix
+
+The reviewer named the per-program cost of a module loaded into every
+program. The measurement and the fix are in
+`specs/tracking/build-time.md` (U2 section) and `library.md` LB1
+Rev 2, landed at `b5a4e1b`: one registered module table in
+`crates/typegpu-gen/src/library.rs`, and every loader takes the core
+set plus the modules the program's imports reach.
+
+Evidence at `b5a4e1b` on this host: `tools/gate.sh --require-backend`
+green, 274 passed, 1 ignored, 244.3 s wall. `tools/live.sh` green on
+yawgpu Metal, 135.9 s, and on Dawn, 118.1 s.
+
+## U2 closed (2026-09-05)
+
+Exit met: `x24` green on Metal (yawgpu) and Dawn, the review has no
+open CRITICAL or MAJOR, the backend gate is back under 1.2 times the
+P16 row. U3 opens.

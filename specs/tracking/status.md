@@ -14,6 +14,7 @@ Updated 2026-08-25.
 | P7 the CPU lane | COMPLETE | `167d34e`, 2026-08-23 |
 | U0 the ui contract (branch `imgui`) | COMPLETE | `a0934c4`, 2026-09-05 |
 | U1 the ui core and `b23-ui-core` (branch `imgui`) | COMPLETE | 2026-09-05, `specs/tracking/imgui.md` |
+| U2 the ui renderer, `b24-ui-render`, `x24-live-ui` (branch `imgui`) | COMPLETE | `b5a4e1b`, 2026-09-05 |
 
 Numbers at `42ecb7f`: 233 tests in six executables, 28 programs
 (`a01`–`a05`, `b01`–`b11`, `x01`–`x12`), 157 facade exports all
