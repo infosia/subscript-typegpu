@@ -9,6 +9,7 @@ use subscript_compiler::Type;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ProgramCall {
     Creation,
+    DirectRenderer,
     Push,
     Pop,
 }
@@ -103,6 +104,12 @@ fn visit_expr(
 ) {
     if expression.pos.file == program_name {
         match &expression.kind {
+            ExprKind::New { class, .. }
+                if module.classes[class.0].name == "UiRenderer"
+                    && module.classes[class.0].pos.file == "typegpu-ui.ts" =>
+            {
+                calls.push(ProgramCall::DirectRenderer);
+            }
             ExprKind::Call {
                 callee: Callee::Method { name, .. },
                 args,
@@ -291,6 +298,15 @@ fn scope_failure(program: &Path) -> Option<String> {
         .file_name()
         .and_then(|name| name.to_str())
         .expect("UTF-8 program name");
+    let mut program_calls = Vec::new();
+    for function in &module.functions {
+        visit_statements(&module, &function.body, program_name, &mut program_calls);
+    }
+    if program_calls.contains(&ProgramCall::DirectRenderer) {
+        return Some(format!(
+            "{program_name}: new UiRenderer is private. Use UiRenderer.create or UiRenderer.createHost"
+        ));
+    }
     let Some(main) = module
         .functions
         .iter()
@@ -344,4 +360,11 @@ fn every_program_scopes_exactly_its_shader_and_pipeline_creation_calls() {
         "PI14 scope failures:\n{}",
         failures.join("\n")
     );
+}
+
+#[test]
+fn direct_renderer_construction_names_the_factories() {
+    let program = repository_root().join("crates/harness/tests/fixtures/scopes/ui-constructor.ts");
+    let failure = scope_failure(&program).expect("direct construction must fail");
+    assert_eq!(failure, "ui-constructor.ts: new UiRenderer is private. Use UiRenderer.create or UiRenderer.createHost");
 }

@@ -417,8 +417,7 @@ impl Host {
     }
 
     fn deliver_input(&mut self) -> Result<(), String> {
-        let mut events = std::mem::take(&mut self.input_events);
-        let result = events.drain(..).try_for_each(|event| {
+        for event in std::mem::take(&mut self.input_events) {
             let (name, args) = match event {
                 InputEvent::Wheel(x, y) => ("wheel", vec![EntryArg::F32(x), EntryArg::F32(y)]),
                 InputEvent::KeyDown(key) => ("keyDown", vec![EntryArg::U32(key)]),
@@ -428,11 +427,8 @@ impl Host {
             if self.input_exports.iter().any(|entry| entry == name) {
                 self.call_entry(name, &args)?;
             }
-            Ok(())
-        });
-        events.clear();
-        self.input_events = events;
-        result
+        }
+        Ok(())
     }
 
     fn frame(&mut self) -> Result<(), String> {
@@ -611,14 +607,12 @@ impl ApplicationHandler for Host {
                     });
                 }
                 if pressed {
-                    match &event.logical_key {
-                        Key::Character(value) => self.input_events.extend(
-                            value
-                                .chars()
+                    if let Some(text) = &event.text {
+                        self.input_events.extend(
+                            text.chars()
+                                .filter(|point| !point.is_control())
                                 .map(|point| InputEvent::Text(u32::from(point))),
-                        ),
-                        Key::Named(NamedKey::Space) => self.input_events.push(InputEvent::Text(32)),
-                        _ => {}
+                        );
                     }
                 }
             }

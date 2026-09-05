@@ -1,9 +1,7 @@
-/*
- * ui-demo
- * Two interactive windows show widgets, a text log, and background color controls.
- * Ported from microui's demo (https://github.com/rxi/microui/blob/master/demo/main.c).
- * The style editor is omitted. The log uses manual scroll controls.
- */
+// example: ui-demo
+// Two interactive windows show widgets, a text log, and background color controls.
+// The style editor is omitted.
+// Ported from microui's demo (https://github.com/rxi/microui/blob/0850aba860959c3e75fb3e97120ca92957f9d057/demo/main.c).
 
 import {
   UiContext, UiRect, UiState, UiRenderer, UiPipelineFacts,
@@ -30,6 +28,9 @@ const checks: UiState<boolean>[] = [
 ];
 const input: UiState<string> = new UiState<string>("");
 let logText: string = "";
+let logUpdated: boolean = false;
+let wheelX: f32 = 0;
+let wheelY: f32 = 0;
 let previousButtons: u32 = 0;
 let ownedDevice: GPUHostOwnedDevice | null = null;
 let renderer: UiRenderer | null = null;
@@ -37,6 +38,12 @@ let renderer: UiRenderer | null = null;
 function appendLog(message: string): void {
   if (logText.length !== 0) logText += "\n";
   logText += message;
+  while (logText.length > 8000) {
+    let end: i32 = 0;
+    while (end < logText.length && logText.charCodeAt(end) !== 10) end += 1;
+    logText = logText.slice(end < logText.length ? end + 1 : end);
+  }
+  logUpdated = true;
 }
 
 function logButton(number: i32): void {
@@ -53,9 +60,9 @@ function colorHex(value: f32): string {
 
 function demoWindow(): void {
   if (ui.beginWindow("Demo Window", new UiRect(40, 40, 300, 450)) === 0) return;
-  const window = ui.roots[ui.rootCount - 1];
-  if (window.rect.w < 240) window.rect.w = 240;
-  if (window.rect.h < 300) window.rect.h = 300;
+  const window = ui.currentContainer();
+  window.rect = new UiRect(window.rect.x, window.rect.y,
+    window.rect.w < 240 ? 240 : window.rect.w, window.rect.h < 300 ? 300 : window.rect.h);
   if (ui.header("Window Info") !== 0) {
     ui.layoutRow([54, -1], 0);
     ui.label("Position:");
@@ -132,12 +139,16 @@ function demoWindow(): void {
 
 function logWindow(): void {
   if (ui.beginWindow("Log Window", new UiRect(350, 40, 300, 200)) === 0) return;
-  // The context exposes no panel scroll setter. The panel retains its manual scroll position.
   ui.layoutRow([-1], -25);
   ui.beginPanel("Log Output");
+  const panel = ui.currentContainer();
   ui.layoutRow([-1], -1);
   ui.text(logText);
   ui.endPanel();
+  if (logUpdated) {
+    panel.scrollY = panel.contentHeight;
+    logUpdated = false;
+  }
   ui.layoutRow([-70, -1], 0);
   let submitted: boolean = (ui.textbox("message", input) & UI_RES_SUBMIT) !== 0;
   if (submitted) ui.setFocus(ui.lastId);
@@ -169,7 +180,13 @@ export function init(
 
 export function wheel(deltaX: f32, deltaY: f32): void {
   // Host wheel deltas describe motion. The UI scroll offset moves in the opposite direction.
-  ui.inputScroll((-deltaX) as i32, (-deltaY) as i32);
+  wheelX -= deltaX;
+  wheelY -= deltaY;
+  const x: i32 = wheelX as i32;
+  const y: i32 = wheelY as i32;
+  ui.inputScroll(x, y);
+  wheelX -= x as f32;
+  wheelY -= y as f32;
 }
 
 export function keyDown(key: u32): void { ui.inputKeyDown(key); }

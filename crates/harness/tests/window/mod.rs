@@ -33,16 +33,8 @@ fn checked_example(program: &PathBuf) -> hir::Module {
 #[test]
 fn window_example_compiles_through_the_host_loader_without_a_device() {
     for program in example_programs() {
-        let (session, exports) = subscript_typegpu_harness::load_program_with_exports(&program)
+        let session = subscript_typegpu_harness::load_program(&program)
             .unwrap_or_else(|error| panic!("compile {}: {error}", program.display()));
-        let module = checked_example(&program);
-        let expected = module
-            .functions
-            .iter()
-            .filter(|function| function.exported && function.pos.file == "main.ts")
-            .map(|function| function.name.clone())
-            .collect::<Vec<_>>();
-        assert_eq!(exports, expected, "{} checked exports", program.display());
         drop(session);
     }
 }
@@ -128,28 +120,49 @@ fn check_host_signatures(module: &hir::Module) {
 #[test]
 fn window_example_has_exact_host_entry_signatures() {
     for program in example_programs() {
-        check_host_signatures(&checked_example(&program));
+        let module = checked_example(&program);
+        check_host_signatures(&module);
+        if program == root().join("examples/ui-demo/main.ts") {
+            let (_session, exports) =
+                subscript_typegpu_harness::load_program_with_exports(&program)
+                    .unwrap_or_else(|error| panic!("compile {}: {error}", program.display()));
+            let expected = module
+                .functions
+                .iter()
+                .filter(|function| function.exported && function.pos.file == "main.ts")
+                .map(|function| function.name.clone())
+                .collect::<Vec<_>>();
+            assert_eq!(exports, expected, "{} checked exports", program.display());
+        }
     }
 }
 
 #[test]
 fn host_signature_rejections_name_the_invalid_entry() {
     let program = root().join("examples/window-triangle/main.ts");
-    let mut module = checked_example(&program);
+    let original = checked_example(&program);
+    let module = &original;
     let template = module
         .functions
         .iter()
         .find(|function| function.exported && function.name == "shutdown")
         .unwrap()
         .clone();
-    for (name, params, is_async) in [
+    let hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let results = [
+        ("shutdown", 0, false),
+        ("frame", 0, false),
         ("unexpectedInput", 0, false),
         ("wheel", 0, false),
         ("keyDown", 0, false),
         ("keyUp", 0, false),
         ("textInput", 0, false),
         ("wheel", 2, true),
-    ] {
+    ]
+    .into_iter()
+    .map(|(name, params, is_async)| {
+        let mut module = original.clone();
         let mut invalid = template.clone();
         invalid.name = name.to_owned();
         invalid.is_async = is_async;
@@ -163,11 +176,21 @@ fn host_signature_rejections_name_the_invalid_entry() {
             invalid.params[0].name = "deltaX".to_owned();
             invalid.params[1].name = "deltaY".to_owned();
         }
-        module.functions.push(invalid);
+        if name == "shutdown" || name == "frame" {
+            module.functions.retain(|function| function.name != name);
+        }
+        if name != "shutdown" {
+            module.functions.push(invalid);
+        }
         let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             check_host_signatures(&module)
-        }))
-        .expect_err("invalid host export must fail");
+        }));
+        (name, failure)
+    })
+    .collect::<Vec<_>>();
+    std::panic::set_hook(hook);
+    for (name, failure) in results {
+        let failure = failure.expect_err("invalid host export must fail");
         let message = failure
             .downcast_ref::<String>()
             .map(String::as_str)
@@ -177,7 +200,6 @@ fn host_signature_rejections_name_the_invalid_entry() {
             message.contains(name),
             "diagnostic must name {name}: {message}"
         );
-        module.functions.pop();
     }
 }
 

@@ -116,8 +116,8 @@ fn owned_device_queue_survives_guarded_pipeline_disposal() {
     std::fs::create_dir_all(&directory).expect("create queue ownership test directory");
     let program = directory.join("queue-ownership.ts");
     let source = r#"
-import { BindGroupLayoutSpec, createComputePipeline } from "./typegpu";
-import { GPUBufferUsage, GPUDevice, GPUShaderStage } from "./webgpu";
+import { BindGroupLayoutSpec, createComputePipeline, createBufferHost } from "./typegpu";
+import { GPUBufferUsage, GPUDevice, GPUShaderStage, hostOwnedGPUDevice } from "./webgpu";
 export function main(): void {
   const device = new GPUDevice(test_instance(), test_device());
   const target = device.createBuffer({ size: 4, usage: GPUBufferUsage.COPY_DST });
@@ -134,6 +134,10 @@ export function main(): void {
   pipeline.dispose();
   device.queue.writeBuffer(target, 0, [1, 0, 0, 0]);
   print(`writes=${test_queue_writes()}`);
+  const host = hostOwnedGPUDevice(test_instance(), test_device());
+  using buffer = createBufferHost<u32>(host, 4, 2, GPUBufferUsage.COPY_DST, "host-buffer");
+  buffer.write(device.queue, 1, [2, 0, 0, 0]);
+  print(`host=${buffer.elementSize},${buffer.count},${buffer.usage},writes=${test_queue_writes()}`);
 }
 "#;
     std::fs::write(&program, "export function main(): void {}\n")
@@ -230,7 +234,7 @@ export function main(): void {
     std::fs::remove_file(&program).expect("remove queue ownership test program");
     std::fs::remove_dir(&directory).expect("remove queue ownership test directory");
     assert_eq!(
-        output, "writes=1\n",
+        output, "writes=1\nhost=4,2,8,writes=2\n",
         "queue write did not reach the live buffer: {output}"
     );
 }

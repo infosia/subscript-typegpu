@@ -639,6 +639,25 @@ export function createBuffer<T>(
   );
 }
 
+export function createBufferHost<T>(
+  device: GPUHostOwnedDevice,
+  elementSize: u32,
+  count: u32,
+  usage: u64,
+  label: string,
+): Buffer<T> {
+  return new Buffer<T>(
+    device.createBuffer({
+      size: (elementSize as u64) * (count as u64),
+      usage,
+      label,
+    }),
+    elementSize,
+    count,
+    usage,
+  );
+}
+
 export class ComputeInvocation {
   globalId: Vec3u;
   localId: Vec3u;

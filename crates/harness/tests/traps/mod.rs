@@ -181,6 +181,12 @@ fn runtime_traps_are_named_and_numbered() {
 #[test]
 fn ui_runtime_traps_are_named_and_numbered() {
     let directory = repository_root().join("crates/harness/tests/fixtures/trap");
+    assert_accept_export(&directory.join("ui-current-container.ts"), "accept");
+    assert_trap_export(
+        &directory.join("ui-current-container.ts"),
+        "outsideFrame",
+        "UIT2 currentContainer frame=0 (author)",
+    );
     if super::differential::backend_is_available() {
         assert_trap(
             &directory.join("ui-quad-capacity.ts"),
@@ -215,6 +221,10 @@ fn ui_runtime_traps_are_named_and_numbered() {
         (
             "ui-tree-pool.ts",
             "UIT4 treeHeader slots=48 available=0 (author)",
+        ),
+        (
+            "ui-current-container.ts",
+            "UIT2 currentContainer depth=0 (author)",
         ),
         ("ui-end-window.ts", "UIT2 endWindow depth=0 (author)"),
         (

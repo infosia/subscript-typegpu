@@ -422,6 +422,11 @@ fn load_program_with_exports_and_library(
     let module = subscript_compiler::check_program(&files)
         .map_err(|diagnostics| ProgramLoadError::rejected(&files, diagnostics))?;
     let entry_file = program.file_name().unwrap_or_default().to_string_lossy();
+    assert_eq!(
+        files.iter().filter(|file| file.name == entry_file).count(),
+        1,
+        "exactly one loaded file must match program {entry_file}"
+    );
     let exports = module
         .functions
         .iter()
