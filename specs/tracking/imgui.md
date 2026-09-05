@@ -161,3 +161,27 @@ yawgpu Metal, 135.9 s, and on Dawn, 118.1 s.
 Exit met: `x24` green on Metal (yawgpu) and Dawn, the review has no
 open CRITICAL or MAJOR, the backend gate is back under 1.2 times the
 P16 row. U3 opens.
+
+## U3 (2026-09-05)
+
+Landed at the commit above `bb65ae2`: the window host queues wheel,
+key, and text events and delivers them before `frame` through the
+entries the script exports (W2 Rev 3, W3 Rev 2); the signature test
+accepts the three required entries and any subset of the four
+optional ones and names an unexpected export (W13 Rev 2);
+`UiRenderer.create` and `UiRenderer.createHost` (UI15 Rev 3, the
+host-owned device blocked the first delivery and the contract took
+the two factories on the `createRenderPipelineHost` precedent);
+`examples/ui-demo/main.ts`, a port of microui's demo windows with the
+style editor omitted.
+
+Evidence on this host: `tools/gate.sh --require-backend` green, 275
+passed, 1 ignored, 263.1 s wall. `tools/window.sh` with `--frames 30`
+on yawgpu Metal: `ui-demo` and `window-triangle` both print
+`window:frames=30` with no `FAIL`. The visual result waits for the
+owner's run. Every existing example is untouched.
+
+Open for U4, from the example: the core exposes no
+`currentContainer()` (the example reaches into `roots`), and no
+scroll setter for a panel (microui's demo scrolls the log to its
+end). The phase review follows.
