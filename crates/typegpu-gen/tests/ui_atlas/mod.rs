@@ -1,5 +1,35 @@
 use crate::support;
 
+fn alpha_hex(module: &str) -> String {
+    assert!(module.contains("export const UI_ATLAS_ALPHA_CHUNK: i32 = 4096;"));
+    let array = module
+        .split_once("UI_ATLAS_ALPHA_HEX: string[] = [")
+        .expect("alpha constant")
+        .1
+        .split_once("];")
+        .expect("alpha array")
+        .0;
+    let chunks = array
+        .split(',')
+        .map(|chunk| {
+            let hex = chunk
+                .trim()
+                .strip_prefix('"')
+                .and_then(|hex| hex.strip_suffix('"'))
+                .expect("alpha chunk literal");
+            assert_eq!(hex.len(), 4096);
+            assert!(hex
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
+            hex
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(chunks.len(), 8);
+    let hex = chunks.concat();
+    assert_eq!(hex.len(), 32768);
+    hex
+}
+
 fn source_commit(module: &str) -> &str {
     module
         .lines()
@@ -19,17 +49,7 @@ fn atlas_regeneration_is_byte_identical() {
         source_commit(&committed),
         source_commit(&generated),
     );
-    let hex = generated
-        .split("UI_ATLAS_ALPHA_HEX: string = \"")
-        .nth(1)
-        .expect("alpha constant")
-        .split('"')
-        .next()
-        .expect("alpha data");
-    assert_eq!(hex.len(), 32768);
-    assert!(hex
-        .bytes()
-        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
+    alpha_hex(&generated);
     for name in ["X", "Y", "W", "H"] {
         let marker = format!("UI_ATLAS_RECT_{name}: i32[] = [");
         let values = generated
@@ -119,13 +139,7 @@ fn atlas_cli_writes_the_library_result() {
             );
         } else {
             let generated = result.expect("generate zero-filled atlas");
-            let hex = generated
-                .split_once("UI_ATLAS_ALPHA_HEX: string = \"")
-                .expect("alpha constant")
-                .1
-                .split_once('"')
-                .expect("alpha data")
-                .0;
+            let hex = alpha_hex(&generated);
             let expected = format!("{}{}", "ff".repeat(count), "00".repeat(16384 - count));
             assert_eq!(hex, expected);
         }

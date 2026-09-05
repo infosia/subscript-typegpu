@@ -356,3 +356,75 @@ The `d45c0c1` re-pin moved two fixture codes, and
 `587d6da` re-pins carry subscript changes that this project did not
 ask for. subscript's own records name them §83 and §84
 (https://github.com/infosia/subscript).
+
+## Re-check at f63fc4d (2026-09-05)
+
+The tree gained the U0 to U4 phases and the ui module after the last
+re-check. The workspace pin moved from `587d6da` to `3677d1f`. This
+run measures the port again on windows-msvc.
+
+Machine: Windows 11, `x86_64-pc-windows-msvc`, rustc 1.95.0, Git Bash.
+Backend: a yawgpu Windows release build with the default Noop backend.
+
+The run was red. `tools/gate.sh --require-backend` exits 1 after 233 s.
+The harness executable has 37 passed, 4 failed, and 1 ignored. One port
+defect causes all four failures. The backend is not implicated. No test
+result on macOS changes. W1 to W7 hold.
+
+Failed:
+
+- `differential::every_program_matches_both_tiers_and_golden`
+- `differential::every_program_is_deterministic_across_repeated_runs`
+- `simulate::every_host_runnable_b_pipeline_prints_a_host_golden`
+- `coverage::dev_corpus_matches_committed_facade_coverage`
+
+### W8 MSVC rejects the atlas alpha literal
+
+`lib/typegpu-ui-atlas.generated.ts` declared `UI_ATLAS_ALPHA_HEX` as
+one string literal of 32,768 characters. The ship tier emits that
+literal into one line of `program.c`, and `cl` rejects the line:
+
+```
+program.c(68721): error C2026
+```
+
+C2026 names a string that exceeds the MSVC length limit for one
+literal. The compiler truncates the trailing characters. MSVC states
+the limit as 16,380 single-byte characters *(docs)*.
+
+Two programs import the atlas and run outside the live lane:
+`programs/b23-ui-core.ts` and `programs/b24-ui-render.ts`. Both fail
+the ship tier, and the four tests above each run one of them. Every
+other program passes both tiers. `programs/x24-live-ui.ts` imports the
+atlas and stays ignored, so it hides the same defect.
+
+clang accepts the literal, so the branch closed green on the reference
+machine.
+
+The cause is in subscript's C emitter, which writes a long string
+constant as one literal. Any subscript program with a literal of this
+length fails the ship tier on windows-msvc. The owner decided a
+downstream workaround now, and escalates the emitter limit to
+subscript separately. UI2 Rev 1 holds the workaround: the generator
+emits the alpha as an array of hex chunks.
+
+### The W8 fix
+
+`crates/typegpu-gen/src/ui_atlas.rs` emits `UI_ATLAS_ALPHA_CHUNK` and
+`UI_ATLAS_ALPHA_HEX: string[]`, 8 chunks of 4,096 hex digits. The chunk
+length is even, so no hex pair splits across two chunks.
+`uiAtlasAlpha()` walks the chunks in order and decodes each pair.
+`crates/typegpu-gen/tests/ui_atlas/mod.rs` parses the array and asserts
+8 chunks, 4,096 digits for each chunk, and 32,768 digits in total.
+`programs/b23-ui-core.ts` checks the chunk count, the chunk length, and
+the total. `lib/typegpu-ui.ts` needed no change.
+
+Evidence at the fix tree: `tools/gate.sh --require-backend` green with
+zero pending, 276 passed and 1 ignored in seven executables, 210 s.
+This number is not a reference-machine measurement. Every `.wgsl` and
+`.expected` golden is byte-identical. The longest string literal in
+`lib/typegpu-ui-atlas.generated.ts` is 4,096 characters.
+
+`tools/window.sh examples/ui-demo/main.ts` runs on yawgpu Vulkan. The
+30-frame smoke prints `window:frames=30`. An interactive run prints
+`window:frames=3509` and exits 0.

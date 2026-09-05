@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Rev 9 (branch review: UI4 Rev 3, UI9 Rev 1, UI11, UI12 Rev 2, UI15 Rev 5, UI18, UI20), 2026-09-05. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Rev 9 (branch review: UI4 Rev 3, UI9 Rev 1, UI11, UI12 Rev 2, UI15 Rev 5, UI18, UI20), 2026-09-05. Rev 10 (UI2 Rev 1: the alpha is an array of hex chunks, W8), 2026-09-05. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -23,21 +23,26 @@ tiers with no GPU. The renderer is the only GPU code.
 - **UI2 — The atlas module is generated.** `subscript-typegpu-gen
   ui-atlas <repo-root>` reads `third_party/microui/demo/atlas.inl`
   and writes `lib/typegpu-ui-atlas.generated.ts` with:
-  `UI_ATLAS_WIDTH` and `UI_ATLAS_HEIGHT` (128), `UI_ATLAS_ALPHA_HEX:
-  string`, the 16,384 alpha bytes as 32,768 lowercase hex digits,
-  (the C initializer of `atlas_texture` names 10,584 bytes and C
-  zero-fills the rest of the 16,384-byte array, so the generator
+  `UI_ATLAS_WIDTH` and `UI_ATLAS_HEIGHT` (128), `UI_ATLAS_ALPHA_CHUNK`
+  (4,096), `UI_ATLAS_ALPHA_HEX: string[]`, the 16,384 alpha bytes as
+  32,768 lowercase hex digits in 8 chunks of `UI_ATLAS_ALPHA_CHUNK`
+  digits (the C initializer of `atlas_texture` names 10,584 bytes and
+  C zero-fills the rest of the 16,384-byte array, so the generator
   zero-fills too and rejects an initializer with more bytes),
-  `uiAtlasAlpha(): u8[]` which decodes it, `UI_ATLAS_RECT_X`,
-  `UI_ATLAS_RECT_Y`, `UI_ATLAS_RECT_W`, `UI_ATLAS_RECT_H: i32[]`, the
-  100 rects in microui's table order (the four icons, the white
-  rect, the 95 glyphs for bytes 32 to 126), `UI_ATLAS_WHITE` (the
-  white rect's index), `UI_ATLAS_FONT` (the index of the glyph for
-  byte 0, so that byte `b` is at `UI_ATLAS_FONT + b`), and
-  `UI_TEXT_HEIGHT` (18). The module header names the source path and
-  the pinned commit. `tools/regen.sh` runs the subcommand. A
-  generator test regenerates the module in memory and compares it
-  byte for byte with the committed file (core principle 7).
+  `uiAtlasAlpha(): u8[]` which decodes the chunks in order,
+  `UI_ATLAS_RECT_X`, `UI_ATLAS_RECT_Y`, `UI_ATLAS_RECT_W`,
+  `UI_ATLAS_RECT_H: i32[]`, the 100 rects in microui's table order
+  (the four icons, the white rect, the 95 glyphs for bytes 32 to
+  126), `UI_ATLAS_WHITE` (the white rect's index), `UI_ATLAS_FONT`
+  (the index of the glyph for byte 0, so that byte `b` is at
+  `UI_ATLAS_FONT + b`), and `UI_TEXT_HEIGHT` (18). The chunks exist
+  because one literal of 32,768 characters crosses the MSVC limit for
+  a string literal, and the ship tier then fails on windows-msvc
+  (`specs/tracking/windows.md` W8). The module header names the
+  source path and the pinned commit. `tools/regen.sh` runs the
+  subcommand. A generator test regenerates the module in memory and
+  compares it byte for byte with the committed file (core principle
+  7).
 - **UI3 — Ids.** An id is a `u32`, FNV-1a over the label's bytes:
   the seed is the id stack's top, or 2166136261 when the stack is
   empty, and each byte `b` from `charCodeAt` applies

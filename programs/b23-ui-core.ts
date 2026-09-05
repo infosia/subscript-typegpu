@@ -6,7 +6,7 @@
 import { uiNumberText, UiContext, UiRect, UiRoot, UiCommand, UiState, UiStyle,
   UI_OPT_ALIGN_CENTER, UI_OPT_ALIGN_RIGHT, UI_OPT_HOLD_FOCUS, UI_OPT_NO_INTERACT, UI_MOUSE_LEFT, UI_MOUSE_RIGHT,
   UI_KEY_SHIFT, UI_KEY_RETURN, UI_ICON_CHECK, UI_COLOR_TEXT } from "./typegpu-ui";
-import { uiAtlasAlpha, UI_ATLAS_ALPHA_HEX, UI_ATLAS_WIDTH, UI_ATLAS_HEIGHT,
+import { uiAtlasAlpha, UI_ATLAS_ALPHA_CHUNK, UI_ATLAS_ALPHA_HEX, UI_ATLAS_WIDTH, UI_ATLAS_HEIGHT,
   UI_ATLAS_RECT_X, UI_ATLAS_RECT_Y, UI_ATLAS_RECT_W, UI_ATLAS_RECT_H,
   UI_ATLAS_FONT, UI_ATLAS_WHITE, UI_TEXT_HEIGHT } from "./typegpu-ui-atlas.generated";
 
@@ -78,7 +78,13 @@ function rect(r: UiRect, x: i32, y: i32, w: i32, h: i32): boolean {
 }
 function verifyCore(): void {
   const alpha: u8[] = uiAtlasAlpha();
-  check(alpha.length === UI_ATLAS_WIDTH * UI_ATLAS_HEIGHT && UI_ATLAS_ALPHA_HEX.length === 32768, "atlas size");
+  let hexLength: i32 = 0;
+  for (let i: i32 = 0; i < UI_ATLAS_ALPHA_HEX.length; i += 1) {
+    check(UI_ATLAS_ALPHA_HEX[i].length === UI_ATLAS_ALPHA_CHUNK, "atlas chunk size");
+    hexLength += UI_ATLAS_ALPHA_HEX[i].length;
+  }
+  check(alpha.length === UI_ATLAS_WIDTH * UI_ATLAS_HEIGHT && hexLength === 32768
+    && UI_ATLAS_ALPHA_CHUNK === 4096 && UI_ATLAS_ALPHA_HEX.length === 8, "atlas size");
   check(UI_ATLAS_RECT_X.length === 100 && UI_ATLAS_RECT_Y.length === 100
     && UI_ATLAS_RECT_W.length === 100 && UI_ATLAS_RECT_H.length === 100, "atlas rects");
   check(UI_ATLAS_RECT_X[UI_ATLAS_WHITE] === 125 && UI_ATLAS_RECT_Y[UI_ATLAS_WHITE] === 68

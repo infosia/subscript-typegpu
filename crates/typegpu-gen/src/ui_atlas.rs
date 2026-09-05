@@ -110,8 +110,16 @@ pub fn generate_ui_atlas(root: &Path) -> Result<String, String> {
         .into_iter()
         .collect::<Option<Vec<_>>>()
         .ok_or("atlas rect is absent")?;
-    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
-    let mut output = format!("// Generated from third_party/microui/demo/atlas.inl.\n// Source commit: {commit}.\n\nexport const UI_ATLAS_WIDTH: i32 = 128;\nexport const UI_ATLAS_HEIGHT: i32 = 128;\nexport const UI_ATLAS_ALPHA_HEX: string = \"{hex}\";\nexport const UI_ATLAS_WHITE: i32 = 4;\nexport const UI_ATLAS_FONT: i32 = -27;\nexport const UI_TEXT_HEIGHT: i32 = 18;\n");
+    const ALPHA_CHUNK: usize = 4096;
+    let chunks = bytes
+        .chunks(ALPHA_CHUNK / 2)
+        .map(|chunk| {
+            let hex: String = chunk.iter().map(|byte| format!("{byte:02x}")).collect();
+            format!("  \"{hex}\"")
+        })
+        .collect::<Vec<_>>()
+        .join(",\n");
+    let mut output = format!("// Generated from third_party/microui/demo/atlas.inl.\n// Source commit: {commit}.\n\nexport const UI_ATLAS_WIDTH: i32 = 128;\nexport const UI_ATLAS_HEIGHT: i32 = 128;\nexport const UI_ATLAS_ALPHA_CHUNK: i32 = {ALPHA_CHUNK};\nexport const UI_ATLAS_ALPHA_HEX: string[] = [\n{chunks}\n];\nexport const UI_ATLAS_WHITE: i32 = 4;\nexport const UI_ATLAS_FONT: i32 = -27;\nexport const UI_TEXT_HEIGHT: i32 = 18;\n");
     for (column, name) in ["X", "Y", "W", "H"].iter().enumerate() {
         let values = rects
             .iter()
@@ -122,6 +130,6 @@ pub fn generate_ui_atlas(root: &Path) -> Result<String, String> {
             "export const UI_ATLAS_RECT_{name}: i32[] = [{values}];\n"
         ));
     }
-    output.push_str("\nexport function uiAtlasAlpha(): u8[] {\n  const bytes: u8[] = [];\n  for (let i: i32 = 0; i < UI_ATLAS_ALPHA_HEX.length; i += 2) {\n    const high: i32 = UI_ATLAS_ALPHA_HEX.charCodeAt(i);\n    const low: i32 = UI_ATLAS_ALPHA_HEX.charCodeAt(i + 1);\n    bytes.push(((high <= 57 ? high - 48 : high - 87) * 16\n      + (low <= 57 ? low - 48 : low - 87)) as u8);\n  }\n  return bytes;\n}\n");
+    output.push_str("\nexport function uiAtlasAlpha(): u8[] {\n  const bytes: u8[] = [];\n  for (let chunk: i32 = 0; chunk < UI_ATLAS_ALPHA_HEX.length; chunk += 1) {\n    const hex: string = UI_ATLAS_ALPHA_HEX[chunk];\n    for (let i: i32 = 0; i < hex.length; i += 2) {\n      const high: i32 = hex.charCodeAt(i);\n      const low: i32 = hex.charCodeAt(i + 1);\n      bytes.push(((high <= 57 ? high - 48 : high - 87) * 16\n        + (low <= 57 ? low - 48 : low - 87)) as u8);\n    }\n  }\n  return bytes;\n}\n");
     Ok(output)
 }
