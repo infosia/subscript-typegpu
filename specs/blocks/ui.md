@@ -272,9 +272,10 @@ tiers with no GPU. The renderer is the only GPU code.
   declaration in the program, so the program hands the generated
   facts to the library.
   `render(context, pass, width, height)` calls `build`, writes the
-  viewport and the live vertex bytes (four vertices per quad in the
-  frame, not the retained tail) through `Buffer<T>.write`, then for
-  each range calls `setScissorRect` with the clip intersected with the
+  viewport and the retained vertex byte array through
+  `Buffer<T>.write` (the array can carry an earlier frame's tail,
+  which no draw range reaches, and a copy of the live part costs an
+  allocation per frame), then for each range calls `setScissorRect` with the clip intersected with the
   viewport (an empty intersection skips the range) and
   `drawIndexed(indexCount, 1, firstIndex, 0, 0)`. After the last
   range it sets the scissor to the full viewport, so a caller that
