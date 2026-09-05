@@ -467,3 +467,25 @@ fn bitonic_non_power_of_two_length_has_the_named_red_trap() {
     );
     println!("observed red: {}", stdout.trim_end());
 }
+
+#[test]
+fn ui_library_kernels_emit_and_validate_from_imports() {
+    let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
+    files.pop();
+    files.push(SourceFile::new(
+        "ui-library-test.ts",
+        r#"
+import { RenderPipelineSpec, renderPipelineL } from "./typegpu";
+import { UiRenderLayout, UiVertex, UiVarying, uiVertex, uiFragment } from "./typegpu-ui";
+export const ui: RenderPipelineSpec = renderPipelineL<UiRenderLayout, UiVertex, UiVarying>(uiVertex, uiFragment, { format: "rgba8unorm" });
+"#,
+    ));
+    let generated = subscript_typegpu_gen::generate(&files)
+        .unwrap_or_else(|diagnostics| panic!("generate imported UI kernels: {diagnostics:?}"));
+    assert_eq!(generated.pipelines.len(), 1);
+    let wgsl = &generated.pipelines[0].1;
+    assert!(wgsl.contains("fn uiVertex("));
+    assert!(wgsl.contains("fn uiFragment("));
+    assert!(wgsl.contains("textureSample("));
+    validate(wgsl);
+}

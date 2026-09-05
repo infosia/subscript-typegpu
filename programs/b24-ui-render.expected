@@ -1,0 +1,18 @@
+quads 31
+indices 186
+range 0 180 clip 0 0 16777216 16777216
+range 180 6 clip 13 85 88 28
+vertices fnv1a 1253674997
+clip commands true
+clip exit counts true
+clip exit ranges true
+clip exit true
+nested roots and orphan commands true
+root order true
+nested parent exit true
+nested child true
+panel exit true
+second window true
+empty frame counts true
+empty frame storage true
+PASS

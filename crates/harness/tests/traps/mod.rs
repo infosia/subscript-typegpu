@@ -11,12 +11,16 @@ fn repository_root() -> PathBuf {
 }
 
 fn assert_trap(fixture: &Path, expected: &str) {
+    assert_trap_export(fixture, "main", expected);
+}
+
+fn assert_trap_export(fixture: &Path, export: &str, expected: &str) {
     let files = subscript_typegpu_harness::program_files(fixture)
         .unwrap_or_else(|error| panic!("load {}: {error}", fixture.display()));
     let libraries = [subscript_typegpu_harness::facade_library()];
     let mut session = ReloadSession::new_with_native_libraries(&files, &libraries)
         .unwrap_or_else(|error| panic!("compile {} dev: {error}", fixture.display()));
-    let mut trapped = session.call_main().is_err();
+    let mut trapped = session.call_export(export).is_err();
     while !trapped && session.async_pending() != 0 {
         trapped = session.async_step().is_err();
     }
@@ -177,6 +181,24 @@ fn runtime_traps_are_named_and_numbered() {
 #[test]
 fn ui_runtime_traps_are_named_and_numbered() {
     let directory = repository_root().join("crates/harness/tests/fixtures/trap");
+    if super::differential::backend_is_available() {
+        assert_trap(
+            &directory.join("ui-quad-capacity.ts"),
+            "UIT1 UiRenderer.build capacity=1 count=2 (author)",
+        );
+        for (export, expected) in [
+            (
+                "zeroCapacity",
+                "UIT1 UiRenderer capacity=0 maximum=16384 (author)",
+            ),
+            (
+                "excessiveCapacity",
+                "UIT1 UiRenderer capacity=16385 maximum=16384 (author)",
+            ),
+        ] {
+            assert_trap_export(&directory.join("ui-quad-capacity.ts"), export, expected);
+        }
+    }
     for (name, expected) in [
         (
             "ui-container-pool.ts",

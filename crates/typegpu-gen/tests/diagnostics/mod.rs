@@ -227,10 +227,7 @@ fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
                         library_spec.contains(&format!("`{rule}`")),
                         "{rule} trap lacks a library rule-table entry"
                     );
-                    // UIT1 has no fixture because the renderer does not exist yet.
-                    if rule != "UIT1" {
-                        assert_site(&path, 1, rule, &allowed, &fixtures);
-                    }
+                    assert_site(&path, 1, rule, &allowed, &fixtures);
                 }
                 for (line_index, line) in source.lines().enumerate() {
                     if line.contains("uiTrap(") && !line.contains("function uiTrap(") {

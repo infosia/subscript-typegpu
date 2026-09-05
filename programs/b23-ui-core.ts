@@ -160,9 +160,9 @@ function verifyCore(): void {
   context.popClip(); context.popClip(); context.end();
   const lines: string[] = context.dumpCommands();
   check(lines.length === 7 && lines[0] === "clip 10 10 5 5" && lines[1] === "rect 5 5 10 10 #11223344"
-    && lines[2] === "clip 10 10 10 10" && lines[3] === "icon 1 10 10 5 5 #ffffffff"
+    && lines[2] === "clip 0 0 16777216 16777216" && lines[3] === "icon 1 10 10 5 5 #ffffffff"
     && lines[4] === "clip 17 10 3 10" && lines[5] === "text 17 10 #ff0000ff \"A\""
-    && lines[6] === "clip 10 10 10 10", "commands");
+    && lines[6] === "clip 0 0 16777216 16777216", "commands");
   const command: UiCommand = context.commands[1];
   check(command.kind === 2 && command.id === 0 && command.text === "", "command fields");
   const back: UiRoot = new UiRoot(11, new UiRect(0, 0, 100, 100), 1);
