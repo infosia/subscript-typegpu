@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -55,8 +55,8 @@ tiers with no GPU. The renderer is the only GPU code.
   `begin()` and `end()` traps `UIT2`. Rev 2: the context keeps its
   command records, root records, and layout records across frames
   and overwrites them in place. Storage grows when a frame exceeds
-  every earlier frame's count and stays at that size, so that a
-  steady frame allocates only the strings of its text commands.
+  every earlier frame's count, and it stays at that size. A steady
+  frame allocates only the strings of its text commands.
   Nothing in the context depends on `Context.collect()`.
 - **UI5 — Input is pushed as plain values, before `begin()`.**
   `inputMouseMove(x: i32, y: i32)`, `inputMouseDown(x, y, button:
@@ -68,17 +68,20 @@ tiers with no GPU. The renderer is the only GPU code.
   126 and ignores every other code point (UI10). Down and press are
   distinct: down is level state, press is set by `inputMouseDown`
   or `inputKeyDown` and cleared by `end()`.
-- **UI6 — Hover and focus.** For a widget with rect `r` and id `id`:
-  the widget is under the pointer when the pointer is inside `r`,
-  inside the current clip rect, and the widget's root container is
-  the hover root. If it is under the pointer and no button is down,
-  hover is `id`. If it is under the pointer and a press happened this
-  frame, focus is `id`. If focus is `id` and no button is down and
-  the widget lacks `UI_OPT_HOLD_FOCUS`, focus clears. If focus is
-  `id` and a press happened outside `r`, focus clears. If it is not
-  under the pointer, hover clears when hover was `id`. The hover root
-  is the root container with the highest z-index under the pointer,
-  taken from the previous frame's containers (UI4).
+- **UI6 — Hover and focus.** Rev 1. For a widget with rect `r` and
+  id `id`: the widget is under the pointer when the pointer is inside
+  `r`, inside the current clip rect, and the widget's root container
+  is the hover root. The rules apply in this order. If it is under
+  the pointer and no button is down, hover is `id`. If focus is `id`
+  and a press happened outside `r`, focus clears. If focus is `id`,
+  no button is down, and the widget lacks `UI_OPT_HOLD_FOCUS`, focus
+  clears. If hover is `id` and a press happened this frame, focus is
+  `id`. If hover is `id`, no press happened, and the widget is not
+  under the pointer, hover clears. A press therefore focuses a widget
+  only when an earlier frame set hover on it with no button down, so
+  a drag never applies the pointer delta of the press frame. The
+  hover root is the root container with the highest z-index under the
+  pointer, taken from the previous frame's containers (UI4).
 
 ## Layout
 
@@ -92,8 +95,8 @@ tiers with no GPU. The renderer is the only GPU code.
   spacing. `layoutBeginColumn()` and `layoutEndColumn()` nest a
   layout whose position and extents fold back into the outer one.
   `layoutSetNext(rect, relative)` places the next item explicitly.
-  The layout tracks the content extent for scroll and autosize.
-  More than 16 widths trap `UIT3`.
+  The layout tracks the content extent for scroll and autosize, and
+  an extent with no item is 0 by 0. More than 16 widths trap `UIT3`.
 - **UI8 — Containers.** A window is a root container: it has a
   rect, a z-index, and a scroll offset, and a press inside it brings
   it to the front. The title bar (height 24) drags the window, the
@@ -128,16 +131,19 @@ tiers with no GPU. The renderer is the only GPU code.
   reads its value from the pointer's x inside the base rect and
   rounds to `step` when `step` is not 0. A number widget adds the
   pointer's x delta times `step` while focused with the left button
-  down. A textbox appends the frame's text, removes one byte on
-  backspace, and clears focus and reports submit on return.
+  down. A slider and a number widget center their text unless `opt`
+  carries an alignment. A textbox appends the frame's text, removes
+  one byte on backspace, and clears focus and reports submit on
+  return.
   Number editing by shift-click (microui's `number_textbox`) is not
   in version 1.
 - **UI10 — Text.** One font, the atlas glyphs for bytes 32 to 126,
   height `UI_TEXT_HEIGHT`. The width of a string is the sum of its
   glyph widths. A byte outside 32 to 126 has width 0 and draws
-  nothing. A number displays with two decimals, computed with
-  integer arithmetic, rounded half away from zero, with a leading
-  minus sign for a negative value.
+  nothing. A number displays with two decimals: the value times 100
+  is rounded half away from zero to an integer, and the digits come
+  from integer arithmetic, with a leading minus sign for a negative
+  value.
 
 ## The command list
 
@@ -147,9 +153,9 @@ tiers with no GPU. The renderer is the only GPU code.
   (`u32`, packed `0xAABBGGRR`, red in the low byte), `id` (the icon
   index for icon commands), and `text` (a `string`, empty except for
   text commands). Each root container owns one contiguous index
-  range. When a root container opens inside another (a popup inside
-  a window), `end()` groups each root's commands into its own range
-  and keeps the call order inside the range. `end()` publishes
+  range. A root container can open inside another, as a popup opens
+  inside a window. Then `end()` groups each root's commands into its
+  own range and keeps the call order inside the range. `end()` publishes
   `drawOrder(): i32[]`, the root containers by ascending z-index.
   There is no jump command: the renderer and the golden walk the
   ranges in draw order.
@@ -158,11 +164,16 @@ tiers with no GPU. The renderer is the only GPU code.
   outside the clip emits nothing. A rect partly inside emits a clip
   command for the intersection, the rect, then a clip command for
   the current clip. Text partly inside emits the same pair around
-  the text command. A container body pushes its clip for its
-  widgets.
+  the text command. A rect or text whose visible part has a zero
+  width or height emits nothing. A container body pushes its clip
+  for its widgets. Two divergences from microui are deliberate:
+  microui emits a zero-sized command, and microui emits the
+  intersected rect with no clip pair for a partly clipped rect.
 - **UI13 — The golden form.** Rev 1. `dumpCommands(): string[]`
-  renders one line per command in draw order (with no root container
-  in the frame, every command in call order): `clip x y w h`, `rect x y w h
+  renders one line per command in draw order. With no root container
+  in the frame, the order is the call order. With a root container
+  in the frame, a command emitted outside every root is dropped, as
+  microui's jump chain skips it. The lines: `clip x y w h`, `rect x y w h
   #rrggbbaa`, `text x y #rrggbbaa "text"`, `icon n x y w h
   #rrggbbaa`, and after them one line per root container in draw
   order: `container id x y w h scrollX scrollY zindex`. A `b`
