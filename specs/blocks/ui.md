@@ -25,6 +25,9 @@ tiers with no GPU. The renderer is the only GPU code.
   and writes `lib/typegpu-ui-atlas.generated.ts` with:
   `UI_ATLAS_WIDTH` and `UI_ATLAS_HEIGHT` (128), `UI_ATLAS_ALPHA_HEX:
   string`, the 16,384 alpha bytes as 32,768 lowercase hex digits,
+  (the C initializer of `atlas_texture` names 10,584 bytes and C
+  zero-fills the rest of the 16,384-byte array, so the generator
+  zero-fills too and rejects an initializer with more bytes),
   `uiAtlasAlpha(): u8[]` which decodes it, `UI_ATLAS_RECT_X`,
   `UI_ATLAS_RECT_Y`, `UI_ATLAS_RECT_W`, `UI_ATLAS_RECT_H: i32[]`, the
   100 rects in microui's table order (the four icons, the white
