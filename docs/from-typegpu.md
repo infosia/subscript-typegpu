@@ -837,9 +837,15 @@ These subscript-typegpu properties have no equivalent.
 - A window host outside the browser: `tools/window.sh` runs a
   script that exports `init`, `frame`, and `shutdown`, and the host
   owns the window, the surface, and the loop. `frame` carries the
-  size, one key scalar, the pointer position, and the button bits.
-  TypeGPU draws into a canvas through `GPUCanvasContext` and reads
-  DOM events.
+  size, one key scalar, the pointer position, and the button bits,
+  and a script that exports `wheel`, `keyDown`, `keyUp`, or
+  `textInput` receives those events before each frame. TypeGPU draws
+  into a canvas through `GPUCanvasContext` and reads DOM events.
+- An immediate-mode GUI: `lib/typegpu-ui.ts` is a port of
+  [microui](https://github.com/rxi/microui). Widget calls between
+  `begin()` and `end()` produce a command list, and `UiRenderer`
+  draws it through one render pipeline declared by the program.
+  `examples/ui-demo` shows it in a window. TypeGPU has no GUI layer.
 
 ## Where to go next
 

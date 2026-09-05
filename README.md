@@ -140,14 +140,19 @@ tools/window.sh examples/boids/main.ts
 
 A windowed program exports three functions the host calls: `init`
 once, `frame` once per displayed frame (with the size, one key
-scalar, and the pointer), and `shutdown` once.
+scalar, and the pointer), and `shutdown` once. A program that also
+exports `wheel`, `keyDown`, `keyUp`, or `textInput` receives those
+events before each frame.
 
 ## Examples
 
-`examples/` holds twenty programs ported from TypeGPU's example
-set — boids, a grid fluid, slime mold, Conway's life, ray marching,
-clouds, and more. Each file states what it shows and where it
-differs from the TypeGPU original.
+`examples/` holds the programs ported from TypeGPU's example set —
+boids, a grid fluid, slime mold, Conway's life, ray marching, clouds,
+and more. Each file states what it shows and where it differs from
+the TypeGPU original. `examples/ui-demo` is a port of
+[microui](https://github.com/rxi/microui)'s demo: an immediate-mode
+GUI authored in subscript (`lib/typegpu-ui.ts`) and drawn through
+one TypeGPU render pipeline.
 
 ## Documents
 
