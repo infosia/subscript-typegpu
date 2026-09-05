@@ -43,6 +43,19 @@ fn atlas_cli_writes_the_library_result() {
         temp.join("third_party/microui/demo/atlas.inl"),
     )
     .expect("copy atlas data");
+    let gitdir = temp.join("third_party/microui/git-data");
+    std::fs::create_dir_all(&gitdir).expect("create git directory");
+    std::fs::write(temp.join("third_party/microui/.git"), "gitdir: git-data\n")
+        .expect("write gitfile");
+    let commit = support::read(&root.join("lib/typegpu-ui-atlas.generated.ts"))
+        .lines()
+        .nth(1)
+        .expect("source header")
+        .strip_prefix("// Source commit: ")
+        .expect("commit prefix")
+        .trim_end_matches('.')
+        .to_owned();
+    std::fs::write(gitdir.join("HEAD"), &commit).expect("write detached HEAD");
     let result = std::process::Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-gen"))
         .arg("ui-atlas")
         .arg(&temp)
@@ -57,6 +70,18 @@ fn atlas_cli_writes_the_library_result() {
         support::read(&temp.join("lib/typegpu-ui-atlas.generated.ts")),
         subscript_typegpu_gen::generate_ui_atlas(&root).expect("generate atlas")
     );
+    std::fs::create_dir_all(gitdir.join("refs/heads")).expect("create refs");
+    std::fs::write(gitdir.join("refs/heads/main"), &commit).expect("write ref");
+    std::fs::write(gitdir.join("HEAD"), "ref: refs/heads/main\n").expect("write symbolic HEAD");
+    assert_eq!(
+        subscript_typegpu_gen::generate_ui_atlas(&temp).expect("resolve ref"),
+        subscript_typegpu_gen::generate_ui_atlas(&root).expect("generate atlas")
+    );
+    std::fs::remove_file(gitdir.join("refs/heads/main")).expect("remove ref");
+    assert!(subscript_typegpu_gen::generate_ui_atlas(&temp).is_err());
+    std::fs::remove_file(gitdir.join("HEAD")).expect("remove HEAD");
+    assert!(subscript_typegpu_gen::generate_ui_atlas(&temp).is_err());
+    std::fs::write(gitdir.join("HEAD"), &commit).expect("restore HEAD");
     std::fs::write(temp.join("third_party/microui/demo/atlas.inl"), "")
         .expect("write invalid atlas");
     assert!(subscript_typegpu_gen::generate_ui_atlas(&temp).is_err());

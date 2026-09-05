@@ -47,30 +47,7 @@ fn programs() -> Vec<PathBuf> {
 }
 
 fn checked(program: &Path) -> (Generated, hir::Module) {
-    let program_name = program
-        .file_name()
-        .and_then(|name| name.to_str())
-        .expect("UTF-8 program name")
-        .to_owned();
-    let support_name = format!(
-        "{}.typegpu.ts",
-        program
-            .file_stem()
-            .and_then(|name| name.to_str())
-            .expect("UTF-8 program stem")
-    );
-    let mut files = subscript_typegpu_harness::program_files(program).expect("load program files");
-    files.retain(|file| {
-        matches!(
-            file.name.as_str(),
-            "subscript-typegpu.generated.d.ts"
-                | "wire-enum-aliases.generated.d.ts"
-                | "webgpu.ts"
-                | "typegpu-types.ts"
-                | "typegpu.ts"
-        ) || file.name == program_name
-            || file.name == support_name
-    });
+    let files = subscript_typegpu_harness::program_files(program).expect("load program files");
     let inputs = files
         .iter()
         .filter(|file| !file.name.ends_with(".typegpu.ts"))

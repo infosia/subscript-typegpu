@@ -1,0 +1,637 @@
+frame 1
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 278 20 #4b4b4bff
+rect 15 38 278 1 #191919ff
+rect 15 59 278 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 293 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 278 20 #1e1e1eff
+rect 15 86 278 1 #191919ff
+rect 15 107 278 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 293 86 1 22 #191919ff
+rect 42 87 8 20 #4b4b4bff
+rect 42 86 8 1 #191919ff
+rect 42 107 8 1 #191919ff
+rect 41 86 1 22 #191919ff
+rect 50 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "10.00"
+text 20 112 #e6e6e6ff "Label"
+icon 2 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+rect 15 159 278 100 #00000000
+rect 15 158 278 1 #191919ff
+rect 15 259 278 1 #191919ff
+rect 14 158 1 102 #191919ff
+rect 293 158 1 102 #191919ff
+rect 20 164 256 20 #1e1e1eff
+rect 20 163 256 1 #191919ff
+rect 20 184 256 1 #191919ff
+rect 19 163 1 22 #191919ff
+rect 276 163 1 22 #191919ff
+container 1569369246 10 10 300 400 0 0 1
+state button=0 checkbox=true slider=10.00 text="" tree=0 checkboxResponse=0 sliderResponse=0 textboxResponse=0
+frame 2
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 290 20 #4b4b4bff
+rect 15 38 290 1 #191919ff
+rect 15 59 290 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 305 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 290 20 #1e1e1eff
+rect 15 86 290 1 #191919ff
+rect 15 107 290 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 305 86 1 22 #191919ff
+rect 43 87 8 20 #4b4b4bff
+rect 43 86 8 1 #191919ff
+rect 43 107 8 1 #191919ff
+rect 42 86 1 22 #191919ff
+rect 51 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "10.00"
+text 20 112 #e6e6e6ff "Label"
+icon 2 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+rect 15 159 290 100 #00000000
+rect 15 158 290 1 #191919ff
+rect 15 259 290 1 #191919ff
+rect 14 158 1 102 #191919ff
+rect 305 158 1 102 #191919ff
+rect 20 164 280 20 #1e1e1eff
+rect 20 163 280 1 #191919ff
+rect 20 184 280 1 #191919ff
+rect 19 163 1 22 #191919ff
+rect 300 163 1 22 #191919ff
+container 1569369246 10 10 300 400 0 0 1
+state button=0 checkbox=true slider=10.00 text="" tree=0 checkboxResponse=0 sliderResponse=0 textboxResponse=0
+frame 3
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 290 20 #737373ff
+rect 15 38 290 1 #191919ff
+rect 15 59 290 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 305 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 290 20 #1e1e1eff
+rect 15 86 290 1 #191919ff
+rect 15 107 290 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 305 86 1 22 #191919ff
+rect 43 87 8 20 #4b4b4bff
+rect 43 86 8 1 #191919ff
+rect 43 107 8 1 #191919ff
+rect 42 86 1 22 #191919ff
+rect 51 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "10.00"
+text 20 112 #e6e6e6ff "Label"
+icon 2 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+rect 15 159 290 100 #00000000
+rect 15 158 290 1 #191919ff
+rect 15 259 290 1 #191919ff
+rect 14 158 1 102 #191919ff
+rect 305 158 1 102 #191919ff
+rect 20 164 280 20 #1e1e1eff
+rect 20 163 280 1 #191919ff
+rect 20 184 280 1 #191919ff
+rect 19 163 1 22 #191919ff
+rect 300 163 1 22 #191919ff
+container 1569369246 10 10 300 400 0 0 3
+state button=2 checkbox=true slider=10.00 text="" tree=0 checkboxResponse=0 sliderResponse=0 textboxResponse=0
+frame 4
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 290 20 #5f5f5fff
+rect 15 38 290 1 #191919ff
+rect 15 59 290 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 305 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 290 20 #1e1e1eff
+rect 15 86 290 1 #191919ff
+rect 15 107 290 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 305 86 1 22 #191919ff
+rect 43 87 8 20 #4b4b4bff
+rect 43 86 8 1 #191919ff
+rect 43 107 8 1 #191919ff
+rect 42 86 1 22 #191919ff
+rect 51 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "10.00"
+text 20 112 #e6e6e6ff "Label"
+icon 2 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+rect 15 159 290 100 #00000000
+rect 15 158 290 1 #191919ff
+rect 15 259 290 1 #191919ff
+rect 14 158 1 102 #191919ff
+rect 305 158 1 102 #191919ff
+rect 20 164 280 20 #1e1e1eff
+rect 20 163 280 1 #191919ff
+rect 20 184 280 1 #191919ff
+rect 19 163 1 22 #191919ff
+rect 300 163 1 22 #191919ff
+container 1569369246 10 10 300 400 0 0 3
+state button=0 checkbox=true slider=10.00 text="" tree=0 checkboxResponse=0 sliderResponse=0 textboxResponse=0
+frame 5
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 290 20 #4b4b4bff
+rect 15 38 290 1 #191919ff
+rect 15 59 290 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 305 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 290 20 #282828ff
+rect 15 86 290 1 #191919ff
+rect 15 107 290 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 305 86 1 22 #191919ff
+rect 43 87 8 20 #737373ff
+rect 43 86 8 1 #191919ff
+rect 43 107 8 1 #191919ff
+rect 42 86 1 22 #191919ff
+rect 51 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "10.00"
+text 20 112 #e6e6e6ff "Label"
+icon 2 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+rect 15 159 290 100 #00000000
+rect 15 158 290 1 #191919ff
+rect 15 259 290 1 #191919ff
+rect 14 158 1 102 #191919ff
+rect 305 158 1 102 #191919ff
+rect 20 164 280 20 #1e1e1eff
+rect 20 163 280 1 #191919ff
+rect 20 184 280 1 #191919ff
+rect 19 163 1 22 #191919ff
+rect 300 163 1 22 #191919ff
+container 1569369246 10 10 300 400 0 0 3
+state button=0 checkbox=true slider=10.00 text="" tree=0 checkboxResponse=0 sliderResponse=0 textboxResponse=0
+frame 6
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 290 20 #4b4b4bff
+rect 15 38 290 1 #191919ff
+rect 15 59 290 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 305 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 290 20 #282828ff
+rect 15 86 290 1 #191919ff
+rect 15 107 290 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 305 86 1 22 #191919ff
+rect 51 87 8 20 #737373ff
+rect 51 86 8 1 #191919ff
+rect 51 107 8 1 #191919ff
+rect 50 86 1 22 #191919ff
+rect 59 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "13.00"
+text 20 112 #e6e6e6ff "Label"
+icon 2 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+rect 15 159 290 100 #00000000
+rect 15 158 290 1 #191919ff
+rect 15 259 290 1 #191919ff
+rect 14 158 1 102 #191919ff
+rect 305 158 1 102 #191919ff
+rect 20 164 280 20 #1e1e1eff
+rect 20 163 280 1 #191919ff
+rect 20 184 280 1 #191919ff
+rect 19 163 1 22 #191919ff
+rect 300 163 1 22 #191919ff
+container 1569369246 10 10 300 400 0 0 3
+state button=0 checkbox=true slider=13.00 text="" tree=0 checkboxResponse=0 sliderResponse=4 textboxResponse=0
+frame 7
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 290 20 #4b4b4bff
+rect 15 38 290 1 #191919ff
+rect 15 59 290 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 305 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 290 20 #282828ff
+rect 15 86 290 1 #191919ff
+rect 15 107 290 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 305 86 1 22 #191919ff
+rect 62 87 8 20 #737373ff
+rect 62 86 8 1 #191919ff
+rect 62 107 8 1 #191919ff
+rect 61 86 1 22 #191919ff
+rect 70 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "17.00"
+text 20 112 #e6e6e6ff "Label"
+icon 2 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+rect 15 159 290 100 #00000000
+rect 15 158 290 1 #191919ff
+rect 15 259 290 1 #191919ff
+rect 14 158 1 102 #191919ff
+rect 305 158 1 102 #191919ff
+rect 20 164 280 20 #1e1e1eff
+rect 20 163 280 1 #191919ff
+rect 20 184 280 1 #191919ff
+rect 19 163 1 22 #191919ff
+rect 300 163 1 22 #191919ff
+container 1569369246 10 10 300 400 0 0 3
+state button=0 checkbox=true slider=17.00 text="" tree=0 checkboxResponse=0 sliderResponse=4 textboxResponse=0
+frame 8
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 290 20 #4b4b4bff
+rect 15 38 290 1 #191919ff
+rect 15 59 290 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 305 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 290 20 #232323ff
+rect 15 86 290 1 #191919ff
+rect 15 107 290 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 305 86 1 22 #191919ff
+rect 62 87 8 20 #5f5f5fff
+rect 62 86 8 1 #191919ff
+rect 62 107 8 1 #191919ff
+rect 61 86 1 22 #191919ff
+rect 70 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "17.00"
+text 20 112 #e6e6e6ff "Label"
+icon 2 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+rect 15 159 290 100 #00000000
+rect 15 158 290 1 #191919ff
+rect 15 259 290 1 #191919ff
+rect 14 158 1 102 #191919ff
+rect 305 158 1 102 #191919ff
+rect 20 164 280 20 #1e1e1eff
+rect 20 163 280 1 #191919ff
+rect 20 184 280 1 #191919ff
+rect 19 163 1 22 #191919ff
+rect 300 163 1 22 #191919ff
+container 1569369246 10 10 300 400 0 0 3
+state button=0 checkbox=true slider=17.00 text="" tree=0 checkboxResponse=0 sliderResponse=0 textboxResponse=0
+frame 9
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 290 20 #4b4b4bff
+rect 15 38 290 1 #191919ff
+rect 15 59 290 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 305 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 290 20 #1e1e1eff
+rect 15 86 290 1 #191919ff
+rect 15 107 290 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 305 86 1 22 #191919ff
+rect 62 87 8 20 #4b4b4bff
+rect 62 86 8 1 #191919ff
+rect 62 107 8 1 #191919ff
+rect 61 86 1 22 #191919ff
+rect 70 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "17.00"
+text 20 112 #e6e6e6ff "Label"
+icon 2 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+rect 15 159 290 100 #00000000
+rect 15 158 290 1 #191919ff
+rect 15 259 290 1 #191919ff
+rect 14 158 1 102 #191919ff
+rect 305 158 1 102 #191919ff
+rect 20 164 280 20 #282828ff
+rect 20 163 280 1 #191919ff
+rect 20 184 280 1 #191919ff
+rect 19 163 1 22 #191919ff
+rect 300 163 1 22 #191919ff
+rect 25 165 1 18 #e6e6e6ff
+container 1569369246 10 10 300 400 0 0 3
+state button=0 checkbox=true slider=17.00 text="" tree=0 checkboxResponse=0 sliderResponse=0 textboxResponse=0
+frame 10
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 290 20 #4b4b4bff
+rect 15 38 290 1 #191919ff
+rect 15 59 290 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 305 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 290 20 #1e1e1eff
+rect 15 86 290 1 #191919ff
+rect 15 107 290 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 305 86 1 22 #191919ff
+rect 62 87 8 20 #4b4b4bff
+rect 62 86 8 1 #191919ff
+rect 62 107 8 1 #191919ff
+rect 61 86 1 22 #191919ff
+rect 70 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "17.00"
+text 20 112 #e6e6e6ff "Label"
+icon 2 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+rect 15 159 290 100 #00000000
+rect 15 158 290 1 #191919ff
+rect 15 259 290 1 #191919ff
+rect 14 158 1 102 #191919ff
+rect 305 158 1 102 #191919ff
+rect 20 164 280 20 #282828ff
+rect 20 163 280 1 #191919ff
+rect 20 184 280 1 #191919ff
+rect 19 163 1 22 #191919ff
+rect 300 163 1 22 #191919ff
+rect 25 165 1 18 #e6e6e6ff
+container 1569369246 10 10 300 400 0 0 3
+state button=0 checkbox=true slider=17.00 text="" tree=0 checkboxResponse=0 sliderResponse=0 textboxResponse=0
+frame 11
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 290 20 #4b4b4bff
+rect 15 38 290 1 #191919ff
+rect 15 59 290 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 305 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 290 20 #1e1e1eff
+rect 15 86 290 1 #191919ff
+rect 15 107 290 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 305 86 1 22 #191919ff
+rect 62 87 8 20 #4b4b4bff
+rect 62 86 8 1 #191919ff
+rect 62 107 8 1 #191919ff
+rect 61 86 1 22 #191919ff
+rect 70 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "17.00"
+text 20 112 #e6e6e6ff "Label"
+icon 2 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+rect 15 159 290 100 #00000000
+rect 15 158 290 1 #191919ff
+rect 15 259 290 1 #191919ff
+rect 14 158 1 102 #191919ff
+rect 305 158 1 102 #191919ff
+rect 20 164 280 20 #282828ff
+rect 20 163 280 1 #191919ff
+rect 20 184 280 1 #191919ff
+rect 19 163 1 22 #191919ff
+rect 300 163 1 22 #191919ff
+text 25 165 #e6e6e6ff "A"
+rect 32 165 1 18 #e6e6e6ff
+container 1569369246 10 10 300 400 0 0 3
+state button=0 checkbox=true slider=17.00 text="A" tree=0 checkboxResponse=0 sliderResponse=0 textboxResponse=4
+frame 12
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 290 20 #4b4b4bff
+rect 15 38 290 1 #191919ff
+rect 15 59 290 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 305 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 290 20 #1e1e1eff
+rect 15 86 290 1 #191919ff
+rect 15 107 290 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 305 86 1 22 #191919ff
+rect 62 87 8 20 #4b4b4bff
+rect 62 86 8 1 #191919ff
+rect 62 107 8 1 #191919ff
+rect 61 86 1 22 #191919ff
+rect 70 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "17.00"
+text 20 112 #e6e6e6ff "Label"
+icon 2 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+rect 15 159 290 100 #00000000
+rect 15 158 290 1 #191919ff
+rect 15 259 290 1 #191919ff
+rect 14 158 1 102 #191919ff
+rect 305 158 1 102 #191919ff
+rect 20 164 280 20 #1e1e1eff
+rect 20 163 280 1 #191919ff
+rect 20 184 280 1 #191919ff
+rect 19 163 1 22 #191919ff
+rect 300 163 1 22 #191919ff
+text 25 165 #e6e6e6ff "A"
+container 1569369246 10 10 300 400 0 0 3
+state button=0 checkbox=true slider=17.00 text="A" tree=0 checkboxResponse=0 sliderResponse=0 textboxResponse=0
+frame 13
+rect 10 10 300 400 #323232ff
+rect 10 9 300 1 #191919ff
+rect 10 410 300 1 #191919ff
+rect 9 9 1 402 #191919ff
+rect 310 9 1 402 #191919ff
+rect 10 10 300 24 #191919ff
+text 15 13 #f0f0f0ff "Core"
+icon 0 286 10 24 24 #f0f0f0ff
+rect 15 39 290 20 #4b4b4bff
+rect 15 38 290 1 #191919ff
+rect 15 59 290 1 #191919ff
+rect 14 38 1 22 #191919ff
+rect 305 38 1 22 #191919ff
+text 20 40 #e6e6e6ff "Button"
+rect 15 63 20 20 #1e1e1eff
+rect 15 62 20 1 #191919ff
+rect 15 83 20 1 #191919ff
+rect 14 62 1 22 #191919ff
+rect 35 62 1 22 #191919ff
+icon 1 15 63 20 20 #e6e6e6ff
+text 40 64 #e6e6e6ff "Checkbox"
+rect 15 87 290 20 #1e1e1eff
+rect 15 86 290 1 #191919ff
+rect 15 107 290 1 #191919ff
+rect 14 86 1 22 #191919ff
+rect 305 86 1 22 #191919ff
+rect 62 87 8 20 #4b4b4bff
+rect 62 86 8 1 #191919ff
+rect 62 107 8 1 #191919ff
+rect 61 86 1 22 #191919ff
+rect 70 86 1 22 #191919ff
+text 20 88 #e6e6e6ff "17.00"
+text 20 112 #e6e6e6ff "Label"
+rect 15 135 290 20 #5f5f5fff
+rect 15 134 290 1 #191919ff
+rect 15 155 290 1 #191919ff
+rect 14 134 1 22 #191919ff
+rect 305 134 1 22 #191919ff
+icon 3 15 135 20 20 #e6e6e6ff
+text 35 136 #e6e6e6ff "Tree"
+text 44 160 #e6e6e6ff "Inside"
+rect 15 183 290 100 #00000000
+rect 15 182 290 1 #191919ff
+rect 15 283 290 1 #191919ff
+rect 14 182 1 102 #191919ff
+rect 305 182 1 102 #191919ff
+rect 20 188 280 20 #1e1e1eff
+rect 20 187 280 1 #191919ff
+rect 20 208 280 1 #191919ff
+rect 19 187 1 22 #191919ff
+rect 300 187 1 22 #191919ff
+text 25 189 #e6e6e6ff "A"
+container 1569369246 10 10 300 400 0 0 3
+state button=0 checkbox=true slider=17.00 text="A" tree=1 checkboxResponse=0 sliderResponse=0 textboxResponse=0
+PASS

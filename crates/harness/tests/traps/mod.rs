@@ -173,3 +173,18 @@ fn runtime_traps_are_named_and_numbered() {
         assert_trap(&directory.join(name), expected);
     }
 }
+
+#[test]
+fn ui_runtime_traps_are_named_and_numbered() {
+    let directory = repository_root().join("crates/harness/tests/fixtures/trap");
+    for (name, expected) in [
+        ("ui-end-window.ts", "UIT2 endWindow depth=0 (author)"),
+        (
+            "ui-row-widths.ts",
+            "UIT3 layoutRow widths=17 maximum=16 (author)",
+        ),
+    ] {
+        assert_trap(&directory.join(name), expected);
+        println!("{expected}");
+    }
+}

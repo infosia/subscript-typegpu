@@ -13,6 +13,26 @@ fn initializer<'a>(source: &'a str, name: &str) -> Result<&'a str, String> {
 
 /// Read the pinned atlas and return its subscript module.
 pub fn generate_ui_atlas(root: &Path) -> Result<String, String> {
+    let submodule = root.join("third_party/microui");
+    let gitfile = std::fs::read_to_string(submodule.join(".git"))
+        .map_err(|error| format!("read microui gitfile: {error}"))?;
+    let gitdir = gitfile
+        .trim()
+        .strip_prefix("gitdir: ")
+        .ok_or("microui gitfile lacks gitdir")?;
+    let gitdir = submodule.join(gitdir);
+    let head = std::fs::read_to_string(gitdir.join("HEAD"))
+        .map_err(|error| format!("read microui HEAD: {error}"))?;
+    let commit = if let Some(reference) = head.trim().strip_prefix("ref: ") {
+        std::fs::read_to_string(gitdir.join(reference))
+            .map_err(|error| format!("read microui ref {reference}: {error}"))?
+    } else {
+        head
+    };
+    let commit = commit.trim();
+    if commit.len() != 40 || !commit.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("microui HEAD does not resolve to a commit hash".into());
+    }
     let path = root.join("third_party/microui/demo/atlas.inl");
     let source = std::fs::read_to_string(&path)
         .map_err(|error| format!("read {}: {error}", path.display()))?;
@@ -85,7 +105,7 @@ pub fn generate_ui_atlas(root: &Path) -> Result<String, String> {
         .collect::<Option<Vec<_>>>()
         .ok_or("atlas rect is absent")?;
     let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
-    let mut output = format!("// Generated from third_party/microui/demo/atlas.inl.\n// Source commit: 0850aba860959c3e75fb3e97120ca92957f9d057.\n\nexport const UI_ATLAS_WIDTH: i32 = 128;\nexport const UI_ATLAS_HEIGHT: i32 = 128;\nexport const UI_ATLAS_ALPHA_HEX: string = \"{hex}\";\nexport const UI_ATLAS_WHITE: i32 = 4;\nexport const UI_ATLAS_FONT: i32 = -27;\nexport const UI_TEXT_HEIGHT: i32 = 18;\n");
+    let mut output = format!("// Generated from third_party/microui/demo/atlas.inl.\n// Source commit: {commit}.\n\nexport const UI_ATLAS_WIDTH: i32 = 128;\nexport const UI_ATLAS_HEIGHT: i32 = 128;\nexport const UI_ATLAS_ALPHA_HEX: string = \"{hex}\";\nexport const UI_ATLAS_WHITE: i32 = 4;\nexport const UI_ATLAS_FONT: i32 = -27;\nexport const UI_TEXT_HEIGHT: i32 = 18;\n");
     for (column, name) in ["X", "Y", "W", "H"].iter().enumerate() {
         let values = rects
             .iter()
