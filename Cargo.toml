@@ -15,9 +15,9 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/infosia/subscript-typegpu"
 
 [workspace.dependencies]
-subscript-bindgen = { git = "https://github.com/infosia/subscript.git", rev = "587d6da" }
-subscript-compiler = { git = "https://github.com/infosia/subscript.git", rev = "587d6da" }
-subscript-codegen = { git = "https://github.com/infosia/subscript.git", rev = "587d6da" }
+subscript-bindgen = { git = "https://github.com/infosia/subscript.git", rev = "3677d1f" }
+subscript-compiler = { git = "https://github.com/infosia/subscript.git", rev = "3677d1f" }
+subscript-codegen = { git = "https://github.com/infosia/subscript.git", rev = "3677d1f" }
 libloading = "0.8"
 # subscript pins serde exactly. The workspace follows the pin so one serde resolves.
 serde = { version = "=1.0.219", features = ["derive"] }
