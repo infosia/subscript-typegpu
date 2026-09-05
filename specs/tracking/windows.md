@@ -405,7 +405,10 @@ The cause is in subscript's C emitter, which writes a long string
 constant as one literal. Any subscript program with a literal of this
 length fails the ship tier on windows-msvc. The owner decided a
 downstream workaround now, and escalates the emitter limit to
-subscript separately. UI2 Rev 1 holds the workaround: the generator
+subscript separately. Escalated 2026-09-05 as R40, written to subscript's
+`HANDOFF-R40.md`: the emitter splits a long string constant into
+adjacent C literals, with the array form above 65,000 bytes as an
+owner decision. UI2 Rev 1 holds the workaround: the generator
 emits the alpha as an array of hex chunks.
 
 ### The W8 fix
