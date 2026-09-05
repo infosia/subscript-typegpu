@@ -147,3 +147,27 @@ tree. Verification runs on the same trees match within noise. The
 growth tracks the example count (31 examples against 28 at the
 P15 close) and the two new goldens. No step doubles a previous
 row. The live lane with x23 runs 118.76 s on Metal.
+
+## U2, the ui module (2026-09-05)
+
+The warm `--require-backend` gate: 204.29 s at the P16 close, 438.4 s
+at `a8ee882` (269 tests). The live lane on Metal: 118.76 s at the P16
+close, 259.65 s at `a8ee882`. Both are about two times the previous
+row, so both are red under rule 6.
+
+The cause is in the diff. A worktree at `cbbab21` (before the ui
+module) and the tree at `a8ee882`, same binary options, same yawgpu
+Noop library, one program at a time:
+
+| Run | `cbbab21` | `a8ee882` |
+|---|---|---|
+| dev `b04-particles` | 2.84 s | 4.48 s |
+| ship `b04-particles` | 2.03 s | 4.16 s |
+| dev `b01-layout` | 3.87 s | 4.51 s |
+
+The harness and the generator load every `lib/` module for every
+program, so the ui module (about 1,100 lines and a 32 KiB atlas
+string) compiles into every program on both tiers, into every
+example, and into every fixture. The fix is LB1 Rev 2: a program
+compiles with the core set and the modules its imports reach. The
+row after the fix follows.
