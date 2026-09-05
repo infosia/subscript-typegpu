@@ -311,3 +311,6 @@ UIT1
 UIT2
 UIT3
 UIT4
+W2 Rev 3
+W3 Rev 2
+W13 Rev 2

@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -219,13 +219,14 @@ tiers with no GPU. The renderer is the only GPU code.
 
 ## The window
 
-- **UI17 — The host feeds the context.** A windowed example maps
-  W2 values to UI5 calls each frame before `begin()`: the pointer
-  position to `inputMouseMove`, button bit changes to
-  `inputMouseDown` and `inputMouseUp`, and the key scalar to
-  `inputText` when it is 32 to 126. Wheel, key down and up, and
-  text beyond one scalar per frame need W2 Rev 3 (plan §8 U3) and
-  are not in version 1 of the example.
+- **UI17 — The host feeds the context.** Rev 1. A windowed example
+  maps the host's values to UI5 calls each frame before `begin()`:
+  the pointer position to `inputMouseMove`, button bit changes to
+  `inputMouseDown` and `inputMouseUp`, and the W2 Rev 3 entries to
+  their UI5 twins: `wheel` to `inputScroll`, `keyDown` and `keyUp` to
+  `inputKeyDown` and `inputKeyUp`, and `textInput` to `inputText`.
+  The example exports the four optional entries and ignores the
+  `key` parameter of `frame`.
 
 ## Traps
 

@@ -3,7 +3,9 @@
 P9 contract. Rev 0, 2026-08-23. Rev 1 (W2, W6, W11 from the phase
 review), 2026-08-23. Rev 2 (W8, W13 after the first `--frames` run),
 2026-08-23. Rev 3 (W8 Rev 2 exiting path, W9 Rev 1 sRGB), 2026-08-24. Rev 4
-(W2 Rev 2, W3 Rev 1 pointer input), 2026-08-24. Plan §8 P9 governs this block. The
+(W2 Rev 2, W3 Rev 1 pointer input), 2026-08-24. Rev 5 (W2 Rev 3, W3
+Rev 2, W13 Rev 2 optional input entries), 2026-09-05. Plan §8 P9 and
+§8 U3 govern this block. The
 facade side is `facade.md` L14 and `facade-generator.md` F23. The
 script side is the API layer (`api-layer.md`) and the TypeGPU layer.
 
@@ -36,6 +38,14 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   `destroy`) and the view with `new GPUTextureView(view)` and
   disposes neither. The host owns both. A harness test checks the
   three signatures of the example through the HIR.
+  Rev 3: four optional entries. When the script exports them, the
+  host calls `wheel(deltaX: f32, deltaY: f32): void`,
+  `keyDown(key: u32): void`, `keyUp(key: u32): void`, and
+  `textInput(codePoint: u32): void` before `frame`, once per queued
+  event, in event order. A script that exports none of them behaves
+  as before. The signature test accepts the three required entries
+  plus any subset of the four optional ones, each with its exact
+  signature, and no other export.
 - **W3 — The host translates input, the script decides.** Rev 1.
   The host handles five window events: close ends the loop, resize
   reconfigures the surface, a key press stores the key's Unicode
@@ -46,6 +56,17 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   key. Position and buttons are level state, not events: `frame`
   reads the latest value and nothing clears them. The meaning of
   every input is script code.
+  Rev 2: the host queues three more event kinds between frames and
+  delivers them through the W2 Rev 3 entries the script exports,
+  then clears the queue. A wheel event carries pixel deltas: a
+  line delta is 30 pixels per line, and a pixel delta passes as is.
+  A key event for shift, control, alt, backspace, or return carries
+  its bit (1, 2, 4, 8, 16) to `keyDown` on press and to `keyUp` on
+  release, and a repeat counts as a press. A character key press
+  carries each Unicode scalar of the character to `textInput`, and
+  the space key carries 32. The `key` parameter of `frame` keeps its
+  Rev 1 meaning. An event kind whose entry the script does not
+  export is dropped.
 - **W4 — One instance.** The host creates the instance through the
   facade's `subscript_typegpu_create_instance` with the L13 backend
   request, creates the surface on it, and requests the adapter and
@@ -127,9 +148,9 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
 
 ## Gates
 
-- **W13 — What the headless gate holds.** Rev 1. The regeneration
+- **W13 — What the headless gate holds.** Rev 2. The regeneration
   gate over the F23 host-only declarations, the W2 signature test
-  over the example, a harness test that compiles the example on the
+  over the example (Rev 2: the optional entries by exact signature), a harness test that compiles the example on the
   dev tier through the same path the host uses (support module
   generated in memory, every `lib/` file loaded) without a device,
   `cargo build --offline -p subscript-typegpu-window`, and `cargo
