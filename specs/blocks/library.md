@@ -19,7 +19,7 @@ module set. Kernel-subset rules are `kernel.md`
 - **LB3 — A module trap has a documented rule id.** A trap prints
   the rule id, the method, the values, and `(author)`, then stops.
   Rev 1. The trap table: `SORT1` — a sort driver received a length
-  or a pass index outside its stated domain. `UIT1`, `UIT2`, `UIT3` —
+  or a pass index outside its stated domain. `UIT1`, `UIT2`, `UIT3`, `UIT4` —
   the ui module's traps, defined in `ui.md` UI18. A trap id that is
   not in this table is a defect.
 - **LB4 — Module tests.** Every exported GPU function is reached by

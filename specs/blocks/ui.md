@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -52,11 +52,12 @@ tiers with no GPU. The renderer is the only GPU code.
   `end()` orders the root containers by z-index, clears the
   press, key-press, and text-input edge state, and stores the
   pointer position for the next delta. A widget call outside
-  `begin()` and `end()` traps `UIT2`. Rev 1: the context keeps its
+  `begin()` and `end()` traps `UIT2`. Rev 2: the context keeps its
   command records, root records, and layout records across frames
-  and overwrites them in place, so that a frame allocates only the
-  strings of its text commands. Nothing in the context depends on
-  `Context.collect()`.
+  and overwrites them in place. Storage grows when a frame exceeds
+  every earlier frame's count and stays at that size, so that a
+  steady frame allocates only the strings of its text commands.
+  Nothing in the context depends on `Context.collect()`.
 - **UI5 — Input is pushed as plain values, before `begin()`.**
   `inputMouseMove(x: i32, y: i32)`, `inputMouseDown(x, y, button:
   u32)`, `inputMouseUp(x, y, button)`, `inputScroll(dx: i32, dy:
@@ -140,15 +141,18 @@ tiers with no GPU. The renderer is the only GPU code.
 
 ## The command list
 
-- **UI11 — Commands are typed records.** The core appends
+- **UI11 — Commands are typed records.** Rev 1. The core appends
   `UiCommand` records to one host array in call order: `kind` (1
   clip, 2 rect, 3 text, 4 icon), `x`, `y`, `w`, `h` (`i32`), `color`
   (`u32`, packed `0xAABBGGRR`, red in the low byte), `id` (the icon
   index for icon commands), and `text` (a `string`, empty except for
-  text commands). Each root container records the index range it
-  emitted. `end()` publishes `drawOrder(): i32[]`, the root
-  containers by ascending z-index. There is no jump command: the
-  renderer and the golden walk the ranges in draw order.
+  text commands). Each root container owns one contiguous index
+  range. When a root container opens inside another (a popup inside
+  a window), `end()` groups each root's commands into its own range
+  and keeps the call order inside the range. `end()` publishes
+  `drawOrder(): i32[]`, the root containers by ascending z-index.
+  There is no jump command: the renderer and the golden walk the
+  ranges in draw order.
 - **UI12 — Clipping.** A clip stack starts at the unbounded rect.
   `pushClip(r)` intersects, `popClip()` restores. A rect or icon
   outside the clip emits nothing. A rect partly inside emits a clip
@@ -214,11 +218,12 @@ tiers with no GPU. The renderer is the only GPU code.
 
 ## Traps
 
-- **UI18 — The trap table** (LB3): `UIT1` — a frame exceeded the
-  renderer's quad capacity. `UIT2` — a widget or layout call
-  outside `begin()` and `end()`, or an `end*` call without its
+- **UI18 — The trap table** (LB3). Rev 1. `UIT1` — a frame
+  exceeded the renderer's quad capacity. `UIT2` — a widget or layout
+  call outside `begin()` and `end()`, or an `end*` call without its
   `begin*`. `UIT3` — `layoutRow` received more than 16 widths.
-  Each trap has a demonstrated red.
+  `UIT4` — a frame needed a 49th container or tree node, so the
+  pool had no slot to evict. Each trap has a demonstrated red.
 
 ## Tests
 
