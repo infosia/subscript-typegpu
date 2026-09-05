@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -209,9 +209,17 @@ tiers with no GPU. The renderer is the only GPU code.
   `rgba8unorm`, every channel the alpha byte, uploaded once through
   `writeTextureBytes`. No library module imports a generated support
   module.
-- **UI15 — The frame builder.** Rev 2. `UiRenderer` is created with
-  the device, the program's pipeline facts, and a quad capacity,
-  default 16,384. `UiPipelineFacts` holds the WGSL, the two entry
+- **UI15 — The frame builder.** Rev 3. `UiRenderer` is created by
+  one of two static factories with the program's pipeline facts and
+  a quad capacity, default 16,384: `UiRenderer.create(device:
+  GPUDevice, facts, capacity)` for a device the script owns, and
+  `UiRenderer.createHost(device: GPUHostOwnedDevice, facts,
+  capacity)` for the window host's device (W2), on the precedent of
+  `createRenderPipelineHost` and `createBindGroupHost`. Each factory
+  creates the resources through its device class, takes the queue
+  once (`device.queue` for a `GPUDevice`, `device.queue()` for a
+  host-owned device, which the renderer then owns and disposes), and
+  hands them to the constructor. `render` writes through that queue. `UiPipelineFacts` holds the WGSL, the two entry
   names, the bind group layout, the vertex buffer layout, and the
   program's `RenderPipelineSpec`. The renderer derives the two
   strides itself from `Context.bytesOf`. A capacity of 0 or above
