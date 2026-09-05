@@ -280,3 +280,9 @@ run of `examples/ui-demo` and the decision to merge `imgui` into
 `main`. Recorded for a later phase, not for this branch: number
 editing by shift-click, a proportional font atlas, a `Root`-shaped
 API over the renderer facts.
+
+## The owner's run (2026-09-05)
+
+The owner ran `examples/ui-demo` on yawgpu Metal (4,709 frames) and on
+Dawn (343 frames) and accepted the visual result. The open item is
+closed. The branch waits for the merge decision.
