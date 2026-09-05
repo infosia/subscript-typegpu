@@ -20,18 +20,21 @@ tiers with no GPU. The renderer is the only GPU code.
   (EX6). Where this block states a number or a rule, microui's
   `src/microui.c` at the pin is the reference. Where this block is
   silent, the pin decides.
-- **UI2 — The atlas module is generated.** `tools/regen.sh` runs
-  `tools/gen-ui-atlas.mjs`, which reads
-  `third_party/microui/demo/atlas.inl` and writes
-  `lib/typegpu-ui-atlas.generated.ts` with: `UI_ATLAS_WIDTH` and
-  `UI_ATLAS_HEIGHT` (128), `UI_ATLAS_ALPHA_HEX: string`, the 16,384
-  alpha bytes as 32,768 lowercase hex digits, `uiAtlasAlpha(): u8[]`
-  which decodes it once, `UI_ATLAS_RECT_X/Y/W/H: i32[]`, the 100
-  rects in microui's table order (the four icons, the white rect,
-  the 95 glyphs for bytes 32 to 126), and `UI_TEXT_HEIGHT` (18). The
-  module carries the source URL and the pinned commit in its header.
-  Regeneration is byte-identical (core principle 7). The tool runs
-  under `node`, as `tools/gen-layout-vectors.mjs` does.
+- **UI2 — The atlas module is generated.** `subscript-typegpu-gen
+  ui-atlas <repo-root>` reads `third_party/microui/demo/atlas.inl`
+  and writes `lib/typegpu-ui-atlas.generated.ts` with:
+  `UI_ATLAS_WIDTH` and `UI_ATLAS_HEIGHT` (128), `UI_ATLAS_ALPHA_HEX:
+  string`, the 16,384 alpha bytes as 32,768 lowercase hex digits,
+  `uiAtlasAlpha(): u8[]` which decodes it, `UI_ATLAS_RECT_X`,
+  `UI_ATLAS_RECT_Y`, `UI_ATLAS_RECT_W`, `UI_ATLAS_RECT_H: i32[]`, the
+  100 rects in microui's table order (the four icons, the white
+  rect, the 95 glyphs for bytes 32 to 126), `UI_ATLAS_WHITE` (the
+  white rect's index), `UI_ATLAS_FONT` (the index of the glyph for
+  byte 0, so that byte `b` is at `UI_ATLAS_FONT + b`), and
+  `UI_TEXT_HEIGHT` (18). The module header names the source path and
+  the pinned commit. `tools/regen.sh` runs the subcommand. A
+  generator test regenerates the module in memory and compares it
+  byte for byte with the committed file (core principle 7).
 - **UI3 — Ids.** An id is a `u32`, FNV-1a over the label's bytes:
   the seed is the id stack's top, or 2166136261 when the stack is
   empty, and each byte `b` from `charCodeAt` applies
