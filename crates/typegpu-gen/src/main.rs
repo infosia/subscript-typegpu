@@ -52,33 +52,10 @@ fn run() -> Result<(), String> {
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or_else(|| format!("program has no UTF-8 file name: {}", program.display()))?;
-    let files = [
-        SourceFile::ambient(
-            "subscript-typegpu.generated.d.ts",
-            read(&library.join("subscript-typegpu.generated.d.ts"))?,
-        ),
-        SourceFile::ambient(
-            "wire-enum-aliases.generated.d.ts",
-            read(&library.join("wire-enum-aliases.generated.d.ts"))?,
-        ),
-        SourceFile::new("webgpu.ts", read(&library.join("webgpu.ts"))?),
-        SourceFile::new("typegpu-types.ts", read(&library.join("typegpu-types.ts"))?),
-        SourceFile::new("typegpu.ts", read(&library.join("typegpu.ts"))?),
-        SourceFile::new("typegpu-color.ts", read(&library.join("typegpu-color.ts"))?),
-        SourceFile::new("typegpu-noise.ts", read(&library.join("typegpu-noise.ts"))?),
-        SourceFile::new(
-            "typegpu-radiance-cascades.ts",
-            read(&library.join("typegpu-radiance-cascades.ts"))?,
-        ),
-        SourceFile::new("typegpu-sdf.ts", read(&library.join("typegpu-sdf.ts"))?),
-        SourceFile::new("typegpu-sort.ts", read(&library.join("typegpu-sort.ts"))?),
-        SourceFile::new(
-            "typegpu-ui-atlas.generated.ts",
-            read(&library.join("typegpu-ui-atlas.generated.ts"))?,
-        ),
-        SourceFile::new("typegpu-ui.ts", read(&library.join("typegpu-ui.ts"))?),
-        SourceFile::new(program_name, read(&program)?),
-    ];
+    let program_file = SourceFile::new(program_name, read(&program)?);
+    let mut files = subscript_typegpu_gen::load_library_files(&library, &program_file)
+        .map_err(|error| error.to_string())?;
+    files.push(program_file);
     let generated = subscript_typegpu_gen::generate(&files)
         .map_err(|diagnostics| subscript_compiler::render_diagnostics(&files, &diagnostics))?;
     std::fs::create_dir_all(&output)

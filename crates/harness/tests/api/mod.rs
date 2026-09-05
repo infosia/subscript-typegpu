@@ -36,21 +36,12 @@ fn program_files_have_the_required_order_names_and_modes() {
             "webgpu.ts",
             "typegpu-types.ts",
             "typegpu.ts",
-            "typegpu-color.ts",
-            "typegpu-noise.ts",
-            "typegpu-radiance-cascades.ts",
-            "typegpu-sdf.ts",
-            "typegpu-sort.ts",
-            "typegpu-ui-atlas.generated.ts",
-            "typegpu-ui.ts",
             "a01-smoke.ts",
         ]
     );
     assert_eq!(
         files.iter().map(|file| file.dts).collect::<Vec<_>>(),
-        vec![
-            true, true, false, false, false, false, false, false, false, false, false, false, false
-        ]
+        vec![true, true, false, false, false, false]
     );
 }
 
@@ -70,13 +61,6 @@ fn typegpu_program_files_end_with_generated_support() {
             "webgpu.ts",
             "typegpu-types.ts",
             "typegpu.ts",
-            "typegpu-color.ts",
-            "typegpu-noise.ts",
-            "typegpu-radiance-cascades.ts",
-            "typegpu-sdf.ts",
-            "typegpu-sort.ts",
-            "typegpu-ui-atlas.generated.ts",
-            "typegpu-ui.ts",
             "b01-layout.ts",
             "b01-layout.typegpu.ts",
         ]
@@ -87,6 +71,49 @@ fn typegpu_program_files_end_with_generated_support() {
             .is_some_and(|file| file.source.contains("Particle_STRIDE")),
         "generated support lacks Particle_STRIDE"
     );
+}
+
+#[test]
+fn ui_program_files_include_ui_and_atlas_without_sort() {
+    let program = repository_root().join("programs/b23-ui-core.ts");
+    let files = subscript_typegpu_harness::program_files(&program).expect("load UI program files");
+    let names = files
+        .iter()
+        .map(|file| file.name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        names,
+        vec![
+            "subscript-typegpu.generated.d.ts",
+            "wire-enum-aliases.generated.d.ts",
+            "webgpu.ts",
+            "typegpu-types.ts",
+            "typegpu.ts",
+            "typegpu-ui-atlas.generated.ts",
+            "typegpu-ui.ts",
+            "b23-ui-core.ts",
+        ]
+    );
+    assert!(!names.contains(&"typegpu-sort.ts"));
+}
+
+#[test]
+fn invalid_program_imports_preserve_compiler_diagnostics() {
+    let directory = std::env::temp_dir().join(format!(
+        "subscript-typegpu-invalid-import-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&directory).expect("create invalid-program directory");
+    let program = directory.join("invalid-import.ts");
+    std::fs::write(&program, "import { UiContext } from ;").expect("write invalid import");
+    let error = subscript_typegpu_harness::load_program(&program)
+        .err()
+        .expect("invalid import must fail");
+    let diagnostics = error.diagnostics().expect("retain parser diagnostics");
+    assert!(diagnostics.contains("invalid-import.ts"), "{diagnostics}");
+    assert!(diagnostics.contains("S100"), "{diagnostics}");
+    assert!(error.summary().starts_with("compile: rejected with "));
+    std::fs::remove_dir_all(directory).expect("remove invalid-program directory");
 }
 
 #[test]

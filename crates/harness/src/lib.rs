@@ -359,48 +359,17 @@ fn ship_facade_library() -> Result<NativeLibrary, String> {
     })
 }
 
-fn library_files() -> Result<Vec<SourceFile>, String> {
-    let directory = repository_root().join("lib");
-    let entries = std::fs::read_dir(&directory)
-        .map_err(|error| format!("read {}: {error}", directory.display()))?;
-    let mut paths = entries
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_file())
-        .collect::<Vec<_>>();
-    const LIBRARY_ORDER: [&str; 5] = [
-        "subscript-typegpu.generated.d.ts",
-        "wire-enum-aliases.generated.d.ts",
-        "webgpu.ts",
-        "typegpu-types.ts",
-        "typegpu.ts",
-    ];
-    paths.sort_by_key(|path| {
-        let name = path.file_name().and_then(OsStr::to_str).unwrap_or("");
-        (
-            LIBRARY_ORDER
-                .iter()
-                .position(|candidate| *candidate == name)
-                .unwrap_or(LIBRARY_ORDER.len()),
-            name.to_owned(),
-        )
-    });
-    paths
-        .into_iter()
-        .map(|path| {
-            let name = path
-                .file_name()
-                .and_then(OsStr::to_str)
-                .ok_or_else(|| format!("library file has no UTF-8 name: {}", path.display()))?;
-            let source = std::fs::read_to_string(&path)
-                .map_err(|error| format!("read {}: {error}", path.display()))?;
-            if name.ends_with(".d.ts") {
-                Ok(SourceFile::ambient(name, source))
-            } else {
-                Ok(SourceFile::new(name, source))
+fn library_files(program: &SourceFile) -> Result<Vec<SourceFile>, ProgramLoadError> {
+    subscript_typegpu_gen::load_library_files(&repository_root().join("lib"), program).map_err(
+        |error| match error {
+            subscript_typegpu_gen::LibraryLoadError::Read(message) => {
+                ProgramLoadError::message(message)
             }
-        })
-        .collect()
+            subscript_typegpu_gen::LibraryLoadError::Parse { file, diagnostics } => {
+                ProgramLoadError::rejected(&[file], diagnostics)
+            }
+        },
+    )
 }
 
 fn prepare_program(program: &Path) -> Result<Vec<SourceFile>, ProgramLoadError> {
@@ -410,8 +379,9 @@ fn prepare_program(program: &Path) -> Result<Vec<SourceFile>, ProgramLoadError> 
     let program_source = std::fs::read_to_string(program).map_err(|error| {
         ProgramLoadError::message(format!("read {}: {error}", program.display()))
     })?;
-    let mut files = library_files().map_err(ProgramLoadError::message)?;
-    files.push(SourceFile::new(format!("{stem}.ts"), program_source));
+    let program_file = SourceFile::new(format!("{stem}.ts"), program_source);
+    let mut files = library_files(&program_file)?;
+    files.push(program_file);
     let support_module = format!("./{stem}.typegpu");
     let mut options = subscript_compiler::CheckOptions::default();
     options.poison_missing_modules = vec![support_module.clone()];
@@ -432,7 +402,7 @@ fn prepare_program(program: &Path) -> Result<Vec<SourceFile>, ProgramLoadError> 
     Ok(files)
 }
 
-/// Loads every library, the program, and its generated support module.
+/// Loads the core sources, import-reachable library modules, the program, and its generated support module.
 pub fn program_files(program: &Path) -> Result<Vec<SourceFile>, String> {
     prepare_program(program).map_err(|error| error.to_string())
 }

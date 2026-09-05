@@ -6,6 +6,89 @@ use subscript_compiler::SourceFile;
 
 use crate::support;
 
+#[test]
+fn ui_import_reaches_the_atlas_in_library_order() {
+    let program = SourceFile::new("ui-import.ts", "import { UiContext } from './typegpu-ui';");
+    let files = subscript_typegpu_gen::load_library_files(&support::root().join("lib"), &program)
+        .expect("load transitive UI imports");
+    assert_eq!(
+        files
+            .iter()
+            .map(|file| file.name.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "subscript-typegpu.generated.d.ts",
+            "wire-enum-aliases.generated.d.ts",
+            "webgpu.ts",
+            "typegpu-types.ts",
+            "typegpu.ts",
+            "typegpu-ui-atlas.generated.ts",
+            "typegpu-ui.ts",
+        ]
+    );
+}
+
+#[test]
+fn import_text_in_comments_and_strings_does_not_reach_modules() {
+    let program = SourceFile::new(
+        "import-text.ts",
+        r#"
+// import { UiContext } from "./typegpu-ui";
+/* import { sdDisk } from "./typegpu-sdf"; */
+const text: string = 'import { randSeed } from "./typegpu-noise";';
+const template: string = `import { bitonicSortStep } from "./typegpu-sort";`;
+import { Missing } from "./unregistered";
+"#,
+    );
+    let files = subscript_typegpu_gen::load_library_files(&support::root().join("lib"), &program)
+        .expect("load core sources");
+    assert_eq!(files.len(), 5);
+    assert_eq!(files.last().expect("core source").name, "typegpu.ts");
+}
+
+#[test]
+fn cyclic_imports_load_each_module_once_and_skip_unreached_files() {
+    let directory = std::env::temp_dir().join(format!(
+        "subscript-typegpu-module-cycle-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&directory).expect("create library directory");
+    for name in [
+        "subscript-typegpu.generated.d.ts",
+        "wire-enum-aliases.generated.d.ts",
+        "webgpu.ts",
+        "typegpu-types.ts",
+        "typegpu.ts",
+    ] {
+        std::fs::copy(support::root().join("lib").join(name), directory.join(name))
+            .expect("copy core source");
+    }
+    std::fs::write(
+        directory.join("typegpu-sort.ts"),
+        "import { noise } from './typegpu-noise';",
+    )
+    .expect("write sort import");
+    std::fs::write(
+        directory.join("typegpu-noise.ts"),
+        "import { sort } from './typegpu-sort';",
+    )
+    .expect("write noise import");
+    let program = SourceFile::new(
+        "cycle.ts",
+        "import { sort } from './typegpu-sort';\nimport { noise } from './typegpu-noise';",
+    );
+    let files = subscript_typegpu_gen::load_library_files(&directory, &program)
+        .expect("load cyclic imports without other optional modules");
+    assert_eq!(files.len(), 7);
+    assert_eq!(files[5].name, "typegpu-noise.ts");
+    assert_eq!(files[6].name, "typegpu-sort.ts");
+    std::fs::remove_file(directory.join("typegpu-noise.ts")).expect("remove reached module");
+    let error = subscript_typegpu_gen::load_library_files(&directory, &program)
+        .expect_err("missing reached module must fail");
+    assert!(error.to_string().contains("typegpu-noise.ts"), "{error}");
+    std::fs::remove_dir_all(directory).expect("remove library directory");
+}
+
 fn validate(wgsl: &str) {
     let module = naga::front::wgsl::parse_str(wgsl)
         .unwrap_or_else(|error| panic!("WGSL parse failed:\n{}", error.emit_to_string(wgsl)));
@@ -196,9 +279,7 @@ fn every_library_method_has_the_sc6_body() {
 
 #[test]
 fn sdf_library_helpers_emit_and_validate() {
-    let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
-    files.pop();
-    files.push(SourceFile::new(
+    let files = support::source_files(SourceFile::new(
         "sdf-library-test.ts",
         r#"
 import { Vec2f, Vec3f } from "./typegpu-types";
@@ -244,9 +325,7 @@ export const sdf: ComputePipelineSpec = computePipeline<Layout>(sdfKernel, { nam
 
 #[test]
 fn radiance_cascade_library_helpers_emit_and_validate() {
-    let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
-    files.pop();
-    files.push(SourceFile::new(
+    let files = support::source_files(SourceFile::new(
         "radiance-cascade-library-test.ts",
         r#"
 import { Vec2f, Vec2u, Vec4f } from "./typegpu-types";
@@ -320,9 +399,7 @@ fn radiance_cascade_host_helpers_return_committed_dimensions_and_sides() {
 
 #[test]
 fn noise_library_helpers_emit_and_validate() {
-    let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
-    files.pop();
-    files.push(SourceFile::new(
+    let files = support::source_files(SourceFile::new(
         "noise-library-test.ts",
         r#"
 import { Vec3f } from "./typegpu-types";
@@ -358,9 +435,7 @@ export const noise: ComputePipelineSpec = computePipeline<Layout>(noiseKernel, {
 
 #[test]
 fn color_library_helpers_emit_and_validate() {
-    let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
-    files.pop();
-    files.push(SourceFile::new(
+    let files = support::source_files(SourceFile::new(
         "color-library-test.ts",
         r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
@@ -406,9 +481,7 @@ export const color: ComputePipelineSpec = computePipeline<Layout>(colorKernel, {
 
 #[test]
 fn sort_library_kernels_emit_and_validate_from_imports() {
-    let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
-    files.pop();
-    files.push(SourceFile::new(
+    let files = support::source_files(SourceFile::new(
         "sort-library-test.ts",
         r#"
 import { ComputePipelineSpec, computePipeline } from "./typegpu";
@@ -470,9 +543,7 @@ fn bitonic_non_power_of_two_length_has_the_named_red_trap() {
 
 #[test]
 fn ui_library_kernels_emit_and_validate_from_imports() {
-    let mut files = support::program_files(&support::root().join("programs/b01-layout.ts"));
-    files.pop();
-    files.push(SourceFile::new(
+    let files = support::source_files(SourceFile::new(
         "ui-library-test.ts",
         r#"
 import { RenderPipelineSpec, renderPipelineL } from "./typegpu";

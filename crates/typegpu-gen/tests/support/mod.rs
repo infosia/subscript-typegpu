@@ -19,38 +19,18 @@ pub(crate) fn b01_files() -> Vec<SourceFile> {
 }
 
 pub(crate) fn program_files(program: &Path) -> Vec<SourceFile> {
-    let root = root();
     let name = program
         .file_name()
         .expect("program file name")
         .to_string_lossy();
-    vec![
-        SourceFile::ambient(
-            "subscript-typegpu.generated.d.ts",
-            read(&root.join("lib/subscript-typegpu.generated.d.ts")),
-        ),
-        SourceFile::ambient(
-            "wire-enum-aliases.generated.d.ts",
-            read(&root.join("lib/wire-enum-aliases.generated.d.ts")),
-        ),
-        SourceFile::new("webgpu.ts", read(&root.join("lib/webgpu.ts"))),
-        SourceFile::new("typegpu-types.ts", read(&root.join("lib/typegpu-types.ts"))),
-        SourceFile::new("typegpu.ts", read(&root.join("lib/typegpu.ts"))),
-        SourceFile::new("typegpu-color.ts", read(&root.join("lib/typegpu-color.ts"))),
-        SourceFile::new("typegpu-noise.ts", read(&root.join("lib/typegpu-noise.ts"))),
-        SourceFile::new(
-            "typegpu-radiance-cascades.ts",
-            read(&root.join("lib/typegpu-radiance-cascades.ts")),
-        ),
-        SourceFile::new("typegpu-sdf.ts", read(&root.join("lib/typegpu-sdf.ts"))),
-        SourceFile::new("typegpu-sort.ts", read(&root.join("lib/typegpu-sort.ts"))),
-        SourceFile::new(
-            "typegpu-ui-atlas.generated.ts",
-            read(&root.join("lib/typegpu-ui-atlas.generated.ts")),
-        ),
-        SourceFile::new("typegpu-ui.ts", read(&root.join("lib/typegpu-ui.ts"))),
-        SourceFile::new(name, read(program)),
-    ]
+    source_files(SourceFile::new(name, read(program)))
+}
+
+pub(crate) fn source_files(program: SourceFile) -> Vec<SourceFile> {
+    let mut files = subscript_typegpu_gen::load_library_files(&root().join("lib"), &program)
+        .expect("load program libraries");
+    files.push(program);
+    files
 }
 
 pub(crate) fn b_programs() -> Vec<PathBuf> {

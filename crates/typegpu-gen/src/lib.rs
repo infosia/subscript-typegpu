@@ -3,6 +3,7 @@
 mod emit;
 mod kernel;
 pub mod layout;
+mod library;
 mod mapping;
 mod pipeline;
 mod render;
@@ -10,6 +11,7 @@ mod schema;
 mod shell;
 mod ui_atlas;
 
+pub use library::{load_library_files, LibraryLoadError};
 pub use ui_atlas::generate_ui_atlas;
 
 use std::collections::BTreeSet;
@@ -121,21 +123,7 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
 }
 
 fn is_library_file(name: &str) -> bool {
-    matches!(
-        name,
-        "webgpu.ts"
-            | "typegpu-types.ts"
-            | "typegpu.ts"
-            | "typegpu-color.ts"
-            | "typegpu-noise.ts"
-            | "typegpu-radiance-cascades.ts"
-            | "typegpu-sdf.ts"
-            | "typegpu-sort.ts"
-            | "typegpu-ui-atlas.generated.ts"
-            | "typegpu-ui.ts"
-            | "subscript-typegpu.generated.d.ts"
-            | "wire-enum-aliases.generated.d.ts"
-    )
+    library::LIBRARY_ORDER.contains(&name)
 }
 
 fn discovery_options(files: &[SourceFile]) -> Result<CheckOptions, Vec<Diagnostic>> {
