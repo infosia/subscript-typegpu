@@ -394,6 +394,7 @@ fn failures(source: &Path) -> Vec<String> {
 #[test]
 fn every_authored_binding_access_uses_the_index_form() {
     let failures = subscript_typegpu_harness::run_program_pool(authored_sources(), failures)
+        .unwrap_or_else(|error| panic!("{error}"))
         .into_iter()
         .flat_map(|(_, failures)| failures)
         .collect::<Vec<_>>();

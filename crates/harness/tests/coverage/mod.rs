@@ -64,7 +64,9 @@ fn dev_corpus_matches_committed_facade_coverage() {
     );
     for (_, coverage) in subscript_typegpu_harness::run_program_pool(live_programs, |program| {
         crate::differential::run_dev_with_coverage(program).1
-    }) {
+    })
+    .unwrap_or_else(|error| panic!("{error}"))
+    {
         reached.extend(coverage);
     }
     let all = subscript_typegpu_harness::native_symbols_generated::facade_export_names()

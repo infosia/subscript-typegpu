@@ -113,7 +113,8 @@ pub(crate) unsafe fn surface_symbol<T: Copy>(name: &'static [u8]) -> Result<T, S
     unsafe { table.library.get::<T>(name) }
         .map(|symbol| *symbol)
         .map_err(|error| {
-            let name = std::str::from_utf8(&name[..name.len() - 1]).unwrap_or("<invalid>");
+            let name = std::str::from_utf8(name.split_last().map_or(name, |(_, prefix)| prefix))
+                .unwrap_or("<invalid>");
             format!("missing symbol {name}: {error}")
         })
 }
@@ -166,10 +167,10 @@ pub(crate) fn store_adapter_info_strings(parent: usize, strings: [String; 4]) ->
             length: 0,
         });
     };
-    std::array::from_fn(|index| RecordFill {
+    stored.each_ref().map(|string| RecordFill {
         value: 0,
-        data: stored[index].as_ptr() as usize,
-        length: stored[index].len(),
+        data: string.as_ptr() as usize,
+        length: string.len(),
     })
 }
 
@@ -585,6 +586,16 @@ pub fn subscript_typegpu_internal_owned_handle_release_count() -> usize {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::indexing_slicing
+    )]
+
     use super::*;
 
     #[test]

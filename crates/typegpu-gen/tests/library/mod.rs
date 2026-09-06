@@ -182,7 +182,7 @@ fn main() {{
             .expect("compile fixture");
 {runner_body}
         session.take_output()
-    }});
+    }}).unwrap_or_else(|error| panic!("compiler thread: {{error}}"));
     std::io::stdout().write_all(&output).expect("write output");
 }}
 "#
@@ -215,6 +215,12 @@ fn main() {{
         .expect("run host fixture");
     std::fs::remove_dir_all(&scratch)
         .unwrap_or_else(|error| panic!("remove {}: {error}", scratch.display()));
+    assert!(
+        run.status.success(),
+        "host runner failed:\n{}\n{}",
+        String::from_utf8_lossy(&run.stdout),
+        String::from_utf8_lossy(&run.stderr),
+    );
     run
 }
 

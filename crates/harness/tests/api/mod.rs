@@ -15,7 +15,8 @@ fn repository_root() -> PathBuf {
 fn compiler_stack_returns_the_body_value_from_a_different_thread() {
     let caller = std::thread::current().id();
     let (value, body_thread) =
-        subscript_typegpu_harness::run_on_compiler_stack(move || (42, std::thread::current().id()));
+        subscript_typegpu_harness::run_on_compiler_stack(move || (42, std::thread::current().id()))
+            .expect("compiler thread");
     assert_eq!(value, 42);
     assert_ne!(body_thread, caller);
 }
@@ -220,4 +221,50 @@ fn facade_library_has_the_generated_symbols_and_header_directory() {
         rendered.matches("(\"subscript_typegpu_").count(),
         super::FACADE_EXPORT_COUNT
     );
+}
+
+#[test]
+fn compiler_stack_returns_panics_as_errors() {
+    let error = subscript_typegpu_harness::run_on_compiler_stack(|| panic!("compiler failure"))
+        .expect_err("compiler panic must return an error");
+    assert_eq!(error, "join compiler thread: compiler failure");
+    let error = subscript_typegpu_harness::run_on_compiler_stack(|| std::panic::panic_any(42))
+        .expect_err("non-string panic must return an error");
+    assert_eq!(
+        error,
+        "join compiler thread: program worker panicked without a string message"
+    );
+}
+
+#[test]
+fn program_pool_returns_sorted_values_and_accepts_empty_input() {
+    let programs = vec![PathBuf::from("b.ts"), PathBuf::from("a.ts")];
+    let outputs =
+        subscript_typegpu_harness::run_program_pool(programs, |program| program.to_path_buf())
+            .expect("program pool");
+    assert_eq!(
+        outputs,
+        vec![
+            (PathBuf::from("a.ts"), PathBuf::from("a.ts")),
+            (PathBuf::from("b.ts"), PathBuf::from("b.ts")),
+        ]
+    );
+    assert!(
+        subscript_typegpu_harness::run_program_pool(Vec::new(), |_| ())
+            .expect("empty program pool")
+            .is_empty()
+    );
+}
+
+#[test]
+fn program_pool_returns_all_failures_in_program_path_order() {
+    let programs = vec![PathBuf::from("b.ts"), PathBuf::from("a.ts")];
+    let completed = std::sync::atomic::AtomicUsize::new(0);
+    let error = subscript_typegpu_harness::run_program_pool(programs, |program| {
+        completed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        panic!("failed {}", program.display());
+    })
+    .expect_err("worker panics must return an error");
+    assert_eq!(error, "a.ts: failed a.ts\nb.ts: failed b.ts");
+    assert_eq!(completed.load(std::sync::atomic::Ordering::Relaxed), 2);
 }

@@ -1,7 +1,18 @@
 //! The generated WebGPU facade.
 
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::indexing_slicing
+)]
 #![warn(missing_docs)]
 
+// subscript-typegpu-webgpu-gen emits the symbol-name slice.
+#[allow(clippy::indexing_slicing)]
 #[rustfmt::skip]
 pub mod generated;
 mod runtime;
@@ -12,6 +23,16 @@ pub use generated::*;
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::indexing_slicing
+    )]
+
     use super::*;
     use std::process::Command;
 

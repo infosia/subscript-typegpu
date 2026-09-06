@@ -1,5 +1,15 @@
 //! The headless development and ship-tier harness.
 
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::indexing_slicing
+)]
+
 /// The facade export table, plus one wrapper per export that counts its calls (T8).
 #[path = "native_symbols.generated.rs"]
 #[rustfmt::skip]
@@ -36,15 +46,17 @@ static PROGRAM_POOL_LOCK: Mutex<()> = Mutex::new(());
 /// Runs `body` on a thread with the stack that the subscript compiler needs.
 /// The dev tier compiles in the calling process on Windows, where the main
 /// thread holds 1 MB. This function gives every platform the same stack.
-pub fn run_on_compiler_stack<T: Send + 'static>(body: impl FnOnce() -> T + Send + 'static) -> T {
+/// Thread spawn and join failures return errors.
+pub fn run_on_compiler_stack<T: Send + 'static>(
+    body: impl FnOnce() -> T + Send + 'static,
+) -> Result<T, String> {
     let thread = std::thread::Builder::new()
         .stack_size(8 * 1024 * 1024)
         .spawn(body)
-        .unwrap_or_else(|error| panic!("spawn compiler thread: {error}"));
-    match thread.join() {
-        Ok(value) => value,
-        Err(payload) => std::panic::resume_unwind(payload),
-    }
+        .map_err(|error| format!("spawn compiler thread: {error}"))?;
+    thread
+        .join()
+        .map_err(|payload| format!("join compiler thread: {}", panic_message(payload)))
 }
 
 fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
@@ -58,8 +70,12 @@ fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
 }
 
 /// Runs per-program work on the shared four-worker pool.
+/// Returns results or worker failures in program-path order.
 #[doc(hidden)]
-pub fn run_program_pool<R, F>(mut programs: Vec<PathBuf>, task: F) -> Vec<(PathBuf, R)>
+pub fn run_program_pool<R, F>(
+    mut programs: Vec<PathBuf>,
+    task: F,
+) -> Result<Vec<(PathBuf, R)>, String>
 where
     R: Send,
     F: Fn(&Path) -> R + Sync,
@@ -104,14 +120,15 @@ where
             })
         })
         .collect::<Vec<_>>();
-    assert!(failures.is_empty(), "{}", failures.join("\n"));
+    if !failures.is_empty() {
+        return Err(failures.join("\n"));
+    }
     outcomes
         .into_iter()
         .map(|(program, outcome)| {
-            let value = outcome.unwrap_or_else(|error| {
-                panic!("program pool omitted the reported failure: {error}")
-            });
-            (program, value)
+            let value = outcome
+                .map_err(|error| format!("program pool omitted the reported failure: {error}"))?;
+            Ok((program, value))
         })
         .collect()
 }
@@ -282,50 +299,51 @@ struct CoverageMemory {
     len: usize,
 }
 
-static COVERAGE_MEMORY: OnceLock<CoverageMemory> = OnceLock::new();
+static COVERAGE_MEMORY: OnceLock<Result<CoverageMemory, String>> = OnceLock::new();
 
-fn coverage_counts() -> &'static [AtomicU64] {
-    let memory = COVERAGE_MEMORY.get_or_init(|| {
-        let len = native_symbols_generated::facade_export_names().len();
-        #[cfg(unix)]
-        let address = {
-            let byte_len = len
-                .checked_mul(std::mem::size_of::<AtomicU64>())
-                .expect("facade coverage array size");
-            // SAFETY: The anonymous shared mapping remains live for the process lifetime.
-            // Its zeroed storage is valid for `AtomicU64`.
-            let address = unsafe {
-                libc::mmap(
-                    std::ptr::null_mut(),
-                    byte_len,
-                    libc::PROT_READ | libc::PROT_WRITE,
-                    libc::MAP_SHARED | libc::MAP_ANON,
-                    -1,
-                    0,
-                )
+fn coverage_counts() -> Result<&'static [AtomicU64], String> {
+    let memory = COVERAGE_MEMORY
+        .get_or_init(|| {
+            let len = native_symbols_generated::facade_export_names().len();
+            #[cfg(unix)]
+            let address = {
+                let byte_len = len
+                    .checked_mul(std::mem::size_of::<AtomicU64>())
+                    .ok_or_else(|| "facade coverage array size".to_owned())?;
+                // SAFETY: The anonymous shared mapping remains live for the process lifetime.
+                // Its zeroed storage is valid for `AtomicU64`.
+                let address = unsafe {
+                    libc::mmap(
+                        std::ptr::null_mut(),
+                        byte_len,
+                        libc::PROT_READ | libc::PROT_WRITE,
+                        libc::MAP_SHARED | libc::MAP_ANON,
+                        -1,
+                        0,
+                    )
+                };
+                if address == libc::MAP_FAILED {
+                    return Err("allocate facade coverage counters".to_owned());
+                }
+                address as usize
             };
-            assert_ne!(
-                address,
-                libc::MAP_FAILED,
-                "allocate facade coverage counters"
-            );
-            address as usize
-        };
-        #[cfg(not(unix))]
-        let address = {
-            let counters = (0..len)
-                .map(|_| AtomicU64::new(0))
-                .collect::<Vec<_>>()
-                .into_boxed_slice();
-            // SAFETY: The leaked allocation remains live for the process lifetime.
-            // Each counter starts at zero with valid `AtomicU64` storage.
-            Box::leak(counters).as_ptr() as usize
-        };
-        CoverageMemory { address, len }
-    });
+            #[cfg(not(unix))]
+            let address = {
+                let counters = (0..len)
+                    .map(|_| AtomicU64::new(0))
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice();
+                // SAFETY: The leaked allocation remains live for the process lifetime.
+                // Each counter starts at zero with valid `AtomicU64` storage.
+                Box::leak(counters).as_ptr() as usize
+            };
+            Ok(CoverageMemory { address, len })
+        })
+        .as_ref()
+        .map_err(Clone::clone)?;
     // SAFETY: `coverage_counts` creates this process-lifetime storage at exactly
     // `len * size_of::<AtomicU64>()` bytes and never changes its address or length.
-    unsafe { std::slice::from_raw_parts(memory.address as *const AtomicU64, memory.len) }
+    Ok(unsafe { std::slice::from_raw_parts(memory.address as *const AtomicU64, memory.len) })
 }
 
 /// Counts one call of the facade export at `index` in `facade_export_names()`.
@@ -333,26 +351,29 @@ fn coverage_counts() -> &'static [AtomicU64] {
 /// The generated native symbol wrappers call this. The counters live in one shared anonymous
 /// mapping, so a forked dev-tier child records into the parent's array.
 ///
-/// # Panics
-///
-/// Panics when `index` is outside the export table.
+/// Ignores an index outside the export table or unavailable counters.
 pub(crate) fn coverage_hit(index: usize) {
-    coverage_counts()[index].fetch_add(1, Ordering::Relaxed);
-}
-
-fn coverage_reset() {
-    for counter in coverage_counts() {
-        counter.store(0, Ordering::Relaxed);
+    if let Ok(counters) = coverage_counts() {
+        if let Some(counter) = counters.get(index) {
+            counter.fetch_add(1, Ordering::Relaxed);
+        }
     }
 }
 
-fn coverage_reached() -> Vec<String> {
-    native_symbols_generated::facade_export_names()
+fn coverage_reset() -> Result<(), String> {
+    for counter in coverage_counts()? {
+        counter.store(0, Ordering::Relaxed);
+    }
+    Ok(())
+}
+
+fn coverage_reached() -> Result<Vec<String>, String> {
+    Ok(native_symbols_generated::facade_export_names()
         .iter()
-        .zip(coverage_counts())
+        .zip(coverage_counts()?)
         .filter(|(_, counter)| counter.load(Ordering::Relaxed) != 0)
         .map(|(name, _)| (*name).to_owned())
-        .collect()
+        .collect())
 }
 
 fn ship_facade_library() -> Result<NativeLibrary, String> {
@@ -512,11 +533,11 @@ pub fn run_dev(program: &Path) -> Result<Vec<u8>, String> {
 
 /// Runs one program through the development JIT and returns the facade exports reached.
 pub fn run_dev_with_coverage(program: &Path) -> Result<(Vec<u8>, Vec<String>), String> {
-    coverage_reset();
+    coverage_reset()?;
     let session = load_program_with_library(program, facade_counting_library())
         .map_err(|error| error.to_string())?;
     let bytes = run_session(session)?;
-    Ok((bytes, coverage_reached()))
+    Ok((bytes, coverage_reached()?))
 }
 
 /// Separates a dev program's stderr from its facade coverage report.
@@ -543,5 +564,42 @@ pub fn backend_lib() -> Result<Option<PathBuf>, String> {
             "SUBSCRIPT_TYPEGPU_BACKEND_LIB points at {}, which is not a file",
             path.display()
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::indexing_slicing
+    )]
+
+    use super::*;
+
+    #[test]
+    fn coverage_ignores_out_of_range_indices_and_counts_valid_calls() {
+        coverage_reset().expect("reset coverage");
+        let counters = coverage_counts().expect("coverage counters");
+        assert!(!counters.is_empty());
+        coverage_hit(counters.len());
+        coverage_hit(usize::MAX);
+        assert!(coverage_reached().expect("coverage report").is_empty());
+        coverage_hit(0);
+        coverage_hit(0);
+        coverage_hit(counters.len() - 1);
+        assert_eq!(counters[0].load(Ordering::Relaxed), 2);
+        assert_eq!(counters[counters.len() - 1].load(Ordering::Relaxed), 1);
+        let names = native_symbols_generated::facade_export_names();
+        assert_eq!(
+            coverage_reached().expect("coverage report"),
+            vec![names[0], names[names.len() - 1]]
+        );
+        coverage_reset().expect("reset coverage");
+        assert!(coverage_reached().expect("coverage report").is_empty());
     }
 }

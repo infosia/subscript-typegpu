@@ -91,7 +91,7 @@ fn run() -> Result<Vec<u8>, String> {
 }
 
 fn main() -> ExitCode {
-    match subscript_typegpu_harness::run_on_compiler_stack(run) {
+    match subscript_typegpu_harness::run_on_compiler_stack(run).and_then(|result| result) {
         Ok(bytes) => match std::io::stdout().write_all(&bytes) {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {

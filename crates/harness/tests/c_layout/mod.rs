@@ -351,5 +351,6 @@ fn schema_and_header_layouts_match_the_engine_for_every_b_program() {
                 name
             );
         }
-    });
+    })
+    .unwrap_or_else(|error| panic!("{error}"));
 }

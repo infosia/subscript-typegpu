@@ -198,6 +198,7 @@ fn run_suite() -> Vec<ProgramOutput> {
             program: program.to_path_buf(),
         }
     })
+    .unwrap_or_else(|error| panic!("{error}"))
     .into_iter()
     .map(|(_, output)| output)
     .collect()

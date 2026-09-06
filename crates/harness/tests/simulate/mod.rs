@@ -520,6 +520,7 @@ fn every_simulation_call_uses_its_generated_pipeline_pair() {
         }
         failures
     })
+    .unwrap_or_else(|error| panic!("{error}"))
     .into_iter()
     .flat_map(|(_, failures)| failures)
     .collect::<Vec<_>>();

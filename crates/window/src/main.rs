@@ -728,7 +728,9 @@ fn run() -> Result<(), WindowError> {
 
 fn main() {
     #[cfg(windows)]
-    let result = subscript_typegpu_harness::run_on_compiler_stack(run);
+    let result = subscript_typegpu_harness::run_on_compiler_stack(run)
+        .map_err(WindowError::Host)
+        .and_then(|result| result);
     #[cfg(not(windows))]
     let result = run();
     match result {
