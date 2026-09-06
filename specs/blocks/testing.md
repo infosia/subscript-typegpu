@@ -211,3 +211,22 @@ principles" govern this block.
   EG11 rests on this equality, and T20 removes the method form from
   every program, so this test is the only cover for the emitter's
   method arms.
+
+- **T22 — Library code has no panic site.** Rev 0, 2026-09-06. Core
+  principle 6 in the gate: every library crate root
+  (`crates/typegpu-gen`, `crates/harness`, `crates/webgpu-gen`,
+  `crates/facade`) denies `clippy::unwrap_used`,
+  `clippy::expect_used`, `clippy::panic`, `clippy::unreachable`,
+  `clippy::todo`, `clippy::unimplemented`, and
+  `clippy::indexing_slicing`, and `cargo clippy --workspace -- -D
+  warnings` is the gate. A `#[cfg(test)]` module allows them. A
+  binary (`main.rs`) and an integration test are not library code.
+  An internal invariant that fails returns an error: in the
+  generators a `Diagnostic` whose message starts with `internal:` and
+  names the site, in the harness a `ProgramLoadError` or a `String`
+  error, and a `#[no_mangle]` or `extern "C"` function that cannot
+  return an error clamps or ignores the value and never unwinds. An
+  `internal:` diagnostic needs no fixture, because no program reaches
+  it, and the diagnostics test exempts that prefix. Generated
+  library files carry the lints through their generator. Arithmetic
+  overflow is outside this rule.
