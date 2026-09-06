@@ -45,6 +45,9 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
 
 - **SC5 — Vectors and matrices are `@CStruct` classes in
   `lib/typegpu-types.ts`**, hand-written, with the R33 alignment.
+  (The file also holds the `Vec*b` classes of K26, the atomic classes
+  of K21, and the indirect blocks of PI17, so this list is the vector
+  and matrix set, not the file.)
   The generator recognizes them by declaring file and class name,
   never by name alone:
   `Vec2f`, `Vec2i`, `Vec2u` (`align: 8`), `Vec3f`, `Vec3i`, `Vec3u`,
@@ -63,7 +66,7 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
   | `Vec2f`, `Vec3f`, `Vec4f` | `add`, `sub`, `mul`, `scale`, `dot`, `length`, `normalize`. `Vec3f` adds `cross` |
   | `Vec2i`, `Vec3i`, `Vec4i`, `Vec2u`, `Vec3u`, `Vec4u` | `add`, `sub`, `mul`, `scale`, `dot` |
   | `Vec2h`, `Vec3h`, `Vec4h` | none (SC8) |
-  | `Mat2x2f`, `Mat3x3f`, `Mat4x4f` | `mul` (matrix × matrix), `mulVec` (matrix × vector), `transpose`, and a free `identity` factory |
+  | `Mat2x2f`, `Mat3x3f`, `Mat4x4f` | `mul` (matrix × matrix), `mulVec` (matrix × vector), `transpose`, and the free factories `mat2x2fIdentity`, `mat3x3fIdentity`, `mat4x4fIdentity` |
 
   `kernel.md` extends the set in P2.
 - **SC7 — Constructors.** Rev 1, 2026-08-25 (the factory root,

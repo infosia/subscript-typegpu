@@ -37,8 +37,9 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   is `f32`, `i32`, `u32`, `boolean`, a library vector or matrix, a
   schema class, or a `FixedArray` of those. `f16` is storage-only
   (LY11 spirit): a kernel reads and writes an `f16` field through an
-  `f32` conversion only when `kernel.md` Rev 1 admits it. In P2 an
-  `f16` field access in a kernel is a diagnostic.
+  `f32` conversion only when a later revision admits it. No revision
+  admits it yet: an `f16` field access in a kernel is a diagnostic,
+  and the `vec2h`, `vec3h`, and `vec4h` factories are host code.
 - **K5 — Rejected types.** `string`, `T[]`, `Map`, `Set`, a reference
   class, `Nullable`, a function value, `f64`, `i64`, `u64`, `i8`,
   `u8`, `i16`, `u16`, `Date`, `RegExp`, `object`, a `Worker`. Each is

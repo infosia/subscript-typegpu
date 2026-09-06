@@ -21,6 +21,8 @@ function sortTrap(method: string, values: string): void {
   unreachable();
 }
 
+// The two parameters of one bitonic step. `k` is the span whose bit picks the sort direction,
+// and `jShift` is the base-2 logarithm of the compare stride.
 @CStruct
 export class BitonicSortPass {
   k: u32;
@@ -32,6 +34,8 @@ export class BitonicSortPass {
   }
 }
 
+// The layout `bitonicSortStep` reads. `values` holds a power-of-two count of `u32` keys, and
+// `pass` carries the parameters of the current step.
 export class BitonicSortResources {
   values!: MutStorage<u32>;
   pass!: Uniform<BitonicSortPass>;
@@ -53,8 +57,8 @@ function requireBitonicSortLength(length: u32): void {
   }
 }
 
-// The host asks for one pass at a time, which lets a windowed caller submit one step
-// per frame while a batch caller can enumerate the same sequence without duplicating it.
+// The host asks for one pass at a time. A windowed caller submits one step per
+// frame, and a batch caller enumerates the same sequence.
 export function bitonicSortPassCount(length: u32): u32 {
   requireBitonicSortLength(length);
   let levels: u32 = 0;
@@ -66,6 +70,8 @@ export function bitonicSortPassCount(length: u32): u32 {
   return levels * (levels + 1) / 2;
 }
 
+// Returns the parameters of pass `passIndex`, counted from zero in dispatch order. SORT1 traps
+// when `passIndex` reaches the pass count, or when `length` is not a power of two.
 export function bitonicSortPass(length: u32, passIndex: u32): BitonicSortPass {
   const count: u32 = bitonicSortPassCount(length);
   if (passIndex >= count) {
@@ -91,9 +97,9 @@ export function bitonicSortPass(length: u32, passIndex: u32): BitonicSortPass {
   return new BitonicSortPass(0, 0);
 }
 
-// Dispatch length / 2 threads because one invocation owns one comparator pair.
-// Committing the ascending comparator here replaces the upstream comparator slot while
-// retaining each bitonic merge direction.
+// Dispatch length / 2 threads: one invocation owns one comparator pair. The
+// ascending comparator replaces the upstream comparator slot and keeps each
+// bitonic merge direction.
 export function bitonicSortStep(
   resources: BitonicSortResources,
   invocation: ComputeInvocation,
@@ -113,11 +119,15 @@ export function bitonicSortStep(
   }
 }
 
+// The layout `prefixScanBlockF32` reads. `values` holds the padded input, and `sums` receives
+// one block total for each workgroup.
 export class PrefixScanBlockResources {
   values!: MutStorage<f32>;
   sums!: MutStorage<f32>;
 }
 
+// The layout `prefixScanApplyF32` reads. `offsets` holds the scanned block sums, one for each
+// workgroup.
 export class PrefixScanApplyResources {
   values!: MutStorage<f32>;
   offsets!: Storage<f32>;
@@ -185,6 +195,8 @@ function requirePrefixScanLength(length: u32): void {
   }
 }
 
+// The host sizing of one scan. `paddedLength` rounds the input up to whole 256-value blocks,
+// and `blockCount` counts them.
 @CStruct
 export class PrefixScanPlanF32 {
   paddedLength: u32;
@@ -196,6 +208,8 @@ export class PrefixScanPlanF32 {
   }
 }
 
+// Returns the plan for `length` values. SORT1 traps at zero and above 65536 values, because the
+// driver scans the block sums one time only.
 export function prefixScanPlanF32(length: u32): PrefixScanPlanF32 {
   requirePrefixScanLength(length);
   const blockCount: u32 = (length + SORT_WORKGROUP_SIZE - 1) / SORT_WORKGROUP_SIZE;
@@ -252,8 +266,8 @@ function prefixScanBlockHostF32(values: f32[], start: u32): f32 {
   return total;
 }
 
-// This mirrors both GPU scan levels and the apply pass, including their f32 addition
-// order, so a readback can be compared byte for byte rather than with a tolerance.
+// The host body mirrors both GPU scan levels and the apply pass, with the same
+// f32 addition order, so a readback compares byte for byte with no tolerance.
 export function prefixScanHostF32(input: f32[]): f32[] {
   const plan: PrefixScanPlanF32 = prefixScanPlanF32(input.length as u32);
   const values: f32[] = [];
