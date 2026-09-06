@@ -1,5 +1,6 @@
 //! The headless development and ship-tier harness.
 
+/// The facade export table, plus one wrapper per export that counts its calls (T8).
 #[path = "native_symbols.generated.rs"]
 #[rustfmt::skip]
 pub mod native_symbols_generated;
@@ -327,6 +328,14 @@ fn coverage_counts() -> &'static [AtomicU64] {
     unsafe { std::slice::from_raw_parts(memory.address as *const AtomicU64, memory.len) }
 }
 
+/// Counts one call of the facade export at `index` in `facade_export_names()`.
+///
+/// The generated native symbol wrappers call this. The counters live in one shared anonymous
+/// mapping, so a forked dev-tier child records into the parent's array.
+///
+/// # Panics
+///
+/// Panics when `index` is outside the export table.
 pub(crate) fn coverage_hit(index: usize) {
     coverage_counts()[index].fetch_add(1, Ordering::Relaxed);
 }

@@ -395,6 +395,7 @@ pub(crate) struct SliceSection {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FunctionRow {
+    /// The exact webgpu.yml function name.
     pub name: String,
     /// Only `create` in the generator.
     pub pattern: String,
@@ -422,6 +423,7 @@ pub(crate) struct MapRow {
 pub(crate) struct ExcludeRow {
     /// `object.method`, or `addref` for the implicit AddRef family.
     pub construct: String,
+    /// Why the construct stays out of the subset (F18).
     pub reason: String,
 }
 
@@ -441,6 +443,7 @@ pub(crate) struct HostOnlyRow {
 pub(crate) struct ExportExcludeRow {
     /// Exact generated `subscript_typegpu_*` export name.
     pub name: String,
+    /// Why no program and no API-layer member reaches the export (F22).
     pub reason: String,
 }
 
@@ -450,6 +453,7 @@ pub(crate) struct ExportExcludeRow {
 pub(crate) struct ConstantRow {
     /// `bitflag.<name>` or `enum.<name>`.
     pub source: String,
+    /// Why the generated Rust needs this constant set.
     pub reason: String,
 }
 
@@ -462,6 +466,7 @@ pub(crate) struct RenameRow {
     pub construct: String,
     /// Exact public replacement name.
     pub to: String,
+    /// Why the public name differs from the derived one (F2).
     pub reason: String,
 }
 
@@ -473,6 +478,7 @@ pub(crate) struct SentinelRow {
     pub construct: String,
     /// The pinned yml constant substituted when the facade field is zero.
     pub zero_maps_to: String,
+    /// Why the field needs a zero rule instead of the sentinel (F15).
     pub reason: String,
 }
 
@@ -484,6 +490,7 @@ pub(crate) struct ChainFlatteningRow {
     pub construct: String,
     /// Extension fields exposed directly on the public descriptor.
     pub fields: Vec<String>,
+    /// Why the extension fields belong on the public descriptor (F12).
     pub reason: String,
 }
 

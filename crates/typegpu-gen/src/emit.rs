@@ -9,6 +9,10 @@ use crate::render::RenderPipeline;
 use crate::schema::Schema;
 use subscript_compiler::{hir::Module, Diagnostic, Pos, RuleCode, Type};
 
+/// Builds the name of the generated bind-group factory of one declaration and group (EG1).
+///
+/// The declaration name gains an uppercase first letter, so `step` with group 0 gives
+/// `createStepBindGroup0`.
 pub(crate) fn bind_group_factory_name(declaration: &str, group: u32) -> String {
     let mut chars = declaration.chars();
     let Some(first) = chars.next() else {
@@ -153,6 +157,8 @@ fn wgsl_type(tree: &TypeTree) -> String {
     }
 }
 
+/// Reports whether the tree holds an `f16` scalar or vector, which puts `enable f16;` on the
+/// module.
 pub(crate) fn uses_f16(tree: &TypeTree) -> bool {
     match tree {
         TypeTree::Scalar(Scalar::F16) => true,
@@ -165,6 +171,10 @@ pub(crate) fn uses_f16(tree: &TypeTree) -> bool {
     }
 }
 
+/// Renders the WGSL `struct` text of one schema, with its fields in declaration order (SC12).
+///
+/// The text carries no `@align` and no `@size` attribute. A schema whose tree is not a struct
+/// gives an empty string.
 pub(crate) fn wgsl_struct(schema: &Schema) -> String {
     let TypeTree::Struct(structure) = &schema.tree else {
         return String::new();
@@ -185,6 +195,10 @@ pub(crate) fn wgsl_struct(schema: &Schema) -> String {
     out
 }
 
+/// Joins the schema structs into the support module's WGSL text.
+///
+/// The text opens with `enable f16;` when a schema holds an `f16` type. One blank line separates
+/// the structs, which keep the order of `structs`.
 pub(crate) fn wgsl_module(schemas: &[Schema], structs: &[(String, String)]) -> String {
     let mut out = String::new();
     if schemas.iter().any(|schema| uses_f16(&schema.tree)) {
@@ -322,6 +336,15 @@ fn emit_binding_entry(
     Ok(())
 }
 
+/// Renders the subscript support module of one program (SC13).
+///
+/// The module carries the layout constants of every schema (SC11). It also carries the pipeline
+/// facts, the bind-group layout specs (PI8, RN10), and the resource factories (EG1).
+///
+/// # Errors
+///
+/// Returns a PI5 diagnostic when the layout engine cannot size a binding item, and an RN9
+/// diagnostic when neither render kernel reaches a binding.
 pub(crate) fn support_module(
     module: &Module,
     schemas: &[Schema],

@@ -14,6 +14,10 @@ use weedle::Definition;
 
 use crate::idl::NamespaceConstant;
 
+/// One WebIDL type, reduced to the shapes the API join needs.
+///
+/// A type outside those shapes becomes `Other`, which the join rejects at its use site rather
+/// than here. A typedef resolves to its target before it reaches this enum.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum IdlType {
     Undefined,
@@ -28,13 +32,21 @@ pub(crate) enum IdlType {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One argument of a WebIDL operation.
 pub(crate) struct IdlArgument {
+    /// The IDL argument name, kept for the emitted parameter.
     pub name: String,
+    /// The resolved argument type.
     pub ty: IdlType,
+    /// The IDL marks the argument `optional`.
     pub optional: bool,
+    /// The IDL default, already rendered as subscript source text.
     pub default: Option<String>,
 }
 
+/// What one IDL member is, and the data its emission needs.
+///
+/// `Special` covers the members the API layer never emits, such as a constructor or a stringifier.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum IdlMemberKind {
     Attribute {
@@ -57,13 +69,19 @@ pub(crate) enum IdlMemberKind {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One member of an IDL interface, dictionary, namespace, or enum.
 pub(crate) struct IdlMember {
+    /// The interface, dictionary, namespace, or enum that owns the member. A mixin or parent
+    /// member carries the name of the construct that includes it, not its own source name.
     pub owner: String,
+    /// The IDL member name.
     pub name: String,
+    /// What the member is, and the data its emission needs.
     pub kind: IdlMemberKind,
 }
 
 impl IdlMember {
+    /// The `owner.name` key that a policy row names (J9).
     pub fn key(&self) -> String {
         format!("{}.{}", self.owner, self.name)
     }
@@ -82,6 +100,10 @@ struct DictionaryDef {
     members: Vec<IdlMember>,
 }
 
+/// The pinned GPUWeb IDL, merged and owned.
+///
+/// The model holds the definitions as declared. It resolves inheritance, mixins, and typedefs
+/// only when a lookup asks for members.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct IdlModel {
     interfaces: BTreeMap<String, InterfaceDef>,
@@ -94,6 +116,14 @@ pub(crate) struct IdlModel {
 }
 
 impl IdlModel {
+    /// Builds the model from the parsed IDL definitions and the extracted namespace constants.
+    ///
+    /// Partial interfaces, mixins, and `includes` statements merge into their target. `weedle2`
+    /// does not parse namespace constants, so `constants` supplies them (see `idl`).
+    ///
+    /// # Errors
+    ///
+    /// Returns a message for a duplicate definition or an unsupported IDL construct.
     pub fn from_definitions(
         definitions: &[Definition<'_>],
         constants: &[NamespaceConstant],
@@ -200,6 +230,15 @@ impl IdlModel {
         Ok(model)
     }
 
+    /// The interface's own members, in declaration order, then each included mixin's members.
+    ///
+    /// Inherited members do not appear. `interface_parent` reports the parent separately. Every
+    /// returned member carries `name` as its owner, and every type is resolved through typedefs.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message for an unknown interface, an interface with partial definitions only,
+    /// an unknown included mixin, or a duplicate member name.
     pub fn interface_members(&self, name: &str) -> Result<Vec<IdlMember>, String> {
         let definition = self
             .interfaces
@@ -230,6 +269,11 @@ impl IdlModel {
             .collect()
     }
 
+    /// The interface's declared parent, or `None` when it inherits nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message for an unknown interface, or one with partial definitions only.
     pub fn interface_parent(&self, name: &str) -> Result<Option<&str>, String> {
         let definition = self
             .interfaces
@@ -243,6 +287,12 @@ impl IdlModel {
         Ok(definition.inheritance.as_deref())
     }
 
+    /// The dictionary's members, inherited ones first, each owned by `name`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message for an unknown dictionary, an inheritance cycle, or a member name that
+    /// a parent and a child both declare.
     pub fn dictionary_members(&self, name: &str) -> Result<Vec<IdlMember>, String> {
         let mut visiting = BTreeSet::new();
         let mut members = Vec::new();
@@ -279,6 +329,11 @@ impl IdlModel {
         Ok(())
     }
 
+    /// The namespace's constants, in declaration order.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message for an unknown namespace or a duplicate constant name.
     pub fn namespace_members(&self, name: &str) -> Result<Vec<IdlMember>, String> {
         let members = self
             .namespaces
@@ -289,6 +344,11 @@ impl IdlModel {
         Ok(members)
     }
 
+    /// The enum's string values, in declaration order.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message for an unknown enum or a duplicate value.
     pub fn enum_members(&self, name: &str) -> Result<Vec<IdlMember>, String> {
         let members = self
             .enums
@@ -640,39 +700,66 @@ fn own_default(value: &DefaultValue<'_>) -> Result<String, String> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One parameter of a mirror function declaration.
 pub(crate) struct MirrorParam {
+    /// The parameter name as `subscript bind` spelled it.
     pub name: String,
+    /// The mirror type text, unparsed.
     pub ty: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One `declare function` of the mirror: a facade export as the script sees it.
 pub(crate) struct MirrorFunction {
+    /// The facade export name.
     pub name: String,
+    /// The parameters in declaration order.
     pub params: Vec<MirrorParam>,
+    /// The mirror return type text, unparsed.
     pub return_type: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One field of a mirror class: a boundary struct member as the script sees it.
 pub(crate) struct MirrorField {
+    /// The field name as `subscript bind` spelled it.
     pub name: String,
+    /// The mirror type text, unparsed.
     pub ty: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One `declare enum` of the mirror, with the pinned numeric value of each member.
 pub(crate) struct MirrorEnum {
+    /// Member name to value, sorted by name.
     pub members: BTreeMap<String, i64>,
 }
 
 #[derive(Clone, Debug, Default)]
+/// The generated mirror, projected into the parts the API join reads.
 pub(crate) struct MirrorModel {
+    /// The opaque handle interface names.
     pub handles: BTreeSet<String>,
+    /// Facade exports by name.
     pub functions: BTreeMap<String, MirrorFunction>,
+    /// Boundary struct fields by class name, in declaration order.
     pub classes: BTreeMap<String, Vec<MirrorField>>,
+    /// Mirror type aliases, target text by alias name.
     pub aliases: BTreeMap<String, String>,
+    /// Boundary enums by name.
     pub enums: BTreeMap<String, MirrorEnum>,
 }
 
 impl MirrorModel {
+    /// Parses the generated mirror text line by line.
+    ///
+    /// The parse reads only the declaration forms `subscript bind` emits, so a change to the
+    /// mirror's shape is a change here. It never runs a TypeScript parser.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message for a duplicate class, enum, or enum member, and for a malformed
+    /// declaration line.
     pub fn parse(source: &str) -> Result<Self, String> {
         let mut model = MirrorModel::default();
         let lines: Vec<&str> = source.lines().collect();

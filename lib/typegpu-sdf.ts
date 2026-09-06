@@ -64,7 +64,7 @@ export function sdBoxFrame(p: Vec3f, half: Vec3f, edge: f32): f32 {
 }
 
 // Returns the signed distance from `p` to an infinite plane. `normal` must be a unit
-// vector. `height` offsets the plane along that normal.
+// vector. The plane passes through `-height * normal`.
 export function sdPlane(p: Vec3f, normal: Vec3f, height: f32): f32 {
   return p.dot(normal) + height;
 }

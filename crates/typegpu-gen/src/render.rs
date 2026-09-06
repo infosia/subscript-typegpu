@@ -7,40 +7,65 @@ use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 use crate::pipeline::{self, BindingKind, Layout};
 
+/// One attribute of a vertex buffer layout (RN6).
 #[derive(Debug, Clone)]
 pub(crate) struct VertexAttribute {
+    /// The `GPUVertexFormat` of the schema field's type (RN5).
     pub(crate) format: &'static str,
+    /// The shader location, which counts from 0 across the vertex schema and the instance schema.
     pub(crate) location: u32,
 }
 
+/// One vertex buffer slot of a render pipeline (RN4).
 #[derive(Debug, Clone)]
 pub(crate) struct VertexBuffer {
+    /// The vertex or instance schema name, whose layout gives the stride and the offsets.
     pub(crate) schema: String,
+    /// The slot: 0 for the vertex schema and 1 for the instance schema.
     pub(crate) slot: u32,
+    /// The step mode, `vertex` or `instance`.
     pub(crate) step_mode: &'static str,
+    /// The attributes, in schema field declaration order.
     pub(crate) attributes: Vec<VertexAttribute>,
 }
 
+/// One field of the varyings class (RN7).
 #[derive(Debug, Clone)]
 pub(crate) struct Varying {
+    /// The field name, which both entry points use.
     pub(crate) name: String,
+    /// The field type.
     pub(crate) ty: Type,
+    /// Whether the field is the `position` field, which emits `@builtin(position)`.
     pub(crate) builtin_position: bool,
+    /// The `@location(n)` index. The `position` field carries none.
     pub(crate) location: Option<u32>,
+    /// Whether the field emits `@interpolate(flat)`, which every integer type does.
     pub(crate) flat: bool,
 }
 
+/// One render pipeline declaration (RN1).
 #[derive(Debug, Clone)]
 pub(crate) struct RenderPipeline {
+    /// The module-level `const` name that carries the declaration.
     pub(crate) declaration: String,
+    /// The vertex kernel name, which becomes the `@vertex` entry point.
     pub(crate) vertex_entry: String,
+    /// The fragment kernel name, which becomes the `@fragment` entry point.
     pub(crate) fragment_entry: String,
+    /// The layout classes, in group order from 0.
     pub(crate) layouts: Vec<Layout>,
+    /// The vertex buffer slots, in slot order.
     pub(crate) vertex_buffers: Vec<VertexBuffer>,
+    /// The varyings class name. The class is not a schema and carries no layout constants (RN7).
     pub(crate) varyings_name: String,
+    /// The varyings fields, in declaration order.
     pub(crate) varyings: Vec<Varying>,
+    /// The `GPUTextureFormat` of the color target, from the declaration's spec (RN12).
     pub(crate) target_format: String,
+    /// The `GPUIndexFormat` of an indexed draw, when the spec names one (RN18).
     pub(crate) index_format: Option<String>,
+    /// The declaration position.
     pub(crate) pos: Pos,
 }
 
@@ -227,6 +252,7 @@ fn varying_type(module: &Module, ty: &Type) -> bool {
     }
 }
 
+/// Reports whether the type is `f16` or an `f16` vector, which puts `enable f16;` on the module.
 pub(crate) fn type_uses_f16(module: &Module, ty: &Type) -> bool {
     matches!(ty, Type::F16)
         || matches!(ty, Type::Class(id) if module.classes[id.0].pos.file == "typegpu-types.ts" && matches!(module.classes[id.0].name.as_str(), "Vec2h" | "Vec3h" | "Vec4h"))
@@ -461,6 +487,15 @@ fn contains_render_call_stmt(module: &Module, stmt: &Stmt) -> bool {
     }
 }
 
+/// Collects every module-level render pipeline declaration of one program (RN1).
+///
+/// The result follows the module's global declaration order.
+///
+/// # Errors
+///
+/// Returns every RN1 through RN8 violation. The cases include a declaration inside a function
+/// and a vertex attribute type outside RN5. A varyings field type outside RN7 and a varyings
+/// class with no `position` field also give one.
 pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
     for function in &module.functions {
@@ -635,6 +670,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
     }
 }
 
+/// Returns the vertex and instance schema names of every render pipeline.
 pub(crate) fn schema_names(pipelines: &[RenderPipeline]) -> BTreeSet<String> {
     pipelines
         .iter()
@@ -795,6 +831,10 @@ fn stage_bindings(
     out
 }
 
+/// Reports which entry points read one binding, as `(vertex, fragment)` (RN9).
+///
+/// The generated layout entry carries the visibility that this pair gives. A binding that
+/// neither entry point reaches is an RN9 diagnostic at emission.
 pub(crate) fn binding_visibility(
     module: &Module,
     pipeline: &RenderPipeline,
@@ -981,6 +1021,12 @@ fn written_binding_stmt(
     }
 }
 
+/// Rejects a vertex kernel that writes a `MutStorage` binding (RN9).
+///
+/// # Errors
+///
+/// Returns an RN9 diagnostic that names the binding. A declaration whose vertex kernel the
+/// module does not declare passes, because emission reports that kernel.
 pub(crate) fn reject_vertex_storage_writes(
     module: &Module,
     pipeline: &RenderPipeline,

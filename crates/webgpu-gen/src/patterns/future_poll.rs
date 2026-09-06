@@ -6,11 +6,14 @@ use crate::naming;
 use crate::patterns::rust_signature;
 use crate::plan::AsyncOp;
 
+/// The `subscript-typegpu.h` comment above the future-id typedef.
 pub(crate) const FUTURE_ID_COMMENT: &str =
     "/* Facade-owned future identifier (monotonically increasing, never 0). */";
 
+/// The `subscript-typegpu.h` comment above the poll declaration, which names each status (L6).
 pub(crate) const COMPLETED_COMMENT: &str = "/*\n * 0 = pending, 1 = success, negative = failed (the negated backend\n * status enum value); -100 = unknown future id.\n */";
 
+/// The `subscript-typegpu.h` comment above a typed take, which names the one-shot transfer (F8).
 pub(crate) const TAKE_COMMENT: &str = "/*\n * NULL until the future completed successfully; ownership transfers\n * once — a second take returns NULL.\n */";
 
 /// Private webgpu.h request-adapter options with INIT-compatible fields.
@@ -28,6 +31,10 @@ pub(crate) fn rust_request_adapter_options(options: &str) -> String {
     )
 }
 
+/// Renders the request declaration for `subscript-typegpu.h`.
+///
+/// The anchor handle leads the parameter list, because the future slot lives on it (F6). A
+/// receiver that is the anchor itself appears once.
 pub(crate) fn c_request_decl(op: &AsyncOp, anchor: &str) -> String {
     let anchor_param = format!(
         "{} {}",
@@ -49,6 +56,10 @@ pub(crate) fn c_request_decl(op: &AsyncOp, anchor: &str) -> String {
     }
 }
 
+/// Renders the descriptor-taking sibling declaration, or `None`.
+///
+/// Only the request that exposes the public device descriptor produces a declaration. Its name
+/// is the base export plus `_with_descriptor`.
 pub(crate) fn c_request_descriptor_decl(op: &AsyncOp, anchor: &str) -> Option<String> {
     op.device_descriptor.then(|| {
         format!(
@@ -62,6 +73,7 @@ pub(crate) fn c_request_descriptor_decl(op: &AsyncOp, anchor: &str) -> Option<St
     })
 }
 
+/// Renders the one shared poll declaration for `subscript-typegpu.h` (F6).
 pub(crate) fn c_completed_decl(anchor: &str) -> String {
     format!(
         "int32_t subscript_typegpu_future_status({} {}, SubscriptTypegpuFutureId future);",
@@ -70,6 +82,7 @@ pub(crate) fn c_completed_decl(anchor: &str) -> String {
     )
 }
 
+/// Renders the one shared future-drop declaration for `subscript-typegpu.h` (F8).
 pub(crate) fn c_drop_decl(anchor: &str) -> String {
     format!(
         "void subscript_typegpu_future_drop({} {}, SubscriptTypegpuFutureId future);",
@@ -78,6 +91,9 @@ pub(crate) fn c_drop_decl(anchor: &str) -> String {
     )
 }
 
+/// Renders the typed take declaration, or `None`.
+///
+/// An op whose callback delivers no handle has no take export, so the result is `None`.
 pub(crate) fn c_take_decl(op: &AsyncOp, anchor: &str) -> Option<String> {
     Some(format!(
         "{} {}({} {}, SubscriptTypegpuFutureId future);",
@@ -88,6 +104,9 @@ pub(crate) fn c_take_decl(op: &AsyncOp, anchor: &str) -> Option<String> {
     ))
 }
 
+/// Renders the private webgpu.h callback typedef for one async op.
+///
+/// A callback that delivers a handle carries it as the second parameter, before the message.
 pub(crate) fn rust_callback_typedef(op: &AsyncOp) -> String {
     let handle = op
         .cb
@@ -116,6 +135,9 @@ pub(crate) fn rust_callback_typedef(op: &AsyncOp) -> String {
     )
 }
 
+/// Renders the private webgpu.h callback-info struct for one async op.
+///
+/// The struct crosses to the backend by value, so the facade never keeps a pointer to it.
 pub(crate) fn rust_callback_info(op: &AsyncOp) -> String {
     format!(
         "/// webgpu.h `{info}` (passed by value).\n\
@@ -132,6 +154,10 @@ pub(crate) fn rust_callback_info(op: &AsyncOp) -> String {
     )
 }
 
+/// Renders the private webgpu.h declaration of the request.
+///
+/// A dropped optional descriptor keeps its parameter here, because the backend still expects it.
+/// The export passes NULL for it.
 pub(crate) fn rust_async_extern(op: &AsyncOp) -> String {
     let mut params = vec![format!(
         "{}: {}",
@@ -149,6 +175,12 @@ pub(crate) fn rust_async_extern(op: &AsyncOp) -> String {
     ) + "\n"
 }
 
+/// Renders the callback body for one async op.
+///
+/// The body runs inside `runtime::callback_guard`, copies the message out of the borrowed view,
+/// records the outcome in the slot, and returns. It calls no webgpu.h function and never
+/// unwinds (F7, L7). With `device_events`, the request-device callback also binds the event
+/// slot to the created device.
 pub(crate) fn rust_callback_fn(op: &AsyncOp, device_events: bool) -> String {
     let (handle_param, handle_value) = op.cb.handle_object.as_ref().map_or_else(
         || (String::new(), "0".to_string()),
@@ -208,6 +240,10 @@ pub(crate) fn rust_callback_fn(op: &AsyncOp, device_events: bool) -> String {
     )
 }
 
+/// Renders the shared helper that copies a callback-scope string view.
+///
+/// Every generated callback copies its message through this helper, so no borrowed backend
+/// pointer outlives the callback (F7).
 pub(crate) fn rust_copy_string_view() -> &'static str {
     "/// Copies a callback-scope string view before the callback returns.\n\
      ///\n\
@@ -227,6 +263,12 @@ pub(crate) fn rust_copy_string_view() -> &'static str {
      }\n"
 }
 
+/// Renders the exported request body, and the compatibility export where one exists.
+///
+/// The body reserves a pending slot on the anchor and registers an AllowProcessEvents callback
+/// (F6, L7). A null receiver returns future id 0 (L9). The adapter request also emits the
+/// `SUBSCRIPT_TYPEGPU_BACKEND` filter, which rejects an unknown value with future id 0 (L15).
+/// A descriptor-taking op emits a second export that forwards a null descriptor.
 pub(crate) fn rust_request_export(
     op: &AsyncOp,
     anchor: &str,
@@ -410,6 +452,10 @@ pub(crate) fn rust_request_export(
     )
 }
 
+/// Renders the one shared poll export body.
+///
+/// The status values come from the runtime slot table. The values are 0 pending, 1 success,
+/// the negated backend status on failure, and -100 for an unknown id (L6, F8).
 pub(crate) fn rust_completed_export(anchor: &str) -> String {
     format!(
         "/// `subscript-typegpu.h`: 0 pending / 1 success / negative failure / -100 unknown.\n\
@@ -422,6 +468,10 @@ pub(crate) fn rust_completed_export(anchor: &str) -> String {
     )
 }
 
+/// Renders the one shared future-drop export body.
+///
+/// A drop of a completed slot releases the handle the slot still owns. A drop of a pending slot
+/// only marks it doomed (F8).
 pub(crate) fn rust_drop_export(anchor: &str) -> String {
     format!(
         "/// `subscript-typegpu.h`: drops a future slot; pending slots become doomed.\n\
@@ -436,6 +486,9 @@ pub(crate) fn rust_drop_export(anchor: &str) -> String {
     )
 }
 
+/// Renders the typed take export body for one async op.
+///
+/// The take transfers the handle once and frees the slot. A second take returns null (F8).
 pub(crate) fn rust_take_export(op: &AsyncOp, anchor: &str) -> String {
     let object = op
         .cb
@@ -468,6 +521,9 @@ pub(crate) fn rust_take_export(op: &AsyncOp, anchor: &str) -> String {
     )
 }
 
+/// Renders the private slot-kind constant for one async op.
+///
+/// The runtime matches this tag on a take, so a take of the wrong future kind fails.
 pub(crate) fn rust_kind_const(op: &AsyncOp) -> String {
     format!(
         "/// Runtime slot-kind tag for `{cb}` futures.\nconst {kind}: u32 = {value};\n",
@@ -477,6 +533,7 @@ pub(crate) fn rust_kind_const(op: &AsyncOp) -> String {
     )
 }
 
+/// Renders the private success constant for one async op, from the pinned yml value.
 pub(crate) fn rust_status_const(op: &AsyncOp) -> String {
     format!(
         "/// webgpu.yml enum value (`success`).\nconst {name}: i32 = {value};\n",
@@ -485,6 +542,11 @@ pub(crate) fn rust_status_const(op: &AsyncOp) -> String {
     )
 }
 
+/// Renders the two helpers that release handles a slot still owns.
+///
+/// The match arms follow `ops` order, one arm per async op whose callback delivers a handle.
+/// The second helper drains the handles the callbacks deferred, which the pump calls after
+/// process-events (L8).
 pub(crate) fn rust_release_helpers(ops: &[&AsyncOp]) -> String {
     let arms: String = ops
         .iter()
@@ -525,6 +587,10 @@ pub(crate) fn rust_release_helpers(ops: &[&AsyncOp]) -> String {
     )
 }
 
+/// Renders the anchor's release export body.
+///
+/// This release differs from every other one: it also frees every remaining future slot on the
+/// anchor and releases the handles those slots own (F8).
 pub(crate) fn rust_anchor_release_export(anchor: &str) -> String {
     let pascal = naming::pascal(anchor);
     let snake = naming::snake(anchor);

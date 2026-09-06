@@ -7,11 +7,16 @@ use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 use crate::layout::{self, Matrix, Member, Scalar, Struct, TypeTree, Vector};
 
+/// One schema class and the layout tree that the layout engine measures.
 #[derive(Debug, Clone)]
 pub(crate) struct Schema {
+    /// The class name, as the author declared it.
     pub(crate) name: String,
+    /// The layout tree, with the members in declaration order (SC2).
     pub(crate) tree: TypeTree,
+    /// The class declaration position.
     pub(crate) pos: Pos,
+    /// The field declaration positions, in declaration order.
     pub(crate) field_positions: Vec<Pos>,
 }
 
@@ -23,6 +28,9 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+/// Reports whether the type is a `Vec2b`, `Vec3b`, or `Vec4b` of `typegpu-types.ts` (K26).
+///
+/// WGSL gives `bool` no host-shareable layout, so a bool vector is never a schema field.
 pub(crate) fn is_bool_vector(module: &Module, ty: &Type) -> bool {
     matches!(ty, Type::Class(id)
         if module.classes[id.0].pos.file == "typegpu-types.ts"
@@ -75,6 +83,10 @@ fn class_alignment(class: &ClassDef) -> Option<u32> {
     class.alignment_override.as_ref().map(|value| value.value)
 }
 
+/// Builds the layout tree of a vector, matrix, or atomic class of `typegpu-types.ts` (SC5).
+///
+/// A class that another file declares gives `None`, so a name alone never makes a library type.
+/// A matrix reads its column alignment from the `Vec<rows>f` class of the same file.
 pub(crate) fn library_tree(module: &Module, class: &ClassDef) -> Option<TypeTree> {
     if class.pos.file != "typegpu-types.ts" {
         return None;
@@ -315,6 +327,17 @@ fn collect_type_reachable(module: &Module, ty: &Type, reachable: &mut BTreeSet<u
     }
 }
 
+/// Collects every schema class that the intended names reach, with its layout tree.
+///
+/// `intended` names the schemas that the imports, the bindings, and the kernels require.
+/// `import_pos` positions a diagnostic about a name that no class matches. The result follows
+/// the module's class declaration order, not the order of `intended`.
+///
+/// # Errors
+///
+/// Returns every violation of the reachable classes. SC1 names a class that is not a schema, and
+/// SC3 or SC5 names an illegal field type. SC9 names a layout mismatch, SC10 a uniform
+/// violation, and SC11 a field name that holds `_`.
 pub(crate) fn discover(
     module: &Module,
     intended: &BTreeSet<String>,

@@ -19,6 +19,7 @@ pub(crate) enum Scalar {
 }
 
 impl Scalar {
+    /// The C spelling of the scalar in `subscript-typegpu.h`.
     pub fn c_name(self) -> &'static str {
         match self {
             Scalar::U32 => "uint32_t",
@@ -29,6 +30,7 @@ impl Scalar {
         }
     }
 
+    /// The Rust spelling of the scalar in the generated facade.
     pub fn rust_name(self) -> &'static str {
         match self {
             Scalar::U32 => "u32",
@@ -73,9 +75,13 @@ pub(crate) enum SyncRet {
 /// One plain sync method (pattern `sync`).
 #[derive(Debug)]
 pub(crate) struct SyncOp {
+    /// The yml object that owns the method.
     pub receiver: String,
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name.
     pub subscript_typegpu_fn: String,
+    /// Ordinary arguments in webgpu.h order, receiver excluded.
     pub args: Vec<MethodArg>,
     pub ret: SyncRet,
 }
@@ -83,11 +89,15 @@ pub(crate) struct SyncOp {
 /// One freestanding create function (pattern `create`).
 #[derive(Debug)]
 pub(crate) struct CreateOp {
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name.
     pub subscript_typegpu_fn: String,
+    /// The yml object whose handle the create returns.
     pub returns_object: String,
     /// Dropped optional descriptor: (yml arg name, opaque WGPU type).
     pub dropped_arg: Option<(String, String)>,
+    /// One-line comment the policy row places above the C declaration.
     pub doc: Option<String>,
 }
 
@@ -102,6 +112,7 @@ pub(crate) struct CallbackPlan {
     pub cb_info: String,
     /// Success constant name (`WGPUXxxStatus_Success`).
     pub status_const: String,
+    /// The numeric success value from the pinned yml.
     pub status_value: u32,
     /// The object the callback delivers.
     pub handle_object: Option<String>,
@@ -110,21 +121,26 @@ pub(crate) struct CallbackPlan {
 /// One async op (pattern `future-poll`, F6 triple).
 #[derive(Debug)]
 pub(crate) struct AsyncOp {
+    /// The yml object that owns the method.
     pub receiver: String,
+    /// The webgpu.h function the request export calls.
     pub wgpu_fn: String,
+    /// The generated `subscript_typegpu_*` request export name.
     pub subscript_typegpu_fn: String,
     /// Dropped optional descriptor: (yml arg name, opaque WGPU type).
     pub dropped_arg: Option<(String, String)>,
+    /// The callback the facade registers with AllowProcessEvents (F7).
     pub cb: CallbackPlan,
     /// `subscript_typegpu_xxx_take` export name.
     pub take_fn: Option<String>,
     /// `SLOT_KIND_*` constant name and value.
     pub kind_const: String,
+    /// The slot-kind value, unique per async op in plan order.
     pub kind_value: u32,
     /// The first async op carries the protocol comments in subscript-typegpu.h.
     pub first: bool,
-    /// `adapter.request_device` exposes the area-7 public descriptor while
-    /// retaining the area-6 callback fields internally.
+    /// `adapter.request_device` exposes the public descriptor and keeps the
+    /// callback fields inside the facade.
     pub device_descriptor: bool,
 }
 
@@ -153,8 +169,10 @@ pub(crate) enum DescriptorFieldKind {
 /// One descriptor field, preserving its yml/C spelling.
 #[derive(Debug, Clone)]
 pub(crate) struct DescriptorField {
+    /// The yml member name. The public C field keeps this spelling.
     pub name: String,
     pub kind: DescriptorFieldKind,
+    /// The yml enum, bitflag, struct, or object name behind a named kind.
     pub named_type: Option<String>,
     /// Whether an object member accepts/preserves NULL.
     pub nullable: bool,
@@ -171,10 +189,15 @@ pub(crate) struct DescriptorField {
 /// One plain chain-free struct crossing the facade boundary.
 #[derive(Debug, Clone)]
 pub(crate) struct StructPlan {
+    /// The yml struct name.
     pub source: String,
+    /// The webgpu.h struct name.
     pub wgpu_struct: String,
+    /// The public struct name in `subscript-typegpu.h`.
     pub subscript_typegpu_struct: String,
+    /// The yml marks the struct `extensible`, so the backend value carries a chain head.
     pub extensible: bool,
+    /// Fields in yml order. The public struct carries no chain field (F12).
     pub fields: Vec<DescriptorField>,
     /// Conversion owns arrays or nullable struct pointees.
     pub owns_storage: bool,
@@ -185,104 +208,158 @@ pub(crate) struct StructPlan {
 /// One internal F15 constant used by a zero-rule conversion.
 #[derive(Debug, Clone)]
 pub(crate) struct SentinelConst {
+    /// The `constant.<name>` key that the `[[sentinels]]` row maps zero to.
     pub source: String,
+    /// The private Rust constant name in the generated facade.
     pub rust_name: String,
+    /// The Rust literal for the pinned constant value.
     pub rust_value: String,
 }
 
 /// One F12 descriptor operation.
 #[derive(Debug)]
 pub(crate) struct DescriptorOp {
+    /// The yml object that owns the method.
     pub receiver: String,
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name.
     pub subscript_typegpu_fn: String,
+    /// The yml struct name of the descriptor argument.
     pub descriptor: String,
+    /// The yml marks the descriptor optional, so the export accepts NULL.
     pub optional: bool,
+    /// The yml object whose handle the create returns.
     pub returns_object: String,
 }
 
 /// One descriptor-carrying async creation operation.
 #[derive(Debug)]
 pub(crate) struct DescriptorAsyncOp {
+    /// The F6 request, poll, and take triple.
     pub async_op: AsyncOp,
+    /// The yml struct name of the descriptor argument.
     pub descriptor: String,
 }
 
 /// WGSL-only shader creation with an internal extension chain.
 #[derive(Debug)]
 pub(crate) struct ShaderWgslOp {
+    /// The yml object that owns the method.
     pub receiver: String,
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name.
     pub subscript_typegpu_fn: String,
+    /// The yml object whose handle the create returns.
     pub returns_object: String,
+    /// The webgpu.h base descriptor struct name.
     pub descriptor_wgpu: String,
+    /// The public chain-free descriptor name in `subscript-typegpu.h`.
     pub descriptor_subscript_typegpu: String,
+    /// The webgpu.h WGSL extension struct the conversion builds internally (PL2).
     pub extension_wgpu: String,
+    /// The `WGPUSType_*` constant name of the WGSL extension.
     pub s_type_const: String,
+    /// The numeric `s_type` value from the pinned yml.
     pub s_type_value: u32,
 }
 
 /// Queue texture upload with its three struct pointers and F20 bytes.
 #[derive(Debug)]
 pub(crate) struct WriteTextureOp {
+    /// The yml object that owns the method.
     pub receiver: String,
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name.
     pub subscript_typegpu_fn: String,
+    /// The yml struct name of the destination pointer (B3).
     pub destination: String,
+    /// The yml struct name of the data-layout pointer.
     pub layout: String,
+    /// The yml struct name of the write-extent pointer.
     pub extent: String,
 }
 
 /// Error-scope future plus facade-owned device event drains (F11/F14).
 #[derive(Debug)]
 pub(crate) struct DeviceEventsOp {
+    /// The yml object that owns the method.
     pub receiver: String,
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name.
     pub subscript_typegpu_fn: String,
+    /// The `WGPUXxxCallback` typedef name.
     pub cb_type: String,
+    /// The `WGPUXxxCallbackInfo` struct name.
     pub cb_info: String,
+    /// The generated `unsafe extern "C" fn` callback name.
     pub cb_fn: String,
+    /// The success constant name (`WGPUXxxStatus_Success`).
     pub status_const: String,
+    /// The numeric success value from the pinned yml.
     pub status_value: u32,
+    /// The `SLOT_KIND_*` constant name of the pop-scope slot.
     pub kind_const: String,
+    /// The slot-kind value, unique per async op in plan order.
     pub kind_value: u32,
+    /// The export that fills the error record and frees the slot (G2).
     pub take_fn: String,
 }
 
 /// One F13 limits out-fill, method or freestanding.
 #[derive(Debug)]
 pub(crate) struct LimitsOp {
+    /// The yml object that owns the method. `None` marks a freestanding function.
     pub receiver: Option<String>,
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name.
     pub subscript_typegpu_fn: String,
+    /// The yml struct name of the out-filled limits struct.
     pub shape: String,
 }
 
 /// One F11 Rev 1 adapter-info fill.
 #[derive(Debug)]
 pub(crate) struct AdapterInfoOp {
+    /// The yml object that owns the method.
     pub receiver: String,
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name.
     pub subscript_typegpu_fn: String,
+    /// The success constant name of the fill status enum.
     pub success_const: String,
+    /// The numeric success value from the pinned yml.
     pub success_value: u32,
 }
 
 /// One scalar feature-presence probe, method or freestanding.
 #[derive(Debug)]
 pub(crate) struct FeatureOp {
+    /// The yml object that owns the method. `None` marks a freestanding function.
     pub receiver: Option<String>,
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name.
     pub subscript_typegpu_fn: String,
+    /// The yml enum name of the probed feature.
     pub enum_name: String,
 }
 
 /// One input string-view method (F10).
 #[derive(Debug)]
 pub(crate) struct LabelOp {
+    /// The yml object that owns the method.
     pub receiver: String,
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name.
     pub subscript_typegpu_fn: String,
+    /// The camelCase parameter name of the string view (F10).
     pub param: String,
 }
 
@@ -296,25 +373,40 @@ pub(crate) enum ByteArg {
 /// One F20 byte-pair reshape.
 #[derive(Debug)]
 pub(crate) struct BytePairOp {
+    /// The yml object that owns the method.
     pub receiver: String,
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name.
     pub subscript_typegpu_fn: String,
+    /// Ordinary arguments before the trailing byte pair, in webgpu.h order.
     pub args: Vec<ByteArg>,
+    /// The data pointer is mutable, so the callee fills the caller's buffer.
     pub mutable: bool,
+    /// The webgpu.h function returns `enum.status`, so the export forwards it.
     pub returns_status: bool,
+    /// The status the export returns when a null check fails (L9).
     pub error_status: i32,
 }
 
 /// One S3 float sibling derived from an F20 byte-pair method.
 #[derive(Debug)]
 pub(crate) struct TypedPairOp {
+    /// The yml object that owns the method.
     pub receiver: String,
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name: the byte-pair export plus `_f32`.
     pub subscript_typegpu_fn: String,
+    /// Ordinary arguments before the trailing byte pair, in webgpu.h order.
     pub args: Vec<ByteArg>,
+    /// The data pointer is mutable, so the callee fills the caller's buffer.
     pub mutable: bool,
+    /// The webgpu.h function returns `enum.status`, so the export forwards it.
     pub returns_status: bool,
+    /// The status the export returns when a null check fails (L9).
     pub error_status: i32,
+    /// The byte-offset parameter. The float export renames it with a `Bytes` suffix.
     pub offset_param: String,
 }
 
@@ -328,12 +420,19 @@ pub(crate) enum ArrayElement {
 /// One count-first array operation.
 #[derive(Debug)]
 pub(crate) struct ArrayOp {
+    /// The yml object that owns the method.
     pub receiver: String,
+    /// The webgpu.h function the export calls.
     pub wgpu_fn: String,
+    /// The generated facade export name.
     pub subscript_typegpu_fn: String,
+    /// Ordinary arguments before the count-first pair, in webgpu.h order.
     pub args: Vec<MethodArg>,
+    /// The camelCase element-pointer parameter name.
     pub param: String,
+    /// The camelCase count name that the webgpu.h call receives.
     pub backend_count: String,
+    /// The public count name from the rename row: the pointer name plus `Count` (B1).
     pub public_count: String,
     pub element: ArrayElement,
 }
@@ -341,11 +440,13 @@ pub(crate) struct ArrayOp {
 /// The explicit range + whole-resource mapAsync variants (A3/F15).
 #[derive(Debug)]
 pub(crate) struct MapAsyncOp {
+    /// The offset-and-size variant, an ordinary F6 triple.
     pub async_op: AsyncOp,
+    /// The whole-buffer sibling export name (A3/F15).
     pub whole_subscript_typegpu_fn: String,
 }
 
-/// One emitted constant set (`[[constants]]` row).
+/// The yml source kind of an emitted constant set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ConstKind {
     Bitflag,
@@ -359,7 +460,9 @@ pub(crate) struct ConstSet {
     pub source: String,
     /// (constant name, rust type, formatted value) rows.
     pub rows: Vec<(String, &'static str, String)>,
+    /// Whether the set comes from a yml bitflag or a yml enum.
     pub kind: ConstKind,
+    /// The yml bitflag or enum name.
     pub name: String,
 }
 
@@ -393,6 +496,7 @@ pub(crate) struct Plan {
     /// Creation chunk: freestanding creates then anchor sync methods
     /// (the anchor release is implicit in this chunk).
     pub creates: Vec<CreateOp>,
+    /// The anchor object's sync methods, emitted after the creates.
     pub anchor_syncs: Vec<SyncOp>,
     /// Middle chunks in policy order.
     pub chunks: Vec<Chunk>,

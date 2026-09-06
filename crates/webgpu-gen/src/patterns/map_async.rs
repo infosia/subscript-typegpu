@@ -4,6 +4,10 @@ use crate::naming;
 use crate::patterns::rust_signature;
 use crate::plan::MapAsyncOp;
 
+/// Renders both map-request declarations for `subscript-typegpu.h`, range first.
+///
+/// The whole-buffer variant exists because the whole-size sentinel is above 2^53 and cannot
+/// cross the boundary (A3, F15).
 pub(crate) fn c_decls(op: &MapAsyncOp) -> Vec<String> {
     let recv_ty = naming::subscript_typegpu_type(&op.async_op.receiver);
     let recv = naming::camel(&op.async_op.receiver);
@@ -19,6 +23,9 @@ pub(crate) fn c_decls(op: &MapAsyncOp) -> Vec<String> {
     ]
 }
 
+/// Renders the private webgpu.h declaration of the map request.
+///
+/// Both public variants call this one backend function.
 pub(crate) fn rust_extern(op: &MapAsyncOp) -> String {
     rust_signature(
         &format!("    fn {}", op.async_op.wgpu_fn),
@@ -90,6 +97,10 @@ fn rust_one_export(op: &MapAsyncOp, whole: bool, mode_const: &str) -> String {
     )
 }
 
+/// Renders both exported map-request bodies, range first.
+///
+/// The whole variant passes offset 0 and `usize::MAX` as the size, so the sentinel stays inside
+/// the facade. A null receiver or a handle with no owning instance returns future id 0 (L9).
 pub(crate) fn rust_exports(op: &MapAsyncOp, mode_const: &str) -> String {
     format!(
         "{}\n{}",

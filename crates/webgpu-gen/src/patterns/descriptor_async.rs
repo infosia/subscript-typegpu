@@ -4,6 +4,9 @@ use crate::naming;
 use crate::patterns::rust_signature;
 use crate::plan::{DescriptorAsyncOp, StructPlan};
 
+/// Renders the descriptor-carrying request declaration for `subscript-typegpu.h`.
+///
+/// The anchor handle leads the parameter list, because the future slot lives on it (F6).
 pub(crate) fn c_request_decl(op: &DescriptorAsyncOp, shape: &StructPlan, anchor: &str) -> String {
     let async_op = &op.async_op;
     format!(
@@ -17,6 +20,7 @@ pub(crate) fn c_request_decl(op: &DescriptorAsyncOp, shape: &StructPlan, anchor:
     )
 }
 
+/// Renders the private webgpu.h declaration of the descriptor-carrying request.
 pub(crate) fn rust_extern(op: &DescriptorAsyncOp, shape: &StructPlan) -> String {
     let async_op = &op.async_op;
     format!(
@@ -29,6 +33,11 @@ pub(crate) fn rust_extern(op: &DescriptorAsyncOp, shape: &StructPlan) -> String 
     )
 }
 
+/// Renders the exported descriptor-carrying request body.
+///
+/// The body converts the public descriptor, reserves a pending slot on the anchor, and
+/// registers an AllowProcessEvents callback (F6, L7). A null anchor, receiver, or descriptor
+/// returns future id 0 (L9). The converted storage lives across the backend call.
 pub(crate) fn rust_export(
     op: &DescriptorAsyncOp,
     shape: &StructPlan,

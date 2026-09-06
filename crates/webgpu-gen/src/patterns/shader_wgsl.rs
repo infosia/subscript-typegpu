@@ -5,6 +5,10 @@ use crate::naming;
 use crate::patterns::rust_signature;
 use crate::plan::ShaderWgslOp;
 
+/// Renders the public shader-module descriptor typedef for `subscript-typegpu.h`.
+///
+/// The public struct carries the label and the code only. The WGSL extension chain stays
+/// private to the facade (PL2).
 pub(crate) fn c_struct(op: &ShaderWgslOp) -> String {
     format!(
         "typedef struct {ty} {{\n    SubscriptTypegpuStringView label;\n    SubscriptTypegpuStringView code;\n}} {ty};",
@@ -12,6 +16,7 @@ pub(crate) fn c_struct(op: &ShaderWgslOp) -> String {
     )
 }
 
+/// Renders the shader-module create declaration for `subscript-typegpu.h`.
 pub(crate) fn c_decl(op: &ShaderWgslOp) -> String {
     format!(
         "{} {}({} {}, const {}* descriptor);",
@@ -23,6 +28,11 @@ pub(crate) fn c_decl(op: &ShaderWgslOp) -> String {
     )
 }
 
+/// Renders the private webgpu.h chain types the WGSL conversion needs.
+///
+/// The output declares a concrete `WGPUChainedStruct`, the WGSL source extension, the base
+/// descriptor, and the `s_type` value from the pinned yml. This is the one place the chain is
+/// concrete, because every other struct treats it as pointer-only.
 pub(crate) fn rust_private_types(op: &ShaderWgslOp) -> String {
     format!(
         "/// webgpu.h `WGPUChainedStruct`; concrete for WGSL source construction.\n#[repr(C)]\n#[derive(Clone, Copy)]\nstruct WGPUChainedStruct {{\n    next: *mut WGPUChainedStruct,\n    s_type: i32,\n}}\n\n/// webgpu.h `{extension}`.\n#[repr(C)]\nstruct {extension} {{\n    chain: WGPUChainedStruct,\n    code: WGPUStringView,\n}}\n\n/// webgpu.h `{descriptor}`.\n#[repr(C)]\nstruct {descriptor} {{\n    next_in_chain: *mut WGPUChainedStruct,\n    label: WGPUStringView,\n}}\n\n/// webgpu.yml `s_type.shader_source_WGSL`.\nconst {s_type}: i32 = {value};\n",
@@ -33,6 +43,9 @@ pub(crate) fn rust_private_types(op: &ShaderWgslOp) -> String {
     )
 }
 
+/// Renders the public shader-module descriptor struct for the generated facade.
+///
+/// The layout matches the `c_struct` typedef, so the mirror binds the same two fields.
 pub(crate) fn rust_public_type(op: &ShaderWgslOp) -> String {
     format!(
         "/// `subscript-typegpu.h`: WGSL shader module descriptor with its source chain flattened.\n#[repr(C)]\n#[derive(Clone, Copy)]\npub struct {descriptor} {{\n    /// Shader module label.\n    pub label: SubscriptTypegpuStringView,\n    /// WGSL source text.\n    pub code: SubscriptTypegpuStringView,\n}}\n",
@@ -40,6 +53,7 @@ pub(crate) fn rust_public_type(op: &ShaderWgslOp) -> String {
     )
 }
 
+/// Renders the private webgpu.h declaration of the shader-module create.
 pub(crate) fn rust_extern(op: &ShaderWgslOp) -> String {
     format!(
         "    fn {}({}: {}, descriptor: *const {}) -> {};\n",
@@ -51,6 +65,11 @@ pub(crate) fn rust_extern(op: &ShaderWgslOp) -> String {
     )
 }
 
+/// Renders the exported shader-module create body.
+///
+/// The body builds the WGSL extension on the stack, points the base descriptor at it, and
+/// calls the backend while both live. A null receiver or descriptor returns a null handle
+/// (L9). The created handle inherits the receiver's owning instance (L11).
 pub(crate) fn rust_export(op: &ShaderWgslOp) -> String {
     let recv = naming::camel(&op.receiver);
     let sig = rust_signature(

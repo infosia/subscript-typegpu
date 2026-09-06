@@ -22,6 +22,9 @@ fn public_arg_name(op: &TypedPairOp, name: &str) -> String {
     }
 }
 
+/// Renders the `subscript-typegpu.h` comment that names the unit of each pair parameter.
+///
+/// The offset counts bytes. The count counts float elements (S3).
 pub(crate) fn c_comment(op: &TypedPairOp) -> String {
     let (count, _, _) = public_pair(op);
     format!(
@@ -30,6 +33,10 @@ pub(crate) fn c_comment(op: &TypedPairOp) -> String {
     )
 }
 
+/// Renders the float sibling declaration for `subscript-typegpu.h`.
+///
+/// The trailing pair carries a `float` pointer. The byte-offset parameter of the source method
+/// gains a `Bytes` suffix, so the two units never share a spelling.
 pub(crate) fn c_decl(op: &TypedPairOp) -> String {
     let mut params = vec![format!(
         "{} {}",
@@ -59,6 +66,11 @@ pub(crate) fn c_decl(op: &TypedPairOp) -> String {
     )
 }
 
+/// Renders the exported float sibling body.
+///
+/// The body multiplies the element count by the size of `f32` and calls the same webgpu.h
+/// function as the byte form (S3). An overflow of that product returns the error status
+/// without a backend call, as a null argument does (L9).
 pub(crate) fn rust_export(op: &TypedPairOp) -> String {
     let recv = naming::camel(&op.receiver);
     let mut params = vec![format!(

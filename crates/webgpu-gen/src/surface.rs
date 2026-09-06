@@ -355,6 +355,15 @@ fn validate_policy(yml: &Yml, policy: &Policy) -> Result<(), PolicyError> {
     Ok(())
 }
 
+/// Renders the Rust-only `crates/facade/src/surface.rs` text from the `[[host_only]]` rows.
+///
+/// The output declares the ten surface functions and their structs, and resolves them on first
+/// use (L14). A yml without a `surface` object and a policy without host-only rows produce a
+/// placeholder module, so a fixture needs no surface data.
+///
+/// # Errors
+///
+/// Returns the policy error class that the host-only two-way validation reports (F23).
 pub(crate) fn render(yml: &Yml, policy: &Policy) -> Result<String, PolicyError> {
     if yml.object("surface").is_none() && policy.host_only.is_empty() {
         return Ok("//! No host-only surface slice in this fixture.\n".to_owned());

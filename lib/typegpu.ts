@@ -70,6 +70,10 @@ function appendTextureComponent(bytes: u8[], format: GPUTextureFormat, value: f3
   appendBytes(bytes, Context.bytesOf<FixedArray<f32, 1>>([value]));
 }
 
+/**
+ * Uploads raw bytes into mip level 0 of a texture, over its full extent and one layer.
+ * When a write covers more than one row, a `bytesPerRow` below 256 traps with TX9.
+ */
 export function writeTextureBytes(
   queue: GPUQueue,
   texture: GPUTexture,
@@ -89,6 +93,12 @@ export function writeTextureBytes(
   );
 }
 
+/**
+ * Encodes `pixels` in row-major order into the texture's format and uploads them.
+ * `rgba8unorm` scales each channel to a byte, and a float format stores the channel in its own
+ * float type.
+ * A pixel count other than `width * height`, or a format outside that set, traps with TX9.
+ */
 export function writeTexturePixels(
   queue: GPUQueue,
   texture: GPUTexture,
@@ -129,6 +139,10 @@ export function writeTexturePixels(
   writeTextureBytes(queue, texture, bytes, bytesPerRow, width, height);
 }
 
+/**
+ * A sampled 2d texture binding. In WGSL it becomes `texture_2d<T>`, where `T` is `f32`.
+ * The host body reads the `Vec4f[]` image the constructor takes, so a kernel also runs on the host.
+ */
 export class Texture2d<T> {
   // The generator reads this zero-length marker to recover T from the typed HIR.
   private values: T[];
@@ -190,6 +204,11 @@ export class Texture2d<T> {
   }
 }
 
+/**
+ * A sampler binding. In WGSL it becomes `sampler`.
+ * The host body carries the filter mode and implements `nearest` only, and any other mode
+ * traps with TX3 inside a sample call.
+ */
 export class Sampler {
   private filterMode: string;
 
@@ -202,6 +221,11 @@ export class Sampler {
   }
 }
 
+/**
+ * Builds the host `Sampler` that matches a GPU sampler descriptor, so both lanes filter alike.
+ * A descriptor with `minFilter` and `magFilter` of `nearest` gives a nearest sampler.
+ * Every other descriptor gives one that traps with TX3 on a sample call.
+ */
 export function samplerFromDescriptor(descriptor: GPUSamplerDescriptor): Sampler {
   if (descriptor.minFilter === "nearest" && descriptor.magFilter === "nearest") {
     return new Sampler("nearest");
@@ -209,11 +233,20 @@ export function samplerFromDescriptor(descriptor: GPUSamplerDescriptor): Sampler
   return new Sampler("non-nearest");
 }
 
+/**
+ * The storage-texture format markers. Each one names the WGSL format of a storage texture
+ * wrapper through the wrapper's `F` type argument, and carries no value of its own.
+ */
 export class Rgba8unorm {}
 export class Rgba16float {}
 export class R32float {}
 export class Rgba32float {}
 
+/**
+ * A write-only storage texture binding. In WGSL it becomes `texture_storage_2d<F, write>`.
+ * Its layout entry access is `write-only`, so a `load` call traps with TX11, and a `store`
+ * outside the extent writes nothing.
+ */
 export class StorageTexture2d<F> {
   private values: Vec4f[];
   // The generator reads this zero-length marker to recover F from the typed HIR.
@@ -247,6 +280,11 @@ export class StorageTexture2d<F> {
   }
 }
 
+/**
+ * A read-only storage texture binding. In WGSL it becomes `texture_storage_2d<F, read>`.
+ * Its layout entry access is `read-only`, it declares no `store`, and a `load` outside the
+ * extent returns a zero `Vec4f`.
+ */
 export class ReadStorageTexture2d<F> {
   private values: Vec4f[];
   // The generator reads this zero-length marker to recover F from the typed HIR.
@@ -275,6 +313,12 @@ export class ReadStorageTexture2d<F> {
   }
 }
 
+/**
+ * A read-write storage texture binding. In WGSL it becomes
+ * `texture_storage_2d<F, read_write>`.
+ * A format outside the r32 set needs the device feature `texture-formats-tier2`, and an access
+ * outside the extent reads a zero `Vec4f` or writes nothing.
+ */
 export class ReadWriteStorageTexture2d<F> {
   private values: Vec4f[];
   // The generator reads this zero-length marker to recover F from the typed HIR.
@@ -316,6 +360,11 @@ export class ReadWriteStorageTexture2d<F> {
   }
 }
 
+/**
+ * A sampled 2d array texture binding. In WGSL it becomes `texture_2d_array<T>`.
+ * `load` takes a layer index, `dimensions()` reports the width and the height only, and
+ * `sample`, `sampleLevel`, and `store` trap with TX3.
+ */
 export class Texture2dArray<T> {
   // The generator reads this zero-length marker to recover T from the typed HIR.
   private values: T[];
@@ -365,6 +414,12 @@ export class Texture2dArray<T> {
   }
 }
 
+/**
+ * A read-only storage array texture binding. In WGSL it becomes
+ * `texture_storage_2d_array<F, read>`.
+ * `load` takes a layer index and returns a zero `Vec4f` outside the extent, and a `store` call
+ * traps with TX13.
+ */
 export class ReadStorageTexture2dArray<F> {
   private values: Vec4f[];
   // The generator reads this zero-length marker to recover F from the typed HIR.
@@ -398,6 +453,12 @@ export class ReadStorageTexture2dArray<F> {
   }
 }
 
+/**
+ * A write-only storage array texture binding. In WGSL it becomes
+ * `texture_storage_2d_array<F, write>`.
+ * `store` takes a layer index and writes nothing outside the extent, and a `load` call traps
+ * with TX13.
+ */
 export class WriteStorageTexture2dArray<F> {
   private values: Vec4f[];
   // The generator reads this zero-length marker to recover F from the typed HIR.
@@ -436,6 +497,11 @@ export class WriteStorageTexture2dArray<F> {
   }
 }
 
+/**
+ * A typed GPU buffer whose indices and counts are elements, never bytes.
+ * `elementSize` is the schema's stride, so element `i` starts at `i * elementSize`.
+ * The class owns the `GPUBuffer`, and `dispose()` releases it.
+ */
 export class Buffer<T> {
   buffer: GPUBuffer;
   elementSize: u32;
@@ -596,6 +662,10 @@ export class Buffer<T> {
   }
 }
 
+/**
+ * Copies `elementCount` elements out of a buffer the caller already mapped with `mapAsync`.
+ * A range past the end traps with BF8. Decode the bytes with `Context.fromBytes`.
+ */
 export function readBuffer<T>(
   readback: Buffer<T>,
   elementIndex: u32,
@@ -610,6 +680,10 @@ export function readBuffer<T>(
   );
 }
 
+/**
+ * Copies one element out of a buffer the caller already mapped with `mapAsync`.
+ * An `elementIndex` at or past the element count traps with BF8.
+ */
 export function readOne<T>(readback: Buffer<T>, elementIndex: u32): u8[] {
   if (elementIndex >= readback.count) {
     authorTrap("BF8", "readOne", `elementIndex=${elementIndex} elementCount=1 count=${readback.count}`);
@@ -620,6 +694,11 @@ export function readOne<T>(readback: Buffer<T>, elementIndex: u32): u8[] {
   );
 }
 
+/**
+ * Creates a `Buffer<T>` that holds `count` elements of `elementSize` bytes each.
+ * Pass the schema's stride constant as `elementSize`, never its size constant.
+ * The buffer keeps `usage`, and a method whose usage flag is absent traps with BF10.
+ */
 export function createBuffer<T>(
   device: GPUDevice,
   elementSize: u32,
@@ -639,6 +718,10 @@ export function createBuffer<T>(
   );
 }
 
+/**
+ * Creates a `Buffer<T>` through a device the host application owns, as `createBuffer` does.
+ * The buffer belongs to the script, so the script disposes it.
+ */
 export function createBufferHost<T>(
   device: GPUHostOwnedDevice,
   elementSize: u32,
@@ -658,6 +741,11 @@ export function createBufferHost<T>(
   );
 }
 
+/**
+ * Carries the compute builtins into a kernel.
+ * The generator emits a `@builtin` parameter for each field the kernel reads and no other.
+ * The host lane builds one per invocation, and a program never constructs one itself.
+ */
 export class ComputeInvocation {
   globalId: Vec3u;
   localId: Vec3u;
@@ -680,15 +768,30 @@ export class ComputeInvocation {
   }
 }
 
+/**
+ * Carries the vertex builtins into a vertex kernel.
+ * The generator emits `@builtin(vertex_index)` and `@builtin(instance_index)` for the fields
+ * the kernel reads.
+ */
 export class VertexInvocation {
   vertexIndex!: u32;
   instanceIndex!: u32;
 }
 
+/**
+ * Carries the fragment builtins into a fragment kernel, and `frontFacing` becomes
+ * `@builtin(front_facing)`.
+ * The fragment position arrives as the varyings' `position` field, never through this class.
+ */
 export class FragmentInvocation {
   frontFacing!: boolean;
 }
 
+/**
+ * A uniform buffer binding. In WGSL it becomes `var<uniform> name: T`.
+ * A kernel reads the value through the accessor `$`, where `T` is a schema class, a library
+ * vector or matrix, or a scalar.
+ */
 export class Uniform<T> {
   private values: T[];
 
@@ -701,6 +804,10 @@ export class Uniform<T> {
   }
 }
 
+/**
+ * A read-only storage buffer binding. In WGSL it becomes `var<storage, read> name: array<T>`.
+ * A kernel reads an element as `items[i]` and the element count as `length()`.
+ */
 export class Storage<T> {
   readonly [index: u32]: T;
   private values: T[];
@@ -718,6 +825,11 @@ export class Storage<T> {
   }
 }
 
+/**
+ * A read-write storage buffer binding. In WGSL it becomes
+ * `var<storage, read_write> name: array<T>`.
+ * A kernel reads an element as `items[i]` and writes one as `items[i] = value`.
+ */
 export class MutStorage<T> {
   [index: u32]: T;
   private values: T[];
@@ -739,6 +851,10 @@ export class MutStorage<T> {
   }
 }
 
+/**
+ * A private module variable. In WGSL it becomes `var<private> x: T = init`.
+ * A kernel reads and writes it as `x.$` and `x.$ = value`, and every invocation holds its own copy.
+ */
 export class PrivateVar<T> {
   private value: T;
 
@@ -755,6 +871,10 @@ export class PrivateVar<T> {
   }
 }
 
+/**
+ * A workgroup variable. In WGSL it becomes `var<workgroup> x: T` with no initializer.
+ * A kernel reads and writes it as `x.$` and `x.$ = value`, and one workgroup shares one copy.
+ */
 export class WorkgroupVar<T> {
   private values: T[];
 
@@ -775,6 +895,11 @@ export class WorkgroupVar<T> {
   }
 }
 
+/**
+ * A workgroup array. In WGSL it becomes `var<workgroup> x: array<T, n>` with no initializer.
+ * A kernel reads and writes an element as `x[i]`, and `length()` reports the declared `n`, not
+ * the count a host run wrote.
+ */
 export class WorkgroupArray<T> {
   [index: u32]: T;
   private values: T[];
@@ -802,33 +927,76 @@ export class WorkgroupArray<T> {
   }
 }
 
+/**
+ * Declares a private module variable as the initializer of a module-level `const`.
+ * The generator folds `init`, and an initializer it cannot fold is a K20 diagnostic.
+ */
 export function privateVar<T>(init: T): PrivateVar<T> {
   return new PrivateVar<T>(init);
 }
 
+/**
+ * Declares a workgroup variable as the initializer of a module-level `const`.
+ * WGSL gives a workgroup variable no initializer, so a kernel writes it before it reads it.
+ */
 export function workgroupVar<T>(): WorkgroupVar<T> {
   return new WorkgroupVar<T>();
 }
 
+/**
+ * Declares a workgroup array of `n` elements as the initializer of a module-level `const`.
+ * `n` must be a literal, because the generator writes it into the WGSL array type.
+ */
 export function workgroupArray<T>(n: u32): WorkgroupArray<T> {
   return new WorkgroupArray<T>(n);
 }
 
+/**
+ * A workgroup execution and memory barrier.
+ * The call is legal as a statement in a kernel body under uniform control flow, never in a helper.
+ * The host body does nothing, so a kernel that reaches it is not host-runnable (CL2).
+ */
 export function workgroupBarrier(): void {}
 
+/**
+ * A storage memory barrier.
+ * The call is legal as a statement in a kernel body under uniform control flow, never in a helper.
+ * The host body does nothing, so a kernel that reaches it is not host-runnable (CL2).
+ */
 export function storageBarrier(): void {}
 
+/**
+ * The descriptor of a WGSL shell.
+ * `body` holds the WGSL statements the generator inserts as the function body, and it must be
+ * a string literal.
+ */
 @Descriptor
 export class WgslShellSpec {
   body!: string;
 }
 
+/**
+ * Marks a module-level function as a WGSL shell.
+ * The generator writes the WGSL signature from the function's types and inserts `spec.body`,
+ * and it never walks the subscript body.
+ * That subscript body stays as the host implementation of the same function.
+ */
 export function wgslShell<F>(fn: F, spec: WgslShellSpec): WgslShellSpec {
   return spec;
 }
 
+/**
+ * Adds raw WGSL text above the generated declarations of every module the program emits.
+ * A program holds at most one call, at module level.
+ * A lexical fence rejects `override`, a barrier, `@group`, `@binding`, and `var<`.
+ */
 export function wgslDeclarations(text: string): void {}
 
+/**
+ * The descriptor of a compute pipeline declaration.
+ * `workgroupSize` holds the three literal workgroup dimensions.
+ * `guarded` adds a hidden uniform binding that clips the kernel to the dispatched thread counts.
+ */
 @Descriptor
 export class ComputePipelineSpec {
   workgroupSize!: FixedArray<u32, 3>;
@@ -836,6 +1004,12 @@ export class ComputePipelineSpec {
   guarded?: boolean = false;
 }
 
+/**
+ * Declares a compute pipeline over one layout class, as a module-level `const`.
+ * The generator reads the kernel from the function reference and the workgroup size from the
+ * literal spec.
+ * `guarded` is legal on this form only.
+ */
 export function computePipeline<L>(
   kernel: (res: L, ctx: ComputeInvocation) => void,
   spec: ComputePipelineSpec,
@@ -843,6 +1017,11 @@ export function computePipeline<L>(
   return { workgroupSize: spec.workgroupSize, name: spec.name, guarded: spec.guarded };
 }
 
+/**
+ * Declares a compute pipeline over two layout classes, as a module-level `const`.
+ * Bind group index is parameter order, so `L0` is group 0 and `L1` is group 1.
+ * `guarded` on this form is a diagnostic (PI15).
+ */
 export function computePipeline2<L0, L1>(
   kernel: (res0: L0, res1: L1, ctx: ComputeInvocation) => void,
   spec: ComputePipelineSpec,
@@ -850,6 +1029,11 @@ export function computePipeline2<L0, L1>(
   return { workgroupSize: spec.workgroupSize, name: spec.name, guarded: spec.guarded };
 }
 
+/**
+ * Declares a compute pipeline over three layout classes, as a module-level `const`.
+ * Bind group index is parameter order, so `L0` is group 0 and `L2` is group 2.
+ * `guarded` on this form is a diagnostic (PI15).
+ */
 export function computePipeline3<L0, L1, L2>(
   kernel: (res0: L0, res1: L1, res2: L2, ctx: ComputeInvocation) => void,
   spec: ComputePipelineSpec,
@@ -857,6 +1041,11 @@ export function computePipeline3<L0, L1, L2>(
   return { workgroupSize: spec.workgroupSize, name: spec.name, guarded: spec.guarded };
 }
 
+/**
+ * Declares a compute pipeline over four layout classes, as a module-level `const`.
+ * Bind group index is parameter order, so `L0` is group 0 and `L3` is group 3.
+ * `guarded` on this form is a diagnostic (PI15).
+ */
 export function computePipeline4<L0, L1, L2, L3>(
   kernel: (res0: L0, res1: L1, res2: L2, res3: L3, ctx: ComputeInvocation) => void,
   spec: ComputePipelineSpec,
@@ -936,6 +1125,11 @@ function simulateComputeLoop<L>(
   }
 }
 
+/**
+ * Runs the kernel on the host over every invocation of `workgroups` workgroups, in row-major order.
+ * Fill the wrappers in `res` before the call, and read them after it.
+ * Pass the generated host-runnable constant as `hostRunnable`, because `false` traps with CL2.
+ */
 export function simulateCompute<L>(
   kernel: (res: L, ctx: ComputeInvocation) => void,
   res: L,
@@ -947,6 +1141,12 @@ export function simulateCompute<L>(
   simulateComputeLoop<L>(kernel, res, spec, workgroups, [0, 0, 0], false);
 }
 
+/**
+ * Runs the kernel on the host over `x`, `y`, and `z` threads, rounded up by the workgroup size
+ * the way `dispatchThreads` rounds them.
+ * For a guarded spec it skips every invocation whose global id is outside those counts.
+ * A `hostRunnable` of `false` traps with CL2.
+ */
 export function simulateComputeThreads<L>(
   kernel: (res: L, ctx: ComputeInvocation) => void,
   res: L,
@@ -965,6 +1165,10 @@ export function simulateComputeThreads<L>(
   simulateComputeLoop<L>(kernel, res, spec, workgroups, [x, y, z], true);
 }
 
+/**
+ * Runs a two-layout kernel on the host over every invocation of `workgroups` workgroups.
+ * A `hostRunnable` of `false` traps with CL2.
+ */
 export function simulateCompute2<L0, L1>(
   kernel: (res0: L0, res1: L1, ctx: ComputeInvocation) => void,
   res0: L0,
@@ -1002,6 +1206,10 @@ export function simulateCompute2<L0, L1>(
   }
 }
 
+/**
+ * Runs a three-layout kernel on the host over every invocation of `workgroups` workgroups.
+ * A `hostRunnable` of `false` traps with CL2.
+ */
 export function simulateCompute3<L0, L1, L2>(
   kernel: (res0: L0, res1: L1, res2: L2, ctx: ComputeInvocation) => void,
   res0: L0,
@@ -1041,6 +1249,10 @@ export function simulateCompute3<L0, L1, L2>(
   }
 }
 
+/**
+ * Runs a four-layout kernel on the host over every invocation of `workgroups` workgroups.
+ * A `hostRunnable` of `false` traps with CL2.
+ */
 export function simulateCompute4<L0, L1, L2, L3>(
   kernel: (res0: L0, res1: L1, res2: L2, res3: L3, ctx: ComputeInvocation) => void,
   res0: L0,
@@ -1082,6 +1294,12 @@ export function simulateCompute4<L0, L1, L2, L3>(
   }
 }
 
+/**
+ * The descriptor of a render pipeline declaration.
+ * The generator reads `format` and `indexFormat`.
+ * The runtime passes `topology`, `cullMode`, `frontFace`, and `blend` into the pipeline
+ * descriptor.
+ */
 @Descriptor
 export class RenderPipelineSpec {
   format!: GPUTextureFormat;
@@ -1120,6 +1338,13 @@ function hostBlendComponent(
   return Math.min(1.0, Math.max(0.0, result as f64)) as f32;
 }
 
+/**
+ * Blends one source color over one destination for a host oracle, and clamps each channel to
+ * the range 0 to 1.
+ * A `blend` of `null` returns `source` unchanged.
+ * This function accepts the `add` operation with `src-alpha`/`one-minus-src-alpha` or `one`/`one`
+ * only, and traps with RN21 otherwise.
+ */
 export function hostBlend(
   source: Vec4f,
   destination: Vec4f,
@@ -1134,6 +1359,12 @@ export function hostBlend(
   );
 }
 
+/**
+ * One attribute of a vertex buffer layout.
+ * `offset` is a byte offset inside the element, which a program reads from the schema's field
+ * offset constant.
+ * `shaderLocation` is the WGSL `@location` index.
+ */
 @Descriptor
 export class VertexAttributeSpec {
   format!: GPUVertexFormat;
@@ -1141,6 +1372,11 @@ export class VertexAttributeSpec {
   shaderLocation!: u32;
 }
 
+/**
+ * The layout of one vertex buffer slot.
+ * `arrayStride` is the element stride in bytes, which is the schema's stride constant.
+ * `stepMode` is `vertex` for the vertex schema and `instance` for the instance schema.
+ */
 @Descriptor
 export class VertexBufferLayoutSpec {
   arrayStride!: u64;
@@ -1148,6 +1384,11 @@ export class VertexBufferLayoutSpec {
   attributes!: VertexAttributeSpec[];
 }
 
+/**
+ * Declares a render pipeline with no bindings, as a module-level `const`.
+ * `V` is the vertex schema, and `O` is the varyings class, which needs a `position: Vec4f` field.
+ * The generator reads both kernels and the literal spec.
+ */
 export function renderPipeline<V, O>(
   vertex: (value: V, ctx: VertexInvocation) => O,
   fragment: (input: O, ctx: FragmentInvocation) => Vec4f,
@@ -1163,6 +1404,11 @@ export function renderPipeline<V, O>(
   };
 }
 
+/**
+ * Declares a render pipeline whose two kernels read one layout class, as a module-level `const`.
+ * The bindings form group 0, and the kernels that reach a binding decide its visibility.
+ * A binding no kernel reaches is a diagnostic (RN9).
+ */
 export function renderPipelineL<L, V, O>(
   vertex: (res: L, value: V, ctx: VertexInvocation) => O,
   fragment: (res: L, input: O, ctx: FragmentInvocation) => Vec4f,
@@ -1178,6 +1424,11 @@ export function renderPipelineL<L, V, O>(
   };
 }
 
+/**
+ * Declares a render pipeline with a second vertex buffer for per-instance data.
+ * The instance schema `I` takes slot 1 with the step mode `instance`.
+ * Its attribute locations continue after the locations of `V`.
+ */
 export function renderPipelineInstanced<V, I, O>(
   vertex: (value: V, instance: I, ctx: VertexInvocation) => O,
   fragment: (input: O, ctx: FragmentInvocation) => Vec4f,
@@ -1193,6 +1444,13 @@ export function renderPipelineInstanced<V, I, O>(
   };
 }
 
+/**
+ * One binding of a generated bind group layout.
+ * `kind` is `uniform`, `read-only-storage`, `storage`, `texture`, `storageTexture`, `sampler`,
+ * `comparisonSampler`, or `guard`.
+ * `visibility` is a shader stage mask, and `minBindingSize` is the byte size the layout engine
+ * computes.
+ */
 @Descriptor
 export class BindGroupLayoutEntrySpec {
   binding!: u32;
@@ -1206,6 +1464,11 @@ export class BindGroupLayoutEntrySpec {
   samplerType?: GPUSamplerBindingType = "filtering";
 }
 
+/**
+ * The resource of one binding.
+ * Exactly one of the three fields is not `null`, and any other count traps with TX4.
+ * Build one with `bufferResource`, `textureResource`, or `samplerResource`.
+ */
 @Descriptor
 export class BindingResource {
   buffer?: GPUBuffer | null = null;
@@ -1213,23 +1476,42 @@ export class BindingResource {
   sampler?: GPUSampler | null = null;
 }
 
+/**
+ * Wraps a buffer as the resource of a `uniform`, `storage`, or `read-only-storage` binding.
+ */
 export function bufferResource(buffer: GPUBuffer): BindingResource {
   return { buffer, textureView: null, sampler: null };
 }
 
+/**
+ * Wraps a texture view as the resource of a `texture` or `storageTexture` binding.
+ */
 export function textureResource(textureView: GPUTextureView): BindingResource {
   return { buffer: null, textureView, sampler: null };
 }
 
+/**
+ * Wraps a sampler as the resource of a `sampler` or `comparisonSampler` binding.
+ */
 export function samplerResource(sampler: GPUSampler): BindingResource {
   return { buffer: null, textureView: null, sampler };
 }
 
+/**
+ * One generated bind group layout, which the support module exports for each group.
+ * The entries follow the layout class's field order, and a hidden `guard` entry comes last.
+ */
 @Descriptor
 export class BindGroupLayoutSpec {
   entries!: BindGroupLayoutEntrySpec[];
 }
 
+/**
+ * The compute pipeline a program dispatches.
+ * It owns the WebGPU pipeline and every guard buffer, and `dispose()` releases them.
+ * A guarded pipeline writes its bounds through the queue, so one command encoder carries at most
+ * one guarded dispatch (PI15).
+ */
 export class ComputePipeline {
   private pipeline: GPUComputePipeline;
   private guardQueue: GPUQueue | null;
@@ -1427,6 +1709,11 @@ export class ComputePipeline {
   }
 }
 
+/**
+ * A pair of timestamp queries and the 16-byte buffer they resolve into.
+ * `resolve` records the resolve, and `copyTo` moves the 16 bytes into a readback buffer.
+ * `dispose()` destroys the query set and releases the resolve buffer.
+ */
 export class TimestampPair {
   private queries: GPUQuerySet;
   private resolved: GPUBuffer;
@@ -1462,6 +1749,11 @@ export class TimestampPair {
   }
 }
 
+/**
+ * Creates a `TimestampPair` on the device, which the caller disposes.
+ * When the device lacks the `timestamp-query` feature, this function returns `null`, so a
+ * program can continue without timestamps.
+ */
 export function createTimestampPair(device: GPUDevice): TimestampPair | null {
   if (!device.hasFeature("timestamp-query")) {
     return null;
@@ -1479,6 +1771,11 @@ export function createTimestampPair(device: GPUDevice): TimestampPair | null {
   return new TimestampPair(queries, resolved);
 }
 
+/**
+ * The render pipeline a program binds into a render pass.
+ * `bind` sets the pipeline, the bind groups, and each vertex buffer at its full size.
+ * When the declaration names no `indexFormat`, `setIndexBuffer` traps with RN18.
+ */
 export class RenderPipeline {
   private pipeline: GPURenderPipeline;
   private indexFormat: GPUIndexFormat;
@@ -1710,7 +2007,11 @@ function finishRenderPipeline(
   return new RenderPipeline(pipeline, spec.indexFormat);
 }
 
-/** Creates inside the caller's validation error scope; this helper does not await. */
+/**
+ * Creates a `ComputePipeline` from the generated WGSL, entry name, layouts, and workgroup size.
+ * The call runs inside the caller's validation error scope and does not await.
+ * It creates one guard buffer per `guard` layout entry, and the pipeline disposes them.
+ */
 export function createComputePipeline(
   device: GPUDevice,
   wgsl: string,
@@ -1757,7 +2058,11 @@ export function createComputePipeline(
   );
 }
 
-/** Creates inside the caller's validation error scope; this helper does not await. */
+/**
+ * Creates a `ComputePipeline` through a device the host application owns.
+ * The call runs inside the caller's validation error scope and does not await.
+ * The pipeline owns the queue wrapper it takes for a guarded dispatch, and disposes that wrapper.
+ */
 export function createComputePipelineHost(
   device: GPUHostOwnedDevice,
   wgsl: string,
@@ -1804,7 +2109,11 @@ export function createComputePipelineHost(
   );
 }
 
-/** Creates inside the caller's validation error scope; this helper does not await. */
+/**
+ * Creates a `RenderPipeline` from the generated WGSL, entry names, layouts, and vertex layouts.
+ * The call runs inside the caller's validation error scope and does not await.
+ * The caller disposes the result.
+ */
 export function createRenderPipeline(
   device: GPUDevice,
   wgsl: string,
@@ -1836,7 +2145,11 @@ export function createRenderPipeline(
   return finishRenderPipeline(pipeline, spec);
 }
 
-/** Creates inside the caller's validation error scope; this helper does not await. */
+/**
+ * Creates a `RenderPipeline` through a device the host application owns.
+ * The call runs inside the caller's validation error scope and does not await.
+ * The caller disposes the result.
+ */
 export function createRenderPipelineHost(
   device: GPUHostOwnedDevice,
   wgsl: string,
@@ -1867,6 +2180,10 @@ export function createRenderPipelineHost(
   return finishRenderPipeline(pipeline, spec);
 }
 
+/**
+ * The shader stage masks a generated bind group layout entry carries in `visibility`.
+ * A binding that two stages reach carries the sum of the two masks.
+ */
 export const COMPUTE_VISIBILITY: u64 = GPUShaderStage.COMPUTE;
 export const VERTEX_VISIBILITY: u64 = GPUShaderStage.VERTEX;
 export const FRAGMENT_VISIBILITY: u64 = GPUShaderStage.FRAGMENT;
@@ -1941,6 +2258,12 @@ function bindGroupEntries(
   return entries;
 }
 
+/**
+ * Creates a bind group from a generated layout spec and one resource per authored binding, in
+ * declaration order.
+ * A resource count that differs from the authored binding count traps with PI9.
+ * A `guard` entry takes `guardBuffer` and consumes no resource.
+ */
 export function createBindGroup(
   device: GPUDevice,
   layout: GPUBindGroupLayout,
@@ -1954,6 +2277,10 @@ export function createBindGroup(
   });
 }
 
+/**
+ * Creates a bind group through a device the host application owns.
+ * The resource order and the checks are the order and the checks of `createBindGroup`.
+ */
 export function createBindGroupHost(
   device: GPUHostOwnedDevice,
   layout: GPUBindGroupLayout,

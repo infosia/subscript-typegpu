@@ -5,24 +5,36 @@ use std::collections::BTreeSet;
 use subscript_compiler::hir::{Callee, Expr, ExprKind, Function, Module, Stmt};
 use subscript_compiler::{Diagnostic, Pos, RuleCode};
 
+/// One WGSL shell: a source function whose GPU body is author WGSL (K29).
 #[derive(Debug, Clone)]
 pub(crate) struct Shell {
+    /// The shell name, which is the shelled function's name without generic arguments.
     pub(crate) name: String,
+    /// The name of the module-level function that carries the host body.
     pub(crate) function: String,
+    /// The WGSL statements that become the emitted function body.
     pub(crate) body: String,
+    /// The declaration position.
     pub(crate) pos: Pos,
 }
 
+/// The program's one `wgslDeclarations` call (K30).
 #[derive(Debug, Clone)]
 pub(crate) struct Declarations {
+    /// The raw WGSL text, which precedes every generated declaration of every module.
     pub(crate) text: String,
+    /// The `const`, `fn`, `struct`, and `alias` names that the text declares.
     pub(crate) names: BTreeSet<String>,
+    /// The call position.
     pub(crate) pos: Pos,
 }
 
+/// The author WGSL of one program.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ShellProgram {
+    /// The shells, in declaration order.
     pub(crate) shells: Vec<Shell>,
+    /// The raw declarations, when the program calls `wgslDeclarations`.
     pub(crate) declarations: Option<Declarations>,
 }
 
@@ -82,6 +94,7 @@ fn descriptor_body(module: &Module, expr: &Expr) -> Result<String, Diagnostic> {
     }
 }
 
+/// Reports whether the character is in WGSL's blankspace set, which the fence tokenizer skips.
 pub(crate) fn is_wgsl_blankspace(ch: char) -> bool {
     matches!(
         ch,
@@ -333,6 +346,16 @@ fn visit_statements(
     }
 }
 
+/// Collects the shells and the raw declarations of one program (K29, K30).
+///
+/// Every shell body and the declaration text pass the lexical fence before this returns, so a
+/// later caller reads checked text.
+///
+/// # Errors
+///
+/// Returns every K29 and K30 violation. The cases include a declaration inside a function and a
+/// body that is not a string literal. A forbidden token, unbalanced braces, and a second
+/// `wgslDeclarations` call also give one.
 pub(crate) fn discover(module: &Module) -> Result<ShellProgram, Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
     for function in &module.functions {
@@ -486,6 +509,14 @@ pub(crate) fn discover(module: &Module) -> Result<ShellProgram, Vec<Diagnostic>>
     }
 }
 
+/// Rejects a shell or declaration name that collides with a generated declaration (K30).
+///
+/// `generated_names` holds author spellings. The comparison mangles them first, so a collision
+/// cannot hide behind a name that the emitter rewrites.
+///
+/// # Errors
+///
+/// Returns one K30 diagnostic for each name that collides.
 pub(crate) fn validate_collisions(
     program: &ShellProgram,
     generated_names: &BTreeSet<String>,
@@ -523,14 +554,26 @@ pub(crate) fn validate_collisions(
     }
 }
 
+/// Reports whether the named function is a shell, whose subscript body the emitter never walks.
 pub(crate) fn function_is_shell(program: &ShellProgram, name: &str) -> bool {
     program.shells.iter().any(|shell| shell.function == name)
 }
 
+/// Returns the shell of the named function, or `None` when the function is not a shell.
 pub(crate) fn shell_for_function<'a>(program: &'a ShellProgram, name: &str) -> Option<&'a Shell> {
     program.shells.iter().find(|shell| shell.function == name)
 }
 
+/// Checks one shell's signature against the K2 helper rules and returns the function.
+///
+/// The emitter writes the WGSL `fn` line from this signature, so the parameter and return types
+/// must map to WGSL.
+///
+/// # Errors
+///
+/// Returns a K29 diagnostic when the function is absent, `async`, a generator, or takes a layout
+/// class or a `ComputeInvocation`. A parameter or return type outside K4 returns its own
+/// diagnostic.
 pub(crate) fn validate_signature<'a>(
     module: &'a Module,
     shell: &Shell,

@@ -32,6 +32,7 @@ pub(crate) struct Yml {
 /// One file-level constant.
 #[derive(Debug, Deserialize)]
 pub(crate) struct Constant {
+    /// The yml constant name, snake_case.
     pub name: String,
     /// Symbolic value such as `usize_max` or `uint64_max`.
     #[allow(dead_code)]
@@ -42,26 +43,32 @@ pub(crate) struct Constant {
 /// still occupy a value slot.
 #[derive(Debug, Deserialize)]
 pub(crate) struct Enum {
+    /// The yml enum name, snake_case.
     pub name: String,
+    /// The entries in value order. A `null` entry holds its slot without a name.
     pub entries: Vec<Option<EnumEntry>>,
 }
 
 /// One named enum entry.
 #[derive(Debug, Deserialize)]
 pub(crate) struct EnumEntry {
+    /// The yml entry name, snake_case.
     pub name: String,
 }
 
 /// One flag type.
 #[derive(Debug, Deserialize)]
 pub(crate) struct Bitflag {
+    /// The yml flag-type name, snake_case.
     pub name: String,
+    /// The entries in bit order, entry 0 first.
     pub entries: Vec<BitflagEntry>,
 }
 
 /// One flag entry. `value_combination` entries combine earlier entries.
 #[derive(Debug, Deserialize)]
 pub(crate) struct BitflagEntry {
+    /// The yml entry name, snake_case.
     pub name: String,
     #[serde(default)]
     pub value_combination: Option<Vec<String>>,
@@ -70,6 +77,7 @@ pub(crate) struct BitflagEntry {
 /// One struct definition.
 #[derive(Debug, Deserialize)]
 pub(crate) struct Struct {
+    /// The yml struct name, snake_case.
     pub name: String,
     /// `standalone`, `extensible`, or `extension` in the pinned yml.
     #[serde(rename = "type", default)]
@@ -77,6 +85,7 @@ pub(crate) struct Struct {
     /// Base descriptors accepted by an extension struct.
     #[serde(default)]
     pub extends: Vec<String>,
+    /// The members in declaration order, which is the C field order.
     #[serde(default)]
     pub members: Vec<Member>,
     /// Whether webgpu.h exposes a by-value FreeMembers helper.
@@ -87,13 +96,19 @@ pub(crate) struct Struct {
 /// One struct member.
 #[derive(Debug, Deserialize)]
 pub(crate) struct Member {
+    /// The yml member name, snake_case.
     pub name: String,
+    /// The yml type name. A prefixed form such as `struct.x` or `enum.x` names another
+    /// construct.
     #[serde(rename = "type")]
     pub ty: String,
+    /// The yml pointer attribute, `immutable` or `mutable`. `None` marks a by-value member.
     #[serde(default)]
     pub pointer: Option<String>,
+    /// The yml marks the member optional, so it accepts NULL or an absent value.
     #[serde(default)]
     pub optional: bool,
+    /// The yml default. A `constant.<name>` value names a file-level constant.
     #[serde(default)]
     pub default: Option<serde_yaml::Value>,
 }
@@ -101,9 +116,11 @@ pub(crate) struct Member {
 /// One callback definition.
 #[derive(Debug, Deserialize)]
 pub(crate) struct Callback {
+    /// The yml callback name, snake_case.
     pub name: String,
     /// `callback_mode` or `immediate`.
     pub style: String,
+    /// The callback arguments in declaration order.
     #[serde(default)]
     pub args: Vec<Arg>,
 }
@@ -111,9 +128,12 @@ pub(crate) struct Callback {
 /// One freestanding function or object method.
 #[derive(Debug, Deserialize)]
 pub(crate) struct Function {
+    /// The yml function or method name, snake_case.
     pub name: String,
+    /// The return declaration. `None` marks a `void` function.
     #[serde(default)]
     pub returns: Option<Returns>,
+    /// The arguments in declaration order, receiver excluded.
     #[serde(default)]
     pub args: Vec<Arg>,
     /// `callback.<name>` for async operations.
@@ -124,6 +144,7 @@ pub(crate) struct Function {
 /// A function/method return declaration.
 #[derive(Debug, Deserialize)]
 pub(crate) struct Returns {
+    /// The yml return type, spelled like a member type.
     #[serde(rename = "type")]
     pub ty: String,
 }
@@ -131,11 +152,15 @@ pub(crate) struct Returns {
 /// One function, method, or callback argument.
 #[derive(Debug, Deserialize)]
 pub(crate) struct Arg {
+    /// The yml argument name, snake_case.
     pub name: String,
+    /// The yml type, spelled like a member type.
     #[serde(rename = "type")]
     pub ty: String,
+    /// The yml pointer attribute, `immutable` or `mutable`. `None` marks a by-value argument.
     #[serde(default)]
     pub pointer: Option<String>,
+    /// The yml marks the argument optional, so the call accepts NULL.
     #[serde(default)]
     pub optional: bool,
 }
@@ -144,7 +169,9 @@ pub(crate) struct Arg {
 /// AddRef/Release.
 #[derive(Debug, Deserialize)]
 pub(crate) struct Object {
+    /// The yml object name, snake_case.
     pub name: String,
+    /// The methods in declaration order. AddRef and Release stay implicit.
     #[serde(default)]
     pub methods: Vec<Function>,
 }

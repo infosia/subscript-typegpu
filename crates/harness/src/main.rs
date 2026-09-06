@@ -1,3 +1,9 @@
+//! The command-line runner of one program on one subscript tier.
+//!
+//! `<dev|ship> <program>` writes the program's raw output to stdout. `--coverage` adds the reached
+//! facade exports to stderr, and `--measure-map-async` times one `mapAsync` wait. The dev tier
+//! carries both extra modes.
+
 use std::io::Write;
 use std::path::Path;
 use std::process::ExitCode;

@@ -5,6 +5,10 @@ use std::collections::BTreeSet;
 use subscript_compiler::hir::{Callee, Expr, ExprKind, Function, Module, Stmt};
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
+/// The address space and the resource kind of one layout binding (PI5, TX1).
+///
+/// `Guard` is the hidden uniform binding of a guarded declaration (PI15). It reaches the layout
+/// spec and no resources class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BindingKind {
     Uniform,
@@ -20,11 +24,13 @@ pub(crate) enum BindingKind {
     Guard,
 }
 
+/// The sampled type of a texture binding (TX1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TextureSampleType {
     Float,
 }
 
+/// The view dimension of a texture binding (TX1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TextureViewDimension {
     TwoD,
@@ -32,6 +38,7 @@ pub(crate) enum TextureViewDimension {
 }
 
 impl TextureViewDimension {
+    /// Returns the dimension of the emitted WGSL texture type, such as `2d_array`.
     pub(crate) fn wgsl(self) -> &'static str {
         match self {
             Self::TwoD => "2d",
@@ -39,6 +46,7 @@ impl TextureViewDimension {
         }
     }
 
+    /// Returns the `GPUTextureViewDimension` value that the generated layout spec carries.
     pub(crate) fn webgpu(self) -> &'static str {
         match self {
             Self::TwoD => "2d",
@@ -48,12 +56,14 @@ impl TextureViewDimension {
 }
 
 impl TextureSampleType {
+    /// Returns the sampled type argument of the emitted WGSL `texture_2d` type.
     pub(crate) fn wgsl(self) -> &'static str {
         match self {
             Self::Float => "f32",
         }
     }
 
+    /// Returns the `GPUTextureSampleType` value that the generated layout spec carries.
     pub(crate) fn webgpu(self) -> &'static str {
         match self {
             Self::Float => "float",
@@ -61,6 +71,7 @@ impl TextureSampleType {
     }
 }
 
+/// The format of a storage texture binding (TX1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StorageTextureFormat {
     Rgba8unorm,
@@ -69,6 +80,7 @@ pub(crate) enum StorageTextureFormat {
     Rgba32float,
 }
 
+/// The access mode of a storage texture binding (TX1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StorageTextureAccess {
     Write,
@@ -77,6 +89,7 @@ pub(crate) enum StorageTextureAccess {
 }
 
 impl StorageTextureAccess {
+    /// Returns the access argument of the emitted WGSL `texture_storage_2d` type.
     pub(crate) fn wgsl(self) -> &'static str {
         match self {
             Self::Write => "write",
@@ -85,6 +98,7 @@ impl StorageTextureAccess {
         }
     }
 
+    /// Returns the `GPUStorageTextureAccess` value that the generated layout spec carries.
     pub(crate) fn webgpu(self) -> &'static str {
         match self {
             Self::Write => "write-only",
@@ -93,16 +107,19 @@ impl StorageTextureAccess {
         }
     }
 
+    /// Reports whether a kernel can call `dimensions` and `load` on a binding with this access.
     pub(crate) fn can_read(self) -> bool {
         matches!(self, Self::Read | Self::ReadWrite)
     }
 
+    /// Reports whether a kernel can call `store` on a binding with this access.
     pub(crate) fn can_write(self) -> bool {
         matches!(self, Self::Write | Self::ReadWrite)
     }
 }
 
 impl StorageTextureFormat {
+    /// Returns the format argument of the emitted WGSL `texture_storage_2d` type.
     pub(crate) fn wgsl(self) -> &'static str {
         match self {
             Self::Rgba8unorm => "rgba8unorm",
@@ -112,12 +129,16 @@ impl StorageTextureFormat {
         }
     }
 
+    /// Returns the `GPUTextureFormat` value that the generated layout spec carries.
     pub(crate) fn webgpu(self) -> &'static str {
         self.wgsl()
     }
 }
 
 impl BindingKind {
+    /// Returns the address space of the emitted WGSL `var` declaration.
+    ///
+    /// A texture and a sampler declare no address space, so both give the empty string.
     pub(crate) fn wgsl(self) -> &'static str {
         match self {
             Self::Uniform => "uniform",
@@ -128,6 +149,7 @@ impl BindingKind {
         }
     }
 
+    /// Returns the `kind` value that the generated layout spec entry carries.
     pub(crate) fn webgpu(self) -> &'static str {
         match self {
             Self::Uniform => "uniform",
@@ -140,6 +162,7 @@ impl BindingKind {
         }
     }
 
+    /// Reports whether a `GPUBuffer` fills the binding, which every guard binding also does.
     pub(crate) fn is_buffer(self) -> bool {
         matches!(
             self,
@@ -148,30 +171,48 @@ impl BindingKind {
     }
 }
 
+/// One binding of a layout class.
 #[derive(Debug, Clone)]
 pub(crate) struct Binding {
+    /// The layout field name, which is also the emitted WGSL variable name.
     pub(crate) name: String,
+    /// The binding index, which is the field's declaration position from 0 (PI3).
     pub(crate) index: u32,
+    /// The address space and the resource kind.
     pub(crate) kind: BindingKind,
+    /// The wrapper's item type `T`, which sizes the binding.
     pub(crate) item_ty: Type,
+    /// The field declaration position.
     pub(crate) pos: Pos,
 }
 
+/// One layout class of a pipeline declaration (PI3).
 #[derive(Debug, Clone)]
 pub(crate) struct Layout {
+    /// The layout class name.
     pub(crate) name: String,
+    /// The bind group index, which is the kernel's parameter order (PI2).
     pub(crate) group: u32,
+    /// The bindings, in field declaration order. A guarded declaration appends its guard last.
     pub(crate) bindings: Vec<Binding>,
 }
 
+/// One compute pipeline declaration (PI1).
 #[derive(Debug, Clone)]
 pub(crate) struct Pipeline {
+    /// The module-level `const` name that carries the declaration.
     pub(crate) declaration: String,
+    /// The kernel function name, which becomes the WGSL entry point.
     pub(crate) entry: String,
+    /// The workgroup size, from the descriptor literal.
     pub(crate) workgroup: [u32; 3],
+    /// Whether sequential host simulation keeps the kernel's behavior (CL2).
     pub(crate) host_runnable: bool,
+    /// Whether the declaration owns a hidden guard binding (PI15).
     pub(crate) guarded: bool,
+    /// The layout classes, in group order from 0.
     pub(crate) layouts: Vec<Layout>,
+    /// The declaration position.
     pub(crate) pos: Pos,
 }
 
@@ -191,11 +232,13 @@ fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+/// Returns the class name of a class type, and `None` for every other type.
 pub(crate) fn class_name<'a>(module: &'a Module, ty: &Type) -> Option<&'a str> {
     let Type::Class(id) = ty else { return None };
     module.classes.get(id.0).map(|class| class.name.as_str())
 }
 
+/// Renders one type the way the checker prints it, for a diagnostic message.
 pub(crate) fn type_name(module: &Module, ty: &Type) -> String {
     subscript_compiler::types::display_type(
         ty,
@@ -205,6 +248,9 @@ pub(crate) fn type_name(module: &Module, ty: &Type) -> String {
     )
 }
 
+/// Returns the class definition when the type is a class that `typegpu.ts` declares.
+///
+/// The file that declares a class identifies a library class. The class name alone never does.
 pub(crate) fn library_class<'a>(
     module: &'a Module,
     ty: &Type,
@@ -349,6 +395,14 @@ fn allowed_binding_item(module: &Module, ty: &Type) -> bool {
     }
 }
 
+/// Reads one layout class into its bindings (PI3).
+///
+/// `group` becomes the bind group index. Binding indices follow field declaration order from 0.
+///
+/// # Errors
+///
+/// A class that is not a plain class of binding wrappers gives a PI3 diagnostic. A class with no
+/// field gives a TX2 diagnostic. A buffer item type outside PI5 gives a PI5 diagnostic.
 pub(crate) fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, Diagnostic> {
     let Type::Class(id) = ty else {
         return Err(diagnostic(
@@ -560,6 +614,7 @@ fn guarded_option(module: &Module, expr: &Expr) -> Result<bool, Diagnostic> {
     }
 }
 
+/// Returns the module-level function of this name, and `None` when the module declares none.
 pub(crate) fn function<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
     module
         .functions
@@ -654,6 +709,16 @@ fn stmt_has_compute(module: &Module, stmt: &Stmt) -> bool {
     }
 }
 
+/// Collects every module-level compute pipeline declaration of one program (PI1).
+///
+/// `shells` names the functions whose bodies are author WGSL, which the barrier check and the
+/// host-runnable check both skip. The result follows the module's global declaration order.
+///
+/// # Errors
+///
+/// Returns every PI1, PI3, PI5, and PI15 violation. A declaration inside a function, a mutable
+/// declaration, a non-literal workgroup size, and a guarded kernel that reaches a barrier are
+/// the cases.
 pub(crate) fn discover(
     module: &Module,
     shells: &crate::shell::ShellProgram,
@@ -832,6 +897,10 @@ pub(crate) fn discover(
     }
 }
 
+/// Returns the author schema names that the pipelines' binding item types reach.
+///
+/// The result excludes the library vector, matrix, and atomic classes, which carry no generated
+/// layout constants.
 pub(crate) fn schema_names(module: &Module, pipelines: &[Pipeline]) -> BTreeSet<String> {
     pipelines
         .iter()

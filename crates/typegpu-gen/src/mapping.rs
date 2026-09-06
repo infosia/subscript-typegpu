@@ -3,6 +3,7 @@
 use subscript_compiler::hir::MathFn;
 
 // Synced with naga 29.0.1 keywords::wgsl.
+/// The WGSL reserved words. An emitted identifier that equals one of them gains a `_` (K14).
 pub(crate) const RESERVED: &[&str] = &[
     // Keywords
     "alias",
@@ -179,6 +180,7 @@ pub(crate) const RESERVED: &[&str] = &[
     "writeonly",
     "yield",
 ];
+/// The WGSL builtin type and function names, which mangle like the reserved words (K14).
 pub(crate) const BUILTIN_IDENTIFIERS: &[&str] = &[
     // types
     "bool",
@@ -424,6 +426,10 @@ pub(crate) const BUILTIN_IDENTIFIERS: &[&str] = &[
     "r64uint",
 ];
 
+/// Maps a subscript identifier to the identifier that the emitter writes (K14).
+///
+/// Every character outside `[A-Za-z0-9_]` becomes `_`. A name that collides with a reserved
+/// word, a builtin, or another mangled name gains a `_`, so the mapping stays injective.
 pub(crate) fn ident(name: &str) -> String {
     let mut result = name
         .chars()
@@ -448,13 +454,20 @@ pub(crate) fn ident(name: &str) -> String {
     result
 }
 
+/// How the emitter writes one library method call in WGSL (K10).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MethodEmission {
+    /// A WGSL atomic builtin over a pointer to the receiver's place (K21).
     Atomic(&'static str),
+    /// A binary operator between the receiver and the one argument.
     Binary(&'static str),
+    /// A builtin call that takes the receiver first, then the arguments.
     Builtin(&'static str),
+    /// A builtin call that takes the receiver last, which the WGSL signature fixes (K25).
     BuiltinReceiverLast(&'static str),
+    /// A unary operator on the receiver.
     Unary(&'static str),
+    /// A swizzle that the emitter writes after the receiver (K27).
     Swizzle(&'static str),
 }
 
@@ -623,6 +636,10 @@ const METHOD_GROUPS: &[MethodGroup] = &[
     },
 ];
 
+/// Returns how one library method emits, or `None` when the table holds no row for it.
+///
+/// The table is the one place a method gets GPU meaning, so a method outside it is a K10
+/// diagnostic at the call site.
 pub(crate) fn method(receiver: &str, name: &str) -> Option<MethodEmission> {
     METHOD_GROUPS
         .iter()
@@ -631,6 +648,10 @@ pub(crate) fn method(receiver: &str, name: &str) -> Option<MethodEmission> {
         .find_map(|(method, emission)| (*method == name).then_some(*emission))
 }
 
+/// Returns the WGSL builtin name of a `Math` member (K11).
+///
+/// `Math.fround` gives the empty string, because the value is already `f32`. A member outside
+/// K11 gives `None`.
 pub(crate) fn math(function: MathFn) -> Option<&'static str> {
     Some(match function {
         MathFn::Abs => "abs",
@@ -650,6 +671,9 @@ pub(crate) fn math(function: MathFn) -> Option<&'static str> {
     })
 }
 
+/// Returns the WGSL name of a library free function or vector factory (K11, K27).
+///
+/// The lookup drops the call's generic arguments first. A name outside the table gives `None`.
 pub(crate) fn free_function(name: &str) -> Option<&'static str> {
     let base = crate::base_name(name);
     Some(match base {

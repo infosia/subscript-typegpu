@@ -68,6 +68,10 @@ fn rust_element(element: &ArrayElement, backend: bool) -> String {
     }
 }
 
+/// Renders the count-first array method declaration for `subscript-typegpu.h`.
+///
+/// The public count name comes from the rename row and equals the pointer name plus `Count`
+/// (B1). The element pointer is always `const`, so the pair is input-only (C1).
 pub(crate) fn c_decl(op: &ArrayOp) -> String {
     let mut params = vec![format!(
         "{} {}",
@@ -80,6 +84,9 @@ pub(crate) fn c_decl(op: &ArrayOp) -> String {
     format!("void {}({});", op.subscript_typegpu_fn, params.join(", "))
 }
 
+/// Renders the private webgpu.h declaration of the count-first array method.
+///
+/// The backend count keeps its own yml spelling, which the rename row replaces in the header.
 pub(crate) fn rust_extern(op: &ArrayOp) -> String {
     let mut params = vec![format!(
         "{}: {}",
@@ -102,6 +109,11 @@ pub(crate) fn rust_extern(op: &ArrayOp) -> String {
     format!("    fn {}({});\n", op.wgpu_fn, params.join(", "))
 }
 
+/// Renders the exported count-first array body.
+///
+/// A null receiver, a null non-nullable handle argument, or a non-zero count with a null
+/// element pointer returns without a backend call (L9). A handle element array casts each
+/// element through the pointer, because the two handle types share a layout.
 pub(crate) fn rust_export(op: &ArrayOp) -> String {
     let recv = naming::camel(&op.receiver);
     let mut params = vec![format!(

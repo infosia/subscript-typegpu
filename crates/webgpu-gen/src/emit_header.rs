@@ -24,6 +24,12 @@ fn line_comment(doc: &str) -> String {
     format!("/* {doc} */")
 }
 
+/// Renders the whole `subscript-typegpu.h` text from the resolved plan.
+///
+/// The order is fixed. Handle typedefs come first, then constant sets, the string view, the
+/// fill records, and the boundary structs. One declaration group per chunk in policy order
+/// follows, and the releases come last. Each entry of `cenum_aliases` adds the
+/// `@subscript-cenum` pragma that `subscript bind` reads beside its constant set.
 pub(crate) fn render(plan: &Plan, cenum_aliases: &[CEnumAlias]) -> String {
     let has_async = plan.chunks.iter().any(|chunk| {
         matches!(

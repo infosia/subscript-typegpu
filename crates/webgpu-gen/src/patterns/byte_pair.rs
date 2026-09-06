@@ -13,6 +13,10 @@ fn public_pair(op: &BytePairOp) -> (&'static str, &'static str, &'static str) {
     }
 }
 
+/// Renders the byte-pair method declaration for `subscript-typegpu.h`.
+///
+/// The trailing pair is `size_t` then a `uint8_t` pointer, in that order (F20). A mutable data
+/// pointer spells the pair `outCount` and `out`, an immutable one `dataCount` and `data`.
 pub(crate) fn c_decl(op: &BytePairOp) -> String {
     let mut params = vec![format!(
         "{} {}",
@@ -42,6 +46,9 @@ pub(crate) fn c_decl(op: &BytePairOp) -> String {
     )
 }
 
+/// Renders the private webgpu.h declaration of the byte-pair method.
+///
+/// The backend keeps the webgpu.h parameter order: the `c_void` pointer first, the size second.
 pub(crate) fn rust_extern(op: &BytePairOp) -> String {
     let mut params = vec![format!(
         "{}: {}",
@@ -72,6 +79,11 @@ pub(crate) fn rust_extern(op: &BytePairOp) -> String {
     ) + "\n"
 }
 
+/// Renders the exported byte-pair body.
+///
+/// A null handle, or a non-zero count with a null pointer, returns without a backend call (L9).
+/// A method that returns a status returns the error status instead. The export reorders the
+/// public count-first pair into the webgpu.h pointer-first order.
 pub(crate) fn rust_export(op: &BytePairOp) -> String {
     let recv = naming::camel(&op.receiver);
     let mut params = vec![format!(

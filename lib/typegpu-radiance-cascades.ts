@@ -4,6 +4,8 @@ import {
   clamp,
 } from "./typegpu-types";
 
+// The host sizing of one cascade set. `cascadeProbes` counts the probes on one axis of cascade
+// 0, `cascadeDim` is the texture width, and `cascadeCount` is the layer count.
 @CStruct
 export class CascadeDimensions {
   cascadeProbes: u32;
@@ -50,27 +52,37 @@ function cascadePow2(layer: u32): u32 {
   return value;
 }
 
+// Returns the stored direction count on one axis at `layer`. The count doubles for each layer,
+// and one stored direction owns four actual rays.
 export function cascadeRaysStored(layer: u32): u32 {
   return 2 * cascadePow2(layer);
 }
 
+// Returns the probe count on one axis at `layer`. The probe spacing doubles for each layer, and
+// the result never falls below one.
 export function cascadeProbesAt(baseProbes: u32, layer: u32): u32 {
   const probes: u32 = baseProbes / cascadePow2(layer);
   return probes > 0 ? probes : 1;
 }
 
+// Returns the distance where the layer's ray segment starts, in the units of `interval0`. The
+// schedule quadruples each segment, so the start sums the earlier layers.
 export function cascadeIntervalStart(interval0: f32, layer: u32): f32 {
   const scale: u32 = cascadePow2(layer);
   const scaleSquared: u32 = scale * scale;
   return interval0 * ((scaleSquared - 1) as f32) / 3.0;
 }
 
+// Returns the distance where the layer's ray segment ends. The segment length is `interval0`
+// times four to the power of `layer`.
 export function cascadeIntervalEnd(interval0: f32, layer: u32): f32 {
   const scale: u32 = cascadePow2(layer);
   const scaleSquared: u32 = scale * scale;
   return cascadeIntervalStart(interval0, layer) + interval0 * (scaleSquared as f32);
 }
 
+// Returns the ray angle in radians, in the range [-pi, pi). The direction index runs row by row
+// over the square grid, and each ray takes the center of its slice.
 export function cascadeRayAngle(dirActual: Vec2u, raysDimActual: u32): f32 {
   const rayIndex: u32 = dirActual.y * raysDimActual + dirActual.x;
   const rayCount: u32 = raysDimActual * raysDimActual;
@@ -97,6 +109,8 @@ export function cascadeMergeUv(
   ).scale(1.0 / cascadeDim);
 }
 
+// Returns the cascade-0 texture position that the final gather reads for direction `quadrant`.
+// `uv` is the output position in [0, 1], and the result is a normalized texture position.
 export function radianceGatherUv(
   quadrant: u32,
   uv: Vec2f,

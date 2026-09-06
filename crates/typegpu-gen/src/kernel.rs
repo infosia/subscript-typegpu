@@ -16,21 +16,33 @@ use crate::schema::Schema;
 
 type Prelude = Vec<(usize, String)>;
 
+/// One author-WGSL line range inside an emitted module (K31).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct WgslSpan {
+    /// `shell <name>` or `declarations`.
     pub(crate) label: String,
+    /// First one-based line of the range.
     pub(crate) start_line: u32,
+    /// Last one-based line of the range.
     pub(crate) end_line: u32,
 }
 
+/// One emitted WGSL module and the author-WGSL ranges inside it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct EmittedWgsl {
+    /// The complete module text, which the committed `.wgsl` golden holds (K16).
     pub(crate) text: String,
+    /// The recorded ranges, in emission order.
     pub(crate) spans: Vec<WgslSpan>,
 }
 
+/// One emitted WGSL expression and the statements that must precede it.
+///
+/// The emitter parenthesizes an operand by the precedence of the emitted WGSL operator, never by
+/// the subscript expression kind (K14).
 #[derive(Debug, Clone)]
 pub(crate) struct Snippet {
+    /// The WGSL expression text.
     pub(crate) text: String,
     precedence: u8,
     prelude: Prelude,
@@ -425,6 +437,12 @@ fn render_kernel_globals(
         .collect())
 }
 
+/// Returns the module constants and variables that the kernel's call graph reads (K19, K20).
+///
+/// # Errors
+///
+/// Returns a K2 diagnostic for a cycle in the call graph. A reached global with no WGSL form
+/// gives a K19 or K20 diagnostic.
 pub(crate) fn reached_global_names(
     module: &Module,
     pipeline: &Pipeline,
@@ -438,6 +456,12 @@ pub(crate) fn reached_global_names(
         .collect())
 }
 
+/// Returns the module constants and variables that both render entry points read (K19, K20).
+///
+/// # Errors
+///
+/// Returns a K2 diagnostic for a cycle in a call graph. A reached global with no WGSL form
+/// gives a K19 or K20 diagnostic.
 pub(crate) fn reached_render_global_names(
     module: &Module,
     pipeline: &RenderPipeline,
@@ -558,6 +582,14 @@ fn statements_block_host(module: &Module, statements: &[Stmt]) -> bool {
     })
 }
 
+/// Reports whether sequential host simulation keeps the kernel's behavior (CL2).
+///
+/// A barrier, a workgroup variable, an atomic method, and a write to a private variable each
+/// give `false`. The support module exports the result as `<name>_HOST_RUNNABLE`.
+///
+/// # Errors
+///
+/// Returns a K2 diagnostic for a cycle in the call graph.
 pub(crate) fn host_runnable(
     module: &Module,
     kernel: &Function,
@@ -588,6 +620,14 @@ pub(crate) fn host_runnable(
     Ok(true)
 }
 
+/// Reports whether the kernel or a helper it reaches calls a barrier (K22).
+///
+/// A shell never counts, because the lexical fence rejects a barrier token (K30). A guarded
+/// declaration whose kernel reaches a barrier is a PI15 diagnostic.
+///
+/// # Errors
+///
+/// Returns a K2 diagnostic for a cycle in the call graph.
 pub(crate) fn reaches_barrier(
     module: &Module,
     kernel: &Function,
@@ -609,6 +649,14 @@ pub(crate) fn reaches_barrier(
     Ok(false)
 }
 
+/// Returns the WGSL spelling of one kernel value type (K4).
+///
+/// A schema class and a varyings class give the mangled struct name (K14).
+///
+/// # Errors
+///
+/// Returns a K4 diagnostic for `f16`, and a K5 diagnostic for a reference class and for every
+/// other type outside the kernel value set.
 pub(crate) fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String, Diagnostic> {
     Ok(match ty {
         Type::F32 => "f32".to_owned(),
@@ -3763,6 +3811,15 @@ fn collect_schema_stmt(
     }
 }
 
+/// Returns the schema names that one compute pipeline's WGSL module declares.
+///
+/// The order is first use: the bindings, then the reached globals, then the helper signatures
+/// and bodies. K14 fixes that order for the emitted structs.
+///
+/// # Errors
+///
+/// Returns a K2 diagnostic for a cycle in the call graph. A reached global with no WGSL form
+/// gives a K19 or K20 diagnostic.
 pub(crate) fn referenced_schema_names(
     module: &Module,
     pipeline: &Pipeline,
@@ -4015,6 +4072,16 @@ fn emit_shell(
     Ok(())
 }
 
+/// Emits the complete WGSL module of one compute pipeline (K14).
+///
+/// `structs` holds the schema struct texts in first-use order, and `uses_f16` adds the `enable`
+/// directive. The result is the text that the committed `.wgsl` golden holds (K16).
+///
+/// # Errors
+///
+/// Returns one diagnostic. The cases include a statement outside K7, an expression outside K9,
+/// and a type outside K4. A method outside K10, a non-uniform barrier (K22), and an atomic
+/// outside read-write storage (K21) also give one.
 pub(crate) fn emit(
     module: &Module,
     pipeline: &Pipeline,
@@ -4215,6 +4282,15 @@ pub(crate) fn emit(
     Ok(EmittedWgsl { text: out, spans })
 }
 
+/// Returns the schema names that one render pipeline's WGSL module declares.
+///
+/// The order is first use: the bindings, then the vertex call graph, then the fragment call
+/// graph. K14 fixes that order for the emitted structs.
+///
+/// # Errors
+///
+/// Returns a K2 diagnostic for a cycle in a call graph. An entry point or a helper that the
+/// module does not declare gives a generator diagnostic.
 pub(crate) fn referenced_render_schema_names(
     module: &Module,
     pipeline: &RenderPipeline,
@@ -4424,6 +4500,15 @@ fn render_helpers(
     Ok(out)
 }
 
+/// Emits the complete WGSL module of one render pipeline, with both entry points (RN9).
+///
+/// `schemas` decides the `enable f16;` directive, and `structs` holds the struct texts in
+/// first-use order. The vertex entry precedes the fragment entry, which K14 fixes.
+///
+/// # Errors
+///
+/// Returns one diagnostic. A vertex kernel that writes a storage binding (RN9) and every
+/// compute-side kernel rejection are the cases.
 pub(crate) fn emit_render(
     module: &Module,
     pipeline: &RenderPipeline,

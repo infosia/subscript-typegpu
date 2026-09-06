@@ -42,6 +42,11 @@ fn is_array(field: &DescriptorField) -> bool {
     )
 }
 
+/// Renders the chain-free struct typedef for `subscript-typegpu.h`.
+///
+/// An array member expands into two fields, the `size_t` count first, in the yml member's
+/// position (F12, B1). A nullable object member carries the `_Nullable` marker (C1). No chain
+/// field enters the public struct.
 pub(crate) fn c_struct(shape: &StructPlan) -> String {
     let mut out = format!("typedef struct {} {{\n", shape.subscript_typegpu_struct);
     for field in &shape.fields {
@@ -71,6 +76,7 @@ pub(crate) fn c_struct(shape: &StructPlan) -> String {
     out
 }
 
+/// Renders the descriptor-taking create declaration for `subscript-typegpu.h`.
 pub(crate) fn c_decl(op: &DescriptorOp, shape: &StructPlan) -> String {
     format!(
         "{} {}({} {}, const {}* descriptor);",
@@ -133,6 +139,10 @@ fn rust_field_type(field: &DescriptorField, backend: bool) -> String {
     }
 }
 
+/// Renders one private sentinel constant for the generated facade.
+///
+/// The constant stays internal, because its value is at or above 2^53 and cannot cross the
+/// boundary (F15). A zero-rule conversion substitutes it for a public zero.
 pub(crate) fn rust_sentinel_const(sentinel: &SentinelConst) -> String {
     format!(
         "/// webgpu.yml `{}`; kept internal because it exceeds the exact script integer range.\n\
@@ -141,6 +151,10 @@ pub(crate) fn rust_sentinel_const(sentinel: &SentinelConst) -> String {
     )
 }
 
+/// Renders the private webgpu.h struct and the public boundary struct, in that order.
+///
+/// The backend struct keeps the yml field order and the chain head. The public struct replaces
+/// each array with a count field and a pointer, and drops the chain (F12).
 pub(crate) fn rust_structs(shape: &StructPlan) -> String {
     let derive = if shape.backend_copy {
         "#[derive(Clone, Copy)]\n"
@@ -215,6 +229,12 @@ fn conversion_value(field: &DescriptorField, source: &str, shape_source: &str) -
     }
 }
 
+/// Renders the public-to-backend conversion function for one struct.
+///
+/// A shape that owns storage returns a holder struct that keeps every converted array, box, and
+/// nested value alive beside the backend value. The caller passes `&converted.value` to the
+/// backend and drops the holder after the call. A zero-rule field also gains its own
+/// substitution function and a `#[doc(hidden)]` probe the suite reads.
 pub(crate) fn rust_conversion(shape: &StructPlan) -> String {
     let mut out = String::new();
     for field in &shape.fields {
@@ -394,6 +414,7 @@ pub(crate) fn rust_conversion(shape: &StructPlan) -> String {
     out
 }
 
+/// Renders the private webgpu.h declaration of the descriptor-taking create.
 pub(crate) fn rust_extern(op: &DescriptorOp, shape: &StructPlan) -> String {
     format!(
         "    fn {}({}: {}, descriptor: *const {}) -> {};\n",
@@ -412,6 +433,11 @@ fn call(op: &DescriptorOp, recv: &str, descriptor: &str) -> String {
     )
 }
 
+/// Renders the exported descriptor-taking create body.
+///
+/// A null receiver returns a null handle (L9). A null descriptor returns a null handle, unless
+/// the yml marks the descriptor optional, and then the body calls the backend with NULL. The
+/// created handle inherits the receiver's owning instance (L11).
 pub(crate) fn rust_export(op: &DescriptorOp, shape: &StructPlan) -> String {
     let recv = naming::camel(&op.receiver);
     let sig = rust_signature(

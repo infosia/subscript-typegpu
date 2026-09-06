@@ -1,3 +1,6 @@
+// A two-component `f32` vector, WGSL `vec2<f32>`. A value class copies on assignment, on an
+// argument pass, and on a return. A kernel never runs the host bodies below: the generator
+// maps each method to a WGSL operator or builtin.
 @CStruct({ align: 8 })
 export class Vec2f {
   x: f32;
@@ -16,10 +19,14 @@ export class Vec2f {
     return new Vec2f(this.x - other.x, this.y - other.y);
   }
 
+  // The componentwise product, WGSL `a * b`. `scale` is the scalar form, because subscript has
+  // no overloads.
   mul(other: Vec2f): Vec2f {
     return new Vec2f(this.x * other.x, this.y * other.y);
   }
 
+  // The scalar multiple, WGSL `v * s`. WGSL spells `mul` and `scale` alike, and the argument
+  // type separates them here.
   scale(s: f32): Vec2f {
     return new Vec2f(this.x * s, this.y * s);
   }
@@ -32,6 +39,8 @@ export class Vec2f {
     return Math.sqrt(this.dot(this) as f64) as f32;
   }
 
+  // Returns the zero vector when the length is zero. WGSL `normalize` divides by the length and
+  // carries no such guard, so a zero input makes the CPU lane and the GPU disagree.
   normalize(): Vec2f {
     const magnitude: f32 = this.length();
     if (magnitude === 0.0) {
@@ -40,6 +49,9 @@ export class Vec2f {
     return this.scale(1.0 / magnitude);
   }
 
+  // The componentwise builtins carry the WGSL name of the same spelling, and the receiver is the
+  // builtin's value argument. `step` and `smoothstep` take their edges first, as WGSL does.
+  // Every other method puts the receiver first.
   abs(): Vec2f { return new Vec2f(Math.abs(this.x as f64) as f32, Math.abs(this.y as f64) as f32); }
   floor(): Vec2f { return new Vec2f(Math.floor(this.x as f64) as f32, Math.floor(this.y as f64) as f32); }
   ceil(): Vec2f { return new Vec2f(Math.ceil(this.x as f64) as f32, Math.ceil(this.y as f64) as f32); }
@@ -59,7 +71,10 @@ export class Vec2f {
   step(edge: Vec2f): Vec2f { return new Vec2f(step(edge.x, this.x), step(edge.y, this.y)); }
   smoothstep(low: Vec2f, high: Vec2f): Vec2f { return new Vec2f(smoothstep(low.x, high.x, this.x), smoothstep(low.y, high.y, this.y)); }
   distance(other: Vec2f): f32 { return this.sub(other).length(); }
+  // WGSL `reflect(v, normal)`. `normal` must be a unit vector, or the result is not a reflection.
   reflect(normal: Vec2f): Vec2f { return this.sub(normal.scale(2.0 * this.dot(normal))); }
+  // WGSL `refract(v, normal, eta)`. `eta` is the source refractive index divided by the
+  // destination index, and `normal` must be a unit vector.
   refract(normal: Vec2f, eta: f32): Vec2f {
     const product: f32 = this.dot(normal);
     const factor: f32 = 1.0 - eta * eta * (1.0 - product * product);
@@ -67,15 +82,21 @@ export class Vec2f {
     return this.scale(eta).sub(normal.scale(eta * product + (Math.sqrt(factor as f64) as f32)));
   }
   faceForward(incident: Vec2f, reference: Vec2f): Vec2f { return incident.dot(reference) < 0.0 ? this : this.scale(-1.0); }
+  // The six comparisons return a `Vec2b` mask, WGSL `a < b` and family. A mask reaches a value
+  // again through `select`, `any`, or `all`.
   lt(other: Vec2f): Vec2b { return new Vec2b(this.x < other.x, this.y < other.y); }
   le(other: Vec2f): Vec2b { return new Vec2b(this.x <= other.x, this.y <= other.y); }
   gt(other: Vec2f): Vec2b { return new Vec2b(this.x > other.x, this.y > other.y); }
   ge(other: Vec2f): Vec2b { return new Vec2b(this.x >= other.x, this.y >= other.y); }
   eq(other: Vec2f): Vec2b { return new Vec2b(this.x === other.x, this.y === other.y); }
   ne(other: Vec2f): Vec2b { return new Vec2b(this.x !== other.x, this.y !== other.y); }
+  // Takes `other` where the mask component is `true` and the receiver where it is `false`.
+  // WGSL `select(v, other, mask)`.
   select(other: Vec2f, mask: Vec2b): Vec2f { return new Vec2f(mask.x ? other.x : this.x, mask.y ? other.y : this.y); }
 }
 
+// A three-component `f32` vector, WGSL `vec3<f32>`. The C size is 16 and the WGSL size is 12.
+// A schema that puts a scalar field after a `Vec3f` field fails the layout check.
 @CStruct({ align: 16 })
 export class Vec3f {
   x: f32;
@@ -108,6 +129,8 @@ export class Vec3f {
     return this.x * other.x + this.y * other.y + this.z * other.z;
   }
 
+  // WGSL `cross(a, b)`. WGSL defines the cross product for three components only, so no other
+  // vector class carries it.
   cross(other: Vec3f): Vec3f {
     return new Vec3f(
       this.y * other.z - this.z * other.y,
@@ -162,11 +185,15 @@ export class Vec3f {
   eq(other: Vec3f): Vec3b { return new Vec3b(this.x === other.x, this.y === other.y, this.z === other.z); }
   ne(other: Vec3f): Vec3b { return new Vec3b(this.x !== other.x, this.y !== other.y, this.z !== other.z); }
   select(other: Vec3f, mask: Vec3b): Vec3f { return new Vec3f(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z); }
+  // The swizzles are read accessors, WGSL `v.xy`. A swizzle is never an assignment target, so a
+  // kernel writes the component fields instead.
   get xy(): Vec2f { return new Vec2f(this.x, this.y); }
   get xz(): Vec2f { return new Vec2f(this.x, this.z); }
   get yz(): Vec2f { return new Vec2f(this.y, this.z); }
 }
 
+// A four-component `f32` vector, WGSL `vec4<f32>`. The C size and the WGSL size are both 16, so
+// a `Vec4f` field never moves the field after it.
 @CStruct({ align: 16 })
 export class Vec4f {
   x: f32;
@@ -259,6 +286,8 @@ export class Vec4f {
   get yzw(): Vec3f { return new Vec3f(this.y, this.z, this.w); }
 }
 
+// A two-component `i32` vector, WGSL `vec2<i32>`. The integer vectors carry no `length`,
+// `normalize`, or transcendental method, because WGSL defines those for float types only.
 @CStruct({ align: 8 })
 export class Vec2i {
   x: i32;
@@ -274,6 +303,8 @@ export class Vec2i {
   mul(other: Vec2i): Vec2i { return new Vec2i(this.x * other.x, this.y * other.y); }
   scale(s: i32): Vec2i { return new Vec2i(this.x * s, this.y * s); }
   dot(other: Vec2i): i32 { return this.x * other.x + this.y * other.y; }
+  // WGSL `abs(v)`. The `i32` minimum is outside the domain: the host returns a value that `i32`
+  // cannot hold, and WGSL returns the minimum itself.
   abs(): Vec2i { return new Vec2i(Math.abs(this.x as f64) as i32, Math.abs(this.y as f64) as i32); }
   min(other: Vec2i): Vec2i { return new Vec2i(Math.min(this.x as f64, other.x as f64) as i32, Math.min(this.y as f64, other.y as f64) as i32); }
   max(other: Vec2i): Vec2i { return new Vec2i(Math.max(this.x as f64, other.x as f64) as i32, Math.max(this.y as f64, other.y as f64) as i32); }
@@ -287,6 +318,8 @@ export class Vec2i {
   select(other: Vec2i, mask: Vec2b): Vec2i { return new Vec2i(mask.x ? other.x : this.x, mask.y ? other.y : this.y); }
 }
 
+// A three-component `i32` vector, WGSL `vec3<i32>`. The C size is 16 and the WGSL size is 12, as
+// with `Vec3f`.
 @CStruct({ align: 16 })
 export class Vec3i {
   x: i32;
@@ -320,6 +353,7 @@ export class Vec3i {
   get yz(): Vec2i { return new Vec2i(this.y, this.z); }
 }
 
+// A four-component `i32` vector, WGSL `vec4<i32>`.
 @CStruct({ align: 16 })
 export class Vec4i {
   x: i32;
@@ -362,6 +396,7 @@ export class Vec4i {
   get yzw(): Vec3i { return new Vec3i(this.y, this.z, this.w); }
 }
 
+// A two-component `u32` vector, WGSL `vec2<u32>`.
 @CStruct({ align: 8 })
 export class Vec2u {
   x: u32;
@@ -389,6 +424,8 @@ export class Vec2u {
   select(other: Vec2u, mask: Vec2b): Vec2u { return new Vec2u(mask.x ? other.x : this.x, mask.y ? other.y : this.y); }
 }
 
+// A three-component `u32` vector, WGSL `vec3<u32>`. The C size is 16 and the WGSL size is 12, as
+// with `Vec3f`.
 @CStruct({ align: 16 })
 export class Vec3u {
   x: u32;
@@ -421,6 +458,7 @@ export class Vec3u {
   get yz(): Vec2u { return new Vec2u(this.y, this.z); }
 }
 
+// A four-component `u32` vector, WGSL `vec4<u32>`.
 @CStruct({ align: 16 })
 export class Vec4u {
   x: u32;
@@ -462,6 +500,9 @@ export class Vec4u {
   get yzw(): Vec3u { return new Vec3u(this.y, this.z, this.w); }
 }
 
+// A two-component boolean mask, WGSL `vec2<bool>`. A comparison method builds one, and `select`
+// reads it. A `Vec2b` field in a schema is a diagnostic, because WGSL `bool` has no
+// host-shareable layout.
 @CStruct
 export class Vec2b {
   x: boolean;
@@ -477,6 +518,7 @@ export class Vec2b {
   not(): Vec2b { return new Vec2b(!this.x, !this.y); }
 }
 
+// A three-component boolean mask, WGSL `vec3<bool>`.
 @CStruct
 export class Vec3b {
   x: boolean;
@@ -494,6 +536,7 @@ export class Vec3b {
   not(): Vec3b { return new Vec3b(!this.x, !this.y, !this.z); }
 }
 
+// A four-component boolean mask, WGSL `vec4<bool>`.
 @CStruct
 export class Vec4b {
   x: boolean;
@@ -513,6 +556,9 @@ export class Vec4b {
   not(): Vec4b { return new Vec4b(!this.x, !this.y, !this.z, !this.w); }
 }
 
+// A two-component `f16` vector, WGSL `vec2<f16>`. The `f16` vectors declare no arithmetic,
+// because subscript treats `f16` as storage only. A module that names an `f16` type opens with
+// `enable f16;`.
 @CStruct({ align: 4 })
 export class Vec2h {
   x: f16;
@@ -524,6 +570,7 @@ export class Vec2h {
   }
 }
 
+// A three-component `f16` vector, WGSL `vec3<f16>`. The C size is 8 and the WGSL size is 6.
 @CStruct({ align: 8 })
 export class Vec3h {
   x: f16;
@@ -537,6 +584,7 @@ export class Vec3h {
   }
 }
 
+// A four-component `f16` vector, WGSL `vec4<f16>`.
 @CStruct({ align: 8 })
 export class Vec4h {
   x: f16;
@@ -552,6 +600,9 @@ export class Vec4h {
   }
 }
 
+// A `u32` cell for atomic access, WGSL `atomic<u32>`. `add`, `sub`, `min`, `max`, and `exchange`
+// return the value from before the update. The receiver must be a place in a storage binding or
+// a workgroup variable.
 @CStruct({ align: 4 })
 export class AtomicU32 {
   value: u32;
@@ -603,6 +654,8 @@ export class AtomicU32 {
   }
 }
 
+// An `i32` cell for atomic access, WGSL `atomic<i32>`. A kernel cannot copy a schema that holds
+// an atomic into a local, and cannot write one as a whole value.
 @CStruct({ align: 4 })
 export class AtomicI32 {
   value: i32;
@@ -654,6 +707,8 @@ export class AtomicI32 {
   }
 }
 
+// A 2x2 `f32` matrix, WGSL `mat2x2<f32>`. Each field is one column, because WGSL matrices are
+// column-major.
 @CStruct({ align: 8 })
 export class Mat2x2f {
   c0: Vec2f;
@@ -664,6 +719,8 @@ export class Mat2x2f {
     this.c1 = c1;
   }
 
+  // The matrix-vector product, WGSL `m * v`. `mul` is the matrix-matrix form, and both emit the
+  // same WGSL operator.
   mulVec(value: Vec2f): Vec2f {
     return new Vec2f(
       this.c0.x * value.x + this.c1.x * value.y,
@@ -683,6 +740,8 @@ export class Mat2x2f {
   }
 }
 
+// A 3x3 `f32` matrix, WGSL `mat3x3<f32>`. Each column is a `Vec3f` with a 4-byte tail, so the
+// size is 48 bytes, not 36.
 @CStruct({ align: 16 })
 export class Mat3x3f {
   c0: Vec3f;
@@ -720,6 +779,7 @@ export class Mat3x3f {
   }
 }
 
+// A 4x4 `f32` matrix, WGSL `mat4x4<f32>`. The size is 64 bytes.
 @CStruct({ align: 16 })
 export class Mat4x4f {
   c0: Vec4f;
@@ -762,6 +822,8 @@ export class Mat4x4f {
   }
 }
 
+// The component factories take the components in order, WGSL `vec2<f32>(x, y)` for `vec2f`.
+// `new Vec2f(x, y)` builds the same value, and a kernel accepts both spellings.
 export function vec2f(x: f32, y: f32): Vec2f { return new Vec2f(x, y); }
 export function vec3f(x: f32, y: f32, z: f32): Vec3f { return new Vec3f(x, y, z); }
 export function vec4f(x: f32, y: f32, z: f32, w: f32): Vec4f { return new Vec4f(x, y, z, w); }
@@ -771,9 +833,12 @@ export function vec4i(x: i32, y: i32, z: i32, w: i32): Vec4i { return new Vec4i(
 export function vec2u(x: u32, y: u32): Vec2u { return new Vec2u(x, y); }
 export function vec3u(x: u32, y: u32, z: u32): Vec3u { return new Vec3u(x, y, z); }
 export function vec4u(x: u32, y: u32, z: u32, w: u32): Vec4u { return new Vec4u(x, y, z, w); }
+// The `From` factories widen a shorter vector, WGSL `vec3<f32>(v, z)`. The source vector fills
+// the low components, and the arguments fill the rest.
 export function vec3fFrom2(v: Vec2f, z: f32): Vec3f { return new Vec3f(v.x, v.y, z); }
 export function vec4fFrom2(v: Vec2f, z: f32, w: f32): Vec4f { return new Vec4f(v.x, v.y, z, w); }
 export function vec4fFrom3(v: Vec3f, w: f32): Vec4f { return new Vec4f(v.x, v.y, v.z, w); }
+// The splat factories repeat one scalar in every component, WGSL `vec2<f32>(s)`.
 export function vec2fSplat(s: f32): Vec2f { return new Vec2f(s, s); }
 export function vec3fSplat(s: f32): Vec3f { return new Vec3f(s, s, s); }
 export function vec4fSplat(s: f32): Vec4f { return new Vec4f(s, s, s, s); }
@@ -789,10 +854,14 @@ export function vec4uFrom3(v: Vec3u, w: u32): Vec4u { return new Vec4u(v.x, v.y,
 export function vec2uSplat(s: u32): Vec2u { return new Vec2u(s, s); }
 export function vec3uSplat(s: u32): Vec3u { return new Vec3u(s, s, s); }
 export function vec4uSplat(s: u32): Vec4u { return new Vec4u(s, s, s, s); }
+// The `f16` factories build a value for a buffer write. A kernel that computes with an `f16`
+// value fails generation.
 export function vec2h(x: f16, y: f16): Vec2h { return new Vec2h(x, y); }
 export function vec3h(x: f16, y: f16, z: f16): Vec3h { return new Vec3h(x, y, z); }
 export function vec4h(x: f16, y: f16, z: f16, w: f16): Vec4h { return new Vec4h(x, y, z, w); }
 
+// The scalar `clamp`, WGSL `clamp(value, low, high)`. `Math` carries no member for it, so the
+// library owns the host body.
 export function clamp(value: f32, low: f32, high: f32): f32 {
   if (value < low) {
     return low;
@@ -803,10 +872,13 @@ export function clamp(value: f32, low: f32, high: f32): f32 {
   return value;
 }
 
+// The scalar linear blend, WGSL `mix(left, right, amount)`. An `amount` outside [0, 1]
+// extrapolates, because the formula carries no clamp.
 export function mix(left: f32, right: f32, amount: f32): f32 {
   return left + (right - left) * amount;
 }
 
+// The scalar `step`, WGSL `step(edge, value)`. The result is 1.0 when `value` equals `edge`.
 export function step(edge: f32, value: f32): f32 {
   if (value < edge) {
     return 0.0;
@@ -814,15 +886,20 @@ export function step(edge: f32, value: f32): f32 {
   return 1.0;
 }
 
+// The scalar `smoothstep`, WGSL `smoothstep(low, high, value)`. The result stays in [0, 1], and
+// its first derivative is zero at both edges.
 export function smoothstep(low: f32, high: f32, value: f32): f32 {
   const amount: f32 = clamp((value - low) / (high - low), 0.0, 1.0);
   return amount * amount * (3.0 - 2.0 * amount);
 }
 
+// The scalar fraction, WGSL `fract(value)`. A negative input still gives a result in [0, 1),
+// because the floor rounds toward minus infinity.
 export function fract(value: f32): f32 {
   return value - (Math.floor(value as f64) as f32);
 }
 
+// The scalar `sign`, WGSL `sign(value)`. The result is an `f32`, and zero maps to 0.0.
 export function sign(value: f32): f32 {
   if (value < 0.0) {
     return -1.0;
@@ -833,10 +910,12 @@ export function sign(value: f32): f32 {
   return 0.0;
 }
 
+// Returns the 2x2 identity, the unit of `Mat2x2f.mul`.
 export function mat2x2fIdentity(): Mat2x2f {
   return new Mat2x2f(vec2f(1.0, 0.0), vec2f(0.0, 1.0));
 }
 
+// Returns the 3x3 identity, the unit of `Mat3x3f.mul`.
 export function mat3x3fIdentity(): Mat3x3f {
   return new Mat3x3f(
     vec3f(1.0, 0.0, 0.0),
@@ -845,6 +924,7 @@ export function mat3x3fIdentity(): Mat3x3f {
   );
 }
 
+// Returns the 4x4 identity, the unit of `Mat4x4f.mul`.
 export function mat4x4fIdentity(): Mat4x4f {
   return new Mat4x4f(
     vec4f(1.0, 0.0, 0.0, 0.0),
@@ -854,6 +934,8 @@ export function mat4x4fIdentity(): Mat4x4f {
   );
 }
 
+// The argument block of an indirect dispatch, 12 bytes in the order WebGPU fixes. A program
+// writes it with `Context.bytesOf` into a buffer that carries `GPUBufferUsage.INDIRECT`.
 @CStruct
 export class DispatchIndirectArgs {
   x: u32;
@@ -867,6 +949,7 @@ export class DispatchIndirectArgs {
   }
 }
 
+// The argument block of an indirect draw, 16 bytes in the order WebGPU fixes.
 @CStruct
 export class DrawIndirectArgs {
   vertexCount: u32;
@@ -882,6 +965,8 @@ export class DrawIndirectArgs {
   }
 }
 
+// The argument block of an indirect indexed draw, 20 bytes. `baseVertex` is signed, and it
+// shifts every index the draw reads.
 @CStruct
 export class DrawIndexedIndirectArgs {
   indexCount: u32;

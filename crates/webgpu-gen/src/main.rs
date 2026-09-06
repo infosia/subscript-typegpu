@@ -1,3 +1,9 @@
+//! The generator driver.
+//!
+//! The binary takes one argument, the repository root. It reads the pinned `webgpu.yml`, the
+//! policy file, and the pinned GPUWeb `.bs` files, then writes every generated output in place.
+//! The second pass calls `subscript_bindgen`, which loads libclang at run time.
+
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 

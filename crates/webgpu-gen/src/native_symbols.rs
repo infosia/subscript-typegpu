@@ -3,11 +3,20 @@
 use crate::naming;
 use crate::plan::{Chunk, Plan};
 
+/// The emitted harness symbol table plus the export names it declares.
 pub(crate) struct GeneratedNativeSymbols {
+    /// The `crates/harness/src/native_symbols.generated.rs` text.
     pub(crate) source: String,
+    /// The exports in table order, after the F22 exclusions.
     pub(crate) names: Vec<String>,
 }
 
+/// The facade export names in declaration order, before the F22 exclusions.
+///
+/// The order follows the facade emission order. The creates come first, then the anchor sync
+/// methods and the anchor release. The chunks follow in policy order, and the other releases
+/// come last in reverse object order. The first async chunk contributes the shared status and
+/// drop exports (F6).
 pub(crate) fn export_names(plan: &Plan) -> Vec<String> {
     let mut names = Vec::new();
     names.extend(
@@ -125,6 +134,11 @@ fn rust_signature<'a>(rust: &'a str, name: &str) -> (&'a str, Vec<&'a str>, &'a 
     (params, arguments, result)
 }
 
+/// Renders the harness symbol table from the plan and the emitted facade source.
+///
+/// `rust` is the `generated.rs` text, read only for each export's parameter list and result.
+/// `excluded_exports` drops the F22 rows. Each retained name also gains a shim that records the
+/// call, so the harness counts the exports a program reaches.
 pub(crate) fn render(
     plan: &Plan,
     rust: &str,

@@ -3,6 +3,9 @@
 use crate::naming;
 use crate::plan::LabelOp;
 
+/// Renders the label setter declaration for `subscript-typegpu.h`.
+///
+/// The string crosses as one `SubscriptTypegpuStringView` parameter (F10).
 pub(crate) fn c_decl(op: &LabelOp) -> String {
     format!(
         "void {}({} {}, SubscriptTypegpuStringView {});",
@@ -13,6 +16,9 @@ pub(crate) fn c_decl(op: &LabelOp) -> String {
     )
 }
 
+/// Renders the private webgpu.h declaration of the label setter.
+///
+/// The line joins the declaration text that becomes one function-table field and one shim.
 pub(crate) fn rust_extern(op: &LabelOp) -> String {
     format!(
         "    fn {}({}: {}, {}: WGPUStringView);\n",
@@ -23,6 +29,10 @@ pub(crate) fn rust_extern(op: &LabelOp) -> String {
     )
 }
 
+/// Renders the exported label setter body.
+///
+/// A null receiver returns without a backend call (L9). The backend borrows the view only for
+/// the duration of the call, so the export copies nothing.
 pub(crate) fn rust_export(op: &LabelOp) -> String {
     let recv = naming::camel(&op.receiver);
     format!(

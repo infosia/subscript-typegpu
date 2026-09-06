@@ -4,6 +4,10 @@ use std::path::Path;
 
 use subscript_compiler::{parse_import_specifiers, render_diagnostics, Diagnostic, SourceFile};
 
+/// The registered library modules (LB1), in the order the compiler loads them.
+///
+/// The first `CORE_COUNT` entries are the core set that every program compiles with. Each other
+/// entry loads only when an import declaration reaches it.
 pub(crate) const LIBRARY_ORDER: [&str; 12] = [
     "subscript-typegpu.generated.d.ts",
     "wire-enum-aliases.generated.d.ts",

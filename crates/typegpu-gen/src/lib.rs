@@ -11,7 +11,9 @@ mod schema;
 mod shell;
 mod ui_atlas;
 
+/// The loader for the library sources that a program reaches, and its error type.
 pub use library::{load_library_files, LibraryLoadError};
+/// Atlas module generation for the ui library.
 pub use ui_atlas::generate_ui_atlas;
 
 use std::collections::BTreeSet;
@@ -21,10 +23,15 @@ use subscript_compiler::{CheckOptions, Diagnostic, Pos, RuleCode, SourceFile};
 
 use crate::layout::{Layout, TypeTree};
 
+/// Formats a value as a WGSL `u32` literal with the `u` suffix that K14 requires.
 pub(crate) fn wgsl_u32_literal(value: impl std::fmt::Display) -> String {
     format!("{value}u")
 }
 
+/// Formats a value as a WGSL `i32` literal with the `i` suffix that K14 requires.
+///
+/// The `i32` minimum becomes `(-2147483647i - 1i)`. WGSL reads `-2147483648i` as the negation of
+/// a literal above the maximum, and Tint refuses that form.
 pub(crate) fn wgsl_i32_literal(value: i64) -> String {
     if value == i64::from(i32::MIN) {
         "(-2147483647i - 1i)".to_owned()
@@ -33,10 +40,15 @@ pub(crate) fn wgsl_i32_literal(value: i64) -> String {
     }
 }
 
+/// Returns a type or function name without its generic arguments.
 pub(crate) fn base_name(name: &str) -> &str {
     name.split('<').next().unwrap_or(name)
 }
 
+/// Reads one field of a descriptor literal by name.
+///
+/// The outer `None` reports that the expression is not a descriptor literal. The inner `None`
+/// reports that the literal leaves the field unset.
 pub(crate) fn descriptor_field<'a>(
     module: &Module,
     expr: &'a Expr,

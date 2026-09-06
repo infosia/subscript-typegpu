@@ -19,6 +19,8 @@ function colorAbs(value: f32): f32 {
   return value < 0.0 ? -value : value;
 }
 
+// A scalar `Math.sqrt` or `Math.pow` needs an `f64` cast, which a kernel rejects. The vector
+// methods carry the scalar case instead.
 function colorSqrt(value: f32): f32 {
   return new Vec2f(value, value).sqrt().x;
 }
@@ -31,7 +33,7 @@ function colorCbrt(value: f32): f32 {
   return sign(value) * colorPow(colorAbs(value), 0.3333333333333333);
 }
 
-// Converts linear-light RGB to the componentwise sRGB transfer curve.
+// Converts linear-light RGB to display-referred sRGB with the componentwise transfer curve.
 export function linearToSrgb(c: Vec3f): Vec3f {
   const low: Vec3f = c.scale(12.92);
   const high: Vec3f = new Vec3f(
@@ -104,7 +106,7 @@ export function linearRgbToOklab(c: Vec3f): Vec3f {
   );
 }
 
-// Bjorn Ottosson's inverse Oklab matrices, cubing the intermediate LMS values.
+// Bjorn Ottosson's inverse Oklab matrices. The function cubes the intermediate LMS values.
 export function oklabToLinearRgb(c: Vec3f): Vec3f {
   const lRoot: f32 = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z;
   const mRoot: f32 = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z;
@@ -253,7 +255,8 @@ function findGamutIntersection(
   return amount;
 }
 
-// Clips Oklab toward an adaptive lightness anchor while preserving hue.
+// Clips Oklab toward an adaptive lightness anchor and keeps the hue. `alpha` sets how far the
+// anchor follows the chroma.
 export function oklabGamutClipAdaptiveL05(lab: Vec3f, alpha: f32): Vec3f {
   const chroma: f32 = colorMax(0.00001, lab.yz.length());
   const a: f32 = lab.y / chroma;
@@ -276,7 +279,7 @@ export function oklabGamutClipAdaptiveL05(lab: Vec3f, alpha: f32): Vec3f {
   return new Vec3f(clippedLightness, clippedChroma * a, clippedChroma * b);
 }
 
-// Clips Oklab adaptively before applying the display-referred sRGB transfer curve.
+// Clips Oklab adaptively, then applies the display-referred sRGB transfer curve.
 export function oklabToRgb(c: Vec3f): Vec3f {
   return linearToSrgb(oklabToLinearRgb(oklabGamutClipAdaptiveL05(c, 0.2)));
 }

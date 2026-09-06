@@ -3,6 +3,9 @@
 use crate::naming;
 use crate::plan::{AdapterInfoOp, FeatureOp, LimitsOp, StructPlan};
 
+/// Renders the adapter-info record typedef for `subscript-typegpu.h`.
+///
+/// The record omits the two subgroup fields of the pinned struct, which stay private (H3).
 pub(crate) fn c_adapter_info() -> &'static str {
     "typedef struct SubscriptTypegpuAdapterInfo {\n\
      \x20   SubscriptTypegpuStringView vendor;\n\
@@ -16,6 +19,10 @@ pub(crate) fn c_adapter_info() -> &'static str {
      } SubscriptTypegpuAdapterInfo;"
 }
 
+/// Renders the public request-device descriptor typedef for `subscript-typegpu.h`.
+///
+/// The public descriptor carries no callback field, because the facade installs the device
+/// callbacks itself (F14).
 pub(crate) fn c_device_descriptor() -> &'static str {
     "typedef struct SubscriptTypegpuDeviceDescriptor {\n\
      \x20   SubscriptTypegpuStringView label;\n\
@@ -26,6 +33,10 @@ pub(crate) fn c_device_descriptor() -> &'static str {
      } SubscriptTypegpuDeviceDescriptor;"
 }
 
+/// Renders the limits fill declaration for `subscript-typegpu.h`.
+///
+/// The fill takes an out-pointer and returns an `int32_t` status (F13, H2). A freestanding
+/// limits fill has no receiver parameter.
 pub(crate) fn c_limits_decl(op: &LimitsOp, shape: &StructPlan) -> String {
     let mut params = Vec::new();
     if let Some(receiver) = &op.receiver {
@@ -43,6 +54,7 @@ pub(crate) fn c_limits_decl(op: &LimitsOp, shape: &StructPlan) -> String {
     )
 }
 
+/// Renders the adapter-info fill declaration for `subscript-typegpu.h` (H3).
 pub(crate) fn c_info_decl(op: &AdapterInfoOp) -> String {
     format!(
         "bool {}({} {}, SubscriptTypegpuAdapterInfo* out);",
@@ -52,6 +64,10 @@ pub(crate) fn c_info_decl(op: &AdapterInfoOp) -> String {
     )
 }
 
+/// Renders the feature-probe declaration for `subscript-typegpu.h`.
+///
+/// The feature enum crosses verbatim and the result is `bool` (F16). A freestanding probe has
+/// no receiver parameter.
 pub(crate) fn c_feature_decl(op: &FeatureOp) -> String {
     let mut params = Vec::new();
     if let Some(receiver) = &op.receiver {
@@ -68,6 +84,9 @@ pub(crate) fn c_feature_decl(op: &FeatureOp) -> String {
     format!("bool {}({});", op.subscript_typegpu_fn, params.join(", "))
 }
 
+/// Renders the private webgpu.h adapter-info struct.
+///
+/// The struct keeps every pinned field, so the by-value free-members call stays correct.
 pub(crate) fn rust_adapter_info_private() -> &'static str {
     "/// webgpu.h `WGPUAdapterInfo`; the two subgroup fields remain private.\n\
      #[repr(C)]\n\
@@ -86,6 +105,10 @@ pub(crate) fn rust_adapter_info_private() -> &'static str {
      }\n"
 }
 
+/// Renders the public adapter-info record for the generated facade.
+///
+/// The layout matches the `c_adapter_info` typedef. The four string views point at facade-owned
+/// bytes that stay valid until the next fill on the same adapter (F11 Rev 1, H3).
 pub(crate) fn rust_adapter_info_public() -> &'static str {
     "/// `subscript-typegpu.h`: facade-filled adapter information.\n\
      #[repr(C)]\n\
@@ -110,6 +133,10 @@ pub(crate) fn rust_adapter_info_public() -> &'static str {
      }\n"
 }
 
+/// Renders the public request-device descriptor for the generated facade.
+///
+/// The layout matches the `c_device_descriptor` typedef. A null `required_limits` means the
+/// request sends no limits.
 pub(crate) fn rust_device_descriptor_public() -> &'static str {
     "/// `subscript-typegpu.h`: request-device descriptor without callback fields.\n\
      #[repr(C)]\n\
@@ -128,6 +155,10 @@ pub(crate) fn rust_device_descriptor_public() -> &'static str {
      }\n"
 }
 
+/// Renders the `#[doc(hidden)]` probe over the required-limits zero rule.
+///
+/// The probe converts a limits value through the same path as a request, so the suite reads the
+/// backend values without a device (H2).
 pub(crate) fn rust_required_limits_probe() -> &'static str {
     "/// Facade-test probe for the H2 required-limits sentinel rules.\n\
      #[doc(hidden)]\n\
@@ -153,6 +184,7 @@ pub(crate) fn rust_required_limits_probe() -> &'static str {
      }\n"
 }
 
+/// Renders the private webgpu.h declaration of the limits fill.
 pub(crate) fn rust_limits_extern(op: &LimitsOp, shape: &StructPlan) -> String {
     let mut params = Vec::new();
     if let Some(receiver) = &op.receiver {
@@ -166,6 +198,7 @@ pub(crate) fn rust_limits_extern(op: &LimitsOp, shape: &StructPlan) -> String {
     format!("    fn {}({}) -> i32;\n", op.wgpu_fn, params.join(", "))
 }
 
+/// Renders the private webgpu.h declaration of the adapter-info fill.
 pub(crate) fn rust_info_extern(op: &AdapterInfoOp) -> String {
     format!(
         "    fn {}({}: {}, out: *mut WGPUAdapterInfo) -> i32;\n",
@@ -175,10 +208,14 @@ pub(crate) fn rust_info_extern(op: &AdapterInfoOp) -> String {
     )
 }
 
+/// Renders the private webgpu.h declaration of the adapter-info free-members call.
+///
+/// The facade calls it itself after the copy, so no script ever frees backend members (H3).
 pub(crate) fn rust_info_free_extern() -> &'static str {
     "    fn wgpuAdapterInfoFreeMembers(info: WGPUAdapterInfo);\n"
 }
 
+/// Renders the private webgpu.h declaration of the feature probe.
 pub(crate) fn rust_feature_extern(op: &FeatureOp) -> String {
     let mut params = Vec::new();
     if let Some(receiver) = &op.receiver {
@@ -192,6 +229,11 @@ pub(crate) fn rust_feature_extern(op: &FeatureOp) -> String {
     format!("    fn {}({}) -> u32;\n", op.wgpu_fn, params.join(", "))
 }
 
+/// Renders the exported limits fill body.
+///
+/// The body zeroes a backend struct, calls the backend, and copies every field verbatim into
+/// the public struct (H2). A null receiver or out-pointer returns status 0 without a call. A
+/// freestanding fill returns 0 while the function table is unloaded.
 pub(crate) fn rust_limits_export(op: &LimitsOp, shape: &StructPlan) -> String {
     let mut params = Vec::new();
     let mut guards = String::new();
@@ -246,6 +288,7 @@ pub(crate) fn rust_limits_export(op: &LimitsOp, shape: &StructPlan) -> String {
     )
 }
 
+/// Renders the private adapter-info success constant, from the pinned yml value.
 pub(crate) fn rust_info_success_const(op: &AdapterInfoOp) -> String {
     format!(
         "/// webgpu.yml adapter-info success status.\nconst {}: i32 = {};\n",
@@ -254,6 +297,11 @@ pub(crate) fn rust_info_success_const(op: &AdapterInfoOp) -> String {
     )
 }
 
+/// Renders the exported adapter-info fill body.
+///
+/// The body copies all four strings into facade storage keyed by the adapter, calls
+/// free-members, then writes the record (H3). A null receiver or out-pointer returns `false`
+/// without a call (L9).
 pub(crate) fn rust_info_export(op: &AdapterInfoOp) -> String {
     let receiver = naming::camel(&op.receiver);
     let receiver_ty = naming::subscript_typegpu_type(&op.receiver);
@@ -306,6 +354,10 @@ pub(crate) fn rust_info_export(op: &AdapterInfoOp) -> String {
     )
 }
 
+/// Renders the exported feature-probe body.
+///
+/// A null receiver returns `false` without a call (L9). A freestanding probe returns `false`
+/// while the function table is unloaded.
 pub(crate) fn rust_feature_export(op: &FeatureOp) -> String {
     let mut params = Vec::new();
     let mut guards = String::new();

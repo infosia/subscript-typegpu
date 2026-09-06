@@ -843,6 +843,10 @@ fn synthetic_typed_anchor(row: &ApiDeviationRow) -> Option<&'static str> {
     }
 }
 
+/// The API member name that an `[[typed_pairs]]` row's `object.method` source implies.
+///
+/// The result is the WebGPU spelling plus an `F32` suffix, for example `GPUQueue.writeBufferF32`.
+/// A source without a dot returns `None`.
 pub(crate) fn typed_pair_api_member(source: &str) -> Option<String> {
     let (object, method) = source.split_once('.')?;
     Some(format!(
@@ -852,6 +856,9 @@ pub(crate) fn typed_pair_api_member(source: &str) -> Option<String> {
     ))
 }
 
+/// Whether the API policy carries a typed-f32 deviation row for `member`.
+///
+/// The plan calls this to refuse a typed pair whose API sibling no policy row anchors (S3).
 pub(crate) fn has_synthetic_typed_anchor(policy: &Policy, member: &str) -> bool {
     policy.api.as_ref().is_some_and(|api| {
         api.deviations

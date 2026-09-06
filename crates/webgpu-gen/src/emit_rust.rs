@@ -172,6 +172,13 @@ mod tests {
     }
 }
 
+/// Renders the whole `crates/facade/src/generated.rs` text from the resolved plan.
+///
+/// The output holds the private webgpu.h types, the function table and its shims, the public
+/// boundary types, and one panic-free export body per chunk. A name in `excluded_exports`
+/// contributes no webgpu.h declaration for a create, a sync method, a limits fill, or a feature
+/// probe, so the table resolves no symbol only that export needed. The caller removes the
+/// export bodies themselves (F22).
 pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String {
     let async_ops: Vec<_> = plan
         .chunks

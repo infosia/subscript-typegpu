@@ -1,3 +1,9 @@
+//! The windowed host of subscript-typegpu programs.
+//!
+//! The host owns the window, the surface, the device, and the event loop (W1). It calls the
+//! script's `init`, `frame`, and `shutdown` exports, and it translates window events into plain
+//! values (W2, W3). The script encodes one frame per call and never presents.
+
 use std::ffi::c_void;
 use std::io::Write;
 use std::path::PathBuf;
@@ -12,10 +18,12 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
 
+/// The CoreGraphics color-space declarations that the macOS `CAMetalLayer` needs (W9).
 #[cfg(target_os = "macos")]
 mod macos_colorspace {
     use std::ffi::c_void;
 
+    /// The opaque object that a `CGColorSpaceRef` points to.
     #[repr(C)]
     pub struct CGColorSpace {
         _opaque: [u8; 0],
@@ -30,8 +38,11 @@ mod macos_colorspace {
 
     #[link(name = "CoreGraphics", kind = "framework")]
     extern "C" {
+        /// The name of the sRGB color space.
         pub static kCGColorSpaceSRGB: *const c_void;
+        /// Creates one owned color space from a name, and returns null on failure.
         pub fn CGColorSpaceCreateWithName(name: *const c_void) -> *mut CGColorSpace;
+        /// Releases one color space that a create call returned.
         pub fn CGColorSpaceRelease(space: *mut CGColorSpace);
     }
 }

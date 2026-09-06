@@ -19,11 +19,14 @@ function uiTrap(rule: string, method: string, values: string): void {
   unreachable();
 }
 
+// A mutable holder for a widget's value.
+// A stateful widget writes `value` in place when the user changes it.
 export class UiState<T> {
   value: T;
   constructor(value: T) { this.value = value; }
 }
 
+// An axis-aligned rectangle in pixels. `x` and `y` are the top-left corner.
 @CStruct
 export class UiRect {
   x: i32;
@@ -40,6 +43,9 @@ export class UiRect {
 
 const UI_UNCLIPPED: UiRect = new UiRect(0, 0, 16777216, 16777216);
 
+// One entry of the frame's command list. `kind` is 1 clip, 2 rect, 3 text, 4 icon.
+// `color` packs `0xAABBGGRR` with red in the low byte, and `id` holds the atlas
+// index of an icon command.
 export class UiCommand {
   kind: i32;
   x: i32;
@@ -61,6 +67,8 @@ export class UiCommand {
   }
 }
 
+// Widget and container options. Each name is one bit, and a caller combines them
+// with `|`. The values follow microui's option order.
 export const UI_OPT_ALIGN_CENTER: u32 = 1;
 export const UI_OPT_ALIGN_RIGHT: u32 = 2;
 export const UI_OPT_NO_INTERACT: u32 = 4;
@@ -74,21 +82,31 @@ export const UI_OPT_AUTO_SIZE: u32 = 512;
 export const UI_OPT_POPUP: u32 = 1024;
 export const UI_OPT_CLOSED: u32 = 2048;
 export const UI_OPT_EXPANDED: u32 = 4096;
+// Mouse button bits. They reach the context through `inputMouseDown` and
+// `inputMouseUp`, and they read back as `mouseDown` and `mousePressed`.
 export const UI_MOUSE_LEFT: u32 = 1;
 export const UI_MOUSE_RIGHT: u32 = 2;
 export const UI_MOUSE_MIDDLE: u32 = 4;
+// Key bits for `inputKeyDown` and `inputKeyUp`. The modifier bits record state only.
+// Only backspace and return change a widget.
 export const UI_KEY_SHIFT: u32 = 1;
 export const UI_KEY_CTRL: u32 = 2;
 export const UI_KEY_ALT: u32 = 4;
 export const UI_KEY_BACKSPACE: u32 = 8;
 export const UI_KEY_RETURN: u32 = 16;
+// Response bits that a widget returns. A caller tests them with `&`, because one
+// call can report more than one.
 export const UI_RES_ACTIVE: u32 = 1;
 export const UI_RES_SUBMIT: u32 = 2;
 export const UI_RES_CHANGE: u32 = 4;
+// Icon indices into the atlas rect table, for `drawIcon` and `buttonIcon`.
+// microui numbers its icons from 1, so each value here is one less.
 export const UI_ICON_CLOSE: i32 = 0;
 export const UI_ICON_CHECK: i32 = 1;
 export const UI_ICON_COLLAPSED: i32 = 2;
 export const UI_ICON_EXPANDED: i32 = 3;
+// Indices into `UiStyle.colors`. `drawControlFrame` adds 1 for the hover color and
+// 2 for the focus color, which keeps each button and base triple adjacent.
 export const UI_COLOR_TEXT: i32 = 0;
 export const UI_COLOR_BORDER: i32 = 1;
 export const UI_COLOR_WINDOW_BG: i32 = 2;
@@ -104,6 +122,8 @@ export const UI_COLOR_BASE_FOCUS: i32 = 11;
 export const UI_COLOR_SCROLL_BASE: i32 = 12;
 export const UI_COLOR_SCROLL_THUMB: i32 = 13;
 
+// The metrics and the color table that every draw call reads. The metrics are
+// pixels, and `colors` holds fourteen `0xAABBGGRR` values under the `UI_COLOR_*` names.
 export class UiStyle {
   width: i32 = 68;
   height: i32 = 10;
@@ -118,6 +138,8 @@ export class UiStyle {
     0xff1e1e1e, 0xff232323, 0xff282828, 0xff2b2b2b, 0xff1e1e1e];
 }
 
+// Returns `value` with two decimals, as a slider and a number widget display it.
+// The result rounds half away from zero.
 export function uiNumberText(value: f32): string {
   const negative: boolean = value < 0;
   const magnitude: f32 = negative ? -value : value;
@@ -168,6 +190,7 @@ class UiLayout {
   constructor(body: UiRect) { this.body = uiCopy(body); }
 }
 
+// A container record: a window, a popup, or a root a program opens itself.
 // Root ranges index the command array. The end index is exclusive.
 export class UiRoot {
   id: u32;
@@ -189,7 +212,11 @@ export class UiRoot {
   }
 }
 
+// The frame state: input, ids, layout, containers, and the command list.
+// A program pushes input, calls `begin()`, calls widgets, then calls `end()`.
+// A widget or layout call outside that pair traps `UIT2`.
 export class UiContext {
+  // A program writes `style`. It reads the fields below and writes none of them.
   style: UiStyle = new UiStyle();
   commands: UiCommand[] = [];
   roots: UiRoot[] = [];
@@ -253,6 +280,8 @@ export class UiContext {
   private requireFrame(method: string): void {
     if (!this.active) uiTrap("UIT2", method, `frame=${this.frame}`);
   }
+  // Starts a frame. It clears the command list and the root list, computes the pointer
+  // delta, and adopts the previous frame's hover root. A second `begin()` traps `UIT2`.
   begin(): void {
     if (this.active) uiTrap("UIT2", "begin", `frame=${this.frame}`);
     this.active = true;
@@ -269,6 +298,8 @@ export class UiContext {
     this.nextHoverZ = -2147483647;
     this.clipCount = 1;
   }
+  // Ends the frame. It orders the roots by z-index, gives each root its command range,
+  // and clears the press, key-press, and text-input state. A stack still open traps `UIT2`.
   end(): void {
     this.requireFrame("end");
     if (this.idCount !== 0 || this.layoutCount !== 0 || this.clipCount !== 1 || this.currentRoot !== 0 || this.containerDepth !== 0 || this.treeCount !== 0) {
@@ -329,46 +360,65 @@ export class UiContext {
     this.previousY = this.mouseY;
     this.active = false;
   }
+  // Records the pointer position in pixels. Call every input method before `begin()`.
   inputMouseMove(x: i32, y: i32): void { this.mouseX = x; this.mouseY = y; }
+  // Records a press. `button` is a `UI_MOUSE_*` bit. The press bit lasts until `end()`,
+  // and the down bit lasts until `inputMouseUp`.
   inputMouseDown(x: i32, y: i32, button: u32): void {
     this.inputMouseMove(x, y);
     this.mouseDown |= button;
     this.mousePressed |= button;
   }
+  // Clears the down bit for `button`. It leaves the press bit of the same frame set.
   inputMouseUp(x: i32, y: i32, button: u32): void {
     this.inputMouseMove(x, y);
     this.mouseDown &= ~button;
   }
+  // Adds a wheel delta in pixels. `end()` applies the total to the container under the
+  // pointer and clears it.
   inputScroll(dx: i32, dy: i32): void { this.scrollX += dx; this.scrollY += dy; }
+  // Sets the down bit and the press bit for `key`, a `UI_KEY_*` value.
   inputKeyDown(key: u32): void { this.keyDown |= key; this.keyPressed |= key; }
+  // Clears the down bit for `key`. The press bit lasts until `end()`.
   inputKeyUp(key: u32): void { this.keyDown &= ~key; }
+  // Appends one character to the frame's text input. A code point outside 32 to 126
+  // adds nothing.
   inputText(codePoint: u32): void {
     const ascii: string = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
     if (codePoint >= 32 && codePoint <= 126) this.textInput += ascii.charAt((codePoint - 32) as i32);
   }
+  // Returns the FNV-1a hash of `label` under the id stack, and records it as `lastId`.
+  // Two widgets with one label in one scope share one id.
   getId(label: string): u32 {
     let hash: u32 = this.idCount === 0 ? 2166136261 : this.ids[this.idCount - 1];
     for (let i: i32 = 0; i < label.length; i += 1) hash = (hash ^ (label.charCodeAt(i) as u32)) * 16777619;
     this.lastId = hash;
     return hash;
   }
+  // Opens an id scope, so that the calls up to `popId()` hash under `label`.
   pushId(label: string): void { this.requireFrame("pushId"); this.pushIdValue(this.getId(label)); }
   private pushIdValue(id: u32): void {
     if (this.idCount === this.ids.length) this.ids.push(id);
     else this.ids[this.idCount] = id;
     this.idCount += 1;
   }
+  // Leaves the innermost id scope. A call with no open scope traps `UIT2`.
   popId(): void {
     this.requireFrame("popId");
     if (this.idCount === 0) uiTrap("UIT2", "popId", "depth=0");
     this.idCount -= 1;
   }
+  // Moves focus to `id` and marks focus as fresh, so that `end()` keeps it.
   setFocus(id: u32): void { this.requireFrame("setFocus"); this.focus = id; this.updatedFocus = true; }
+  // Reports whether the pointer sits inside `rect`, inside the current clip rect, and
+  // inside this frame's hover root. It returns false outside every root container.
   mouseOver(rect: UiRect): boolean {
     this.requireFrame("mouseOver");
     return this.currentRoot !== 0 && this.currentRoot === this.hoverRoot
       && uiContains(rect, this.mouseX, this.mouseY) && uiContains(this.getClip(), this.mouseX, this.mouseY);
   }
+  // Applies the hover and focus rules to the widget with `id` and `rect`.
+  // `UI_OPT_NO_INTERACT` skips them, and `UI_OPT_HOLD_FOCUS` keeps focus after the release.
   updateControl(id: u32, rect: UiRect, opt: u32 = 0): void {
     this.requireFrame("updateControl");
     if (this.focus === id) this.updatedFocus = true;
@@ -381,13 +431,17 @@ export class UiContext {
     if (this.hover === id && this.mousePressed !== 0) this.setFocus(id);
     if (this.hover === id && this.mousePressed === 0 && !over) this.hover = 0;
   }
+  // Returns a copy of the innermost clip rect.
   getClip(): UiRect { this.requireFrame("getClip"); return uiCopy(this.clips[this.clipCount - 1]); }
+  // Pushes the intersection of `rect` and the current clip rect. A command outside the
+  // result emits nothing.
   pushClip(rect: UiRect): void { this.requireFrame("pushClip"); this.pushClipValue(uiIntersection(this.getClip(), rect)); }
   private pushClipValue(rect: UiRect): void {
     if (this.clipCount === this.clips.length) this.clips.push(rect);
     else this.clips[this.clipCount] = rect;
     this.clipCount += 1;
   }
+  // Restores the previous clip rect. A call at the unbounded base traps `UIT2`.
   popClip(): void {
     this.requireFrame("popClip");
     if (this.clipCount <= 1) uiTrap("UIT2", "popClip", `depth=${this.clipCount}`);
@@ -415,8 +469,12 @@ export class UiContext {
     this.append(kind, rect, color, id, text);
     if (partial) this.append(1, uiCopy(UI_UNCLIPPED));
   }
+  // Appends a filled rect in `color`. A rect that the clip rect crosses emits a clip
+  // command, the rect, then a clip command that restores the unbounded rect.
   drawRect(rect: UiRect, color: u32): void { this.emit(2, rect, color); }
+  // Appends an icon command. The renderer centers the atlas glyph inside `rect`.
   drawIcon(icon: i32, rect: UiRect, color: u32): void { this.emit(4, rect, color, icon); }
+  // Returns the pixel width of `text`. A byte outside 32 to 126 adds nothing.
   textWidth(text: string): i32 {
     let width: i32 = 0;
     for (let i: i32 = 0; i < text.length; i += 1) {
@@ -425,6 +483,8 @@ export class UiContext {
     }
     return width;
   }
+  // Appends a text command with its top-left corner at `x`, `y`. It drops every byte
+  // outside 32 to 126 before it measures the string.
   drawText(text: string, x: i32, y: i32, color: u32): void {
     let visible: string = "";
     for (let i: i32 = 0; i < text.length; i += 1) {
@@ -434,6 +494,7 @@ export class UiContext {
     this.emit(3, new UiRect(x, y, this.textWidth(visible), UI_TEXT_HEIGHT), color, 0, visible);
   }
 
+  // Opens a layout over `body`. Widgets take their rects from it until `popLayout()`.
   // A layout body uses content coordinates after the scroll offset.
   pushLayout(body: UiRect, scrollX: i32 = 0, scrollY: i32 = 0): void {
     this.requireFrame("pushLayout");
@@ -445,6 +506,8 @@ export class UiContext {
     layout.maxX = -UI_UNCLIPPED.w; layout.maxY = -UI_UNCLIPPED.w; layout.nextType = 0; layout.column = false;
     this.layoutCount += 1;
   }
+  // Closes the innermost layout and returns the extent its items covered.
+  // An extent with no item is 0 by 0. A call with no open layout traps `UIT2`.
   popLayout(): UiRect {
     const layout: UiLayout = this.layout("popLayout");
     this.layoutCount -= 1;
@@ -455,6 +518,9 @@ export class UiContext {
     if (this.layoutCount === 0) uiTrap("UIT2", method, "depth=0");
     return this.layouts[this.layoutCount - 1];
   }
+  // Starts a row of up to 16 items, as microui's `mu_layout_row`. A width of 0 takes
+  // the style width, and a negative width extends to that many pixels from the right
+  // edge. More than 16 widths trap `UIT3`.
   layoutRow(widths: i32[], height: i32): void {
     const layout: UiLayout = this.layout("layoutRow");
     if (widths.length > 16) uiTrap("UIT3", "layoutRow", `widths=${widths.length} maximum=16`);
@@ -465,11 +531,16 @@ export class UiContext {
     layout.x = layout.indent;
     layout.y = layout.nextRow;
   }
+  // Places the next item at `rect`, for one call only. A relative rect offsets from the
+  // layout body, and an absolute rect passes through with no layout advance.
   layoutSetNext(rect: UiRect, relative: boolean): void {
     const layout: UiLayout = this.layout("layoutSetNext");
     layout.next = uiCopy(rect);
     layout.nextType = relative ? 1 : 2;
   }
+  // Returns the next item's rect in absolute pixels and records it as `lastRect`.
+  // A height of 0 takes the style height. The row advances by the tallest item plus
+  // the spacing.
   layoutNext(): UiRect {
     const layout: UiLayout = this.layout("layoutNext");
     let rect: UiRect = uiCopy(layout.next);
@@ -501,10 +572,13 @@ export class UiContext {
     this.lastRect = uiCopy(rect);
     return rect;
   }
+  // Opens a nested layout over the next item's rect. Its position and extent fold back
+  // into the outer layout at `layoutEndColumn()`.
   layoutBeginColumn(): void {
     this.pushLayout(this.layoutNext());
     this.layout("layoutBeginColumn").column = true;
   }
+  // Closes the column. A call with no open column traps `UIT2`.
   layoutEndColumn(): void {
     this.requireFrame("layoutEndColumn");
     if (this.layoutCount < 2) uiTrap("UIT2", "layoutEndColumn", `depth=${this.layoutCount}`);
@@ -518,6 +592,8 @@ export class UiContext {
     parent.maxY = uiMax(parent.maxY, child.maxY);
   }
 
+  // Opens `root` as a root container, so that `end()` gives its commands one contiguous
+  // range. It pushes no clip rect, unlike `beginWindow`.
   // Each root retains its command owner index.
   beginRoot(root: UiRoot): void {
     this.requireFrame("beginRoot");
@@ -533,12 +609,15 @@ export class UiContext {
       this.nextHoverZ = root.zindex;
     }
   }
+  // Closes the innermost root container. A call with no open root traps `UIT2`.
   endRoot(): void {
     this.requireFrame("endRoot");
     if (this.currentRoot === 0) uiTrap("UIT2", "endRoot", "root=0");
     this.rootDepth -= 1;
     this.currentRoot = this.rootDepth === 0 ? 0 : this.roots[this.rootStack[this.rootDepth - 1]].id;
   }
+  // Returns the root indices by ascending z-index, valid after `end()`.
+  // The array is new on each call.
   drawOrder(): i32[] {
     const result: i32[] = [];
     for (let i: i32 = 0; i < this.orderCount; i += 1) result.push(this.order[i]);
@@ -551,6 +630,8 @@ export class UiContext {
     if (command.kind === 3) return `text ${command.x} ${command.y} ${color} "${command.text}"`;
     return `icon ${command.id} ${command.x} ${command.y} ${command.w} ${command.h} ${color}`;
   }
+  // Returns one line per command in draw order, then one line per root container.
+  // With a root container in the frame, a command outside every root is dropped.
   dumpCommands(): string[] {
     const lines: string[] = [];
     if (this.rootCount === 0) {
@@ -566,6 +647,8 @@ export class UiContext {
     }
     return lines;
   }
+  // Fills `rect` with the style color at `colorId` and draws a one-pixel border.
+  // The title bar and the two scrollbar colors take no border.
   drawFrame(rect: UiRect, colorId: i32): void {
     this.drawRect(rect, this.style.colors[colorId]);
     if (colorId === UI_COLOR_TITLE_BG || colorId === UI_COLOR_SCROLL_BASE || colorId === UI_COLOR_SCROLL_THUMB) return;
@@ -576,10 +659,14 @@ export class UiContext {
     this.drawRect(new UiRect(rect.x - 1, rect.y - 1, 1, rect.h + 2), border);
     this.drawRect(new UiRect(rect.x + rect.w, rect.y - 1, 1, rect.h + 2), border);
   }
+  // Draws a widget frame, and adds 1 to `colorId` for hover and 2 for focus.
+  // `UI_OPT_NO_FRAME` draws nothing.
   drawControlFrame(id: u32, rect: UiRect, colorId: i32, opt: u32 = 0): void {
     this.requireFrame("drawControlFrame");
     if ((opt & UI_OPT_NO_FRAME) === 0) this.drawFrame(rect, colorId + (this.focus === id ? 2 : this.hover === id ? 1 : 0));
   }
+  // Draws `text` clipped to `rect` and centered on the vertical axis. `opt` selects the
+  // horizontal alignment, which is left by default.
   drawControlText(text: string, rect: UiRect, colorId: i32, opt: u32 = 0): void {
     let x: i32 = rect.x + this.style.padding;
     const width: i32 = this.textWidth(text);
@@ -589,6 +676,8 @@ export class UiContext {
     this.drawText(text, x, rect.y + (rect.h - UI_TEXT_HEIGHT) / 2, this.style.colors[colorId]);
     this.popClip();
   }
+  // Draws a button with the text `label` and returns `UI_RES_SUBMIT` on a left press.
+  // The label is also the id, so two buttons with one label in one scope act as one.
   button(label: string, opt: u32 = 0): u32 {
     const id: u32 = this.getId(label);
     const rect: UiRect = this.layoutNext();
@@ -597,6 +686,8 @@ export class UiContext {
     this.drawControlText(label, rect, UI_COLOR_TEXT, opt);
     return this.focus === id && this.mousePressed === UI_MOUSE_LEFT ? UI_RES_SUBMIT : 0;
   }
+  // Draws a button that carries the atlas icon `icon` and returns `UI_RES_SUBMIT` on a
+  // left press. The icon index is the id, because there is no label.
   buttonIcon(icon: i32, opt: u32 = 0): u32 {
     let id: u32 = this.idCount === 0 ? 2166136261 : this.ids[this.idCount - 1];
     let bytes: u32 = icon as u32;
@@ -608,6 +699,7 @@ export class UiContext {
     this.drawIcon(icon, rect, this.style.colors[UI_COLOR_TEXT]);
     return this.focus === id && this.mousePressed === UI_MOUSE_LEFT ? UI_RES_SUBMIT : 0;
   }
+  // Draws a box and a label. A press inverts `state.value` and returns `UI_RES_CHANGE`.
   checkbox(label: string, state: UiState<boolean>): u32 {
     const id: u32 = this.getId(label);
     const rect: UiRect = this.layoutNext();
@@ -622,6 +714,9 @@ export class UiContext {
     this.drawControlText(label, new UiRect(rect.x + rect.h, rect.y, rect.w - rect.h, rect.h), UI_COLOR_TEXT);
     return response;
   }
+  // Draws a slider over `low` to `high` and writes the result into `state`.
+  // A drag reads the value from the pointer's x, and a non-zero `step` rounds it.
+  // It returns `UI_RES_CHANGE` when the value moves.
   slider(label: string, state: UiState<f32>, low: f32, high: f32, step: f32 = 0, opt: u32 = 0): u32 {
     const id: u32 = this.getId(label);
     const rect: UiRect = this.layoutNext();
@@ -640,6 +735,8 @@ export class UiContext {
       (opt & (UI_OPT_ALIGN_CENTER | UI_OPT_ALIGN_RIGHT)) === 0 ? opt | UI_OPT_ALIGN_CENTER : opt);
     return old !== state.value ? UI_RES_CHANGE : 0;
   }
+  // Draws a number field and writes into `state`. A horizontal drag under focus adds
+  // the pointer delta times `step`. It returns `UI_RES_CHANGE` when the value moves.
   number(label: string, state: UiState<f32>, step: f32, opt: u32 = 0): u32 {
     const id: u32 = this.getId(label);
     const rect: UiRect = this.layoutNext();
@@ -651,6 +748,8 @@ export class UiContext {
       (opt & (UI_OPT_ALIGN_CENTER | UI_OPT_ALIGN_RIGHT)) === 0 ? opt | UI_OPT_ALIGN_CENTER : opt);
     return old !== state.value ? UI_RES_CHANGE : 0;
   }
+  // Draws a text field and edits `state.value` while it holds focus. It appends the
+  // frame's text, removes one byte on backspace, and returns `UI_RES_SUBMIT` on return.
   textbox(label: string, state: UiState<string>, opt: u32 = 0): u32 {
     const id: u32 = this.getId(label);
     const rect: UiRect = this.layoutNext();
@@ -675,7 +774,10 @@ export class UiContext {
     } else this.drawControlText(state.value, rect, UI_COLOR_TEXT, opt);
     return response;
   }
+  // Draws one line of text in the next layout item. The text clips to that rect.
   label(text: string): void { this.drawControlText(text, this.layoutNext(), UI_COLOR_TEXT); }
+  // Draws text with word wrap over the full width of the layout. It breaks at a space
+  // or a newline and advances one row per line.
   text(text: string): void {
     this.layoutBeginColumn();
     this.layoutRow(this.fullWidth, UI_TEXT_HEIGHT);
@@ -731,7 +833,12 @@ export class UiContext {
       rect.w - rect.h + this.style.padding, rect.h), UI_COLOR_TEXT);
     return expanded ? UI_RES_ACTIVE : 0;
   }
+  // Draws a collapsible header and returns `UI_RES_ACTIVE` while it is open.
+  // The open state lives in a pool of 48 slots. A frame that needs a 49th slot traps
+  // `UIT4`.
   header(label: string, opt: u32 = 0): u32 { return this.treeHeader(label, opt, false); }
+  // Draws a tree node and returns `UI_RES_ACTIVE` while it is open. It indents the
+  // layout and opens an id scope, so a non-zero result requires `endTreenode()`.
   beginTreenode(label: string, opt: u32 = 0): u32 {
     const response: u32 = this.treeHeader(label, opt, true);
     if (response !== 0) {
@@ -743,6 +850,7 @@ export class UiContext {
     }
     return response;
   }
+  // Closes a tree node. A call without its `beginTreenode` traps `UIT2`.
   endTreenode(): void {
     this.requireFrame("endTreenode");
     if (this.treeCount === 0 || this.treeDepths[this.treeCount - 1] !== this.idCount) uiTrap("UIT2", "endTreenode", `depth=${this.treeCount}`);
@@ -818,6 +926,9 @@ export class UiContext {
     const padding: i32 = this.style.padding;
     this.pushLayout(new UiRect(body.x + padding, body.y + padding, body.w - padding * 2, body.h - padding * 2), record.scrollX, record.scrollY);
   }
+  // Opens a window and returns `UI_RES_ACTIVE`, or 0 when the window is closed.
+  // Call `endWindow()` only for a non-zero result. The rect applies on the first frame,
+  // and the title drag and the resize handle own it afterwards.
   beginWindow(title: string, rect: UiRect, opt: u32 = 0): u32 {
     this.requireFrame("beginWindow");
     const id: u32 = this.getId(title);
@@ -881,12 +992,19 @@ export class UiContext {
     this.popId();
     this.containerDepth -= 1;
   }
+  // Closes the window and stores its content extent. A call without `beginWindow` traps
+  // `UIT2`.
   endWindow(): void { this.endContainer("endWindow", 1); }
+  // Returns the innermost open container's live record, as microui's
+  // `mu_get_current_container`. A program reads and writes its rect, body, scroll, and
+  // content extent. A call with no open container traps `UIT2`.
   currentContainer(): UiRoot {
     this.requireFrame("currentContainer");
     if (this.containerDepth === 0) uiTrap("UIT2", "currentContainer", "depth=0");
     return this.containers[this.containerStack[this.containerDepth - 1]];
   }
+  // Opens a non-root container over the next layout item and clips its widgets to it.
+  // `UI_OPT_CLOSED` traps `UIT2`, because a panel has no closed state.
   beginPanel(label: string, opt: u32 = 0): void {
     this.pushId(label);
     const slot: i32 = this.container(this.lastId, opt);
@@ -898,7 +1016,11 @@ export class UiContext {
     this.containerBody(slot, record.rect, opt);
     this.pushClip(record.body);
   }
+  // Closes the panel and stores its content extent. A call without `beginPanel` traps
+  // `UIT2`.
   endPanel(): void { this.endContainer("endPanel", 2); }
+  // Marks the popup named `label` open at the pointer and raises it above every
+  // container. The next `beginPopup(label)` then returns a non-zero response.
   openPopup(label: string): void {
     this.requireFrame("openPopup");
     const slot: i32 = this.container(this.getId(label), 0);
@@ -907,14 +1029,19 @@ export class UiContext {
     this.lastZindex += 1; record.zindex = this.lastZindex;
     this.hoverRoot = record.id; this.nextHoverRoot = record.id; this.nextHoverZ = record.zindex;
   }
+  // Opens the popup named `label` and returns `UI_RES_ACTIVE`, or 0 when it is closed.
+  // The popup fits itself to its content, and a press outside it closes it.
   beginPopup(label: string): u32 {
     const response: u32 = this.beginWindow(label, new UiRect(0, 0, 0, 0), UI_OPT_POPUP | UI_OPT_AUTO_SIZE | UI_OPT_NO_RESIZE | UI_OPT_NO_SCROLL | UI_OPT_NO_TITLE | UI_OPT_CLOSED);
     if (response !== 0) this.containerKinds[this.containerDepth - 1] = 3;
     return response;
   }
+  // Closes the popup. A call without `beginPopup` traps `UIT2`.
   endPopup(): void { this.endContainer("endPopup", 3); }
 }
 
+// One vertex of the UI quad stream. `position` is in pixels, `uv` is normalized to
+// the atlas, and `color` packs `0xAABBGGRR`.
 @CStruct
 export class UiVertex {
   position: Vec2f;
@@ -925,6 +1052,8 @@ export class UiVertex {
   }
 }
 
+// The uniform that the vertex kernel divides by to reach clip space. Both fields
+// hold the render target size in pixels.
 @CStruct
 export class UiViewport {
   width: f32;
@@ -932,12 +1061,16 @@ export class UiViewport {
   constructor(width: f32, height: f32) { this.width = width; this.height = height; }
 }
 
+// The bind group of the UI pipeline: the viewport uniform, the atlas texture, and
+// the nearest-filter sampler.
 export class UiRenderLayout {
   viewport!: Uniform<UiViewport>;
   atlas!: Texture2d<f32>;
   nearest!: Sampler;
 }
 
+// The vertex kernel's output and the fragment kernel's input. `color` carries the
+// unpacked RGBA in the 0 to 1 range.
 @CStruct
 export class UiVarying {
   position: Vec4f;
@@ -948,6 +1081,8 @@ export class UiVarying {
   }
 }
 
+// The vertex kernel. It maps a pixel position to clip space through the viewport
+// uniform, and it unpacks the vertex color into floats.
 export function uiVertex(res: UiRenderLayout, vertex: UiVertex, ctx: VertexInvocation): UiVarying {
   return new UiVarying(
     new Vec4f(vertex.position.x * 2.0 / res.viewport.$.width - 1.0,
@@ -960,16 +1095,22 @@ export function uiVertex(res: UiRenderLayout, vertex: UiVertex, ctx: VertexInvoc
   );
 }
 
+// The fragment kernel. It multiplies the vertex alpha by the atlas sample's red
+// channel, so a glyph and a filled rect share one pipeline.
 export function uiFragment(res: UiRenderLayout, input: UiVarying, ctx: FragmentInvocation): Vec4f {
   const alpha: f32 = res.atlas.sample(res.nearest, input.uv).x;
   return new Vec4f(input.color.x, input.color.y, input.color.z, input.color.w * alpha);
 }
 
+// The blend state the UI pipeline requires: source alpha over one minus source
+// alpha, on the color channels and on the alpha channel.
 export const UI_BLEND: GPUBlendState = {
   color: { operation: "add", srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha" },
   alpha: { operation: "add", srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha" },
 };
 
+// What the generator produces for the UI pipeline and a program hands to the
+// renderer: the WGSL, the two entry names, the two layouts, and the pipeline spec.
 export class UiPipelineFacts {
   wgsl: string;
   vertexEntry: string;
@@ -986,6 +1127,7 @@ export class UiPipelineFacts {
   }
 }
 
+// One indexed draw and its scissor rect. `first` and `count` count indices, not quads.
 export class UiDrawRange {
   first: u32;
   count: u32 = 0;
@@ -1037,7 +1179,12 @@ class UiRendererLayout {
   }
 }
 
+// Turns a `UiContext` command list into one indexed draw per clip rect.
+// `create` and `createHost` are the only creation path, and `dispose()` releases
+// every resource the renderer owns.
 export class UiRenderer {
+  // `build` refreshes these. `vertexBytes` can keep a tail from a longer earlier frame,
+  // which no draw range reaches.
   readonly capacity: u32;
   quadCount: u32 = 0;
   indexCount: u32 = 0;
@@ -1066,6 +1213,9 @@ export class UiRenderer {
     this.group = group; this.pipeline = pipeline;
   }
 
+  // Creates a renderer over a device the script owns. `capacity` counts quads.
+  // A capacity of 0 or above 16,384, or a spec that is not `triangle-list` with
+  // `uint16`, traps `UIT1`.
   static create(device: GPUDevice, facts: UiPipelineFacts, capacity: u32 = 16384): UiRenderer {
     uiValidateRenderer(facts, capacity);
     const queue: GPUQueue = device.queue;
@@ -1093,6 +1243,8 @@ export class UiRenderer {
       nearest, viewport, group, pipeline);
   }
 
+  // Creates a renderer over the window host's device. The renderer owns the queue it
+  // takes here and disposes it.
   static createHost(device: GPUHostOwnedDevice, facts: UiPipelineFacts, capacity: u32 = 16384): UiRenderer {
     uiValidateRenderer(facts, capacity);
     const queue: GPUQueue = device.queue();
@@ -1184,6 +1336,8 @@ export class UiRenderer {
     }
   }
 
+  // Walks the command list in draw order and fills the vertex bytes and the draw ranges.
+  // A frame above the quad capacity traps `UIT1`.
   build(context: UiContext): void {
     this.quadCount = 0; this.indexCount = 0;
     this.rangeCount = 0;
@@ -1197,6 +1351,9 @@ export class UiRenderer {
     if (this.rangeCount > 0 && this.ranges[this.rangeCount - 1].count === 0) this.rangeCount -= 1;
   }
 
+  // Builds the frame, writes the buffers, and records one scissored draw per range into
+  // `pass`. `width` and `height` are the render target size in pixels. It restores the
+  // full-viewport scissor before it returns.
   render(context: UiContext, pass: GPURenderPassEncoder, width: u32, height: u32): void {
     this.build(context);
     this.viewport.write(this.queue, 0, Context.bytesOf<UiViewport>(new UiViewport(width as f32, height as f32)));
@@ -1214,6 +1371,7 @@ export class UiRenderer {
     pass.setScissorRect(0, 0, width, height);
   }
 
+  // Releases every GPU resource, and the queue too when `createHost` produced it.
   dispose(): void {
     this.group.dispose(); this.pipeline.dispose(); this.viewport.dispose(); this.nearest.dispose();
     this.atlasView.dispose(); this.atlas.dispose(); this.indices.dispose(); this.vertices.dispose();

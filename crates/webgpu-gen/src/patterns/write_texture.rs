@@ -5,6 +5,10 @@ use crate::naming;
 use crate::patterns::rust_signature;
 use crate::plan::{StructPlan, WriteTextureOp};
 
+/// Renders the texture-upload declaration for `subscript-typegpu.h`.
+///
+/// The parameter order is destination, layout, extent, then the count-first byte pair (B3).
+/// That order differs from webgpu.h, which puts the byte pair before the layout.
 pub(crate) fn c_decl(
     op: &WriteTextureOp,
     destination: &StructPlan,
@@ -22,6 +26,9 @@ pub(crate) fn c_decl(
     )
 }
 
+/// Renders the private webgpu.h declaration of the texture upload.
+///
+/// The parameters keep the webgpu.h order: destination, data pointer, data size, layout, extent.
 pub(crate) fn rust_extern(
     op: &WriteTextureOp,
     destination: &StructPlan,
@@ -46,6 +53,11 @@ pub(crate) fn rust_extern(
     ) + "\n"
 }
 
+/// Renders the exported texture-upload body.
+///
+/// The body converts all three public structs into backend values, holds them alive, and
+/// reorders the arguments into the webgpu.h order. A null handle, a null struct pointer, or a
+/// non-zero count with a null data pointer returns without a backend call (L9).
 pub(crate) fn rust_export(
     op: &WriteTextureOp,
     destination: &StructPlan,

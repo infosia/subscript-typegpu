@@ -19,10 +19,13 @@ export class RandomF32 {
   }
 }
 
+// The kernel expression set has no `^`, so the exclusive or comes from `|`, `&`, and `~`.
 function xorU32(left: u32, right: u32): u32 {
   return (left | right) & ~(left & right);
 }
 
+// Returns the first state for `randF32`. A caller seeds each lane from its own index, because
+// equal seeds give equal sequences.
 export function randSeed(seed: u32): u32 {
   let state: u32 = xorU32(xorU32(seed, 61), seed / 65536);
   state *= 9;
@@ -31,6 +34,8 @@ export function randSeed(seed: u32): u32 {
   return xorU32(state, state / 32768);
 }
 
+// Returns the next state beside its value, so a caller threads the state through each call.
+// A repeated `state` gives a repeated value.
 export function randF32(state: u32): RandomF32 {
   let next: u32 = xorU32(state, state * 8192);
   next = xorU32(next, next / 131072);

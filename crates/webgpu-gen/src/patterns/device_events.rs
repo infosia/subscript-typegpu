@@ -3,6 +3,10 @@
 use crate::naming;
 use crate::plan::DeviceEventsOp;
 
+/// Renders both device-event record typedefs for `subscript-typegpu.h`.
+///
+/// A script reads an error or a device loss through an out-parameter fill of these records
+/// (F11 Rev 1, G1). Neither record ever crosses by return value.
 pub(crate) fn c_records() -> &'static str {
     "typedef struct SubscriptTypegpuErrorRecord {\n\
      \x20   SubscriptTypegpuErrorType type;\n\
@@ -15,6 +19,10 @@ pub(crate) fn c_records() -> &'static str {
      } SubscriptTypegpuLostRecord;"
 }
 
+/// Renders the four device-event declarations for `subscript-typegpu.h`.
+///
+/// The order is the pop-scope request, the pop-scope take, the uncaptured-error drain, then the
+/// device-lost fill. Each fill takes an out-pointer and returns `bool` (G2, G3, G4).
 pub(crate) fn c_decls(op: &DeviceEventsOp, anchor: &str) -> Vec<String> {
     vec![
         format!(
@@ -34,6 +42,11 @@ pub(crate) fn c_decls(op: &DeviceEventsOp, anchor: &str) -> Vec<String> {
     ]
 }
 
+/// Renders the private webgpu.h device-descriptor and callback types.
+///
+/// The facade needs the concrete device descriptor, because it installs the device-lost and
+/// uncaptured-error callbacks itself at device creation (F14). None of these types enters
+/// `subscript-typegpu.h`.
 pub(crate) fn rust_private_types(op: &DeviceEventsOp) -> String {
     format!(
         "/// webgpu.h request-device descriptor types used to install F14 callbacks.\n\
@@ -108,6 +121,7 @@ pub(crate) fn rust_private_types(op: &DeviceEventsOp) -> String {
     )
 }
 
+/// Renders the private webgpu.h declaration of the pop-error-scope request.
 pub(crate) fn rust_extern(op: &DeviceEventsOp) -> String {
     format!(
         "    fn {}(device: WGPUDevice, callback_info: {}) -> WGPUFuture;\n",
@@ -115,6 +129,10 @@ pub(crate) fn rust_extern(op: &DeviceEventsOp) -> String {
     )
 }
 
+/// Renders both public record structs for the generated facade.
+///
+/// The layout matches the `c_records` typedefs. The message bytes stay facade-owned and stay
+/// valid until the next fill on the same parent object (F11 Rev 1).
 pub(crate) fn rust_public_records() -> &'static str {
     "/// `subscript-typegpu.h`: facade-filled error type and message.\n\
      #[repr(C)]\n\
@@ -137,6 +155,7 @@ pub(crate) fn rust_public_records() -> &'static str {
      }\n"
 }
 
+/// Renders the pop-error-scope success constant and its slot-kind tag.
 pub(crate) fn rust_constants(op: &DeviceEventsOp) -> String {
     format!(
         "/// webgpu.yml pop-error-scope success value.\n\
@@ -150,6 +169,11 @@ pub(crate) fn rust_constants(op: &DeviceEventsOp) -> String {
     )
 }
 
+/// Renders the three device-event callback bodies.
+///
+/// The order is device-lost, uncaptured-error, then pop-error-scope. Each body runs inside
+/// `runtime::callback_guard`, copies the message out of the borrowed view, records the outcome,
+/// and returns without a webgpu.h call (F7, L7).
 pub(crate) fn rust_callbacks(op: &DeviceEventsOp) -> String {
     format!(
         "// SAFETY: the callback signature matches the pinned webgpu.h declaration.\n\
@@ -214,6 +238,11 @@ pub(crate) fn rust_callbacks(op: &DeviceEventsOp) -> String {
     )
 }
 
+/// Renders the four exported device-event bodies plus their shared string-view helper.
+///
+/// The order matches `c_decls`. Every fill returns `false` for a null out-pointer and consumes
+/// nothing (G2). The drain returns records in the order the callback enqueued them (G3). The
+/// output also carries a `#[doc(hidden)]` injection the suite uses for the string lifetime.
 pub(crate) fn rust_exports(op: &DeviceEventsOp, anchor: &str, mode_const: &str) -> String {
     format!(
         "/// `subscript-typegpu.h`: pops the current error scope into an F6 future.\n\

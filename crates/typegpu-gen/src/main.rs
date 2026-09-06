@@ -1,3 +1,9 @@
+//! The command-line driver of the TypeGPU generator.
+//!
+//! `gen <program.ts> --lib <dir> -o <dir>` writes the support module and one `.wgsl` file per
+//! pipeline declaration. `ui-atlas <repo-root>` writes the generated atlas module. The harness
+//! calls the library instead, in process.
+
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
