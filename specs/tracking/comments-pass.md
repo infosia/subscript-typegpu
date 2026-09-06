@@ -78,3 +78,33 @@ green, 276 passed, 1 ignored, 222.1 s wall. The first run was red at
 defines LB1 to LB4. The seven `LB` ids joined the file. Every golden
 is byte-identical. The diff: 44 files, 1,519 comment lines added, 15
 comment lines rewritten, no code line changed.
+
+## The examples (2026-09-06)
+
+Owner instruction: the examples are the tutorial, so comments inside
+functions explain each step (EX2 Rev 3). Five Opus writers covered the
+32 examples by group, with the TypeGPU v0.12.0 originals beside them
+for the divergence sentences. Comment lines went from 384 to 2,550
+over 15,068 file lines (the count after the pass). Every change is a
+comment line: the code, the order, and the formatting are
+byte-identical, and the W13 compile of every example is green.
+
+Header corrections the writers reported and this pass made: the
+`window-triangle` header took the `// example:` form, and thirteen
+headers gained the reductions their bodies carry (`dispatch`,
+`trippy-raymarching`, `disco`, `box-raytracing`, `game-of-life`,
+`boids`, `clouds`, `stable-fluid`, `radiance-cascades`,
+`radiance-cascades-drawing`, `caustics`, `matrix-next`, `confetti`,
+`fluid-double-buffering`, `jump-flood-voronoi`). EX5 Rev 1 records the
+`noop` state and several `check:` lines.
+
+Defects the writers found in the code, recorded for a coding round:
+`smoky-triangle`, `caustics`, `vaporrave`, and `ray-marching` set
+their bind group to `null` in `shutdown()` and in the `init` failure
+path without `dispose()`, where the other windowed examples dispose
+it. `fluid-double-buffering` integrates a velocity field that nothing
+reads, so its density moves by diffusion only, where upstream advects
+along the velocity. The header now states the port's behavior.
+
+Evidence: `tools/gate.sh --require-backend` green, 283 passed, 1
+ignored, 221.7 s wall. `tools/hygiene.sh` exit 0.
