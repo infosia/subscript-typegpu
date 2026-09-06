@@ -2,6 +2,7 @@
 
 // T22: library code holds no panic site. An internal failure returns a `ProgramLoadError` or a
 // `String` error. A test module allows the lints again.
+#![deny(missing_docs)]
 #![deny(
     clippy::unwrap_used,
     clippy::expect_used,

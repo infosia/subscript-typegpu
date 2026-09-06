@@ -213,23 +213,23 @@ pub(crate) fn render(
             format!(" {result}")
         };
         source.push_str(&format!(
-            "extern \"C\" fn coverage_{index}({params}){result} {{\n    super::coverage_hit({index});\n    facade::{name}({})\n}}\n\n",
+            "/// Records a coverage hit, then forwards the arguments and result through [`facade::{name}`].\nextern \"C\" fn coverage_{index}({params}){result} {{\n    super::coverage_hit({index});\n    facade::{name}({})\n}}\n\n",
             arguments.join(", ")
         ));
     }
-    source.push_str("pub fn facade_export_names() -> &'static [&'static str] {\n    &[\n");
+    source.push_str("/// Returns the facade export names in symbol-table order.\npub fn facade_export_names() -> &'static [&'static str] {\n    &[\n");
     for name in &names {
         source.push_str(&format!("        \"{name}\",\n"));
     }
     source.push_str("    ]\n}\n\n");
-    source.push_str("pub fn facade_symbols() -> Vec<(String, *const u8)> {\n    vec![\n");
+    source.push_str("/// Returns facade export names paired with their direct function addresses.\npub fn facade_symbols() -> Vec<(String, *const u8)> {\n    vec![\n");
     for name in &names {
         source.push_str(&format!(
             "        (\"{name}\".to_owned(), facade::{name} as *const u8),\n"
         ));
     }
     source.push_str("    ]\n}\n\n");
-    source.push_str("pub fn facade_counting_symbols() -> Vec<(String, *const u8)> {\n    vec![\n");
+    source.push_str("/// Returns facade export names paired with wrappers that count calls before they forward arguments and results to the named exports.\npub fn facade_counting_symbols() -> Vec<(String, *const u8)> {\n    vec![\n");
     for (index, name) in names.iter().enumerate() {
         source.push_str(&format!(
             "        (\"{name}\".to_owned(), coverage_{index} as *const u8),\n"

@@ -11,7 +11,7 @@
     clippy::unimplemented,
     clippy::indexing_slicing
 )]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #![forbid(unsafe_code)]
 
 mod api;

@@ -199,15 +199,40 @@ fn render_member(out: &mut String, yml: &Yml, member: &Member) -> Result<(), Pol
                 ));
             }
         };
-        out.push_str(&format!("    pub {count}: usize,\n"));
         out.push_str(&format!(
-            "    pub {}: {pointer} {element},\n",
+            "    /// The number of elements at `{}`.\n    pub {count}: usize,\n",
+            crate::naming::camel(&member.name)
+        ));
+        out.push_str(&format!(
+            "    /// The element array with length `{count}`.\n    pub {}: {pointer} {element},\n",
             crate::naming::camel(&member.name)
         ));
         return Ok(());
     }
+    let fallback = format!("The native `{}` value for this structure.", member.name);
+    let description = match member.name.as_str() {
+        "label" => "The diagnostic label for the surface.",
+        "window" => "The native window that receives the surface output.",
+        "layer" => "The Metal layer that receives the surface output.",
+        "display" => "The native display connection that owns the surface.",
+        "surface" => "The Wayland surface that receives the output.",
+        "hinstance" => "The Windows module instance that owns the window.",
+        "hwnd" => "The Windows window handle that receives the output.",
+        "connection" => "The XCB connection that owns the window.",
+        "device" => "The device that creates the surface textures.",
+        "format" => "The pixel format of the surface textures.",
+        "usage" => "The permitted uses of the surface textures.",
+        "width" => "The surface texture width in pixels.",
+        "height" => "The surface texture height in pixels.",
+        "alpha_mode" => "The alpha composition mode for presentation.",
+        "present_mode" => "The frame presentation mode.",
+        "usages" => "The texture uses that the surface supports.",
+        "texture" => "The current surface texture returned by the backend.",
+        "status" => "The result of the current surface texture request.",
+        _ => &fallback,
+    };
     out.push_str(&format!(
-        "    pub {}: {},\n",
+        "    /// {description}\n    pub {}: {},\n",
         crate::naming::camel(&member.name),
         pointed_type(yml, &member.ty, member.pointer.as_deref())?
     ));
@@ -221,12 +246,13 @@ fn render_member(out: &mut String, yml: &Yml, member: &Member) -> Result<(), Pol
 fn render_struct(out: &mut String, yml: &Yml, shape: &Struct) -> Result<(), PolicyError> {
     out.push_str("#[repr(C)]\n#[derive(Clone, Copy)]\n");
     out.push_str(&format!(
-        "pub struct {} {{\n",
+        "/// The native {} data with the pinned C field layout.\npub struct {} {{\n",
+        shape.name.replace('_', " "),
         crate::naming::wgpu_type(&shape.name)
     ));
     match shape.kind.as_str() {
-        "extensible" => out.push_str("    pub nextInChain: *mut WGPUChainedStruct,\n"),
-        "extension" => out.push_str("    pub chain: WGPUChainedStruct,\n"),
+        "extensible" => out.push_str("    /// The first extension, or null when no extension exists.\n    pub nextInChain: *mut WGPUChainedStruct,\n"),
+        "extension" => out.push_str("    /// The extension header that identifies this structure and the next extension.\n    pub chain: WGPUChainedStruct,\n"),
         "standalone" => {}
         other => {
             return Err(invalid(
@@ -477,15 +503,15 @@ pub(crate) fn render(yml: &Yml, policy: &Policy) -> Result<String, PolicyError> 
     }
 
     let mut out = String::from(
-        "//! Generated from webgpu.yml plus policy.toml. Do not edit.\n#![allow(missing_docs, non_snake_case, non_upper_case_globals)]\n\nuse std::ffi::{c_char, c_void};\nuse std::sync::OnceLock;\n\n",
+        "//! Generated from webgpu.yml plus policy.toml. Do not edit.\n#![allow(non_snake_case, non_upper_case_globals)]\n\nuse std::ffi::{c_char, c_void};\nuse std::sync::OnceLock;\n\n",
     );
     for object in &objects {
         let name = crate::naming::wgpu_type(object);
         if object == "surface" {
-            out.push_str(&format!("pub type {name} = *mut c_void;\n"));
+            out.push_str(&format!("/// An opaque backend handle for a native surface.\npub type {name} = *mut c_void;\n"));
         } else {
             out.push_str(&format!(
-                "pub type {name} = crate::{};\n",
+                "/// The facade handle for a native {object}.\npub type {name} = crate::{};\n",
                 crate::naming::subscript_typegpu_type(object)
             ));
         }
@@ -497,11 +523,15 @@ pub(crate) fn render(yml: &Yml, policy: &Policy) -> Result<String, PolicyError> 
             entry: format!("enum.{name}"),
         })?;
         let ty = crate::naming::wgpu_type(name);
-        out.push_str(&format!("pub type {ty} = u32;\n"));
+        out.push_str(&format!(
+            "/// The native {} selection encoded for the C ABI.\npub type {ty} = u32;\n",
+            name.replace('_', " ")
+        ));
         for (index, entry) in value.entries.iter().enumerate() {
             let Some(entry) = entry else { continue };
             out.push_str(&format!(
-                "pub const {}: {ty} = {index};\n",
+                "/// Selects `{}` for [`{ty}`].\npub const {}: {ty} = {index};\n",
+                entry.name,
                 crate::naming::wgpu_enum_member(name, &entry.name)
             ));
         }
@@ -512,7 +542,10 @@ pub(crate) fn render(yml: &Yml, policy: &Policy) -> Result<String, PolicyError> 
             entry: format!("bitflag.{name}"),
         })?;
         let ty = crate::naming::wgpu_type(name);
-        out.push_str(&format!("pub type {ty} = u64;\n"));
+        out.push_str(&format!(
+            "/// The native {} bit mask for the C ABI.\npub type {ty} = u64;\n",
+            name.replace('_', " ")
+        ));
         for entry in &value.entries {
             let number = value
                 .value_of(&entry.name)
@@ -520,16 +553,17 @@ pub(crate) fn render(yml: &Yml, policy: &Policy) -> Result<String, PolicyError> 
                     entry: format!("bitflag.{name}.{}", entry.name),
                 })?;
             out.push_str(&format!(
-                "pub const {}: {ty} = {number};\n",
+                "/// The `{}` mask for [`{ty}`].\npub const {}: {ty} = {number};\n",
+                entry.name,
                 crate::naming::wgpu_enum_member(name, &entry.name)
             ));
         }
         out.push('\n');
     }
 
-    out.push_str("#[repr(C)]\n#[derive(Clone, Copy)]\npub struct WGPUChainedStruct {\n    pub next: *mut WGPUChainedStruct,\n    pub sType: WGPUSType,\n}\n\n");
+    out.push_str("#[repr(C)]\n#[derive(Clone, Copy)]\n/// The common header for a native descriptor extension.\npub struct WGPUChainedStruct {\n    /// The next extension, or null at the end of the chain.\n    pub next: *mut WGPUChainedStruct,\n    /// The type tag that identifies the extension structure.\n    pub sType: WGPUSType,\n}\n\n");
     if needs_string_view {
-        out.push_str("#[repr(C)]\n#[derive(Clone, Copy)]\npub struct WGPUStringView {\n    pub data: *const c_char,\n    pub length: usize,\n}\n\n");
+        out.push_str("#[repr(C)]\n#[derive(Clone, Copy)]\n/// A borrowed UTF-8 string for the native C ABI.\npub struct WGPUStringView {\n    /// The string bytes, or null for an absent string.\n    pub data: *const c_char,\n    /// The byte count, or `usize::MAX` for a null-terminated string.\n    pub length: usize,\n}\n\n");
     }
     for shape in &selected_structs {
         render_struct(&mut out, yml, shape)?;
@@ -542,20 +576,24 @@ pub(crate) fn render(yml: &Yml, policy: &Policy) -> Result<String, PolicyError> 
             function.name.strip_prefix("wgpu").unwrap_or(&function.name)
         );
         out.push_str(&format!(
-            "pub type {proc_name} = unsafe extern \"C\" fn({}){};\n",
+            "/// The native `{}` entry point with its pinned argument and result ABI.\npub type {proc_name} = unsafe extern \"C\" fn({}){};\n",
+            function.name,
             params.join(", "),
             result.map_or_else(String::new, |result| format!(" -> {result}"))
         ));
     }
-    out.push_str("\npub struct SurfaceTable {\n");
+    out.push_str("\n/// The surface entry points resolved from the backend library.\npub struct SurfaceTable {\n");
     for function in &functions {
         let proc_name = format!(
             "WGPUProc{}",
             function.name.strip_prefix("wgpu").unwrap_or(&function.name)
         );
-        out.push_str(&format!("    pub {}: {proc_name},\n", function.name));
+        out.push_str(&format!(
+            "    /// The backend address for `{}`.\n    pub {}: {proc_name},\n",
+            function.name, function.name
+        ));
     }
-    out.push_str("}\n\nstatic SURFACE_TABLE: OnceLock<SurfaceTable> = OnceLock::new();\n\npub fn table() -> Result<&'static SurfaceTable, String> {\n    if let Some(table) = SURFACE_TABLE.get() {\n        return Ok(table);\n    }\n    let loaded = SurfaceTable {\n");
+    out.push_str("}\n\nstatic SURFACE_TABLE: OnceLock<SurfaceTable> = OnceLock::new();\n\n/// Returns the cached surface entry points, or resolves them from the configured backend library.\n/// Returns an error if the backend or a required symbol cannot load, or the table cannot initialize.\npub fn table() -> Result<&'static SurfaceTable, String> {\n    if let Some(table) = SURFACE_TABLE.get() {\n        return Ok(table);\n    }\n    let loaded = SurfaceTable {\n");
     for function in &functions {
         out.push_str(&format!(
             "        {}: {{\n            // SAFETY: the type comes from this symbol's pinned webgpu.yml declaration.\n            unsafe {{ crate::runtime::surface_symbol(b\"{}\\0\") }}?\n        }},\n",

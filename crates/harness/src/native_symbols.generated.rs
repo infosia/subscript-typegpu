@@ -7,21 +7,25 @@
 use subscript_typegpu_facade as facade;
 use subscript_typegpu_facade::*;
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_create_instance`].
 extern "C" fn coverage_0() -> SubscriptTypegpuInstance {
     super::coverage_hit(0);
     facade::subscript_typegpu_create_instance()
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_instance_process_events`].
 extern "C" fn coverage_1(instance: SubscriptTypegpuInstance) {
     super::coverage_hit(1);
     facade::subscript_typegpu_instance_process_events(instance)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_instance_release`].
 extern "C" fn coverage_2(instance: SubscriptTypegpuInstance) {
     super::coverage_hit(2);
     facade::subscript_typegpu_instance_release(instance)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_instance_request_adapter`].
 extern "C" fn coverage_3(
     instance: SubscriptTypegpuInstance,
 ) -> SubscriptTypegpuFutureId {
@@ -29,16 +33,19 @@ extern "C" fn coverage_3(
     facade::subscript_typegpu_instance_request_adapter(instance)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_future_status`].
 extern "C" fn coverage_4(instance: SubscriptTypegpuInstance, future: SubscriptTypegpuFutureId) -> i32 {
     super::coverage_hit(4);
     facade::subscript_typegpu_future_status(instance, future)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_future_drop`].
 extern "C" fn coverage_5(instance: SubscriptTypegpuInstance, future: SubscriptTypegpuFutureId) {
     super::coverage_hit(5);
     facade::subscript_typegpu_future_drop(instance, future)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_request_adapter_take`].
 extern "C" fn coverage_6(
     instance: SubscriptTypegpuInstance,
     future: SubscriptTypegpuFutureId,
@@ -47,11 +54,13 @@ extern "C" fn coverage_6(
     facade::subscript_typegpu_request_adapter_take(instance, future)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_adapter_get_limits`].
 extern "C" fn coverage_7(adapter: SubscriptTypegpuAdapter, out: *mut SubscriptTypegpuLimits) -> i32 {
     super::coverage_hit(7);
     facade::subscript_typegpu_adapter_get_limits(adapter, out)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_adapter_get_info`].
 extern "C" fn coverage_8(
     adapter: SubscriptTypegpuAdapter,
     out: *mut SubscriptTypegpuAdapterInfo,
@@ -60,11 +69,13 @@ extern "C" fn coverage_8(
     facade::subscript_typegpu_adapter_get_info(adapter, out)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_adapter_has_feature`].
 extern "C" fn coverage_9(adapter: SubscriptTypegpuAdapter, feature: i32) -> bool {
     super::coverage_hit(9);
     facade::subscript_typegpu_adapter_has_feature(adapter, feature)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_adapter_request_device_with_descriptor`].
 extern "C" fn coverage_10(
     instance: SubscriptTypegpuInstance,
     adapter: SubscriptTypegpuAdapter,
@@ -74,6 +85,7 @@ extern "C" fn coverage_10(
     facade::subscript_typegpu_adapter_request_device_with_descriptor(instance, adapter, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_request_device_take`].
 extern "C" fn coverage_11(
     instance: SubscriptTypegpuInstance,
     future: SubscriptTypegpuFutureId,
@@ -82,31 +94,37 @@ extern "C" fn coverage_11(
     facade::subscript_typegpu_request_device_take(instance, future)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_get_queue`].
 extern "C" fn coverage_12(device: SubscriptTypegpuDevice) -> SubscriptTypegpuQueue {
     super::coverage_hit(12);
     facade::subscript_typegpu_device_get_queue(device)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_destroy`].
 extern "C" fn coverage_13(device: SubscriptTypegpuDevice) {
     super::coverage_hit(13);
     facade::subscript_typegpu_device_destroy(device)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_set_label`].
 extern "C" fn coverage_14(device: SubscriptTypegpuDevice, label: SubscriptTypegpuStringView) {
     super::coverage_hit(14);
     facade::subscript_typegpu_device_set_label(device, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_push_error_scope`].
 extern "C" fn coverage_15(device: SubscriptTypegpuDevice, filter: i32) {
     super::coverage_hit(15);
     facade::subscript_typegpu_device_push_error_scope(device, filter)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_pop_error_scope`].
 extern "C" fn coverage_16(device: SubscriptTypegpuDevice) -> SubscriptTypegpuFutureId {
     super::coverage_hit(16);
     facade::subscript_typegpu_device_pop_error_scope(device)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_pop_error_scope_take`].
 extern "C" fn coverage_17(
     instance: SubscriptTypegpuInstance,
     future: SubscriptTypegpuFutureId,
@@ -116,6 +134,7 @@ extern "C" fn coverage_17(
     facade::subscript_typegpu_pop_error_scope_take(instance, future, out)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_next_uncaptured_error`].
 extern "C" fn coverage_18(
     device: SubscriptTypegpuDevice,
     out: *mut SubscriptTypegpuErrorRecord,
@@ -124,6 +143,7 @@ extern "C" fn coverage_18(
     facade::subscript_typegpu_device_next_uncaptured_error(device, out)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_lost_info`].
 extern "C" fn coverage_19(
     device: SubscriptTypegpuDevice,
     out: *mut SubscriptTypegpuLostRecord,
@@ -132,11 +152,13 @@ extern "C" fn coverage_19(
     facade::subscript_typegpu_device_lost_info(device, out)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_get_limits`].
 extern "C" fn coverage_20(device: SubscriptTypegpuDevice, out: *mut SubscriptTypegpuLimits) -> i32 {
     super::coverage_hit(20);
     facade::subscript_typegpu_device_get_limits(device, out)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_get_adapter_info`].
 extern "C" fn coverage_21(
     device: SubscriptTypegpuDevice,
     out: *mut SubscriptTypegpuAdapterInfo,
@@ -145,11 +167,13 @@ extern "C" fn coverage_21(
     facade::subscript_typegpu_device_get_adapter_info(device, out)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_has_feature`].
 extern "C" fn coverage_22(device: SubscriptTypegpuDevice, feature: i32) -> bool {
     super::coverage_hit(22);
     facade::subscript_typegpu_device_has_feature(device, feature)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_buffer`].
 extern "C" fn coverage_23(
     device: SubscriptTypegpuDevice,
     descriptor: *const SubscriptTypegpuBufferDescriptor,
@@ -158,6 +182,7 @@ extern "C" fn coverage_23(
     facade::subscript_typegpu_device_create_buffer(device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_texture`].
 extern "C" fn coverage_24(
     device: SubscriptTypegpuDevice,
     descriptor: *const SubscriptTypegpuTextureDescriptor,
@@ -166,6 +191,7 @@ extern "C" fn coverage_24(
     facade::subscript_typegpu_device_create_texture(device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_sampler`].
 extern "C" fn coverage_25(
     device: SubscriptTypegpuDevice,
     descriptor: *const SubscriptTypegpuSamplerDescriptor,
@@ -174,6 +200,7 @@ extern "C" fn coverage_25(
     facade::subscript_typegpu_device_create_sampler(device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_bind_group_layout`].
 extern "C" fn coverage_26(
     device: SubscriptTypegpuDevice,
     descriptor: *const SubscriptTypegpuBindGroupLayoutDescriptor,
@@ -182,6 +209,7 @@ extern "C" fn coverage_26(
     facade::subscript_typegpu_device_create_bind_group_layout(device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_bind_group`].
 extern "C" fn coverage_27(
     device: SubscriptTypegpuDevice,
     descriptor: *const SubscriptTypegpuBindGroupDescriptor,
@@ -190,6 +218,7 @@ extern "C" fn coverage_27(
     facade::subscript_typegpu_device_create_bind_group(device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_pipeline_layout`].
 extern "C" fn coverage_28(
     device: SubscriptTypegpuDevice,
     descriptor: *const SubscriptTypegpuPipelineLayoutDescriptor,
@@ -198,6 +227,7 @@ extern "C" fn coverage_28(
     facade::subscript_typegpu_device_create_pipeline_layout(device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_shader_module`].
 extern "C" fn coverage_29(
     device: SubscriptTypegpuDevice,
     descriptor: *const SubscriptTypegpuShaderModuleDescriptor,
@@ -206,6 +236,7 @@ extern "C" fn coverage_29(
     facade::subscript_typegpu_device_create_shader_module(device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_compute_pipeline`].
 extern "C" fn coverage_30(
     device: SubscriptTypegpuDevice,
     descriptor: *const SubscriptTypegpuComputePipelineDescriptor,
@@ -214,6 +245,7 @@ extern "C" fn coverage_30(
     facade::subscript_typegpu_device_create_compute_pipeline(device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_compute_pipeline_async_begin`].
 extern "C" fn coverage_31(
     instance: SubscriptTypegpuInstance,
     device: SubscriptTypegpuDevice,
@@ -223,6 +255,7 @@ extern "C" fn coverage_31(
     facade::subscript_typegpu_device_create_compute_pipeline_async_begin(instance, device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_create_compute_pipeline_async_take`].
 extern "C" fn coverage_32(
     instance: SubscriptTypegpuInstance,
     future: SubscriptTypegpuFutureId,
@@ -231,6 +264,7 @@ extern "C" fn coverage_32(
     facade::subscript_typegpu_create_compute_pipeline_async_take(instance, future)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_render_pipeline`].
 extern "C" fn coverage_33(
     device: SubscriptTypegpuDevice,
     descriptor: *const SubscriptTypegpuRenderPipelineDescriptor,
@@ -239,6 +273,7 @@ extern "C" fn coverage_33(
     facade::subscript_typegpu_device_create_render_pipeline(device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_render_pipeline_async_begin`].
 extern "C" fn coverage_34(
     instance: SubscriptTypegpuInstance,
     device: SubscriptTypegpuDevice,
@@ -248,6 +283,7 @@ extern "C" fn coverage_34(
     facade::subscript_typegpu_device_create_render_pipeline_async_begin(instance, device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_create_render_pipeline_async_take`].
 extern "C" fn coverage_35(
     instance: SubscriptTypegpuInstance,
     future: SubscriptTypegpuFutureId,
@@ -256,6 +292,7 @@ extern "C" fn coverage_35(
     facade::subscript_typegpu_create_render_pipeline_async_take(instance, future)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_command_encoder`].
 extern "C" fn coverage_36(
     device: SubscriptTypegpuDevice,
     descriptor: *const SubscriptTypegpuCommandEncoderDescriptor,
@@ -264,6 +301,7 @@ extern "C" fn coverage_36(
     facade::subscript_typegpu_device_create_command_encoder(device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_render_bundle_encoder`].
 extern "C" fn coverage_37(
     device: SubscriptTypegpuDevice,
     descriptor: *const SubscriptTypegpuRenderBundleEncoderDescriptor,
@@ -272,6 +310,7 @@ extern "C" fn coverage_37(
     facade::subscript_typegpu_device_create_render_bundle_encoder(device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_create_query_set`].
 extern "C" fn coverage_38(
     device: SubscriptTypegpuDevice,
     descriptor: *const SubscriptTypegpuQuerySetDescriptor,
@@ -280,11 +319,13 @@ extern "C" fn coverage_38(
     facade::subscript_typegpu_device_create_query_set(device, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_queue_submit`].
 extern "C" fn coverage_39(queue: SubscriptTypegpuQueue, commands_count: usize, commands: *const SubscriptTypegpuCommandBuffer) {
     super::coverage_hit(39);
     facade::subscript_typegpu_queue_submit(queue, commands_count, commands)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_queue_on_submitted_work_done`].
 extern "C" fn coverage_40(
     instance: SubscriptTypegpuInstance,
     queue: SubscriptTypegpuQueue,
@@ -293,6 +334,7 @@ extern "C" fn coverage_40(
     facade::subscript_typegpu_queue_on_submitted_work_done(instance, queue)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_queue_write_buffer`].
 extern "C" fn coverage_41(
     queue: SubscriptTypegpuQueue,
     buffer: SubscriptTypegpuBuffer,
@@ -304,6 +346,7 @@ extern "C" fn coverage_41(
     facade::subscript_typegpu_queue_write_buffer(queue, buffer, bufferOffset, dataCount, data)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_queue_write_buffer_f32`].
 extern "C" fn coverage_42(
     queue: SubscriptTypegpuQueue,
     buffer: SubscriptTypegpuBuffer,
@@ -315,6 +358,7 @@ extern "C" fn coverage_42(
     facade::subscript_typegpu_queue_write_buffer_f32(queue, buffer, bufferOffsetBytes, dataCount, data)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_queue_write_texture`].
 extern "C" fn coverage_43(
     queue: SubscriptTypegpuQueue,
     dst: *const SubscriptTypegpuTexelCopyTextureInfo,
@@ -327,11 +371,13 @@ extern "C" fn coverage_43(
     facade::subscript_typegpu_queue_write_texture(queue, dst, layout, extent, dataCount, data)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_queue_set_label`].
 extern "C" fn coverage_44(queue: SubscriptTypegpuQueue, label: SubscriptTypegpuStringView) {
     super::coverage_hit(44);
     facade::subscript_typegpu_queue_set_label(queue, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_buffer_map_async`].
 extern "C" fn coverage_45(
     buffer: SubscriptTypegpuBuffer,
     mode: u64,
@@ -342,6 +388,7 @@ extern "C" fn coverage_45(
     facade::subscript_typegpu_buffer_map_async(buffer, mode, offset, size)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_buffer_read_mapped_range`].
 extern "C" fn coverage_46(
     buffer: SubscriptTypegpuBuffer,
     offset: usize,
@@ -352,6 +399,7 @@ extern "C" fn coverage_46(
     facade::subscript_typegpu_buffer_read_mapped_range(buffer, offset, outCount, out)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_buffer_read_mapped_range_f32`].
 extern "C" fn coverage_47(
     buffer: SubscriptTypegpuBuffer,
     offsetBytes: usize,
@@ -362,6 +410,7 @@ extern "C" fn coverage_47(
     facade::subscript_typegpu_buffer_read_mapped_range_f32(buffer, offsetBytes, outCount, out)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_buffer_write_mapped_range`].
 extern "C" fn coverage_48(
     buffer: SubscriptTypegpuBuffer,
     offset: usize,
@@ -372,36 +421,43 @@ extern "C" fn coverage_48(
     facade::subscript_typegpu_buffer_write_mapped_range(buffer, offset, dataCount, data)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_buffer_set_label`].
 extern "C" fn coverage_49(buffer: SubscriptTypegpuBuffer, label: SubscriptTypegpuStringView) {
     super::coverage_hit(49);
     facade::subscript_typegpu_buffer_set_label(buffer, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_buffer_get_usage`].
 extern "C" fn coverage_50(buffer: SubscriptTypegpuBuffer) -> u64 {
     super::coverage_hit(50);
     facade::subscript_typegpu_buffer_get_usage(buffer)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_buffer_get_size`].
 extern "C" fn coverage_51(buffer: SubscriptTypegpuBuffer) -> u64 {
     super::coverage_hit(51);
     facade::subscript_typegpu_buffer_get_size(buffer)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_buffer_get_map_state`].
 extern "C" fn coverage_52(buffer: SubscriptTypegpuBuffer) -> i32 {
     super::coverage_hit(52);
     facade::subscript_typegpu_buffer_get_map_state(buffer)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_buffer_unmap`].
 extern "C" fn coverage_53(buffer: SubscriptTypegpuBuffer) {
     super::coverage_hit(53);
     facade::subscript_typegpu_buffer_unmap(buffer)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_buffer_destroy`].
 extern "C" fn coverage_54(buffer: SubscriptTypegpuBuffer) {
     super::coverage_hit(54);
     facade::subscript_typegpu_buffer_destroy(buffer)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_create_view`].
 extern "C" fn coverage_55(
     texture: SubscriptTypegpuTexture,
     descriptor: *const SubscriptTypegpuTextureViewDescriptor,
@@ -410,106 +466,127 @@ extern "C" fn coverage_55(
     facade::subscript_typegpu_texture_create_view(texture, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_set_label`].
 extern "C" fn coverage_56(texture: SubscriptTypegpuTexture, label: SubscriptTypegpuStringView) {
     super::coverage_hit(56);
     facade::subscript_typegpu_texture_set_label(texture, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_get_width`].
 extern "C" fn coverage_57(texture: SubscriptTypegpuTexture) -> u32 {
     super::coverage_hit(57);
     facade::subscript_typegpu_texture_get_width(texture)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_get_height`].
 extern "C" fn coverage_58(texture: SubscriptTypegpuTexture) -> u32 {
     super::coverage_hit(58);
     facade::subscript_typegpu_texture_get_height(texture)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_get_depth_or_array_layers`].
 extern "C" fn coverage_59(texture: SubscriptTypegpuTexture) -> u32 {
     super::coverage_hit(59);
     facade::subscript_typegpu_texture_get_depth_or_array_layers(texture)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_get_mip_level_count`].
 extern "C" fn coverage_60(texture: SubscriptTypegpuTexture) -> u32 {
     super::coverage_hit(60);
     facade::subscript_typegpu_texture_get_mip_level_count(texture)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_get_sample_count`].
 extern "C" fn coverage_61(texture: SubscriptTypegpuTexture) -> u32 {
     super::coverage_hit(61);
     facade::subscript_typegpu_texture_get_sample_count(texture)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_get_dimension`].
 extern "C" fn coverage_62(texture: SubscriptTypegpuTexture) -> i32 {
     super::coverage_hit(62);
     facade::subscript_typegpu_texture_get_dimension(texture)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_get_format`].
 extern "C" fn coverage_63(texture: SubscriptTypegpuTexture) -> i32 {
     super::coverage_hit(63);
     facade::subscript_typegpu_texture_get_format(texture)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_get_usage`].
 extern "C" fn coverage_64(texture: SubscriptTypegpuTexture) -> u64 {
     super::coverage_hit(64);
     facade::subscript_typegpu_texture_get_usage(texture)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_destroy`].
 extern "C" fn coverage_65(texture: SubscriptTypegpuTexture) {
     super::coverage_hit(65);
     facade::subscript_typegpu_texture_destroy(texture)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_view_set_label`].
 extern "C" fn coverage_66(textureView: SubscriptTypegpuTextureView, label: SubscriptTypegpuStringView) {
     super::coverage_hit(66);
     facade::subscript_typegpu_texture_view_set_label(textureView, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_sampler_set_label`].
 extern "C" fn coverage_67(sampler: SubscriptTypegpuSampler, label: SubscriptTypegpuStringView) {
     super::coverage_hit(67);
     facade::subscript_typegpu_sampler_set_label(sampler, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_bind_group_layout_set_label`].
 extern "C" fn coverage_68(bindGroupLayout: SubscriptTypegpuBindGroupLayout, label: SubscriptTypegpuStringView) {
     super::coverage_hit(68);
     facade::subscript_typegpu_bind_group_layout_set_label(bindGroupLayout, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_bind_group_set_label`].
 extern "C" fn coverage_69(bindGroup: SubscriptTypegpuBindGroup, label: SubscriptTypegpuStringView) {
     super::coverage_hit(69);
     facade::subscript_typegpu_bind_group_set_label(bindGroup, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_pipeline_layout_set_label`].
 extern "C" fn coverage_70(pipelineLayout: SubscriptTypegpuPipelineLayout, label: SubscriptTypegpuStringView) {
     super::coverage_hit(70);
     facade::subscript_typegpu_pipeline_layout_set_label(pipelineLayout, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_shader_module_set_label`].
 extern "C" fn coverage_71(shaderModule: SubscriptTypegpuShaderModule, label: SubscriptTypegpuStringView) {
     super::coverage_hit(71);
     facade::subscript_typegpu_shader_module_set_label(shaderModule, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pipeline_get_bind_group_layout`].
 extern "C" fn coverage_72(computePipeline: SubscriptTypegpuComputePipeline, groupIndex: u32) -> SubscriptTypegpuBindGroupLayout {
     super::coverage_hit(72);
     facade::subscript_typegpu_compute_pipeline_get_bind_group_layout(computePipeline, groupIndex)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pipeline_set_label`].
 extern "C" fn coverage_73(computePipeline: SubscriptTypegpuComputePipeline, label: SubscriptTypegpuStringView) {
     super::coverage_hit(73);
     facade::subscript_typegpu_compute_pipeline_set_label(computePipeline, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pipeline_get_bind_group_layout`].
 extern "C" fn coverage_74(renderPipeline: SubscriptTypegpuRenderPipeline, groupIndex: u32) -> SubscriptTypegpuBindGroupLayout {
     super::coverage_hit(74);
     facade::subscript_typegpu_render_pipeline_get_bind_group_layout(renderPipeline, groupIndex)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pipeline_set_label`].
 extern "C" fn coverage_75(renderPipeline: SubscriptTypegpuRenderPipeline, label: SubscriptTypegpuStringView) {
     super::coverage_hit(75);
     facade::subscript_typegpu_render_pipeline_set_label(renderPipeline, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_finish`].
 extern "C" fn coverage_76(
     commandEncoder: SubscriptTypegpuCommandEncoder,
     descriptor: *const SubscriptTypegpuCommandBufferDescriptor,
@@ -518,6 +595,7 @@ extern "C" fn coverage_76(
     facade::subscript_typegpu_command_encoder_finish(commandEncoder, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_begin_compute_pass`].
 extern "C" fn coverage_77(
     commandEncoder: SubscriptTypegpuCommandEncoder,
     descriptor: *const SubscriptTypegpuComputePassDescriptor,
@@ -526,6 +604,7 @@ extern "C" fn coverage_77(
     facade::subscript_typegpu_command_encoder_begin_compute_pass(commandEncoder, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_begin_render_pass`].
 extern "C" fn coverage_78(
     commandEncoder: SubscriptTypegpuCommandEncoder,
     descriptor: *const SubscriptTypegpuRenderPassDescriptor,
@@ -534,261 +613,313 @@ extern "C" fn coverage_78(
     facade::subscript_typegpu_command_encoder_begin_render_pass(commandEncoder, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_copy_buffer_to_buffer`].
 extern "C" fn coverage_79(commandEncoder: SubscriptTypegpuCommandEncoder, source: SubscriptTypegpuBuffer, sourceOffset: u64, destination: SubscriptTypegpuBuffer, destinationOffset: u64, size: u64) {
     super::coverage_hit(79);
     facade::subscript_typegpu_command_encoder_copy_buffer_to_buffer(commandEncoder, source, sourceOffset, destination, destinationOffset, size)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_copy_buffer_to_texture`].
 extern "C" fn coverage_80(commandEncoder: SubscriptTypegpuCommandEncoder, source: *const SubscriptTypegpuTexelCopyBufferInfo, destination: *const SubscriptTypegpuTexelCopyTextureInfo, copySize: *const SubscriptTypegpuExtent3D) {
     super::coverage_hit(80);
     facade::subscript_typegpu_command_encoder_copy_buffer_to_texture(commandEncoder, source, destination, copySize)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_copy_texture_to_buffer`].
 extern "C" fn coverage_81(commandEncoder: SubscriptTypegpuCommandEncoder, source: *const SubscriptTypegpuTexelCopyTextureInfo, destination: *const SubscriptTypegpuTexelCopyBufferInfo, copySize: *const SubscriptTypegpuExtent3D) {
     super::coverage_hit(81);
     facade::subscript_typegpu_command_encoder_copy_texture_to_buffer(commandEncoder, source, destination, copySize)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_copy_texture_to_texture`].
 extern "C" fn coverage_82(commandEncoder: SubscriptTypegpuCommandEncoder, source: *const SubscriptTypegpuTexelCopyTextureInfo, destination: *const SubscriptTypegpuTexelCopyTextureInfo, copySize: *const SubscriptTypegpuExtent3D) {
     super::coverage_hit(82);
     facade::subscript_typegpu_command_encoder_copy_texture_to_texture(commandEncoder, source, destination, copySize)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_clear_buffer`].
 extern "C" fn coverage_83(commandEncoder: SubscriptTypegpuCommandEncoder, buffer: SubscriptTypegpuBuffer, offset: u64, size: u64) {
     super::coverage_hit(83);
     facade::subscript_typegpu_command_encoder_clear_buffer(commandEncoder, buffer, offset, size)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_resolve_query_set`].
 extern "C" fn coverage_84(commandEncoder: SubscriptTypegpuCommandEncoder, querySet: SubscriptTypegpuQuerySet, firstQuery: u32, queryCount: u32, destination: SubscriptTypegpuBuffer, destinationOffset: u64) {
     super::coverage_hit(84);
     facade::subscript_typegpu_command_encoder_resolve_query_set(commandEncoder, querySet, firstQuery, queryCount, destination, destinationOffset)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_insert_debug_marker`].
 extern "C" fn coverage_85(commandEncoder: SubscriptTypegpuCommandEncoder, markerLabel: SubscriptTypegpuStringView) {
     super::coverage_hit(85);
     facade::subscript_typegpu_command_encoder_insert_debug_marker(commandEncoder, markerLabel)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_push_debug_group`].
 extern "C" fn coverage_86(commandEncoder: SubscriptTypegpuCommandEncoder, groupLabel: SubscriptTypegpuStringView) {
     super::coverage_hit(86);
     facade::subscript_typegpu_command_encoder_push_debug_group(commandEncoder, groupLabel)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_pop_debug_group`].
 extern "C" fn coverage_87(commandEncoder: SubscriptTypegpuCommandEncoder) {
     super::coverage_hit(87);
     facade::subscript_typegpu_command_encoder_pop_debug_group(commandEncoder)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_set_label`].
 extern "C" fn coverage_88(commandEncoder: SubscriptTypegpuCommandEncoder, label: SubscriptTypegpuStringView) {
     super::coverage_hit(88);
     facade::subscript_typegpu_command_encoder_set_label(commandEncoder, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pass_encoder_set_pipeline`].
 extern "C" fn coverage_89(computePassEncoder: SubscriptTypegpuComputePassEncoder, pipeline: SubscriptTypegpuComputePipeline) {
     super::coverage_hit(89);
     facade::subscript_typegpu_compute_pass_encoder_set_pipeline(computePassEncoder, pipeline)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pass_encoder_set_bind_group`].
 extern "C" fn coverage_90(computePassEncoder: SubscriptTypegpuComputePassEncoder, groupIndex: u32, group: SubscriptTypegpuBindGroup, dynamicOffsets_count: usize, dynamicOffsets: *const u32) {
     super::coverage_hit(90);
     facade::subscript_typegpu_compute_pass_encoder_set_bind_group(computePassEncoder, groupIndex, group, dynamicOffsets_count, dynamicOffsets)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pass_encoder_dispatch_workgroups`].
 extern "C" fn coverage_91(computePassEncoder: SubscriptTypegpuComputePassEncoder, workgroupCountX: u32, workgroupCountY: u32, workgroupCountZ: u32) {
     super::coverage_hit(91);
     facade::subscript_typegpu_compute_pass_encoder_dispatch_workgroups(computePassEncoder, workgroupCountX, workgroupCountY, workgroupCountZ)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pass_encoder_dispatch_workgroups_indirect`].
 extern "C" fn coverage_92(computePassEncoder: SubscriptTypegpuComputePassEncoder, indirectBuffer: SubscriptTypegpuBuffer, indirectOffset: u64) {
     super::coverage_hit(92);
     facade::subscript_typegpu_compute_pass_encoder_dispatch_workgroups_indirect(computePassEncoder, indirectBuffer, indirectOffset)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pass_encoder_insert_debug_marker`].
 extern "C" fn coverage_93(computePassEncoder: SubscriptTypegpuComputePassEncoder, markerLabel: SubscriptTypegpuStringView) {
     super::coverage_hit(93);
     facade::subscript_typegpu_compute_pass_encoder_insert_debug_marker(computePassEncoder, markerLabel)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pass_encoder_push_debug_group`].
 extern "C" fn coverage_94(computePassEncoder: SubscriptTypegpuComputePassEncoder, groupLabel: SubscriptTypegpuStringView) {
     super::coverage_hit(94);
     facade::subscript_typegpu_compute_pass_encoder_push_debug_group(computePassEncoder, groupLabel)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pass_encoder_pop_debug_group`].
 extern "C" fn coverage_95(computePassEncoder: SubscriptTypegpuComputePassEncoder) {
     super::coverage_hit(95);
     facade::subscript_typegpu_compute_pass_encoder_pop_debug_group(computePassEncoder)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pass_encoder_end`].
 extern "C" fn coverage_96(computePassEncoder: SubscriptTypegpuComputePassEncoder) {
     super::coverage_hit(96);
     facade::subscript_typegpu_compute_pass_encoder_end(computePassEncoder)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pass_encoder_set_label`].
 extern "C" fn coverage_97(computePassEncoder: SubscriptTypegpuComputePassEncoder, label: SubscriptTypegpuStringView) {
     super::coverage_hit(97);
     facade::subscript_typegpu_compute_pass_encoder_set_label(computePassEncoder, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_set_pipeline`].
 extern "C" fn coverage_98(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, pipeline: SubscriptTypegpuRenderPipeline) {
     super::coverage_hit(98);
     facade::subscript_typegpu_render_pass_encoder_set_pipeline(renderPassEncoder, pipeline)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_set_bind_group`].
 extern "C" fn coverage_99(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, groupIndex: u32, group: SubscriptTypegpuBindGroup, dynamicOffsets_count: usize, dynamicOffsets: *const u32) {
     super::coverage_hit(99);
     facade::subscript_typegpu_render_pass_encoder_set_bind_group(renderPassEncoder, groupIndex, group, dynamicOffsets_count, dynamicOffsets)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_set_vertex_buffer`].
 extern "C" fn coverage_100(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, slot: u32, buffer: SubscriptTypegpuBuffer, offset: u64, size: u64) {
     super::coverage_hit(100);
     facade::subscript_typegpu_render_pass_encoder_set_vertex_buffer(renderPassEncoder, slot, buffer, offset, size)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_set_index_buffer`].
 extern "C" fn coverage_101(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, buffer: SubscriptTypegpuBuffer, format: i32, offset: u64, size: u64) {
     super::coverage_hit(101);
     facade::subscript_typegpu_render_pass_encoder_set_index_buffer(renderPassEncoder, buffer, format, offset, size)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_draw`].
 extern "C" fn coverage_102(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, vertexCount: u32, instanceCount: u32, firstVertex: u32, firstInstance: u32) {
     super::coverage_hit(102);
     facade::subscript_typegpu_render_pass_encoder_draw(renderPassEncoder, vertexCount, instanceCount, firstVertex, firstInstance)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_draw_indexed`].
 extern "C" fn coverage_103(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, indexCount: u32, instanceCount: u32, firstIndex: u32, baseVertex: i32, firstInstance: u32) {
     super::coverage_hit(103);
     facade::subscript_typegpu_render_pass_encoder_draw_indexed(renderPassEncoder, indexCount, instanceCount, firstIndex, baseVertex, firstInstance)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_draw_indirect`].
 extern "C" fn coverage_104(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, indirectBuffer: SubscriptTypegpuBuffer, indirectOffset: u64) {
     super::coverage_hit(104);
     facade::subscript_typegpu_render_pass_encoder_draw_indirect(renderPassEncoder, indirectBuffer, indirectOffset)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_draw_indexed_indirect`].
 extern "C" fn coverage_105(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, indirectBuffer: SubscriptTypegpuBuffer, indirectOffset: u64) {
     super::coverage_hit(105);
     facade::subscript_typegpu_render_pass_encoder_draw_indexed_indirect(renderPassEncoder, indirectBuffer, indirectOffset)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_set_viewport`].
 extern "C" fn coverage_106(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, x: f32, y: f32, width: f32, height: f32, minDepth: f32, maxDepth: f32) {
     super::coverage_hit(106);
     facade::subscript_typegpu_render_pass_encoder_set_viewport(renderPassEncoder, x, y, width, height, minDepth, maxDepth)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_set_scissor_rect`].
 extern "C" fn coverage_107(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, x: u32, y: u32, width: u32, height: u32) {
     super::coverage_hit(107);
     facade::subscript_typegpu_render_pass_encoder_set_scissor_rect(renderPassEncoder, x, y, width, height)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_set_blend_constant`].
 extern "C" fn coverage_108(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, color: *const SubscriptTypegpuColor) {
     super::coverage_hit(108);
     facade::subscript_typegpu_render_pass_encoder_set_blend_constant(renderPassEncoder, color)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_set_stencil_reference`].
 extern "C" fn coverage_109(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, reference: u32) {
     super::coverage_hit(109);
     facade::subscript_typegpu_render_pass_encoder_set_stencil_reference(renderPassEncoder, reference)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_begin_occlusion_query`].
 extern "C" fn coverage_110(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, queryIndex: u32) {
     super::coverage_hit(110);
     facade::subscript_typegpu_render_pass_encoder_begin_occlusion_query(renderPassEncoder, queryIndex)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_end_occlusion_query`].
 extern "C" fn coverage_111(renderPassEncoder: SubscriptTypegpuRenderPassEncoder) {
     super::coverage_hit(111);
     facade::subscript_typegpu_render_pass_encoder_end_occlusion_query(renderPassEncoder)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_execute_bundles`].
 extern "C" fn coverage_112(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, bundles_count: usize, bundles: *const SubscriptTypegpuRenderBundle) {
     super::coverage_hit(112);
     facade::subscript_typegpu_render_pass_encoder_execute_bundles(renderPassEncoder, bundles_count, bundles)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_insert_debug_marker`].
 extern "C" fn coverage_113(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, markerLabel: SubscriptTypegpuStringView) {
     super::coverage_hit(113);
     facade::subscript_typegpu_render_pass_encoder_insert_debug_marker(renderPassEncoder, markerLabel)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_push_debug_group`].
 extern "C" fn coverage_114(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, groupLabel: SubscriptTypegpuStringView) {
     super::coverage_hit(114);
     facade::subscript_typegpu_render_pass_encoder_push_debug_group(renderPassEncoder, groupLabel)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_pop_debug_group`].
 extern "C" fn coverage_115(renderPassEncoder: SubscriptTypegpuRenderPassEncoder) {
     super::coverage_hit(115);
     facade::subscript_typegpu_render_pass_encoder_pop_debug_group(renderPassEncoder)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_end`].
 extern "C" fn coverage_116(renderPassEncoder: SubscriptTypegpuRenderPassEncoder) {
     super::coverage_hit(116);
     facade::subscript_typegpu_render_pass_encoder_end(renderPassEncoder)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_set_label`].
 extern "C" fn coverage_117(renderPassEncoder: SubscriptTypegpuRenderPassEncoder, label: SubscriptTypegpuStringView) {
     super::coverage_hit(117);
     facade::subscript_typegpu_render_pass_encoder_set_label(renderPassEncoder, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_buffer_set_label`].
 extern "C" fn coverage_118(commandBuffer: SubscriptTypegpuCommandBuffer, label: SubscriptTypegpuStringView) {
     super::coverage_hit(118);
     facade::subscript_typegpu_command_buffer_set_label(commandBuffer, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_set_pipeline`].
 extern "C" fn coverage_119(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder, pipeline: SubscriptTypegpuRenderPipeline) {
     super::coverage_hit(119);
     facade::subscript_typegpu_render_bundle_encoder_set_pipeline(renderBundleEncoder, pipeline)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_set_bind_group`].
 extern "C" fn coverage_120(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder, groupIndex: u32, group: SubscriptTypegpuBindGroup, dynamicOffsets_count: usize, dynamicOffsets: *const u32) {
     super::coverage_hit(120);
     facade::subscript_typegpu_render_bundle_encoder_set_bind_group(renderBundleEncoder, groupIndex, group, dynamicOffsets_count, dynamicOffsets)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_set_vertex_buffer`].
 extern "C" fn coverage_121(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder, slot: u32, buffer: SubscriptTypegpuBuffer, offset: u64, size: u64) {
     super::coverage_hit(121);
     facade::subscript_typegpu_render_bundle_encoder_set_vertex_buffer(renderBundleEncoder, slot, buffer, offset, size)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_set_index_buffer`].
 extern "C" fn coverage_122(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder, buffer: SubscriptTypegpuBuffer, format: i32, offset: u64, size: u64) {
     super::coverage_hit(122);
     facade::subscript_typegpu_render_bundle_encoder_set_index_buffer(renderBundleEncoder, buffer, format, offset, size)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_draw`].
 extern "C" fn coverage_123(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder, vertexCount: u32, instanceCount: u32, firstVertex: u32, firstInstance: u32) {
     super::coverage_hit(123);
     facade::subscript_typegpu_render_bundle_encoder_draw(renderBundleEncoder, vertexCount, instanceCount, firstVertex, firstInstance)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_draw_indexed`].
 extern "C" fn coverage_124(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder, indexCount: u32, instanceCount: u32, firstIndex: u32, baseVertex: i32, firstInstance: u32) {
     super::coverage_hit(124);
     facade::subscript_typegpu_render_bundle_encoder_draw_indexed(renderBundleEncoder, indexCount, instanceCount, firstIndex, baseVertex, firstInstance)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_draw_indirect`].
 extern "C" fn coverage_125(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder, indirectBuffer: SubscriptTypegpuBuffer, indirectOffset: u64) {
     super::coverage_hit(125);
     facade::subscript_typegpu_render_bundle_encoder_draw_indirect(renderBundleEncoder, indirectBuffer, indirectOffset)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_draw_indexed_indirect`].
 extern "C" fn coverage_126(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder, indirectBuffer: SubscriptTypegpuBuffer, indirectOffset: u64) {
     super::coverage_hit(126);
     facade::subscript_typegpu_render_bundle_encoder_draw_indexed_indirect(renderBundleEncoder, indirectBuffer, indirectOffset)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_insert_debug_marker`].
 extern "C" fn coverage_127(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder, markerLabel: SubscriptTypegpuStringView) {
     super::coverage_hit(127);
     facade::subscript_typegpu_render_bundle_encoder_insert_debug_marker(renderBundleEncoder, markerLabel)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_push_debug_group`].
 extern "C" fn coverage_128(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder, groupLabel: SubscriptTypegpuStringView) {
     super::coverage_hit(128);
     facade::subscript_typegpu_render_bundle_encoder_push_debug_group(renderBundleEncoder, groupLabel)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_pop_debug_group`].
 extern "C" fn coverage_129(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder) {
     super::coverage_hit(129);
     facade::subscript_typegpu_render_bundle_encoder_pop_debug_group(renderBundleEncoder)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_finish`].
 extern "C" fn coverage_130(
     renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder,
     descriptor: *const SubscriptTypegpuRenderBundleDescriptor,
@@ -797,136 +928,163 @@ extern "C" fn coverage_130(
     facade::subscript_typegpu_render_bundle_encoder_finish(renderBundleEncoder, descriptor)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_set_label`].
 extern "C" fn coverage_131(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder, label: SubscriptTypegpuStringView) {
     super::coverage_hit(131);
     facade::subscript_typegpu_render_bundle_encoder_set_label(renderBundleEncoder, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_set_label`].
 extern "C" fn coverage_132(renderBundle: SubscriptTypegpuRenderBundle, label: SubscriptTypegpuStringView) {
     super::coverage_hit(132);
     facade::subscript_typegpu_render_bundle_set_label(renderBundle, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_query_set_get_type`].
 extern "C" fn coverage_133(querySet: SubscriptTypegpuQuerySet) -> i32 {
     super::coverage_hit(133);
     facade::subscript_typegpu_query_set_get_type(querySet)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_query_set_get_count`].
 extern "C" fn coverage_134(querySet: SubscriptTypegpuQuerySet) -> u32 {
     super::coverage_hit(134);
     facade::subscript_typegpu_query_set_get_count(querySet)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_query_set_destroy`].
 extern "C" fn coverage_135(querySet: SubscriptTypegpuQuerySet) {
     super::coverage_hit(135);
     facade::subscript_typegpu_query_set_destroy(querySet)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_query_set_set_label`].
 extern "C" fn coverage_136(querySet: SubscriptTypegpuQuerySet, label: SubscriptTypegpuStringView) {
     super::coverage_hit(136);
     facade::subscript_typegpu_query_set_set_label(querySet, label)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_query_set_release`].
 extern "C" fn coverage_137(querySet: SubscriptTypegpuQuerySet) {
     super::coverage_hit(137);
     facade::subscript_typegpu_query_set_release(querySet)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_release`].
 extern "C" fn coverage_138(renderBundle: SubscriptTypegpuRenderBundle) {
     super::coverage_hit(138);
     facade::subscript_typegpu_render_bundle_release(renderBundle)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_bundle_encoder_release`].
 extern "C" fn coverage_139(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder) {
     super::coverage_hit(139);
     facade::subscript_typegpu_render_bundle_encoder_release(renderBundleEncoder)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_buffer_release`].
 extern "C" fn coverage_140(commandBuffer: SubscriptTypegpuCommandBuffer) {
     super::coverage_hit(140);
     facade::subscript_typegpu_command_buffer_release(commandBuffer)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pass_encoder_release`].
 extern "C" fn coverage_141(renderPassEncoder: SubscriptTypegpuRenderPassEncoder) {
     super::coverage_hit(141);
     facade::subscript_typegpu_render_pass_encoder_release(renderPassEncoder)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pass_encoder_release`].
 extern "C" fn coverage_142(computePassEncoder: SubscriptTypegpuComputePassEncoder) {
     super::coverage_hit(142);
     facade::subscript_typegpu_compute_pass_encoder_release(computePassEncoder)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_command_encoder_release`].
 extern "C" fn coverage_143(commandEncoder: SubscriptTypegpuCommandEncoder) {
     super::coverage_hit(143);
     facade::subscript_typegpu_command_encoder_release(commandEncoder)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_render_pipeline_release`].
 extern "C" fn coverage_144(renderPipeline: SubscriptTypegpuRenderPipeline) {
     super::coverage_hit(144);
     facade::subscript_typegpu_render_pipeline_release(renderPipeline)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_compute_pipeline_release`].
 extern "C" fn coverage_145(computePipeline: SubscriptTypegpuComputePipeline) {
     super::coverage_hit(145);
     facade::subscript_typegpu_compute_pipeline_release(computePipeline)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_shader_module_release`].
 extern "C" fn coverage_146(shaderModule: SubscriptTypegpuShaderModule) {
     super::coverage_hit(146);
     facade::subscript_typegpu_shader_module_release(shaderModule)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_pipeline_layout_release`].
 extern "C" fn coverage_147(pipelineLayout: SubscriptTypegpuPipelineLayout) {
     super::coverage_hit(147);
     facade::subscript_typegpu_pipeline_layout_release(pipelineLayout)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_bind_group_release`].
 extern "C" fn coverage_148(bindGroup: SubscriptTypegpuBindGroup) {
     super::coverage_hit(148);
     facade::subscript_typegpu_bind_group_release(bindGroup)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_bind_group_layout_release`].
 extern "C" fn coverage_149(bindGroupLayout: SubscriptTypegpuBindGroupLayout) {
     super::coverage_hit(149);
     facade::subscript_typegpu_bind_group_layout_release(bindGroupLayout)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_sampler_release`].
 extern "C" fn coverage_150(sampler: SubscriptTypegpuSampler) {
     super::coverage_hit(150);
     facade::subscript_typegpu_sampler_release(sampler)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_view_release`].
 extern "C" fn coverage_151(textureView: SubscriptTypegpuTextureView) {
     super::coverage_hit(151);
     facade::subscript_typegpu_texture_view_release(textureView)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_texture_release`].
 extern "C" fn coverage_152(texture: SubscriptTypegpuTexture) {
     super::coverage_hit(152);
     facade::subscript_typegpu_texture_release(texture)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_buffer_release`].
 extern "C" fn coverage_153(buffer: SubscriptTypegpuBuffer) {
     super::coverage_hit(153);
     facade::subscript_typegpu_buffer_release(buffer)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_queue_release`].
 extern "C" fn coverage_154(queue: SubscriptTypegpuQueue) {
     super::coverage_hit(154);
     facade::subscript_typegpu_queue_release(queue)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_device_release`].
 extern "C" fn coverage_155(device: SubscriptTypegpuDevice) {
     super::coverage_hit(155);
     facade::subscript_typegpu_device_release(device)
 }
 
+/// Records a coverage hit, then forwards the arguments and result through [`facade::subscript_typegpu_adapter_release`].
 extern "C" fn coverage_156(adapter: SubscriptTypegpuAdapter) {
     super::coverage_hit(156);
     facade::subscript_typegpu_adapter_release(adapter)
 }
 
+/// Returns the facade export names in symbol-table order.
 pub fn facade_export_names() -> &'static [&'static str] {
     &[
         "subscript_typegpu_create_instance",
@@ -1089,6 +1247,7 @@ pub fn facade_export_names() -> &'static [&'static str] {
     ]
 }
 
+/// Returns facade export names paired with their direct function addresses.
 pub fn facade_symbols() -> Vec<(String, *const u8)> {
     vec![
         ("subscript_typegpu_create_instance".to_owned(), facade::subscript_typegpu_create_instance as *const u8),
@@ -1251,6 +1410,7 @@ pub fn facade_symbols() -> Vec<(String, *const u8)> {
     ]
 }
 
+/// Returns facade export names paired with wrappers that count calls before they forward arguments and results to the named exports.
 pub fn facade_counting_symbols() -> Vec<(String, *const u8)> {
     vec![
         ("subscript_typegpu_create_instance".to_owned(), coverage_0 as *const u8),
