@@ -60,10 +60,15 @@ import {
   atomicFluidRender_WGSL,
 } from "./main.typegpu";
 
+// The grid commits to 64 squared cells, and a full cell holds 1024 water. `WALL_LEVEL` is 2 to
+// the 31st power, far above any water level, so one `u32` carries the level and the wall mark.
+// TypeGPU keeps a separate flags buffer with four cell kinds.
 const GRID_SIZE: u32 = 64;
 const CELL_COUNT: u32 = GRID_SIZE * GRID_SIZE;
 const MAX_WATER: u32 = 1024;
 const WALL_LEVEL: u32 = 2147483648;
+// The caps bound the water one cell moves in one frame, so a tall column drains over many
+// frames. TypeGPU derives the same bound from a viscosity slider.
 const GRAVITY_STEP: u32 = 96;
 const SIDE_STEP: u32 = 24;
 const BRUSH_WATER: u32 = 192;
@@ -72,6 +77,7 @@ const BRUSH_ERASE: u32 = 0;
 const BRUSH_WATER_MODE: u32 = 1;
 const BRUSH_WALL: u32 = 2;
 
+// One corner of the render strip. The generator derives `Vertex_STRIDE` from this class.
 @CStruct
 class Vertex {
   position: Vec2f;
@@ -81,6 +87,9 @@ class Vertex {
   }
 }
 
+// The same cell buffer carries three declarations. `WaterCell` is the atomic `u32` the brush
+// edits, `WaterLevel` is the plain read the flow pass takes, and `WaterDelta` is the change.
+// Each layout picks the declaration its pass needs, and the bytes never change shape.
 @CStruct
 class WaterCell {
   level: AtomicU32;
@@ -108,6 +117,8 @@ class WaterDelta {
   }
 }
 
+// The brush segment in cell coordinates, with the mode and an active flag. One frame writes it
+// once. TypeGPU passes a radius and a cell kind and erases from the right mouse button.
 @CStruct
 class BrushParams {
   previous: Vec2f;
@@ -123,6 +134,7 @@ class BrushParams {
   }
 }
 
+// The vertex output. `position` is clip space and `uv` runs 0 to 1 across the surface.
 @CStruct
 class Varyings {
   position: Vec4f;
@@ -134,21 +146,28 @@ class Varyings {
   }
 }
 
+// The flow layout reads the current levels and accumulates signed changes into the next buffer.
+// No pass writes the source, so a plain read never sees a partial update.
 class AtomicFluidLayout {
   current!: Storage<WaterLevel>;
   next!: MutStorage<WaterDelta>;
 }
 
+// The finalize layout binds the same pair. Its pass turns the accumulated changes into levels.
 class AtomicFinalizeLayout {
   current!: Storage<WaterLevel>;
   next!: MutStorage<WaterDelta>;
 }
 
+// The brush layout writes the new state directly, so a stroke lands on the buffer the frame
+// displays.
 class AtomicBrushLayout {
   cells!: MutStorage<WaterCell>;
   brush!: Uniform<BrushParams>;
 }
 
+// The render layout binds the cells as mutable storage, because an atomic load needs that
+// access.
 class AtomicFluidRenderLayout {
   cells!: MutStorage<WaterCell>;
 }
@@ -159,6 +178,7 @@ function minU32(left: u32, right: u32): u32 {
 
 // Each invocation reads current and atomically accumulates signed changes in the cleared next buffer.
 // A finalize pass clamps next, the brush follows, and the frame swaps the buffer roles.
+// Four neighbors can change one cell in the same dispatch, so every change needs an atomic.
 function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void {
   const x: u32 = ctx.globalId.x;
   const y: u32 = ctx.globalId.y;
@@ -166,6 +186,7 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
   let level: u32 = res.current[index].level;
   if (level === 0 || level >= WALL_LEVEL) return;
 
+  // Gravity first. The cell gives the space below what it can take, up to the per-frame cap.
   if (y > 0) {
     const belowIndex: u32 = index - GRID_SIZE;
     const belowLevel: u32 = res.current[belowIndex].level;
@@ -183,6 +204,7 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
   }
   if (level === 0) return;
 
+  // Then one sideways move toward the lower of the two horizontal neighbors.
   let targetIndex: u32 = index;
   let targetLevel: u32 = level;
   if (x > 0) {
@@ -201,6 +223,8 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
       targetLevel = rightLevel;
     }
   }
+  // A difference of one or less stops the move, so a flat surface never swaps water forever.
+  // The quarter share levels the pair over several frames and never overshoots.
   if (targetIndex !== index && level > targetLevel + 1) {
     const sideways: u32 = minU32((level - targetLevel) / 4, SIDE_STEP);
     if (sideways > 0) {
@@ -210,6 +234,9 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
   }
 }
 
+// The second pass turns changes into levels. A wall keeps its marker, and every other cell
+// clamps the sum of its old level and its change into the 0 to `MAX_WATER` range.
+// The signed store of the lowest `i32` reads back as `WALL_LEVEL` through the unsigned view.
 function atomicFinalizeKernel(res: AtomicFinalizeLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.y * GRID_SIZE + ctx.globalId.x;
   const current: u32 = res.current[index].level;
@@ -222,6 +249,9 @@ function atomicFinalizeKernel(res: AtomicFinalizeLayout, ctx: ComputeInvocation)
   res.next[index].level.store(minU32(positive, MAX_WATER) as i32);
 }
 
+// The third pass paints one stroke. `sdLine` gives the distance from the cell to the segment
+// between the last two pointer positions, so a fast drag leaves no gap.
+// TypeGPU uses the same helper and takes a point distance when the segment has no length.
 function atomicBrushKernel(res: AtomicBrushLayout, ctx: ComputeInvocation): void {
   const x: u32 = ctx.globalId.x;
   const y: u32 = ctx.globalId.y;
@@ -246,7 +276,6 @@ function atomicBrushKernel(res: AtomicBrushLayout, ctx: ComputeInvocation): void
 
 // TypeGPU draws one full-screen triangle and picks its three corners from the vertex index.
 // This port draws a four-corner strip from a typed vertex buffer.
-// This port stores the four corners in a typed vertex buffer.
 function atomicFluidVertex(
   res: AtomicFluidRenderLayout,
   value: Vertex,
@@ -258,6 +287,8 @@ function atomicFluidVertex(
   );
 }
 
+// The fragment maps its uv to the nearest cell. A wall paints stone gray, and the water level
+// drives a blue ramp. TypeGPU maps its level through a logistic curve and paints four kinds.
 function atomicFluidFragment(
   res: AtomicFluidRenderLayout,
   input: Varyings,
@@ -281,6 +312,9 @@ function atomicFluidFragment(
   );
 }
 
+// The four declarations name the kernel, the layout type, and the workgroup size. The generator
+// reads them ahead of the run and emits the WGSL, the entry names, and the layout facts.
+// TypeGPU builds the same WGSL at run time from the kernel function.
 export const atomicFlow: ComputePipelineSpec = computePipeline<AtomicFluidLayout>(
   atomicFlowKernel,
   { name: "atomicFlow", workgroupSize: [8, 8, 1] },
@@ -305,6 +339,9 @@ export const atomicFluidRender: RenderPipelineSpec = renderPipelineL<
   topology: "triangle-strip",
 });
 
+// The host calls `init`, `frame`, and `shutdown` as separate entries, so every handle lives here.
+// This example owns each handle from creation until `shutdown` releases it. TypeGPU frees the
+// same resources through garbage collection and `root.destroy()`.
 let activeDevice: GPUHostOwnedDevice | null = null;
 let activeFlow: ComputePipeline | null = null;
 let activeFinalize: ComputePipeline | null = null;
@@ -332,22 +369,30 @@ export function init(
   device: SubscriptTypegpuDevice,
   format: GPUTextureFormat,
 ): void {
+  // The pipeline declares its target format literally. A surface with another format ends the
+  // example before any draw.
   if (format !== atomicFluidRender_TARGET_FORMAT) {
     print(`FAIL format expected=${atomicFluidRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
+  // The host owns the device and the instance. The wrapper carries no `dispose`, so this example
+  // never releases what it did not create.
   const hostDevice = hostOwnedGPUDevice(instance, device);
+  // The four strip corners in clip space, in the order the triangle-strip topology needs.
   const vertexValues: FixedArray<Vertex, 4> = [
     new Vertex(new Vec2f(-1.0, -1.0)),
     new Vertex(new Vec2f(1.0, -1.0)),
     new Vertex(new Vec2f(-1.0, 1.0)),
     new Vertex(new Vec2f(1.0, 1.0)),
   ];
+  // Buffer sizes come from the generated stride and size constants, never from a hand count.
   const vertices = hostDevice.createBuffer({
     label: "atomic-fluid-vertices",
     size: (Vertex_STRIDE * 4) as u64,
     usage: GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
+  // The two cell grids alternate between source and target. Both carry the same size, so a bind
+  // group can pair them in either direction.
   const cellsA = hostDevice.createBuffer({
     label: "atomic-fluid-cells-a",
     size: (WaterCell_STRIDE * CELL_COUNT) as u64,
@@ -358,12 +403,15 @@ export function init(
     size: (WaterCell_STRIDE * CELL_COUNT) as u64,
     usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
   });
+  // The brush uniform. One frame writes it once, and the brush pass reads it in every cell.
   const brush = hostDevice.createBuffer({
     label: "atomic-fluid-brush",
     size: BrushParams_SIZE as u64,
     usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
   });
 
+  // The initial scene walls the floor and both sides, adds a shelf across the middle, and fills
+  // the rows below 14 with water. `Context.bytesInto` writes one cell in place at its offset.
   const initialCells: u8[] = [];
   let initialByte: u32 = 0;
   while (initialByte < WaterCell_STRIDE * CELL_COUNT) {
@@ -387,10 +435,14 @@ export function init(
       index * WaterCell_STRIDE,
     );
   }
+  // Both grids start from the same bytes, so either one can act as the source on the first
+  // frame. Queue writes land before the commands that a later submit carries.
   using queue = hostDevice.queue();
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 4>>(vertexValues));
   queue.writeBuffer(cellsA, 0, initialCells);
   queue.writeBuffer(cellsB, 0, initialCells);
+  // The idle brush stays inactive. The two points differ, so `sdLine` never takes a zero-length
+  // segment.
   const idlePoint = new Vec2f(0.0, 0.0);
   queue.writeBuffer(
     brush,
@@ -400,7 +452,11 @@ export function init(
     ),
   );
 
+  // The error scope catches a pipeline creation failure. TypeGPU rejects a promise. Here the pop
+  // returns a value, so this example releases what it created and prints the first error line.
   hostDevice.pushErrorScope("validation");
+  // Each compute pipeline takes the generated WGSL text, the entry name, the layout facts, and
+  // the workgroup size. That size must equal the size in the declaration above.
   const flowPipeline = createComputePipelineHost(
     hostDevice,
     atomicFlow_WGSL,
@@ -422,6 +478,8 @@ export function init(
     [atomicBrush_LAYOUT0],
     [8, 8, 1],
   );
+  // The render pipeline also takes the vertex buffer layout and the declaration, which carries
+  // the target format and the topology.
   const renderPipeline = createRenderPipelineHost(
     hostDevice,
     atomicFluidRender_WGSL,
@@ -445,10 +503,14 @@ export function init(
     return;
   }
 
+  // The pipeline reports the layout WebGPU built for group 0. Each call returns a new handle, and
+  // the bind groups below need it only at creation.
   using flowLayout = flowPipeline.bindGroupLayout(0);
   using finalizeLayout = finalizePipeline.bindGroupLayout(0);
   using brushLayout = brushPipeline.bindGroupLayout(0);
   using renderLayout = renderPipeline.bindGroupLayout(0);
+  // Eight bind groups cover both buffer directions for the flow and the finalize pass, and both
+  // choices for the brush and the render pass. The resource order follows the layout fields.
   const flowGroupAB = createBindGroupHost(
     hostDevice,
     flowLayout,
@@ -497,6 +559,8 @@ export function init(
     atomicFluidRender_LAYOUT0,
     [bufferResource(cellsB)],
   );
+  // The handles reach module state only after every creation succeeds, so a failed init leaves
+  // no partial state behind.
   activeDevice = hostDevice;
   activeFlow = flowPipeline;
   activeFinalize = finalizePipeline;
@@ -525,6 +589,8 @@ export function frame(
   pointerY: f32,
   buttons: u32,
 ): void {
+  // The frame copies module state into locals and checks each handle. An empty handle means init
+  // failed, and the frame ends without a draw. TypeGPU reports the same failure as an exception.
   const device = activeDevice;
   const flowPipeline = activeFlow;
   const finalizePipeline = activeFinalize;
@@ -560,10 +626,14 @@ export function frame(
   if (cellsB === null) return;
   if (brush === null) return;
 
+  // Key 49, key 50, and key 48 are `1`, `2`, and `0`. TypeGPU picks the same brush from a select
+  // and erases while the right button is down.
   if (key === 49) brushMode = BRUSH_WATER_MODE;
   if (key === 50) brushMode = BRUSH_WALL;
   if (key === 48) brushMode = BRUSH_ERASE;
 
+  // The brush needs a segment. A release forgets the previous point, so the first sample after a
+  // press starts and ends the segment on the same cell.
   let currentX: f32 = 0.0;
   let currentY: f32 = 0.0;
   let previousX: f32 = 0.0;
@@ -585,6 +655,8 @@ export function frame(
     if (currentY > gridMax) currentY = gridMax;
     previousX = previousPointerX >= 0.0 ? previousPointerX : currentX;
     previousY = previousPointerY >= 0.0 ? previousPointerY : currentY;
+    // A zero-length segment has no direction, so a still pointer moves the start of the segment
+    // by one thousandth of a cell.
     if (previousX === currentX && previousY === currentY) {
       previousX = currentX > 0.001 ? currentX - 0.001 : currentX + 0.001;
     }
@@ -593,6 +665,8 @@ export function frame(
     previousPointerY = currentY;
   }
 
+  // Frame parity names the source and the target. The brush and the render group both take the
+  // target, so a stroke lands on the state the frame displays.
   const useAB: boolean = frameCount % 2 === 0;
   const nextCells: GPUBuffer = useAB ? cellsB : cellsA;
   const flowGroup: GPUBindGroup = useAB ? flowGroupAB : flowGroupBA;
@@ -601,6 +675,8 @@ export function frame(
   const renderGroup: GPUBindGroup = useAB ? renderGroupB : renderGroupA;
   frameCount += 1;
 
+  // The brush write reaches the device before the submit below, so the stroke of this frame uses
+  // the pointer of this frame.
   using queue = device.queue();
   queue.writeBuffer(
     brush,
@@ -612,11 +688,15 @@ export function frame(
       brushActive,
     )),
   );
+  // The clear starts the target at zero, because the flow pass accumulates changes into it.
+  // Each dispatch records its own compute pass, and the passes run in record order.
+  // The counts are workgroups, so 64 cells over a workgroup of 8 need eight groups per axis.
   using encoder = device.createCommandEncoderDefault();
   encoder.clearBuffer(nextCells, 0, (WaterCell_STRIDE * CELL_COUNT) as u64);
   flowPipeline.dispatch(encoder, [flowGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
   finalizePipeline.dispatch(encoder, [finalizeGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
   brushPipeline.dispatch(encoder, [brushGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
+  // The host owns the presented view, so this example wraps it and releases nothing.
   const target = new GPUTextureView(view);
   using renderPass = encoder.beginRenderPass({
     colorAttachments: [{
@@ -626,15 +706,22 @@ export function frame(
       storeOp: "store",
     }],
   });
+  // The surface size changes when the window resizes, so both rectangles follow the frame size.
   renderPass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   renderPass.setScissorRect(0, 0, width, height);
+  // Four vertices draw the strip, and the render group selects the grid the brush pass wrote.
   renderPipeline.bind(renderPass, [renderGroup], [vertices]);
   renderPass.draw(4);
   renderPass.end();
+  // The command buffer reaches the device queue after the encoder finishes. The host presents
+  // the surface after this call returns.
   using command = encoder.finishDefault();
   queue.submit([command]);
 }
 
+// The host calls this once before it releases the device. This example disposes in reverse
+// creation order, so a bind group never outlives the buffers it names.
+// TypeGPU releases the same resources with one `root.destroy()` call.
 export function shutdown(): void {
   if (activeRenderGroupB !== null) activeRenderGroupB.dispose();
   if (activeRenderGroupA !== null) activeRenderGroupA.dispose();
@@ -652,6 +739,7 @@ export function shutdown(): void {
   if (activeBrushPipeline !== null) activeBrushPipeline.dispose();
   if (activeFinalize !== null) activeFinalize.dispose();
   if (activeFlow !== null) activeFlow.dispose();
+  // The cleared state leaves no released handle reachable from module scope.
   activeRenderGroupB = null;
   activeRenderGroupA = null;
   activeBrushGroupB = null;

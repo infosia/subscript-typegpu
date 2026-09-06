@@ -71,6 +71,8 @@ import {
   slimeRender_WGSL,
 } from "./main.typegpu";
 
+// Distances count trail cells and angles count radians. `dispatch` takes workgroup counts, so
+// 256 divides by the diffuse workgroup of 8 and 4096 divides by the move workgroup of 64.
 const TRAIL_SIZE: u32 = 256;
 const AGENT_COUNT: u32 = 4096;
 const SENSOR_DISTANCE: f32 = 5.0;
@@ -81,6 +83,7 @@ const DEPOSIT_AMOUNT: f32 = 0.2;
 const TRAIL_DECAY: f32 = 0.96;
 const TAU: f32 = 6.2831855;
 
+// One corner of the render strip. The generator derives `Vertex_STRIDE` from this class.
 @CStruct
 class Vertex {
   position: Vec2f;
@@ -90,6 +93,8 @@ class Vertex {
   }
 }
 
+// One agent. The position counts trail cells, the heading counts radians, and `randomState`
+// carries the PRNG state forward. TypeGPU stores position and angle and reseeds from the index.
 @CStruct
 class Agent {
   position: Vec2f;
@@ -103,6 +108,7 @@ class Agent {
   }
 }
 
+// The vertex output. `position` is clip space and `uv` runs 0 to 1 across the surface.
 @CStruct
 class Varyings {
   position: Vec4f;
@@ -114,21 +120,29 @@ class Varyings {
   }
 }
 
+// The move layout binds the agents, the trail they sense, and the trail they mark. A deposit
+// reads and then writes the same cell, so the target binding is read-write.
+// The two textures swap roles every frame, so one layout serves both directions.
 class SlimeMoveLayout {
   agents!: MutStorage<Agent>;
   sense!: ReadStorageTexture2d<R32float>;
   trail!: ReadWriteStorageTexture2d<R32float>;
 }
 
+// The diffuse layout reads one trail and writes the other, so no invocation reads a cell that
+// another invocation already changed.
 class SlimeDiffuseLayout {
   source!: ReadStorageTexture2d<R32float>;
   target!: StorageTexture2d<R32float>;
 }
 
+// The render layout reads one trail. Two bind groups on it select the texture the frame shows.
 class SlimeRenderLayout {
   trail!: ReadStorageTexture2d<R32float>;
 }
 
+// The trail is a torus. A coordinate one step outside the grid returns on the opposite edge.
+// TypeGPU clamps at the border, reflects the heading, and adds jitter instead.
 function wrapTrail(value: f32): f32 {
   let wrapped: f32 = value;
   if (wrapped < 0.0) wrapped += TRAIL_SIZE as f32;
@@ -156,6 +170,7 @@ function senseTrailCell(position: Vec2f, angle: f32): Vec2i {
 function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.globalId.x;
   const agent: Agent = res.agents[index];
+  // The stored state advances once per frame, so each agent walks its own fixed sequence.
   const jitter: RandomF32 = randF32(agent.randomState);
   agent.randomState = jitter.state;
   agent.heading += (jitter.value - 0.5) * 0.3;
@@ -168,6 +183,8 @@ function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
   const right: f32 = res.sense.load(
     senseTrailCell(agent.position, agent.heading - SENSOR_ANGLE),
   ).x;
+  // Two better sides trap the agent, and three zero samples give it nothing to follow. Both
+  // cases pick a side at random. Otherwise the agent turns toward the stronger sensor.
   if (
     (left > forward && right > forward)
     || (forward === 0.0 && left === 0.0 && right === 0.0)
@@ -184,6 +201,7 @@ function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
   } else if (left > right && left >= forward) {
     agent.heading += TURN_SPEED;
   }
+  // The agent moves one cell along its heading, and the wrap keeps it on the torus.
   const stepAngles = new Vec2f(agent.heading, agent.heading);
   agent.position.x = wrapTrail(
     agent.position.x + stepAngles.cos().x * STEP_SIZE,
@@ -192,6 +210,8 @@ function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
     agent.position.y + stepAngles.sin().x * STEP_SIZE,
   );
   res.agents[index] = agent;
+  // The deposit adds to the cell the agent now occupies. The read and the write on one binding
+  // need the read-write access the layout declares.
   const cell = new Vec2i(agent.position.x as i32, agent.position.y as i32);
   const previous: f32 = res.trail.load(cell).x;
   res.trail.store(cell, new Vec4f(previous + DEPOSIT_AMOUNT, 0.0, 0.0, 1.0));
@@ -204,6 +224,7 @@ function diffuseTrail(res: SlimeDiffuseLayout, ctx: ComputeInvocation): void {
   const x: i32 = ctx.globalId.x as i32;
   const y: i32 = ctx.globalId.y as i32;
   const limit: i32 = TRAIL_SIZE as i32;
+  // The neighbor indices wrap, so the diffusion crosses the border the same way the agents do.
   const left: i32 = x > 0 ? x - 1 : limit - 1;
   const right: i32 = x + 1 < limit ? x + 1 : 0;
   const down: i32 = y > 0 ? y - 1 : limit - 1;
@@ -254,6 +275,9 @@ function slimeFragment(
   );
 }
 
+// The three declarations name the kernel, the layout type, and the workgroup size. The generator
+// reads them ahead of the run and emits the WGSL, the entry names, and the layout facts.
+// TypeGPU builds the same WGSL at run time from the kernel function.
 export const slimeMove: ComputePipelineSpec = computePipeline<SlimeMoveLayout>(
   moveAgents,
   { name: "slimeMove", workgroupSize: [64, 1, 1] },
@@ -273,6 +297,9 @@ export const slimeRender: RenderPipelineSpec = renderPipelineL<
   topology: "triangle-strip",
 });
 
+// One holder for everything `init` creates. The host calls `init`, `frame`, and `shutdown` as
+// separate entries, so the handles outlive each call and `shutdown` owns their release.
+// TypeGPU frees the same resources through garbage collection and `root.destroy()`.
 class SlimeState {
   device: GPUHostOwnedDevice;
   move: ComputePipeline;
@@ -331,6 +358,8 @@ class SlimeState {
 let activeState: SlimeState | null = null;
 let frameCount: u32 = 0;
 
+// The initial trail is empty. The upload takes one `Vec4f` per cell, and only the first
+// component reaches an `r32float` texture.
 function zeroTrail(): Vec4f[] {
   const pixels: Vec4f[] = [];
   let index: u32 = 0;
@@ -346,11 +375,16 @@ export function init(
   device: SubscriptTypegpuDevice,
   format: GPUTextureFormat,
 ): void {
+  // The pipeline declares its target format literally. A surface with another format ends the
+  // example before any draw.
   if (format !== slimeRender_TARGET_FORMAT) {
     print(`FAIL format expected=${slimeRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
+  // The host owns the device and the instance. The wrapper carries no `dispose`, so this example
+  // never releases what it did not create.
   const hostDevice = hostOwnedGPUDevice(instance, device);
+  // Buffer sizes come from the generated stride constants, never from a hand count.
   const vertices = hostDevice.createBuffer({
     label: "slime-vertices",
     size: (Vertex_STRIDE * 4) as u64,
@@ -361,6 +395,9 @@ export function init(
     size: (Agent_STRIDE * AGENT_COUNT) as u64,
     usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
   });
+  // The trail pair carries one `f32` per cell. `STORAGE_BINDING` lets a kernel load and store
+  // the texture, and `COPY_DST` lets the upload below clear it.
+  // TypeGPU sizes its pair from the canvas and keeps four channels per cell.
   const textureUsage: u64 = GPUTextureUsage.STORAGE_BINDING + GPUTextureUsage.COPY_DST;
   const trailA = hostDevice.createTexture({
     label: "slime-trail-a",
@@ -374,8 +411,10 @@ export function init(
     format: "r32float",
     usage: textureUsage,
   });
+  // Every binding takes a view, not the texture. Both views live until `shutdown` releases them.
   const viewA = trailA.createView();
   const viewB = trailB.createView();
+  // The four strip corners in clip space, in the order the triangle-strip topology needs.
   const vertexValues: FixedArray<Vertex, 4> = [
     new Vertex(new Vec2f(-1.0, -1.0)),
     new Vertex(new Vec2f(1.0, -1.0)),
@@ -411,6 +450,8 @@ export function init(
     }
     agentIndex += 1;
   }
+  // Queue writes land before the commands that a later submit carries, so the agents and the
+  // empty trails reach the device before the first dispatch.
   using queue = hostDevice.queue();
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 4>>(vertexValues));
   queue.writeBuffer(agents, 0, agentBytes);
@@ -418,7 +459,11 @@ export function init(
   writeTexturePixels(queue, trailA, empty, TRAIL_SIZE, TRAIL_SIZE);
   writeTexturePixels(queue, trailB, empty, TRAIL_SIZE, TRAIL_SIZE);
 
+  // The error scope catches a pipeline creation failure. TypeGPU rejects a promise. Here the pop
+  // returns a value, so this example releases what it created and prints the first error line.
   hostDevice.pushErrorScope("validation");
+  // Each compute pipeline takes the generated WGSL text, the entry name, the layout facts, and
+  // the workgroup size. That size must equal the size in the declaration above.
   const movePipeline = createComputePipelineHost(
     hostDevice,
     slimeMove_WGSL,
@@ -433,6 +478,8 @@ export function init(
     [slimeDiffuse_LAYOUT0],
     [8, 8, 1],
   );
+  // The render pipeline also takes the vertex buffer layout and the declaration, which carries
+  // the target format and the topology.
   const renderPipeline = createRenderPipelineHost(
     hostDevice,
     slimeRender_WGSL,
@@ -457,9 +504,13 @@ export function init(
     return;
   }
 
+  // The pipeline reports the layout WebGPU built for group 0. Each call returns a new handle, and
+  // the bind groups below need it only at creation.
   using moveLayout = movePipeline.bindGroupLayout(0);
   using diffuseLayout = diffusePipeline.bindGroupLayout(0);
   using renderLayout = renderPipeline.bindGroupLayout(0);
+  // Six bind groups cover both trail directions for each pass and both display choices.
+  // The resource order follows the field order of the layout class.
   const moveAB = createBindGroupHost(hostDevice, moveLayout, slimeMove_LAYOUT0, [
     bufferResource(agents),
     textureResource(viewA),
@@ -484,6 +535,7 @@ export function init(
   const renderB = createBindGroupHost(hostDevice, renderLayout, slimeRender_LAYOUT0, [
     textureResource(viewB),
   ]);
+  // The state reaches module scope only after every creation succeeds.
   activeState = new SlimeState(
     hostDevice,
     movePipeline,
@@ -513,6 +565,8 @@ export function frame(
   pointerY: f32,
   buttons: u32,
 ): void {
+  // A failed `init` leaves the state empty, and the frame ends without a draw. TypeGPU reports
+  // the same failure as an exception.
   if (activeState === null) return;
   const active = activeState;
   // Frame parity diffuses A into B, then agents sense A and deposit into B.
@@ -521,7 +575,11 @@ export function frame(
   const moveGroup: GPUBindGroup = readsA ? active.moveAB : active.moveBA;
   const diffuseGroup: GPUBindGroup = readsA ? active.diffuseAB : active.diffuseBA;
   const displayGroup: GPUBindGroup = readsA ? active.renderB : active.renderA;
+  // Each dispatch records its own compute pass, and the passes run in record order. The diffuse
+  // pass fills the target first, so it never overwrites the deposits the move pass adds.
   using encoder = active.device.createCommandEncoderDefault();
+  // The counts are workgroups, not threads. The trail needs 32 groups per axis, and the agents
+  // need 64 groups on one axis.
   active.diffuse.dispatch(
     encoder,
     [diffuseGroup],
@@ -530,6 +588,7 @@ export function frame(
     1,
   );
   active.move.dispatch(encoder, [moveGroup], AGENT_COUNT / 64, 1, 1);
+  // The host owns the presented view, so this example wraps it and releases nothing.
   const target = new GPUTextureView(view);
   using renderPass = encoder.beginRenderPass({
     colorAttachments: [{
@@ -539,17 +598,24 @@ export function frame(
       storeOp: "store",
     }],
   });
+  // The surface size changes when the window resizes, so both rectangles follow the frame size.
   renderPass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   renderPass.setScissorRect(0, 0, width, height);
+  // Four vertices draw the strip, and the display group selects the trail the deposits reached.
   active.render.bind(renderPass, [displayGroup], [active.vertices]);
   renderPass.draw(4);
   renderPass.end();
+  // The command buffer reaches the device queue after the encoder finishes. The frame count then
+  // reverses the two texture roles for the next frame.
   using command = encoder.finishDefault();
   using queue = active.device.queue();
   queue.submit([command]);
   frameCount += 1;
 }
 
+// The host calls this once before it releases the device. This example disposes in reverse
+// creation order, so a bind group never outlives the textures and the buffers it names.
+// TypeGPU releases the same resources with one `root.destroy()` call.
 export function shutdown(): void {
   if (activeState === null) return;
   const active = activeState;
@@ -568,6 +634,7 @@ export function shutdown(): void {
   active.render.dispose();
   active.diffuse.dispose();
   active.move.dispose();
+  // The cleared state leaves no released handle reachable from module scope.
   activeState = null;
   frameCount = 0;
 }

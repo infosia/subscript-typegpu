@@ -36,6 +36,8 @@ import {
   multiply_WORKGROUP_Z,
 } from "./main.typegpu";
 
+// The matrix record: the live size and a fixed 16-value body. TypeGPU sizes its body for a
+// six-by-six maximum and drives the live size from sliders.
 @CStruct
 class Matrix {
   size: Vec2u;
@@ -82,6 +84,8 @@ export const multiply: ComputePipelineSpec = computePipeline<MatrixLayout>(
   },
 );
 
+// The product buffer starts from a zeroed record, so a partial dispatch leaves no stale
+// value in the readback.
 function zeroMatrix(): Matrix {
   return new Matrix(
     new Vec2u(4, 4),
@@ -94,6 +98,8 @@ function zeroMatrix(): Matrix {
   );
 }
 
+// Three outcomes: `noop` when the device wrote nothing, `pass` on an exact match, and `fail`
+// otherwise. The match is exact, because both lanes add in the same order.
 function resultState(actual: Matrix, expected: Matrix): string {
   let allZero: boolean = true;
   let hostNonzero: boolean = false;
@@ -116,6 +122,8 @@ function resultState(actual: Matrix, expected: Matrix): string {
 }
 
 export async function main(): Promise<void> {
+  // The API layer polls the future itself, so the script never pumps the event loop. A null
+  // adapter reports the failure by value, because the layers carry no exceptions.
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
   if (adapterResult === null) {
     gpu.dispose();
@@ -131,8 +139,12 @@ export async function main(): Promise<void> {
   }
   let state: string = "fail";
   {
+    // Every GPU handle lives in this block, and the script releases each one at the end.
+    // TypeGPU leaves the same handles to `root.destroy` and the collector.
     using adapter = adapterResult;
     using device = deviceResult;
+    // Two committed four-by-four matrices. TypeGPU fills its matrices with random values on
+    // every reshuffle, so its result changes between runs.
     const leftValue = new Matrix(
       new Vec2u(4, 4),
       [
@@ -151,6 +163,8 @@ export async function main(): Promise<void> {
         0.0, 2.0, 3.0, 1.0,
       ],
     );
+    // `Matrix_SIZE` is a generated constant, so each buffer follows the schema layout. The two
+    // inputs need STORAGE and COPY_DST, and the product adds COPY_SRC for the readback.
     using left: Buffer<Matrix> = createBuffer<Matrix>(
       device,
       Matrix_SIZE,
@@ -172,9 +186,13 @@ export async function main(): Promise<void> {
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
       "matrix-product",
     );
+    // The queue keeps its work in the order it receives it, so these writes land before the
+    // submitted dispatch reads them.
     left.writeOne(device.queue, 0, Context.bytesOf<Matrix>(leftValue));
     right.writeOne(device.queue, 0, Context.bytesOf<Matrix>(rightValue));
     product.writeOne(device.queue, 0, Context.bytesOf<Matrix>(zeroMatrix()));
+    // The generated WGSL, entry name, layout, and workgroup size build the pipeline. The scope
+    // catches a validation error from that call.
     device.pushErrorScope("validation");
     using pipeline = createComputePipeline(
       device,
@@ -185,6 +203,8 @@ export async function main(): Promise<void> {
     );
     const validationError = await device.popErrorScope();
     if (validationError === null) {
+      // The bind group joins the three buffers to the generated layout. The resource order
+      // follows the field order of `MatrixLayout`.
       using nativeLayout = pipeline.bindGroupLayout(0);
       using bindGroup = createBindGroup(
         device,
@@ -197,10 +217,15 @@ export async function main(): Promise<void> {
         ],
       );
       using encoder = device.createCommandEncoderDefault();
+      // One thread walks every output cell, so the dispatch asks for exactly one thread and
+      // the workgroup count stays at one.
       pipeline.dispatchThreads(encoder, [bindGroup], 1, 1, 1);
+      // The GPU runs nothing until the queue receives the command buffer.
       using command = encoder.finishDefault();
       device.queue.submit([command]);
 
+      // The host lane holds the same three bindings in wrapper types, so one kernel body
+      // serves both lanes.
       const host = new MatrixLayout();
       host.left = new Storage<Matrix>([leftValue]);
       host.right = new Storage<Matrix>([rightValue]);
@@ -227,5 +252,6 @@ export async function main(): Promise<void> {
     }
   }
   gpu.dispose();
+  // One check line reports the outcome, so a reader who runs the example needs no golden.
   print(`check:product ${state}`);
 }
