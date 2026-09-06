@@ -17,7 +17,9 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   level, reads the kernel from the `FuncRef` argument, and reads the
   workgroup size from the descriptor literal. A non-literal size, a
   non-`FuncRef` kernel, or a declaration inside a function is a
-  diagnostic.
+  diagnostic. Rev 1: the descriptor names the pipeline with a string
+  literal equal to the `const` name (the generator keys its outputs
+  by it), and a workgroup axis of 0 is a diagnostic.
 - **PI2 — The kernel signature by layout count.** `computePipeline<L0>`
   takes `(res: L0, ctx: ComputeInvocation) => void`.
   `computePipeline2<L0, L1>`, `computePipeline3<L0, L1, L2>`, and

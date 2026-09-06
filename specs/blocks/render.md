@@ -217,7 +217,8 @@ does not say otherwise. Schemas are `schema.md`.
   Rev 1, 2026-08-23. The generator's set: a vertex schema field
   outside RN5, a varyings class without `position: Vec4f`, a varying
   field outside RN7, a vertex kernel that writes any storage binding
-  (every write, not the first), a binding no kernel reaches (RN9), a
+  (the check walks every write and reports the first), a binding no
+  kernel reaches (RN9), a
   class that is both a varyings class and a schema. Two cases fail
   subscript's checker first, because the library's declaration
   types them: a fragment return outside `Vec4f` and a kernel
