@@ -9,7 +9,8 @@ run P7.
   library method a kernel calls has a real host body (D7), every
   binding wrapper stores its values on the host (PI5), and every
   builtin is a field of `ComputeInvocation`. `simulateCompute<L>(kernel,
-  res: L, spec: ComputePipelineSpec, workgroups: FixedArray<u32, 3>)`
+  res: L, spec: ComputePipelineSpec, workgroups: FixedArray<u32, 3>,
+  hostRunnable)` (the fifth parameter per CL2)
   is a library generic function with a real body: it loops over
   workgroups and local invocations in row-major order, builds one
   `ComputeInvocation` per invocation, and calls `kernel(res, ctx)`.

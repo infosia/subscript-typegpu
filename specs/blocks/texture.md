@@ -86,7 +86,8 @@ Kernels are `kernel.md`, pipelines `pipeline.md`, render `render.md`.
   pixels: Vec4f[], width: u32, height: u32)` for the float formats
   (each component converted to the texture's format by the encode
   table this rule fixes: `rgba8unorm` scales to a byte with
-  round-half-away-from-zero, the float formats pass bits through)
+  round-half-away-from-zero, `rgba16float` converts each channel to
+  `f16`, and the 32-bit float formats pass bits through)
   and `writeTextureBytes(queue, texture, bytes: u8[], bytesPerRow:
   u32, width, height)` as the raw form. Both call the API layer's
   `writeTexture` with a full-extent single-mip destination. A

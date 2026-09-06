@@ -90,8 +90,10 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   `dispatch(encoder, groups: GPUBindGroup[], x, y, z)`,
   `dispatchThreads(encoder, groups, x, y, z)` (rounds each axis up by
   its workgroup size), `dispose()`, and `createBindGroup(device,
-  layout: GPUBindGroupLayout, spec: BindGroupLayoutSpec, buffers:
-  GPUBuffer[]): GPUBindGroup` (positional, binding order equals
+  layout: GPUBindGroupLayout, spec: BindGroupLayoutSpec, resources:
+  BindingResource[], guardBuffer): GPUBindGroup` (the resources are
+  buffers, texture views, and samplers per TX4 Rev 1, the guard
+  buffer per PI15; positional, binding order equals
   declaration order, a count mismatch traps with both counts). It
   builds on `lib/webgpu.ts` and `lib/typegpu-types.ts` only.
 - **PI10 — The WGSL golden.** Per K16. The harness module
@@ -135,7 +137,7 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   typed factories append the guard buffer for a `guard` entry, so
   the author's resource list is unchanged. `dispatchThreads(encoder,
   groups, x, y, z)` writes `[x, y, z, 0]` to the guard buffer through
-  `device.queue()` before it records the pass. `dispatch` and
+  the device's queue before it records the pass. `dispatch` and
   `dispatchTimed` write the workgroup count times the workgroup
   size. The write is a queue operation and the pass is a recorded
   command, so one command encoder carries at most one guarded

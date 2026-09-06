@@ -29,8 +29,10 @@ this block. The byte path is subscript R34 at `bb9dadc`
   check is WebGPU's `writeBuffer` rule: a backend rejects a 6-byte
   write and records no error outside an error scope, so the trap is
   the only early signal (measured 2026-08-23 on yawgpu and Dawn with
-  a 3-index `u16` buffer: the readback stayed zero). `writeOne` and
-  `patch` apply the same three checks. A `u16` index buffer is
+  a 3-index `u16` buffer: the readback stayed zero). `writeOne` applies
+  the same three checks. `patch` writes one field, so it applies the
+  range checks and not the multiple-of-element-size check, and it
+  traps with `EG2` (`ergonomics.md`). A `u16` index buffer is
   therefore written as a `FixedArray<u16, 4>` or longer even
   multiple. `read`, `readOne`, and `copyTo` apply the same
   multiple-of-4 rule to their byte offset and byte length (WebGPU's
@@ -59,7 +61,7 @@ this block. The byte path is subscript R34 at `bb9dadc`
   `ac9436f` admits an `async` method on a generic class). The
   method creates a staging buffer of `elementCount * elementSize`
   bytes with `MAP_READ + COPY_DST`, records `copyTo` into a fresh
-  command encoder, submits on `device.queue()`, awaits
+  command encoder, submits on the device's queue, awaits
   `mapAsync(READ)`, copies the bytes out with `readBuffer`, unmaps,
   disposes the staging buffer, and returns the bytes. Before it
   creates the staging buffer, it checks `elementIndex + elementCount
