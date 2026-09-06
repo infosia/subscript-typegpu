@@ -29,3 +29,4 @@ objc2-quartz-core = "=0.2.2"
 
 [profile.dev]
 debug = "line-tables-only"
+split-debuginfo = "off"

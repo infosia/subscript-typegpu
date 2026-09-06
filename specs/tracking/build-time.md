@@ -186,3 +186,17 @@ programs, the seven ui trap fixtures, the two window rejection
 suites, and the loader tests. No step doubles a previous row after
 the LB1 Rev 2 fix. The live lane: Metal 120.6 s, Dawn 118.0 s, with
 `x24` in the set (P16: 118.76 s on Metal without it).
+
+## `split-debuginfo = "off"` (2026-09-06)
+
+At the pin `d314ce0`, before the change: `target/debug/deps` held
+90,582 `.o` files, 13 GB, from the default unpacked split debuginfo
+on macOS. `target/debug` was 20 GB. The warm `--require-backend` gate:
+251.1 s.
+
+After `split-debuginfo = "off"` in `[profile.dev]` (the setting
+subscript took in its §85.1 rule 7a): the harness rebuild 32.8 s, no
+new `.o` file, the first gate 300.2 s with every test binary rebuilt,
+the second gate 225.1 s warm, both green with 276 passed and 1
+ignored. The stale `.o` files were deleted by hand, and the next
+`cargo build` was a no-op. `debug = "line-tables-only"` stays.

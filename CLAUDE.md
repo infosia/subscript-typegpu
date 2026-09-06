@@ -138,8 +138,10 @@ full debuginfo. These rules close each cause.
    depends on `subscript-compiler` and never on `subscript-codegen`.
    `naga` is a dev-dependency only. The harness is the only crate
    that depends on `subscript-codegen`.
-5. **`[profile.dev] debug = "line-tables-only"`** in the workspace
-   manifest.
+5. **`[profile.dev] debug = "line-tables-only"` and
+   `split-debuginfo = "off"`** in the workspace manifest. Unpacked
+   debuginfo left one `.o` file per codegen unit in
+   `target/debug/deps` (90,582 files, 13 GB, measured 2026-09-06).
 6. **Budgets are measured, recorded, and gated.** P0 measures the
    cold build, the warm no-op build, and the warm full gate on the
    reference machine, and records them in
