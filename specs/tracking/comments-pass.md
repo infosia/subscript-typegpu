@@ -143,3 +143,41 @@ The visual result waits for the owner's run.
 The owner ran `fluid-double-buffering` on yawgpu Metal (963 frames)
 and accepted the visual result: the fluid falls from the top source
 and flows around the obstacle. The open item is closed.
+
+## The Rust private items and T23 (2026-09-07)
+
+Owner instruction: every public API carries a comment, and the Rust
+sources carry more comments. `cargo clippy -W missing_docs` at the
+start: 2 public items without a comment in `typegpu-gen` (two enum
+variant fields), 3 in the harness's generated symbol table, 0 in
+`webgpu-gen` and `facade`. Three Opus writers documented the private
+and `pub(crate)` items and added `//` step comments in the long
+functions, comment lines only:
+
+| Crate | Documented items before | After |
+|---|---|---|
+| `typegpu-gen` | 99 of 247 functions | 293 of 304 items (11 self-describing) |
+| `harness` (lib and main), `window`, `facade` hand-written | 19 of 89 functions | 77 of 89 |
+| `webgpu-gen` | 116 of 343 items | 332 of 343 |
+
+The commit `484eb20` holds 2,189 comment lines. T23 (`testing.md`)
+makes `missing_docs` a gate: the four library crate roots deny it,
+and the harness symbol-table emitter and the facade surface emitter
+write a `///` line for every public item they emit, so the two
+generated files carry comments through their generators. Landed in
+the commit above this record. Evidence: `tools/gate.sh
+--require-backend` green, 283 passed, 1 ignored, 217.5 s wall.
+
+Spec drifts the writers found, fixed the same day: W9 named
+`create_surface` as the only platform-conditional code (`1e1b98e`), W5
+the failure message, PI1 the name literal and the zero axis, RN16 the
+report rule (`aeb2a00`), H2 the u32 limit constant (`fefe929`).
+
+Reported and open for a coding round: `IdlModel::from_definitions`
+merges two full definitions of a dictionary that declares no parent
+instead of an error, because the duplicate test reads the
+inheritance flag. Recorded and kept as written: F22's exclusion is a
+filter over five chunk kinds (`emit_rust::render` states the scope);
+K19's cycle guard in `fold_global_constant` is unreachable by the
+rule and stays as defence; `mapping::ident` mangles the `_g_` prefix
+the emitter owns.
