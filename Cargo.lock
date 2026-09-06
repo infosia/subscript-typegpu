@@ -1962,7 +1962,7 @@ dependencies = [
 [[package]]
 name = "subscript-bindgen"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=d314ce0#d314ce0267880588ba3ace8b6c849ee97f76d00f"
+source = "git+https://github.com/infosia/subscript.git?rev=155660d#155660df45092bea7bd7786589edb481bdc5563e"
 dependencies = [
  "clang-sys",
 ]
@@ -1970,7 +1970,7 @@ dependencies = [
 [[package]]
 name = "subscript-codegen"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=d314ce0#d314ce0267880588ba3ace8b6c849ee97f76d00f"
+source = "git+https://github.com/infosia/subscript.git?rev=155660d#155660df45092bea7bd7786589edb481bdc5563e"
 dependencies = [
  "cc",
  "cranelift-codegen",
@@ -1987,7 +1987,7 @@ dependencies = [
 [[package]]
 name = "subscript-compiler"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=d314ce0#d314ce0267880588ba3ace8b6c849ee97f76d00f"
+source = "git+https://github.com/infosia/subscript.git?rev=155660d#155660df45092bea7bd7786589edb481bdc5563e"
 dependencies = [
  "regress",
  "serde",
@@ -1999,7 +1999,7 @@ dependencies = [
 [[package]]
 name = "subscript-runtime"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=d314ce0#d314ce0267880588ba3ace8b6c849ee97f76d00f"
+source = "git+https://github.com/infosia/subscript.git?rev=155660d#155660df45092bea7bd7786589edb481bdc5563e"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -2130,8 +2130,7 @@ dependencies = [
 [[package]]
 name = "swc_ecma_parser"
 version = "6.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b92d3a25349d7f612c38d940f09f9c19c7b7aa3bf4d22fbe31ea44fd5354de02"
+source = "git+https://github.com/infosia/swc_ecma_parser?branch=subscript-eof-bump#113e3c470d9a91538aaa723c1ed244fbfde8b300"
 dependencies = [
  "either",
  "new_debug_unreachable",
