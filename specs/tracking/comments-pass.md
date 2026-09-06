@@ -1,0 +1,80 @@
+# comments-pass — documentation comments on the hand-written sources
+
+2026-09-06. Owner instruction: every public function carries a
+documentation comment that is simple, non-redundant, and easy to read
+for a developer. Opus subagents write them, one per file group, and
+Codex writes none. Generated files are out of scope: `lib/webgpu.ts`,
+the two mirrors, `lib/typegpu-ui-atlas.generated.ts`,
+`crates/facade/src`, and `crates/harness/src/native_symbols.generated.rs`
+take their comments from the generators.
+
+## Coverage
+
+| File group | Before | After |
+|---|---|---|
+| `lib/typegpu.ts` | 4 of 73 exports | 73 of 73 (68 blocks, two family groups) |
+| `lib/typegpu-ui.ts` | 1 of 59 | 59 of 59, plus 60 public methods and 6 constant groups |
+| `lib/typegpu-types.ts` | 0 of 62 | 36 documented, 26 family members self-describing after the first |
+| `lib/typegpu-noise.ts`, `-sort.ts`, `-radiance-cascades.ts` | 12 of 29 | 29 of 29 |
+| `lib/typegpu-color.ts`, `-sdf.ts` | complete | 5 rewritten (one wrong sign, four `-ing` forms) |
+| `crates/typegpu-gen/src` | 40 of 99 items | 99 of 99, plus a crate header on the binary |
+| `crates/harness/src`, `crates/window/src` | 17 of 23 | 23 of 23, plus two crate headers |
+| `crates/webgpu-gen/src` | 165 of 265 | 265 of 265 across 22 files, plus a crate header on the binary |
+
+## Spec drifts the writers found, fixed the same day
+
+`9fe31bb`: UI20 lacked `pushId`, `popId`, `[Symbol.dispose]`, and UI6
+the no-root case. `485b86b`: TX9 said the float formats pass bits
+through (the `rgba16float` channel converts to `f16`), BF2 said
+`patch` applies the three checks (it applies the range checks and
+traps with `EG2`), PI9 and CL1 carried stale signatures, BF9 and PI15
+said `device.queue()` where `GPUDevice` has an accessor. `72b4d8d`:
+K4 scoped the `f16` rejection to a phase and the `h` factories are
+host code, SC5 read as the whole class list, SC6 named an `identity`
+factory that does not exist.
+
+`generator-import.md` I7 said the driver writes six outputs. It
+writes seven: `crates/facade/src/surface.rs` is the seventh (F23).
+Fixed with this record.
+
+Reported and kept as written: `render::reject_vertex_storage_writes`
+emits `RN9`, and RN16 lists the rejection without an id. F22 states
+that an excluded export is never emitted. The code emits and then
+filters the header and the Rust source, and `emit_rust::render`
+applies the exclusion to five chunk kinds. The observable result
+matches F22, and the mechanism does not. The comment on
+`emit_rust::render` states the actual scope. A pre-existing residue
+comment in `plan.rs` (two schedule labels) is rewritten.
+
+## Panic paths in library code, open
+
+Core principle 6 forbids panics in library code. The writers listed
+these sites for a later coding round: `crates/typegpu-gen/src/emit.rs`
+(`expect` on an array stride), `kernel.rs` (`expect` on an atomic
+receiver class name), `shell.rs` (`expect` on a character boundary),
+`crates/harness/src/lib.rs` (`panic!` in `run_on_compiler_stack` and
+in the pool, `expect` on the coverage array size, `assert_ne!` on
+`MAP_FAILED`, unchecked indexing in `coverage_hit`),
+`crates/window/src/main.rs` (two `expect` on the stored window), and
+unchecked `module.classes[id.0]` indexing in `pipeline.rs` and
+`render.rs`. `crates/webgpu-gen/src` holds 55 more (`plan.rs` 15,
+`emit_rust.rs` 16, `patterns/descriptor.rs` 7, `emit_header.rs` 4,
+`native_symbols.rs` 4, `patterns/handle_array.rs` 3,
+`patterns/future_poll.rs` 2, `api.rs`, `model.rs`, `patterns/sync.rs`
+1 each). Two of those reach a panic from the generator's own output
+rather than from a proven invariant: `emit_rust::function_signatures`
+on a declaration it cannot split, and `native_symbols::rust_signature`
+on an export the emitted Rust lacks. Each site is reachable only
+through an internal invariant, and none has a fixture. A round decides each: return an error, or
+state the invariant in the comment.
+
+## Evidence
+
+`cargo fmt --all -- --check` clean. `tools/gate.sh --require-backend`
+green, 276 passed, 1 ignored, 222.1 s wall. The first run was red at
+`rule_ids::every_cited_rule_id_resolves`: a comment in
+`crates/typegpu-gen/src/library.rs` cites `LB1`, and
+`specs/blocks/rule-ids.txt` had no `LB` line although `library.md`
+defines LB1 to LB4. The seven `LB` ids joined the file. Every golden
+is byte-identical. The diff: 44 files, 1,519 comment lines added, 15
+comment lines rewritten, no code line changed.

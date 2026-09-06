@@ -85,9 +85,9 @@ quotes its gate result.
 - **I7 — The driver.** `main.rs` takes one argument, the
   repository root, and reads `third_party/webgpu-headers/webgpu.yml`,
   `crates/webgpu-gen/policy.toml`, and the two gpuweb `.bs` files. It
-  writes exactly these six: `crates/facade/subscript-typegpu.h`,
-  `crates/facade/src/generated.rs`,
-  `lib/subscript-typegpu.generated.d.ts`,
+  writes exactly these seven: `crates/facade/subscript-typegpu.h`,
+  `crates/facade/src/generated.rs`, `crates/facade/src/surface.rs`
+  (F23), `lib/subscript-typegpu.generated.d.ts`,
   `lib/wire-enum-aliases.generated.d.ts`, `lib/webgpu.ts`,
   `crates/harness/src/native_symbols.generated.rs`. `tools/regen.sh`
   runs it. Gate: the regen test regenerates into a scratch directory
