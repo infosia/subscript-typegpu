@@ -3,7 +3,9 @@
 // The upstream nested 3D array is flattened to x * 49 + y * 7 + z. Its mat4.aim
 // camera reduces to host-computed origin/right/up/forward basis vectors. A zero-alpha
 // fragment replaces upstream discard because the kernel subset has no discard.
-// The upstream sliders and pointer do not port; the camera orbits on the frame count.
+// The upstream sliders and pointer do not port, and the camera orbits on the frame count.
+// Boxes span whole lattice cells from 0 to 7, where upstream centers them with half-box
+// bounds, and the quad is a triangle list, not a strip.
 // Ported from TypeGPU's box-raytracing example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -47,6 +49,8 @@ import {
   boxes_WGSL,
 } from "./main.typegpu";
 
+// The grid holds 7 cells per axis, so CELL_COUNT is 343. ROTATION_SPEED is radians per
+// second, and CAMERA_DISTANCE and BOX_SIZE are world units.
 const GRID_SIZE: u32 = 7;
 const CELL_COUNT: u32 = 343;
 const ROTATION_SPEED: f32 = 1.2;
@@ -54,6 +58,8 @@ const CAMERA_DISTANCE: f32 = 16.0;
 const BOX_SIZE: f32 = 1.0;
 const MATERIAL_DENSITY: f32 = 2.0;
 
+// The vertex record. The generator emits Vertex_STRIDE from this class, so the host code
+// never counts bytes.
 @CStruct
 class Vertex {
   position: Vec2f;
@@ -63,6 +69,8 @@ class Vertex {
   }
 }
 
+// One cell of the flattened grid. A schema holds no `boolean`, because WGSL `bool` is not
+// host-shareable, so `isActive` is a `u32`.
 @CStruct
 class BoxCell {
   isActive: u32;
@@ -74,6 +82,8 @@ class BoxCell {
   }
 }
 
+// The camera uniform. The host computes the basis vectors, so the fragment needs no matrix.
+// Upstream sends an inverse view matrix from `mat4.aim` instead.
 @CStruct
 class Camera {
   canvasDims: Vec2f;
@@ -97,6 +107,8 @@ class Camera {
   }
 }
 
+// The inter-stage record. The field named `position` becomes the clip-space builtin, and
+// `uv` becomes location 0.
 @CStruct
 class Varyings {
   position: Vec4f;
@@ -108,6 +120,8 @@ class Varyings {
   }
 }
 
+// The slab test returns three values at once. `hit` is a `u32` for the same reason as
+// `isActive`.
 @CStruct
 class Intersection {
   hit: u32;
@@ -121,6 +135,7 @@ class Intersection {
   }
 }
 
+// The bind group layout. `Storage` is read-only, which matches a grid that no pass writes.
 class BoxLayout {
   cells!: Storage<BoxCell>;
   camera!: Uniform<Camera>;
@@ -178,6 +193,8 @@ function intersectBox(
   return new Intersection(tMax >= tMin ? 1 : 0, tMin, tMax);
 }
 
+// The vertex stage passes the corner through and derives the uv. Upstream computes the ray
+// origin here, and this port reads the camera uniform in the fragment stage.
 function boxVertex(res: BoxLayout, value: Vertex, ctx: VertexInvocation): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -185,12 +202,16 @@ function boxVertex(res: BoxLayout, value: Vertex, ctx: VertexInvocation): Varyin
   );
 }
 
+// One invocation traces one ray through the whole grid. The direction comes from the camera
+// basis, so no matrix multiply runs per pixel.
 function boxFragment(
   res: BoxLayout,
   input: Varyings,
   ctx: FragmentInvocation,
 ): Vec4f {
   const camera: Camera = res.camera.$;
+  // The view coordinates divide by the shorter side, so the field of view stays equal on both
+  // axes.
   const pixel = input.uv.mul(camera.canvasDims);
   const minimumDimension: f32 = scalarMin(camera.canvasDims.x, camera.canvasDims.y);
   const view = pixel.sub(camera.canvasDims.scale(0.5)).scale(1.0 / minimumDimension);
@@ -198,6 +219,7 @@ function boxFragment(
     .add(camera.up.scale(view.y))
     .add(camera.forward)
     .normalize();
+  // One test against the whole grid rejects a ray early, so a miss costs one slab test.
   const bounds: Intersection = intersectBox(
     camera.origin,
     direction,
@@ -209,6 +231,8 @@ function boxFragment(
   let densitySum: f32 = 0.0;
   let inverseColor = new Vec3f(0.0, 0.0, 0.0);
   let hitAny: boolean = false;
+  // The flat loop replaces the upstream triple loop over a nested 3D array. The index splits
+  // back into x, y, and z, because a flat storage array carries one stride.
   for (let index: u32 = 0; index < CELL_COUNT; index += 1) {
     const cell: BoxCell = res.cells[index];
     if (cell.isActive === 0) continue;
@@ -247,6 +271,8 @@ function boxFragment(
   ));
   // The second encode follows the upstream shader's deliberate wash.
   const corrected: Vec3f = srgb.pow(new Vec3f(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2));
+  // The blend state below expects premultiplied color, so the return scales the color and the
+  // alpha by the same factor.
   const alpha: f32 = scalarMin(densitySum, 1.0);
   return new Vec4f(
     scalarMin(corrected.x, 1.0),
@@ -256,6 +282,8 @@ function boxFragment(
   ).scale(alpha);
 }
 
+// The declaration carries the blend state. `one` and `one-minus-src-alpha` compose the
+// premultiplied color the fragment returns over the cleared background.
 export const boxes: RenderPipelineSpec = renderPipelineL<BoxLayout, Vertex, Varyings>(
   boxVertex,
   boxFragment,
@@ -276,6 +304,8 @@ export const boxes: RenderPipelineSpec = renderPipelineL<BoxLayout, Vertex, Vary
   },
 );
 
+// The host calls `init`, `frame`, and `shutdown` separately, so every handle that outlives
+// `init` lives in module state. A `using` declaration disposes a handle too early here.
 let activeDevice: GPUHostOwnedDevice | null = null;
 let activePipeline: RenderPipeline | null = null;
 let activeVertices: GPUBuffer | null = null;
@@ -284,6 +314,8 @@ let activeCamera: GPUBuffer | null = null;
 let activeGroup: GPUBindGroup | null = null;
 let frameCount: u32 = 0;
 
+// The host builds the camera basis once per frame. The eye orbits the grid center at
+// CAMERA_DISTANCE, and `right`, `up`, and `forward` form the view frame.
 function orbitCamera(width: u32, height: u32, time: f32): Camera {
   const center = new Vec3f(3.0, 3.0, 3.0);
   const eye = center.add(new Vec3f(
@@ -297,37 +329,54 @@ function orbitCamera(width: u32, height: u32, time: f32): Camera {
   return new Camera(new Vec2f(width as f32, height as f32), eye, right, up, forward);
 }
 
+// `init` runs once, after the host configures the surface. It creates every long-lived
+// resource. The instance and the device stay with the host.
 export function init(
   instance: SubscriptTypegpuInstance,
   device: SubscriptTypegpuDevice,
   format: GPUTextureFormat,
 ): void {
+  // The generator pins the target format into the pipeline. A mismatch with the host surface
+  // fails here, not inside pipeline creation.
   if (format !== boxes_TARGET_FORMAT) {
     print(`FAIL format expected=${boxes_TARGET_FORMAT} actual=${format}`);
     return;
   }
+  // The wrapper adapts the host handles to the API layer. It carries no `dispose`, because
+  // the host owns the device.
   const hostDevice = hostOwnedGPUDevice(instance, device);
+  // The vertex buffer holds the three corners of the fullscreen triangle. Vertex_STRIDE keeps
+  // the size right when the schema changes.
   const vertices = hostDevice.createBuffer({
     label: "box-raytracing-fullscreen",
     size: (Vertex_STRIDE * 3) as u64,
     usage: GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
+  // The cell buffer holds 343 records. STORAGE covers the shader read, and COPY_DST covers the
+  // host write below.
   const cells = hostDevice.createBuffer({
     label: "box-raytracing-cells",
     size: (BoxCell_STRIDE * CELL_COUNT) as u64,
     usage: GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
   });
+  // One uniform buffer holds Camera. COPY_DST admits the queue write that each frame makes.
   const camera = hostDevice.createBuffer({
     label: "box-raytracing-camera",
     size: Camera_SIZE as u64,
     usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
   });
+  // The queue wrapper is a handle. `using` disposes it at the end of `init`, and `frame`
+  // takes a fresh one.
   using queue = hostDevice.queue();
+  // `Context.bytesOf` lays out the values with the generated C layout, so the bytes match the
+  // WGSL that the generator emits.
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>([
     new Vertex(new Vec2f(-1.0, -1.0)),
     new Vertex(new Vec2f(3.0, -1.0)),
     new Vertex(new Vec2f(-1.0, 3.0)),
   ]));
+  // The seed writes one record per cell, at the flat index the fragment reads back. The active
+  // test cuts a corner out of the cube, and the albedo maps the cell position to a color.
   for (let x: u32 = 0; x < GRID_SIZE; x += 1) {
     for (let y: u32 = 0; y < GRID_SIZE; y += 1) {
       for (let z: u32 = 0; z < GRID_SIZE; z += 1) {
@@ -350,8 +399,14 @@ export function init(
       }
     }
   }
+  // The first camera write assumes a 1 by 1 surface. The first frame replaces it with the real
+  // surface size.
   queue.writeBuffer(camera, 0, Context.bytesOf<Camera>(orbitCamera(1, 1, 0.0)));
+  // The error scope catches a validation failure from pipeline creation. The layers return the
+  // failure as a value, so a `null` check replaces an exception.
   hostDevice.pushErrorScope("validation");
+  // The call takes the generated WGSL text, the two entry names, the bind group layout, and
+  // the vertex layout. No shader text is built here.
   const pipeline = createRenderPipelineHost(
     hostDevice,
     boxes_WGSL,
@@ -362,6 +417,8 @@ export function init(
     boxes,
   );
   const validationError = hostDevice.popErrorScope();
+  // The error path disposes every handle that the failed run already created, because no
+  // finalizer runs later.
   if (validationError !== null) {
     pipeline.dispose();
     camera.dispose();
@@ -370,13 +427,18 @@ export function init(
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
+  // The native layout comes from the pipeline. The bind group reads it at creation, so `using`
+  // releases the handle right after.
   using bindLayout = pipeline.bindGroupLayout(0);
+  // The resource order follows the field order of BoxLayout: the cells, then the camera.
   const group = createBindGroupHost(
     hostDevice,
     bindLayout,
     boxes_LAYOUT0,
     [bufferResource(cells), bufferResource(camera)],
   );
+  // The state moves to module scope only after every step passes. A failed `init` leaves the
+  // fields null, and `frame` returns at once.
   activeDevice = hostDevice;
   activePipeline = pipeline;
   activeVertices = vertices;
@@ -385,6 +447,8 @@ export function init(
   activeGroup = group;
 }
 
+// The host calls `frame` once per presented frame. `view` is the swapchain view the host
+// owns, and `width` and `height` are surface pixels.
 export function frame(
   view: SubscriptTypegpuTextureView,
   width: u32,
@@ -399,12 +463,18 @@ export function frame(
   const vertices = activeVertices;
   const camera = activeCamera;
   const group = activeGroup;
+  // A null field means `init` failed or never ran. The frame returns, because the layers
+  // report failure as a value.
   if (device === null) return;
   if (pipeline === null) return;
   if (vertices === null) return;
   if (camera === null) return;
   if (group === null) return;
+  // The frame count is the only clock the window host offers. 60 frames stand for one second,
+  // and ROTATION_SPEED turns that into the orbit angle.
   frameCount += 1;
+  // The queue applies the camera write below before it runs the submitted command buffer. The
+  // fragment then reads the pose of this frame.
   using queue = device.queue();
   queue.writeBuffer(
     camera,
@@ -415,8 +485,12 @@ export function frame(
       ((frameCount as f32) / 60.0) * ROTATION_SPEED,
     )),
   );
+  // The host owns the swapchain view. The wrapper adds no ownership, and `shutdown` never
+  // disposes it.
   const target = new GPUTextureView(view);
+  // One encoder records the whole frame. `using` disposes it after the submit.
   using encoder = device.createCommandEncoderDefault();
+  // The clear paints the background. The blend then composes each ray result over that color.
   using pass = encoder.beginRenderPass({
     colorAttachments: [{
       view: target,
@@ -425,21 +499,31 @@ export function frame(
       storeOp: "store",
     }],
   });
+  // The viewport and the scissor follow the current surface size, because the host resizes the
+  // swapchain without a new pipeline.
   pass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   pass.setScissorRect(0, 0, width, height);
+  // `bind` sets the pipeline, the bind groups, and the vertex buffers in one call. TypeGPU
+  // spells the same step as `.with(bindGroup)`.
   pipeline.bind(pass, [group], [vertices]);
+  // The three vertices reach past the surface, and the rasterizer clips the excess.
   pass.draw(3);
   pass.end();
+  // `finishDefault` closes the encoder, and `submit` hands the command buffer to the queue.
+  // The host presents the surface after `frame` returns.
   using command = encoder.finishDefault();
   queue.submit([command]);
 }
 
+// The host calls `shutdown` once, before it releases the device. The bind group goes first,
+// because it names the other handles.
 export function shutdown(): void {
   if (activeGroup !== null) activeGroup.dispose();
   if (activeCamera !== null) activeCamera.dispose();
   if (activeCells !== null) activeCells.dispose();
   if (activeVertices !== null) activeVertices.dispose();
   if (activePipeline !== null) activePipeline.dispose();
+  // The null assignments make a second `shutdown` call safe.
   activeCamera = null;
   activeCells = null;
   activeVertices = null;

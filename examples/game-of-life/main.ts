@@ -3,7 +3,9 @@
 // This port keeps the naive strategy at a fixed 128-square grid. It drops the workgroup-tiled
 // strategy, the bit-packed strategy, the size selector, the zoom view, and the pause controls.
 // One glider replaces the upstream random seed, and a fixed square brush replaces the
-// upstream brush radius, brush modes, and stroke line.
+// upstream brush radius, brush modes, and stroke line. The cell texture is `r32float`,
+// not `r32uint`, and the neighbor lookup wraps into a torus. The view selector, the
+// timestep, the steps-per-frame, and the Step controls do not port.
 // Ported from TypeGPU's game-of-life example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -60,12 +62,16 @@ import {
   lifeStep_WGSL,
 } from "./main.typegpu";
 
+// The grid is fixed at 128 cells per axis, and 128 divides by the workgroup size of 8.
+// BRUSH_RADIUS is in cells, so the brush covers a 5 by 5 square.
 const GRID_SIZE: u32 = 128;
 const BRUSH_RADIUS: f32 = 2.5;
 const EDIT_NONE: u32 = 0;
 const EDIT_CLEAR: u32 = 1;
 const EDIT_DRAW: u32 = 2;
 
+// The vertex record. The generator emits Vertex_STRIDE from this class, so the host code
+// never counts bytes.
 @CStruct
 class Vertex {
   position: Vec2f;
@@ -75,6 +81,8 @@ class Vertex {
   }
 }
 
+// The edit uniform. `point` is in cell coordinates, not pixels, and `mode` carries one of
+// the three EDIT_ constants.
 @CStruct
 class EditParams {
   point: Vec2f;
@@ -86,6 +94,8 @@ class EditParams {
   }
 }
 
+// The inter-stage record. The field named `position` becomes the clip-space builtin, and
+// `uv` becomes location 0.
 @CStruct
 class Varyings {
   position: Vec4f;
@@ -97,16 +107,21 @@ class Varyings {
   }
 }
 
+// The step bind group. `ReadStorageTexture2d` is read-only and `StorageTexture2d` is
+// write-only, so the types state that one dispatch never writes the texture it reads.
 class LifeStepLayout {
   generation!: ReadStorageTexture2d<R32float>;
   next!: StorageTexture2d<R32float>;
 }
 
+// The edit bind group. `ReadWriteStorageTexture2d` reads and writes one texture, because the
+// brush changes cells in place.
 class LifeEditLayout {
   generation!: ReadWriteStorageTexture2d<R32float>;
   edit!: Uniform<EditParams>;
 }
 
+// The render bind group. The fragment loads a texel directly, so the pass needs no sampler.
 class LifeRenderLayout {
   generation!: ReadStorageTexture2d<R32float>;
 }
@@ -130,8 +145,12 @@ function lifeStepKernel(res: LifeStepLayout, ctx: ComputeInvocation): void {
     + res.generation.load(new Vec2i(left, up)).x
     + res.generation.load(new Vec2i(x, up)).x
     + res.generation.load(new Vec2i(right, up)).x;
+  // A cell is one r32float texel, so the test compares against 0.5. Upstream packs the same
+  // state as r32uint.
   const alive: boolean = res.generation.load(new Vec2i(x, y)).x > 0.5;
   let next: f32 = 0.0;
+  // The neighbor count is a float sum, so each rule compares against a range. Three neighbors
+  // create a cell, and two keep a live one.
   if (neighbors > 2.5 && neighbors < 3.5) {
     next = 1.0;
   } else if (alive && neighbors > 1.5 && neighbors < 2.5) {
@@ -159,6 +178,8 @@ function lifeEditKernel(res: LifeEditLayout, ctx: ComputeInvocation): void {
   }
 }
 
+// The vertex stage passes the corner through and derives the uv. Four corners and the strip
+// topology cover the surface with two triangles.
 function lifeVertex(
   res: LifeRenderLayout,
   value: Vertex,
@@ -170,6 +191,8 @@ function lifeVertex(
   );
 }
 
+// The uv maps to a cell index. A uv of exactly 1.0 lands one cell past the last row, so the
+// clamp pulls it back.
 function lifeFragment(
   res: LifeRenderLayout,
   input: Varyings,
@@ -188,16 +211,22 @@ function lifeFragment(
   );
 }
 
+// The workgroup is 8 by 8, so one workgroup covers 64 cells. 128 divides by 8, and no
+// invocation falls outside the grid.
 export const lifeStep: ComputePipelineSpec = computePipeline<LifeStepLayout>(
   lifeStepKernel,
   { name: "lifeStep", workgroupSize: [8, 8, 1] },
 );
 
+// The edit kernel covers the whole grid with the same workgroup size, so one dispatch count
+// serves both compute pipelines.
 export const lifeEdit: ComputePipelineSpec = computePipeline<LifeEditLayout>(
   lifeEditKernel,
   { name: "lifeEdit", workgroupSize: [8, 8, 1] },
 );
 
+// The topology is a triangle strip, so four vertices make two triangles. TypeGPU draws its
+// display pass from a fullscreen triangle instead.
 export const lifeRender: RenderPipelineSpec = renderPipelineL<
   LifeRenderLayout,
   Vertex,
@@ -207,6 +236,8 @@ export const lifeRender: RenderPipelineSpec = renderPipelineL<
   topology: "triangle-strip",
 });
 
+// One record holds every handle that outlives `init`. TypeGPU keeps the same handles in a
+// closure, and `frame` here needs one null check instead of fourteen.
 class LifeState {
   device: GPUHostOwnedDevice;
   step: ComputePipeline;
@@ -286,6 +317,7 @@ function gliderSeed(): Vec4f[] {
   return pixels;
 }
 
+// A storage texture starts undefined, so the second generation takes an explicit zero fill.
 function emptyGeneration(): Vec4f[] {
   const pixels: Vec4f[] = [];
   let index: u32 = 0;
@@ -296,27 +328,41 @@ function emptyGeneration(): Vec4f[] {
   return pixels;
 }
 
+// `init` runs once, after the host configures the surface. It creates every long-lived
+// resource. The instance and the device stay with the host.
 export function init(
   instance: SubscriptTypegpuInstance,
   device: SubscriptTypegpuDevice,
   format: GPUTextureFormat,
 ): void {
+  // The generator pins the target format into the pipeline. A mismatch with the host surface
+  // fails here, not inside pipeline creation.
   if (format !== lifeRender_TARGET_FORMAT) {
     print(`FAIL format expected=${lifeRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
+  // The wrapper adapts the host handles to the API layer. It carries no `dispose`, because
+  // the host owns the device.
   const hostDevice = hostOwnedGPUDevice(instance, device);
+  // The vertex buffer holds the four corners of the strip. Vertex_STRIDE keeps the size right
+  // when the schema changes.
   const vertices = hostDevice.createBuffer({
     label: "life-vertices",
     size: (Vertex_STRIDE * 4) as u64,
     usage: GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
+  // One uniform buffer serves both edit bind groups. COPY_DST admits the write that a frame
+  // with input makes.
   const editParams = hostDevice.createBuffer({
     label: "life-edit",
     size: EditParams_SIZE as u64,
     usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
   });
+  // STORAGE_BINDING covers every load and store in the three shaders, and COPY_DST covers the
+  // seed write below.
   const textureUsage: u64 = GPUTextureUsage.STORAGE_BINDING + GPUTextureUsage.COPY_DST;
+  // Two textures hold the generations and swap roles each frame. The r32float format keeps one
+  // cell per texel.
   const generationA = hostDevice.createTexture({
     label: "life-generation-a",
     size: { width: GRID_SIZE, height: GRID_SIZE },
@@ -329,20 +375,31 @@ export function init(
     format: "r32float",
     usage: textureUsage,
   });
+  // A bind group holds a view, not a texture, so each generation needs a view handle of its own.
   const viewA = generationA.createView();
   const viewB = generationB.createView();
+  // The four corners run in strip order: lower left, lower right, upper left, upper right.
   const vertexValues: FixedArray<Vertex, 4> = [
     new Vertex(new Vec2f(-1.0, -1.0)),
     new Vertex(new Vec2f(1.0, -1.0)),
     new Vertex(new Vec2f(-1.0, 1.0)),
     new Vertex(new Vec2f(1.0, 1.0)),
   ];
+  // The queue wrapper is a handle. `using` disposes it at the end of `init`, and `frame`
+  // takes a fresh one.
   using queue = hostDevice.queue();
+  // `Context.bytesOf` lays out the values with the generated C layout, so the bytes match the
+  // WGSL that the generator emits.
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 4>>(vertexValues));
+  // The helper pads each row to the 256-byte row alignment that a texture write needs.
   writeTexturePixels(queue, generationA, gliderSeed(), GRID_SIZE, GRID_SIZE);
   writeTexturePixels(queue, generationB, emptyGeneration(), GRID_SIZE, GRID_SIZE);
 
+  // One error scope covers all three pipeline creations. The layers return the failure as a
+  // value, so a `null` check replaces an exception.
   hostDevice.pushErrorScope("validation");
+  // Each compute call takes the generated WGSL, the entry name, the bind group layout, and the
+  // workgroup size that the declaration above names.
   const stepPipeline = createComputePipelineHost(
     hostDevice,
     lifeStep_WGSL,
@@ -357,6 +414,7 @@ export function init(
     [lifeEdit_LAYOUT0],
     [8, 8, 1],
   );
+  // The render call adds the two entry names and the vertex layout. No shader text is built here.
   const renderPipeline = createRenderPipelineHost(
     hostDevice,
     lifeRender_WGSL,
@@ -367,6 +425,8 @@ export function init(
     lifeRender,
   );
   const validationError = hostDevice.popErrorScope();
+  // The error path disposes every handle that the failed run already created, because no
+  // finalizer runs later.
   if (validationError !== null) {
     renderPipeline.dispose();
     editPipeline.dispose();
@@ -381,9 +441,13 @@ export function init(
     return;
   }
 
+  // Three native layouts come from the three pipelines. Every bind group reads its layout at
+  // creation, so `using` releases all three at the end of `init`.
   using stepLayout = stepPipeline.bindGroupLayout(0);
   using editLayout = editPipeline.bindGroupLayout(0);
   using renderLayout = renderPipeline.bindGroupLayout(0);
+  // Six bind groups cover both directions of the swap for each pass. The frame then picks
+  // three of them and builds none.
   const stepAB = createBindGroupHost(hostDevice, stepLayout, lifeStep_LAYOUT0, [
     textureResource(viewA),
     textureResource(viewB),
@@ -406,6 +470,8 @@ export function init(
   const renderB = createBindGroupHost(hostDevice, renderLayout, lifeRender_LAYOUT0, [
     textureResource(viewB),
   ]);
+  // The state moves to module scope only after every step passes. A failed `init` leaves
+  // `activeState` null, and `frame` returns at once.
   activeState = new LifeState(
     hostDevice,
     stepPipeline,
@@ -426,6 +492,8 @@ export function init(
   );
 }
 
+// The host calls `frame` once per presented frame. `view` is the swapchain view the host
+// owns, and `width` and `height` are surface pixels.
 export function frame(
   view: SubscriptTypegpuTextureView,
   width: u32,
@@ -435,9 +503,12 @@ export function frame(
   pointerY: f32,
   buttons: u32,
 ): void {
+  // A null state means `init` failed or never ran. The frame returns, because the layers
+  // report failure as a value.
   if (activeState === null) return;
   const active = activeState;
-  // The host passes the key as a Unicode scalar, and 48 is the `0` key.
+  // The host passes the key as a Unicode scalar, and 48 is the `0` key. Bit 0 of `buttons`
+  // is the left button, and the host reports -1, -1 until the pointer first enters the window.
   // Grid row 0 sits at the bottom of the surface, so the pointer Y is flipped.
   let editMode: u32 = EDIT_NONE;
   let editPoint = new Vec2f(0.0, 0.0);
@@ -457,8 +528,14 @@ export function frame(
   const stepGroup: GPUBindGroup = readsA ? active.stepAB : active.stepBA;
   const editGroup: GPUBindGroup = readsA ? active.editB : active.editA;
   const displayGroup: GPUBindGroup = readsA ? active.renderB : active.renderA;
+  // One encoder records the step pass, the edit pass, and the render pass. The device runs
+  // them in the recorded order.
   using encoder = active.device.createCommandEncoderDefault();
+  // `dispatch` takes workgroup counts, not thread counts. 128 cells over a workgroup of 8 give
+  // 16 workgroups per axis, with no partial workgroup.
   active.step.dispatch(encoder, [stepGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
+  // The edit pass runs only on a frame with input. It runs after the step pass, so the brush
+  // survives into the next generation.
   if (editMode !== EDIT_NONE) {
     queue.writeBuffer(
       active.editParams,
@@ -467,7 +544,10 @@ export function frame(
     );
     active.edit.dispatch(encoder, [editGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
   }
+  // The host owns the swapchain view. The wrapper adds no ownership, and `shutdown` never
+  // disposes it.
   const target = new GPUTextureView(view);
+  // The pass clears to the dead-cell color, so no pixel of an earlier frame survives a resize.
   using renderPass = encoder.beginRenderPass({
     colorAttachments: [{
       view: target,
@@ -476,16 +556,26 @@ export function frame(
       storeOp: "store",
     }],
   });
+  // The viewport and the scissor follow the current surface size, because the host resizes the
+  // swapchain without a new pipeline.
   renderPass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   renderPass.setScissorRect(0, 0, width, height);
+  // `bind` sets the pipeline, the bind groups, and the vertex buffers in one call. TypeGPU
+  // spells the same step as `.with(bindGroup)`.
   active.render.bind(renderPass, [displayGroup], [active.vertices]);
+  // Four vertices and the strip topology give the two triangles that cover the surface.
   renderPass.draw(4);
   renderPass.end();
+  // `finishDefault` closes the encoder, and `submit` hands the command buffer to the queue.
+  // The host presents the surface after `frame` returns.
   using command = encoder.finishDefault();
   queue.submit([command]);
+  // The counter advances after the submit, so the next frame reads the texture this frame wrote.
   frameCount += 1;
 }
 
+// The host calls `shutdown` once, before it releases the device. The bind groups go first,
+// because they name the views and the buffers.
 export function shutdown(): void {
   if (activeState === null) return;
   const active = activeState;
@@ -504,6 +594,7 @@ export function shutdown(): void {
   active.render.dispose();
   active.edit.dispose();
   active.step.dispose();
+  // The null assignment makes a second `shutdown` call safe.
   activeState = null;
   frameCount = 0;
 }

@@ -1,7 +1,7 @@
 // example: disco
-// Cycles three animated fullscreen patterns from one shared palette.
-// Keys 1, 2, and 3 select rings, swirl, and kaleidoscope.
-// TypeGPU ships seven selectable patterns. This port commits three.
+// Cycles three animated fullscreen patterns that share one palette function with
+// different coefficients. Keys 1, 2, and 3 select rings, swirl, and kaleidoscope.
+// TypeGPU ships seven selectable patterns. This port commits three designs of its own.
 // Ported from TypeGPU's disco example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -52,6 +52,8 @@ import {
   swirl_WGSL,
 } from "./main.typegpu";
 
+// The vertex record. The generator emits Vertex_STRIDE from this class, so the host code
+// never counts bytes.
 @CStruct
 class Vertex {
   position: Vec2f;
@@ -61,6 +63,8 @@ class Vertex {
   }
 }
 
+// The per-frame uniform. `time` carries seconds derived from the frame count, and
+// `resolution` carries the surface size in pixels.
 @CStruct
 class FrameData {
   time: f32;
@@ -72,6 +76,8 @@ class FrameData {
   }
 }
 
+// The inter-stage record. The field named `position` becomes the clip-space builtin, and
+// `uv` becomes location 0.
 @CStruct
 class Varyings {
   position: Vec4f;
@@ -83,10 +89,14 @@ class Varyings {
   }
 }
 
+// The bind group layout. The three patterns declare the same layout, so one uniform buffer
+// and one bind group serve all three pipelines.
 class DiscoLayout {
   frame!: Uniform<FrameData>;
 }
 
+// The cosine palette maps one scalar to a color. The 6.28318 factor turns the argument into
+// a full turn.
 function cosinePalette(a: Vec3f, b: Vec3f, c: Vec3f, d: Vec3f, value: f32): Vec3f {
   return a.add(b.mul(c.scale(value).add(d).scale(6.28318).cos()));
 }
@@ -106,6 +116,8 @@ function absolute(value: f32): f32 {
   return value;
 }
 
+// The uv maps to [-1, 1] with the x axis stretched by the aspect ratio. Upstream stretches
+// the shorter axis instead, so a tall surface shows a different zoom.
 function discoUv(input: Varyings, resolution: Vec2f): Vec2f {
   return new Vec2f(
     (input.uv.x * 2.0 - 1.0) * resolution.x / resolution.y,
@@ -113,6 +125,8 @@ function discoUv(input: Varyings, resolution: Vec2f): Vec2f {
   );
 }
 
+// One vertex stage feeds all three fragment stages. TypeGPU builds two triangles from the
+// vertex index, and this port draws one oversized triangle from a vertex buffer.
 function discoVertex(res: DiscoLayout, value: Vertex, ctx: VertexInvocation): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -129,6 +143,8 @@ function ringsFragment(
   const frame: FrameData = res.frame.$;
   let point: Vec2f = discoUv(input, frame.resolution);
   let glow: f32 = 0.0;
+  // Each pass rotates the plane, folds it into cells, and adds one ring edge to `glow`. The
+  // fold puts many copies of the same ring on one surface.
   for (let iteration: u32 = 0; iteration < 4; iteration += 1) {
     point = rotate(point, frame.time * 0.08 + (iteration as f32) * 0.38);
     const cell: Vec2f = point.scale(1.45).fract().sub(new Vec2f(0.5, 0.5));
@@ -159,6 +175,7 @@ function swirlFragment(
   const frame: FrameData = res.frame.$;
   let point: Vec2f = discoUv(input, frame.resolution);
   let glow: f32 = 0.0;
+  // The rotation angle grows with the radius, so the fold twists more away from the center.
   for (let iteration: u32 = 0; iteration < 5; iteration += 1) {
     const radius: f32 = point.length();
     point = rotate(
@@ -190,6 +207,8 @@ function kaleidoscopeFragment(
   const frame: FrameData = res.frame.$;
   let point: Vec2f = discoUv(input, frame.resolution);
   let glow: f32 = 0.0;
+  // `abs` mirrors the plane into one quadrant before each rotation. The mirror turns a plain
+  // fold into a kaleidoscope.
   for (let iteration: u32 = 0; iteration < 3; iteration += 1) {
     point = rotate(
       point.abs(),
@@ -208,6 +227,8 @@ function kaleidoscopeFragment(
   return new Vec4f(color.x, color.y, color.z, 1.0);
 }
 
+// Three declarations share one vertex stage and one layout class. The generator emits one
+// WGSL module per declaration, each with its own entry names and constants.
 export const rings: RenderPipelineSpec = renderPipelineL<DiscoLayout, Vertex, Varyings>(
   discoVertex,
   ringsFragment,
@@ -226,6 +247,8 @@ export const kaleidoscope: RenderPipelineSpec = renderPipelineL<DiscoLayout, Ver
   { format: "bgra8unorm" },
 );
 
+// The host calls `init`, `frame`, and `shutdown` separately, so every handle that outlives
+// `init` lives in module state. A `using` declaration disposes a handle too early here.
 let activeDevice: GPUHostOwnedDevice | null = null;
 let activeRings: RenderPipeline | null = null;
 let activeSwirl: RenderPipeline | null = null;
@@ -236,11 +259,15 @@ let activeGroup: GPUBindGroup | null = null;
 let frameCount: u32 = 0;
 let patternIndex: u32 = 0;
 
+// `init` runs once, after the host configures the surface. It creates every long-lived
+// resource. The instance and the device stay with the host.
 export function init(
   instance: SubscriptTypegpuInstance,
   device: SubscriptTypegpuDevice,
   format: GPUTextureFormat,
 ): void {
+  // The generator pins a target format into each pipeline. The check covers all three, so no
+  // mismatch reaches pipeline creation.
   if (
     format !== rings_TARGET_FORMAT
     || format !== swirl_TARGET_FORMAT
@@ -249,29 +276,44 @@ export function init(
     print(`FAIL format expected=${rings_TARGET_FORMAT} actual=${format}`);
     return;
   }
+  // The wrapper adapts the host handles to the API layer. It carries no `dispose`, because
+  // the host owns the device.
   const hostDevice = hostOwnedGPUDevice(instance, device);
+  // The vertex buffer holds the three corners of the fullscreen triangle. Vertex_STRIDE keeps
+  // the size right when the schema changes.
   const vertices = hostDevice.createBuffer({
     label: "disco-vertices",
     size: (Vertex_STRIDE * 3) as u64,
     usage: GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
+  // One uniform buffer holds FrameData for every pattern. COPY_DST admits the queue write that
+  // each frame makes.
   const frameBuffer = hostDevice.createBuffer({
     label: "disco-frame",
     size: FrameData_SIZE as u64,
     usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
   });
+  // The queue wrapper is a handle. `using` disposes it at the end of `init`, and `frame`
+  // takes a fresh one.
   using queue = hostDevice.queue();
+  // `Context.bytesOf` lays out the values with the generated C layout, so the bytes match the
+  // WGSL that the generator emits.
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>([
     new Vertex(new Vec2f(-1.0, -1.0)),
     new Vertex(new Vec2f(3.0, -1.0)),
     new Vertex(new Vec2f(-1.0, 3.0)),
   ]));
+  // The first uniform write gives the buffer a defined value before the first frame runs.
   queue.writeBuffer(
     frameBuffer,
     0,
     Context.bytesOf<FrameData>(new FrameData(0.0, new Vec2f(1.0, 1.0))),
   );
+  // One error scope covers all three pipeline creations. The layers return the failure as a
+  // value, so a `null` check replaces an exception.
   hostDevice.pushErrorScope("validation");
+  // Each call takes the generated WGSL text, the two entry names, the bind group layout, and
+  // the vertex layout. No shader text is built here.
   const ringsPipeline = createRenderPipelineHost(
     hostDevice,
     rings_WGSL,
@@ -300,6 +342,8 @@ export function init(
     kaleidoscope,
   );
   const validationError = hostDevice.popErrorScope();
+  // The error path disposes every handle that the failed run already created, because no
+  // finalizer runs later.
   if (validationError !== null) {
     kaleidoscopePipeline.dispose();
     swirlPipeline.dispose();
@@ -309,6 +353,8 @@ export function init(
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
+  // The three pipelines declare the same layout, so the group built from the rings layout
+  // binds to any of them.
   using bindLayout = ringsPipeline.bindGroupLayout(0);
   const group = createBindGroupHost(
     hostDevice,
@@ -316,6 +362,8 @@ export function init(
     rings_LAYOUT0,
     [bufferResource(frameBuffer)],
   );
+  // The state moves to module scope only after every step passes. A failed `init` leaves the
+  // fields null, and `frame` returns at once.
   activeDevice = hostDevice;
   activeRings = ringsPipeline;
   activeSwirl = swirlPipeline;
@@ -325,6 +373,8 @@ export function init(
   activeGroup = group;
 }
 
+// The host calls `frame` once per presented frame. `view` is the swapchain view the host
+// owns, and `width` and `height` are surface pixels.
 export function frame(
   view: SubscriptTypegpuTextureView,
   width: u32,
@@ -338,18 +388,28 @@ export function frame(
   const vertices = activeVertices;
   const frameBuffer = activeFrameBuffer;
   const group = activeGroup;
+  // The host passes the key as a Unicode scalar, so 49, 50, and 51 are the `1`, `2`, and `3`
+  // keys. `patternIndex` holds the choice, because the host clears `key` after each frame.
   if (key === 49) patternIndex = 0;
   if (key === 50) patternIndex = 1;
   if (key === 51) patternIndex = 2;
+  // The choice selects a whole pipeline, not a branch inside one shader. Each pattern owns a
+  // compiled module of its own.
   let pipeline = activeRings;
   if (patternIndex === 1) pipeline = activeSwirl;
   if (patternIndex === 2) pipeline = activeKaleidoscope;
+  // A null field means `init` failed or never ran. The frame returns, because the layers
+  // report failure as a value.
   if (device === null) return;
   if (pipeline === null) return;
   if (vertices === null) return;
   if (frameBuffer === null) return;
   if (group === null) return;
+  // The frame count is the only clock the window host offers. 60 frames stand for one second
+  // of shader time.
   frameCount += 1;
+  // The queue applies the write below before it runs the command buffer that the submit sends,
+  // so the fragment reads the values of this frame.
   using queue = device.queue();
   queue.writeBuffer(
     frameBuffer,
@@ -359,8 +419,12 @@ export function frame(
       new Vec2f(width as f32, height as f32),
     )),
   );
+  // The host owns the swapchain view. The wrapper adds no ownership, and `shutdown` never
+  // disposes it.
   const target = new GPUTextureView(view);
+  // One encoder records the whole frame. `using` disposes it after the submit.
   using encoder = device.createCommandEncoderDefault();
+  // The pass clears to near black first, so no pixel of an earlier frame survives a resize.
   using pass = encoder.beginRenderPass({
     colorAttachments: [{
       view: target,
@@ -369,15 +433,24 @@ export function frame(
       storeOp: "store",
     }],
   });
+  // The viewport and the scissor follow the current surface size, because the host resizes the
+  // swapchain without a new pipeline.
   pass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   pass.setScissorRect(0, 0, width, height);
+  // `bind` sets the pipeline, the bind groups, and the vertex buffers in one call. The same
+  // group serves whichever pattern the key selected.
   pipeline.bind(pass, [group], [vertices]);
+  // The three vertices reach past the surface, and the rasterizer clips the excess.
   pass.draw(3);
   pass.end();
+  // `finishDefault` closes the encoder, and `submit` hands the command buffer to the queue.
+  // The host presents the surface after `frame` returns.
   using command = encoder.finishDefault();
   queue.submit([command]);
 }
 
+// The host calls `shutdown` once, before it releases the device. The bind group goes first,
+// because it names the other handles.
 export function shutdown(): void {
   if (activeGroup !== null) activeGroup.dispose();
   if (activeFrameBuffer !== null) activeFrameBuffer.dispose();
@@ -385,6 +458,7 @@ export function shutdown(): void {
   if (activeKaleidoscope !== null) activeKaleidoscope.dispose();
   if (activeSwirl !== null) activeSwirl.dispose();
   if (activeRings !== null) activeRings.dispose();
+  // The null assignments make a second `shutdown` call safe.
   activeFrameBuffer = null;
   activeVertices = null;
   activeKaleidoscope = null;
