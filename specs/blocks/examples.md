@@ -53,10 +53,11 @@ plan's P10 list.
   shared program loader on the dev tier with no device, and asserts
   success. A windowed example additionally passes the W2 signature
   test. Adding an example adds no Rust code.
-- **EX5 — A headless example is checked by value.** A headless
-  example ends with one `check:` line that states a computed
-  invariant and `pass` or `fail`, so a reader who runs it knows the
-  result without a golden. The gate does not run examples on a
+- **EX5 — A headless example is checked by value.** Rev 1. A
+  headless example ends with one or more `check:` lines, each of
+  which states a computed invariant and `pass`, `fail`, or `noop`
+  (the backend validated and ran nothing), so a reader who runs it
+  knows the result without a golden. The gate does not run examples on a
   device (invariant 5); the owner's device runs are recorded in
   `specs/tracking/p10-examples.md`.
 - **EX6 — Upstream is cited, never copied.** The port reimplements

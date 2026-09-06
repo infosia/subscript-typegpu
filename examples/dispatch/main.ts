@@ -1,6 +1,6 @@
 // example: dispatch
 // Counts guarded compute invocations for thread counts that no workgroup size divides.
-// This port keeps the upstream guard cases and drops its other tests.
+// This port keeps the four size cases and drops the multiple-dispatch, bind-group, and slot cases.
 // Ported from TypeGPU's dispatch example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -45,6 +45,8 @@ import {
   count3d_WORKGROUP_Z,
 } from "./main.typegpu";
 
+// One atomic counter. Every invocation adds to the same address, so the final value is the
+// number of invocations that ran.
 @CStruct
 class Counter {
   value: AtomicU32;
@@ -60,10 +62,14 @@ class CounterLayout {
   counter!: MutStorage<Counter>;
 }
 
+// The kernel body of all three pipelines. The body reads no global id, so the generated
+// guard alone decides how many invocations reach the counter.
 function countKernel(res: CounterLayout, ctx: ComputeInvocation): void {
   res.counter[0].value.add(1);
 }
 
+// 13, 35, and 45 threads. No workgroup size below divides its thread count, so every
+// dispatch launches more invocations than the example asks for.
 const DISPATCH_1D: FixedArray<u32, 3> = [13, 1, 1];
 const DISPATCH_2D: FixedArray<u32, 3> = [7, 5, 1];
 const DISPATCH_3D: FixedArray<u32, 3> = [5, 3, 3];
@@ -76,6 +82,8 @@ export const count1d: ComputePipelineSpec = computePipeline<CounterLayout>(count
   guarded: true,
 });
 
+// The three declarations differ only in the workgroup shape, so one kernel body exercises
+// the guard on one axis, on two axes, and on three.
 export const count2d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
   name: "count2d",
   workgroupSize: [4, 4, 1],
@@ -88,6 +96,8 @@ export const count3d: ComputePipelineSpec = computePipeline<CounterLayout>(count
   guarded: true,
 });
 
+// `Counter_SIZE` is a generated constant. STORAGE binds the counter to the kernel, COPY_DST
+// admits the zero write, and COPY_SRC admits the readback copy.
 function counterBuffer(device: GPUDevice, label: string): Buffer<Counter> {
   return createBuffer<Counter>(
     device,
@@ -99,6 +109,8 @@ function counterBuffer(device: GPUDevice, label: string): Buffer<Counter> {
 }
 
 export async function main(): Promise<void> {
+  // The API layer polls the future itself, so the script never pumps the event loop. A null
+  // adapter reports the failure by value, because the layers carry no exceptions.
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
   if (adapterResult === null) {
     gpu.dispose();
@@ -114,16 +126,22 @@ export async function main(): Promise<void> {
   }
   let state: string = "fail";
   {
+    // Every GPU handle lives in this block, and the script releases each one at the end.
+    // TypeGPU leaves the same handles to `root.destroy` and the collector.
     using adapter = adapterResult;
     using device = deviceResult;
     using first = counterBuffer(device, "dispatch-1d");
     using second = counterBuffer(device, "dispatch-2d");
     using third = counterBuffer(device, "dispatch-3d");
+    // The three counters start from the same zero record, so each result counts this dispatch
+    // and nothing before it.
     const zero = new Counter(new AtomicU32(0));
     first.writeOne(device.queue, 0, Context.bytesOf<Counter>(zero));
     second.writeOne(device.queue, 0, Context.bytesOf<Counter>(zero));
     third.writeOne(device.queue, 0, Context.bytesOf<Counter>(zero));
 
+    // Each pipeline comes from its own generated constants. One scope covers all three, so a
+    // failure in any of them ends the run before the dispatches.
     device.pushErrorScope("validation");
     using firstPipeline = createComputePipeline(
       device,
@@ -199,12 +217,18 @@ export async function main(): Promise<void> {
         DISPATCH_3D[1],
         DISPATCH_3D[2],
       );
+      // One encoder carries all three dispatches, and the queue runs them in the recorded
+      // order. The GPU runs nothing until the queue receives the command buffer.
       using command = encoder.finishDefault();
       device.queue.submit([command]);
 
+      // Each read copies one element into a staging buffer and awaits the map. TypeGPU's
+      // `buffer.read` hides the same two steps.
       const firstBytes: u8[] = await first.readOne(device, 0);
       const secondBytes: u8[] = await second.readOne(device, 0);
       const thirdBytes: u8[] = await third.readOne(device, 0);
+      // The bytes come back through the same schema layout the kernel wrote, so the atomic
+      // load reads the counter the device left.
       const firstValue: Counter = Context.fromBytes<Counter>(firstBytes, 0);
       const secondValue: Counter = Context.fromBytes<Counter>(secondBytes, 0);
       const thirdValue: Counter = Context.fromBytes<Counter>(thirdBytes, 0);
@@ -225,5 +249,7 @@ export async function main(): Promise<void> {
     }
   }
   gpu.dispose();
+  // One check line reports the outcome, so a reader who runs the example needs no golden.
+  // The upstream page reports the same kind of result in a table.
   print(`check:dispatch ${state}`);
 }
