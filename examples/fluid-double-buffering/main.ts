@@ -1,8 +1,9 @@
 // example: fluid-double-buffering
-// Diffuses a density field through three grid passes around an obstacle that follows the
-// pointer or the A and D keys. The velocity field is integrated and never advects density,
-// where upstream moves density along it. The source tracks the obstacle, where upstream
-// holds it at a fixed position, and the wall slider becomes a fixed value. The grid is 32 by 32.
+// Moves a density field along a per-cell velocity through three grid passes around an
+// obstacle that follows the pointer or the A and D keys. Each cell picks the cheapest open
+// neighbor as its velocity and sends density there, as upstream does. The source tracks the
+// obstacle, where upstream holds it at a fixed position, and the wall slider becomes a fixed
+// value. The grid is 32 by 32.
 // Ported from TypeGPU's fluid-double-buffering example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -120,14 +121,78 @@ class FluidRenderLayout {
   cells!: Storage<FluidCell>;
 }
 
+function isValidFlowOut(x: i32, y: i32, params: FluidParams): boolean {
+  const radius: f32 = ((GRID_SIZE - 1) as f32) * 0.5;
+  let horizontal: f32 = (x as f32) / radius - 1.0 - params.obstacleX;
+  if (horizontal < 0.0) horizontal = -horizontal;
+  let vertical: f32 = (y as f32) / radius - 1.0;
+  if (vertical < 0.0) vertical = -vertical;
+  return x >= 0 && y >= 0 && x < (GRID_SIZE as i32) && y < (GRID_SIZE as i32)
+    && !(horizontal < 0.12 && vertical < 0.35);
+}
+
+function computeVelocity(
+  x: i32,
+  y: i32,
+  params: FluidParams,
+  density: f32,
+  up: f32,
+  down: f32,
+  right: f32,
+  left: f32,
+): Vec2f {
+  let best: f32 = density;
+  let velocity: Vec2f = new Vec2f(0.0, 0.0);
+  if (isValidFlowOut(x, y + 1, params) && up + 0.5 < best) {
+    best = up + 0.5;
+    velocity = new Vec2f(0.0, 1.0);
+  }
+  if (isValidFlowOut(x, y - 1, params) && down - 0.5 < best) {
+    best = down - 0.5;
+    velocity = new Vec2f(0.0, -1.0);
+  }
+  if (isValidFlowOut(x + 1, y, params) && right < best) {
+    best = right;
+    velocity = new Vec2f(1.0, 0.0);
+  }
+  if (isValidFlowOut(x - 1, y, params) && left < best) {
+    velocity = new Vec2f(-1.0, 0.0);
+  }
+  return velocity;
+}
+
+function flowFromCell(
+  myX: i32,
+  myY: i32,
+  x: i32,
+  y: i32,
+  source: FluidCell,
+  destinationDensity: f32,
+): f32 {
+  let amount: f32 = 0.0;
+  if (source.velocity.length() >= 0.5) {
+    amount = 0.3 + (source.density - destinationDensity) * 0.1;
+    if (amount < 0.01) amount = 0.01;
+    if (amount > source.density) amount = source.density;
+  }
+  let contribution: f32 = 0.0;
+  if (myX === x && myY === y) {
+    contribution = source.density - amount;
+  } else if (myX === x + (source.velocity.x as i32) && myY === y + (source.velocity.y as i32)) {
+    contribution += amount;
+  }
+  return contribution;
+}
+
 // TypeGPU advances the grid with one compute pass per step. This port splits the step into
 // three passes that alternate source and target. The obstacle pass writes the render state.
 function flowKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   const x: u32 = ctx.globalId.x;
   const y: u32 = ctx.globalId.y;
   const index: u32 = y * GRID_SIZE + x;
-  // A neighbor outside the grid falls back to the cell itself, so the border neither gains nor
-  // loses density.
+  // A neighbor outside the grid falls back to the cell itself for the velocity choice. The
+  // transport loop below skips a source outside the grid, so a border cell exchanges density
+  // with its valid neighbors only.
   const leftIndex: u32 = x > 0 ? index - 1 : index;
   const rightIndex: u32 = x + 1 < GRID_SIZE ? index + 1 : index;
   const downIndex: u32 = y > 0 ? index - GRID_SIZE : index;
@@ -137,12 +202,31 @@ function flowKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   const right: FluidCell = res.source[rightIndex];
   const down: FluidCell = res.source[downIndex];
   const up: FluidCell = res.source[upIndex];
-  const neighborDensity: f32 = (left.density + right.density + down.density + up.density) * 0.25;
-  // The five weights sum to one, so a flat field keeps its density. The velocity keeps 97 percent
-  // of its value and follows the density gradient. TypeGPU moves density along that velocity.
-  cell.density = cell.density * 0.91 + neighborDensity * 0.09;
-  cell.velocity.x = cell.velocity.x * 0.97 + (left.density - right.density) * 0.001;
-  cell.velocity.y = cell.velocity.y * 0.97 + (down.density - up.density) * 0.001;
+  const params: FluidParams = res.params.$;
+  // The velocity is the unit step toward the open neighbor with the least cost, where cost is
+  // the neighbor's density plus 0.5 per row upward. The cell then keeps what it does not send
+  // and receives the out-flow of each neighbor whose velocity points at it.
+  cell.velocity = computeVelocity(x as i32, y as i32, params, cell.density,
+    up.density, down.density, right.density, left.density);
+  cell.density = 0.0;
+  for (let neighbor: i32 = 0; neighbor < 5; neighbor += 1) {
+    let sourceX: i32 = x as i32;
+    let sourceY: i32 = y as i32;
+    if (neighbor === 1) sourceY += 1;
+    if (neighbor === 2) sourceY -= 1;
+    if (neighbor === 3) sourceX += 1;
+    if (neighbor === 4) sourceX -= 1;
+    if (sourceX >= 0 && sourceY >= 0 && sourceX < (GRID_SIZE as i32) && sourceY < (GRID_SIZE as i32)) {
+      const source: FluidCell = res.source[(sourceY as u32) * GRID_SIZE + (sourceX as u32)];
+      const destinationX: i32 = sourceX + (source.velocity.x as i32);
+      const destinationY: i32 = sourceY + (source.velocity.y as i32);
+      let destinationDensity: f32 = 0.0;
+      if (destinationX >= 0 && destinationY >= 0 && destinationX < (GRID_SIZE as i32) && destinationY < (GRID_SIZE as i32)) {
+        destinationDensity = res.source[(destinationY as u32) * GRID_SIZE + (destinationX as u32)].density;
+      }
+      cell.density += flowFromCell(x as i32, y as i32, sourceX, sourceY, source, destinationDensity);
+    }
+  }
   res.target[index] = cell;
 }
 

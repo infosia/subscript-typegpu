@@ -360,6 +360,7 @@ export function frame(
 // The host calls shutdown once. The script frees every GPU handle by hand, because this
 // library keeps no finalizer and no reference count for scripts.
 export function shutdown(): void {
+  if (activeGroup !== null) activeGroup.dispose();
   if (activeFrameBuffer !== null) activeFrameBuffer.dispose();
   if (activeVertices !== null) activeVertices.dispose();
   if (activePipeline !== null) activePipeline.dispose();
