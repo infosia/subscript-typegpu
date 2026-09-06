@@ -13,6 +13,7 @@ pub(crate) fn pascal(name: &str) -> String {
         .join("_")
 }
 
+/// Title-cases each `_`-separated token of one segment and joins them without a separator.
 fn pascal_words(name: &str) -> String {
     name.split('_')
         .map(|part| {

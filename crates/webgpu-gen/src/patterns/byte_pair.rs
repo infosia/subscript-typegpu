@@ -5,6 +5,10 @@ use crate::naming;
 use crate::patterns::rust_signature;
 use crate::plan::{ByteArg, BytePairOp};
 
+/// The public count name, the element pointer type, and the pointer name of one pair.
+///
+/// A mutable pair reads bytes back into script memory, so it spells `outCount` and `out`. An
+/// immutable pair spells `dataCount` and `data`. Both keep the count-first order (F20).
 fn public_pair(op: &BytePairOp) -> (&'static str, &'static str, &'static str) {
     if op.mutable {
         ("outCount", "uint8_t*", "out")

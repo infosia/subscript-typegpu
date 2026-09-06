@@ -20,6 +20,7 @@ pub(crate) struct Schema {
     pub(crate) field_positions: Vec<Pos>,
 }
 
+/// Builds one author-facing diagnostic that names `rule`, the single rule it enforces (SC14).
 fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -37,6 +38,9 @@ pub(crate) fn is_bool_vector(module: &Module, ty: &Type, pos: &Pos) -> Result<bo
             && matches!(crate::class(module, id.0, "schema::is_bool_vector", pos)?.name.as_str(), "Vec2b" | "Vec3b" | "Vec4b")))
 }
 
+/// Reports whether the class is one of the indirect argument schemas of `typegpu-types.ts` (PI17).
+///
+/// A program writes these into a buffer, so the layout engine sizes them like any schema.
 fn is_indirect_schema(class: &ClassDef) -> bool {
     class.pos.file == "typegpu-types.ts"
         && matches!(
@@ -45,6 +49,10 @@ fn is_indirect_schema(class: &ClassDef) -> bool {
         )
 }
 
+/// Reports whether a name match against this class can name a schema (SC1).
+///
+/// A library class is a vector, a matrix, or a runtime type, never a schema. The indirect argument
+/// schemas are the one exception.
 fn is_schema_candidate(class: &ClassDef) -> bool {
     !matches!(
         class.pos.file.as_str(),
@@ -52,6 +60,7 @@ fn is_schema_candidate(class: &ClassDef) -> bool {
     ) || is_indirect_schema(class)
 }
 
+/// Returns the component scalar and the lane count of a library vector class name (SC5).
 fn vector_shape(name: &str) -> Option<(Scalar, u8)> {
     Some(match name {
         "Vec2f" => (Scalar::F32, 2),
@@ -70,6 +79,7 @@ fn vector_shape(name: &str) -> Option<(Scalar, u8)> {
     })
 }
 
+/// Returns the column count and the row count of a library matrix class name (SC5).
 fn matrix_shape(name: &str) -> Option<(u8, u8)> {
     Some(match name {
         "Mat2x2f" => (2, 2),
@@ -79,6 +89,7 @@ fn matrix_shape(name: &str) -> Option<(u8, u8)> {
     })
 }
 
+/// Returns the class alignment override that `@CStruct({ align: n })` declares, for the C layout.
 fn class_alignment(class: &ClassDef) -> Option<u32> {
     class.alignment_override.as_ref().map(|value| value.value)
 }
@@ -119,12 +130,21 @@ pub(crate) fn library_tree(module: &Module, class: &ClassDef) -> Option<TypeTree
     }))
 }
 
+/// Builds one schema's layout tree from the typed HIR.
 struct Walker<'a> {
     module: &'a Module,
+    /// The class ids on the current path, which turns an infinite descent into an SC3 diagnostic.
     stack: HashSet<usize>,
 }
 
 impl Walker<'_> {
+    /// Maps one field type to its layout tree. `field_name` and `pos` name the field in a
+    /// diagnostic.
+    ///
+    /// # Errors
+    ///
+    /// Returns LY8 for `boolean`, SC5 for a bool vector, and SC3 for every other illegal field
+    /// type. A nested class descends, so the diagnostic names the innermost field.
     fn type_tree(
         &mut self,
         ty: &Type,
@@ -169,8 +189,15 @@ impl Walker<'_> {
         }
     }
 
+    /// Maps one value class to its layout tree, with the members in declaration order (SC2).
+    ///
+    /// # Errors
+    ///
+    /// Returns LY9 for a class with no field and SC3 for a value-class cycle. A field type gives
+    /// the diagnostics of `type_tree`.
     fn class_tree(&mut self, index: usize, pos: &Pos) -> Result<TypeTree, Diagnostic> {
         let class = crate::class(self.module, index, "schema::class_tree", pos)?;
+        // A vector, a matrix, or an atomic is a leaf with its own arithmetic, never a struct.
         if let Some(tree) = library_tree(self.module, class) {
             return Ok(tree);
         }
@@ -207,6 +234,15 @@ impl Walker<'_> {
     }
 }
 
+/// Compares the C layout with the WGSL layout and returns the SC9 diagnostic when they differ.
+///
+/// The schema class is the host type, so one layout serves both sides. The check runs field by
+/// field first, so the diagnostic names the first field that moves, then the alignment, then the
+/// size. No padding field is ever generated: the author reorders or adds an alignment override.
+///
+/// # Errors
+///
+/// If a field has no recorded position, returns an internal diagnostic.
 fn identity_diagnostic(schema: &Schema) -> Result<Option<Diagnostic>, Diagnostic> {
     let wgsl = layout::wgsl_layout(&schema.tree);
     let c = layout::c_layout(&schema.tree);
@@ -247,6 +283,11 @@ fn identity_diagnostic(schema: &Schema) -> Result<Option<Diagnostic>, Diagnostic
     Ok(None)
 }
 
+/// Returns the message of the first uniform address space violation in `tree` (LY11).
+///
+/// The uniform space adds two rules to the default layout: an array stride is a multiple of 16,
+/// and a struct-typed member sits at a multiple of 16. `path` is the dotted member path, empty at
+/// the root, and it reaches the message so that the author finds the member.
 fn uniform_violation(tree: &TypeTree, path: &str) -> Option<String> {
     match tree {
         TypeTree::Array(element, _) => {
@@ -286,12 +327,21 @@ fn uniform_violation(tree: &TypeTree, path: &str) -> Option<String> {
     }
 }
 
+/// Returns the names of the schemas that a `Uniform<T>` wrapper carries (PI7).
+///
+/// The checker instantiates one class per `T`, so the module holds a `Uniform<...>` class for every
+/// uniform binding item. The caller runs the LY11 check on these schemas alone.
+///
+/// # Errors
+///
+/// If a wrapper names a class the module does not hold, returns an internal diagnostic.
 fn uniform_schema_names(module: &Module) -> Result<BTreeSet<String>, Diagnostic> {
     let mut names = BTreeSet::new();
     for class in &module.classes {
         if class.pos.file != "typegpu.ts" || class.is_value || !class.name.starts_with("Uniform<") {
             continue;
         }
+        // The host body stores the value in `values`, so that field's type names `T` (PI5).
         let Some(field) = class.fields.iter().find(|field| field.name == "values") else {
             continue;
         };
@@ -310,6 +360,14 @@ fn uniform_schema_names(module: &Module) -> Result<BTreeSet<String>, Diagnostic>
     Ok(names)
 }
 
+/// Adds the class at `index` and the classes its fields reach to `reachable` (SC1).
+///
+/// A field of another schema is a schema use, so a nested class becomes a schema without a name in
+/// `intended`. A class already in the set stops the descent, so a cycle terminates here.
+///
+/// # Errors
+///
+/// If a field names a class the module does not hold, returns an internal diagnostic.
 fn collect_reachable(
     module: &Module,
     index: usize,
@@ -326,6 +384,14 @@ fn collect_reachable(
     Ok(())
 }
 
+/// Descends one field type and adds the schema classes it reaches to `reachable`.
+///
+/// A library vector, a matrix, an atomic, and a bool vector are leaves that carry no member, so
+/// none of them enters the set. An illegal field type stays for the walker to reject.
+///
+/// # Errors
+///
+/// If the type names a class the module does not hold, returns an internal diagnostic.
 fn collect_type_reachable(
     module: &Module,
     ty: &Type,
@@ -371,6 +437,7 @@ pub(crate) fn discover(
     let mut schemas = Vec::new();
     let mut diagnostics = Vec::new();
     let mut reachable = BTreeSet::new();
+    // First pass: resolve each intended name to a class and collect the classes its fields reach.
     for name in intended {
         let Some((index, class)) = module
             .classes
@@ -396,11 +463,14 @@ pub(crate) fn discover(
         collect_reachable(module, index, &mut reachable, &class.pos)
             .map_err(|error| vec![error])?;
     }
+    // Second pass: walk the reachable classes in declaration order, which fixes the result order.
+    // Every violation lands in `diagnostics`, so one run reports every schema defect.
     for (index, class) in module.classes.iter().enumerate() {
         if !reachable.contains(&index) {
             continue;
         }
         for field in &class.fields {
+            // `X_OFFSET_a_b` must name one field, so a field name with `_` is ambiguous (SC11).
             if field.name.contains('_') {
                 diagnostics.push(diagnostic(
                     "SC11",
@@ -424,6 +494,8 @@ pub(crate) fn discover(
                     pos: class.pos.clone(),
                     field_positions: class.fields.iter().map(|field| field.pos.clone()).collect(),
                 };
+                // The uniform check reads the WGSL layout, so it runs on a schema whose two
+                // layouts already agree (SC9, then SC10).
                 if let Some(error) = identity_diagnostic(&schema).map_err(|error| vec![error])? {
                     diagnostics.push(error);
                 } else if uniform_names.contains(&schema.name) {

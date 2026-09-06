@@ -86,6 +86,10 @@ impl From<PolicyError> for Error {
     }
 }
 
+/// Collects the `[[export_exclude]]` names after it validates each row two ways (F22).
+///
+/// The function returns `PolicyError::Invalid` for an empty reason, `PolicyError::Unknown` for a
+/// name the plan does not export, and `PolicyError::Duplicate` for a repeated name.
 fn export_exclusions(
     policy: &policy::Policy,
     plan: &plan::Plan,
@@ -115,6 +119,10 @@ fn export_exclusions(
     Ok(excluded)
 }
 
+/// Drops the C declaration of every excluded export from the header text (F22).
+///
+/// The filter matches a declaration by the ` <name>(` spelling. It then collapses each run of
+/// blank lines that the removal leaves, so the header stays byte-stable.
 fn filter_header_exports(mut header: String, excluded: &BTreeSet<String>) -> String {
     if excluded.is_empty() {
         return header;
@@ -139,6 +147,12 @@ fn filter_header_exports(mut header: String, excluded: &BTreeSet<String>) -> Str
     header
 }
 
+/// Finds the byte range of one generated `extern "C"` export inside the Rust output.
+///
+/// The range starts at the export's first doc-comment line. An export without a doc comment
+/// starts at `#[no_mangle]`. The range ends after the closing brace and the blank lines that
+/// follow it. The brace scan skips string literals and character literals, so a brace inside a
+/// generated string never ends the body. A source without such an export gives `None`.
 fn rust_export_range(source: &str, name: &str) -> Option<std::ops::Range<usize>> {
     let marker = format!("pub extern \"C\" fn {name}(");
     let signature = source.find(&marker)?;
@@ -192,6 +206,10 @@ fn rust_export_range(source: &str, name: &str) -> Option<std::ops::Range<usize>>
     None
 }
 
+/// Deletes every excluded export from the generated Rust source (F22).
+///
+/// The function returns an `internal:` error when an excluded name has no generated function.
+/// `export_exclusions` already proved that the name is an export, so absence is a generator bug.
 fn filter_rust_exports(mut rust: String, excluded: &BTreeSet<String>) -> Result<String, Error> {
     for name in excluded {
         let range = rust_export_range(&rust, name).ok_or_else(|| {
@@ -211,9 +229,12 @@ fn filter_rust_exports(mut rust: String, excluded: &BTreeSet<String>) -> Result<
 pub fn generate(yml_text: &str, policy_text: &str) -> Result<Generated, Error> {
     let yml: model::Yml = serde_yaml::from_str(yml_text).map_err(Error::Yaml)?;
     let policy: policy::Policy = toml::from_str(policy_text).map_err(Error::Toml)?;
+    // F23: the surface family is Rust-only. It never enters the header, the mirror, or the
+    // symbol table, so it renders from the yml before the export plan exists.
     let surface = surface::render(&yml, &policy)?;
     let plan = plan::build(&yml, &policy)?;
     let excluded_exports = export_exclusions(&policy, &plan)?;
+    // The CEnum alias list comes from policy and yml alone, so the facade stage needs no mirror.
     let cenum_aliases = policy
         .api
         .as_ref()
@@ -230,6 +251,8 @@ pub fn generate(yml_text: &str, policy_text: &str) -> Result<Generated, Error> {
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
+    // A stale `[api] enums` row puts a `@subscript-cenum` directive in the header with no typedef
+    // behind it. Each alias must name exactly one emitted enum typedef.
     for alias in &cenum_aliases {
         let matches = plan
             .const_sets
@@ -267,6 +290,10 @@ pub fn generate(yml_text: &str, policy_text: &str) -> Result<Generated, Error> {
     })
 }
 
+/// Builds the `internal:` policy error that reports a broken generator invariant.
+///
+/// `site` names the function that found the defect. `what` states the invariant. The error
+/// reaches the driver as a policy error, so no generator path panics.
 pub(crate) fn internal(site: &str, what: impl std::fmt::Display) -> policy::PolicyError {
     policy::PolicyError::Invalid {
         entry: site.to_owned(),

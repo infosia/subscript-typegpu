@@ -33,6 +33,7 @@ pub(crate) fn rust_instance_backend_types(instance_descriptor: &str) -> String {
         .replace("$INSTANCE_DESCRIPTOR$", instance_descriptor)
 }
 
+/// The stored yml name of one method argument, before any casing conversion.
 fn arg_name(arg: &MethodArg) -> &str {
     match arg {
         MethodArg::Scalar(name, _) | MethodArg::Bitflag(name, _) | MethodArg::Enum(name, _) => name,
@@ -40,6 +41,10 @@ fn arg_name(arg: &MethodArg) -> &str {
     }
 }
 
+/// Renders one method parameter for `subscript-typegpu.h`.
+///
+/// A nullable handle carries the `_Nullable` marker (C1). A struct argument crosses as a
+/// `const` pointer to its chain-free boundary struct (F12).
 fn c_arg(arg: &MethodArg) -> String {
     let name = naming::camel(arg_name(arg));
     match arg {
@@ -60,6 +65,10 @@ fn c_arg(arg: &MethodArg) -> String {
     }
 }
 
+/// The Rust type of one method argument. `backend` selects the webgpu.h side.
+///
+/// A flag is `u64` and a plain enum is `i32` on both sides (F16). A handle and a struct
+/// pointer take the webgpu.h type or the facade type.
 fn rust_arg_type(arg: &MethodArg, backend: bool) -> String {
     match arg {
         MethodArg::Scalar(_, scalar) => scalar.rust_name().into(),
@@ -83,6 +92,10 @@ fn rust_arg_type(arg: &MethodArg, backend: bool) -> String {
     }
 }
 
+/// The early-return statement of a null check, typed by the method's return (L9).
+///
+/// A `void` method returns nothing, a handle method a null pointer, and every other method the
+/// typed zero.
 fn null_return(ret: &SyncRet) -> &'static str {
     match ret {
         SyncRet::Void => "        return;\n",
@@ -162,6 +175,10 @@ pub(crate) fn rust_create_export(op: &CreateOp) -> Result<String, crate::policy:
         .doc
         .as_deref()
         .unwrap_or("creates the handle with no descriptor.");
+    // The instance create is the one export that reads the environment. It maps
+    // SUBSCRIPT_TYPEGPU_BACKEND to a yawgpu backend id and sends the extension chain only when
+    // the loaded library is yawgpu (L4, L13). A non-yawgpu library gets no chain, and the
+    // request rides on the adapter filter alone (L15). Every other create takes no descriptor.
     let (safety, call) = if op.returns_object == "instance" {
         let instance_descriptor = &op
             .dropped_arg
@@ -250,6 +267,8 @@ pub(crate) fn rust_create_export(op: &CreateOp) -> Result<String, crate::policy:
 pub(crate) fn rust_sync_export(op: &SyncOp, drain_callbacks: bool) -> String {
     let recv = naming::camel(&op.receiver);
     let recv_ty = naming::subscript_typegpu_type(&op.receiver);
+    // Each argument contributes a null guard, a conversion, or neither. The three strings hold
+    // the emitted order: the receiver check, the handle guards, the conversions, then the call.
     let mut guards = String::new();
     let mut conversions = String::new();
     let mut arg_values = Vec::new();

@@ -25,6 +25,7 @@ pub(crate) fn bind_group_factory_name(declaration: &str, group: u32) -> String {
     )
 }
 
+/// Returns the API-layer handle class that one binding kind takes as its resource (TX4).
 fn resource_type(kind: BindingKind) -> &'static str {
     match kind {
         BindingKind::Uniform
@@ -36,6 +37,7 @@ fn resource_type(kind: BindingKind) -> &'static str {
     }
 }
 
+/// Returns the `BindingResource` factory that wraps one binding kind's handle (TX4).
 fn resource_factory(kind: BindingKind) -> &'static str {
     match kind {
         BindingKind::Uniform
@@ -47,6 +49,11 @@ fn resource_factory(kind: BindingKind) -> &'static str {
     }
 }
 
+/// Appends the typed resources class of one layout class and its factory (EG1, PI8).
+///
+/// The three loops walk the same bindings in declaration order, so the class fields, the factory
+/// parameters, and the returned members stay in one order. A guard binding is hidden: the runtime
+/// supplies its buffer, and it never appears in the author's resource list (PI15).
 fn emit_resources_class(out: &mut String, layout: &crate::pipeline::Layout) {
     out.push_str(&format!(
         "@Descriptor\nexport class {}Resources {{\n",
@@ -90,6 +97,12 @@ fn emit_resources_class(out: &mut String, layout: &crate::pipeline::Layout) {
     out.push_str("  };\n}\n\n");
 }
 
+/// Appends the bind-group factory of one declaration and layout class (EG1, PI8).
+///
+/// `pipeline_type` is `ComputePipeline` or `RenderPipeline` and names the parameter's type. The
+/// resource list follows binding declaration order, which `createBindGroup` reads positionally.
+/// The compute form passes the pipeline's guard buffer, which the runtime appends for a guard
+/// entry (PI15).
 fn emit_bind_group_factory(
     out: &mut String,
     declaration: &str,
@@ -122,6 +135,7 @@ fn emit_bind_group_factory(
     }
 }
 
+/// Builds one author-facing diagnostic that names `rule`, the single rule it enforces.
 fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -130,6 +144,9 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+/// Builds a diagnostic that names the generator as its source (K15).
+///
+/// The author's program passed the checker, so a reader who sees one has found a generator defect.
 fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -138,6 +155,7 @@ fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+/// Returns the WGSL spelling of one layout tree (LY12).
 fn wgsl_type(tree: &TypeTree) -> String {
     match tree {
         TypeTree::Scalar(scalar) => scalar.wgsl().to_owned(),
@@ -213,6 +231,7 @@ pub(crate) fn wgsl_module(schemas: &[Schema], structs: &[(String, String)]) -> S
     out
 }
 
+/// Escapes a text for one double-quoted subscript string literal in the support module.
 fn escape_string(value: &str) -> String {
     value
         .replace('\\', "\\\\")
@@ -220,6 +239,15 @@ fn escape_string(value: &str) -> String {
         .replace('\n', "\\n")
 }
 
+/// Appends the `X_OFFSET_<path>` and `X_STRIDE_<path>` constants of one struct level (SC11).
+///
+/// `prefix` is the member path so far, empty at the schema root, and a nested path joins with an
+/// underscore. `base_offset` is the path's offset from the schema start, so every emitted offset is
+/// absolute. A field name never holds an underscore, so the paths stay unique.
+///
+/// # Errors
+///
+/// If an array member layout carries no stride, returns an internal diagnostic.
 fn emit_nested_offsets(
     out: &mut String,
     schema_name: &str,
@@ -266,6 +294,14 @@ fn emit_nested_offsets(
     Ok(())
 }
 
+/// Returns the WGSL size of one binding item type, which becomes the entry's `minBindingSize`.
+///
+/// The size comes from the layout engine, never from the backend (PI8).
+///
+/// # Errors
+///
+/// If the engine cannot size the type, returns a PI5 diagnostic. The wrapper item set is closed,
+/// so the case reaches an author who names a type outside it.
 fn binding_size(
     module: &Module,
     schemas: &[Schema],
@@ -296,6 +332,14 @@ fn binding_size(
         })
 }
 
+/// Appends one `BindGroupLayoutEntrySpec` line to the layout spec (PI8, TX5).
+///
+/// `visibility` is the stage expression the caller computed: a compute declaration passes one
+/// constant, a render declaration passes the stages that reach the binding (RN9).
+///
+/// # Errors
+///
+/// If the layout engine cannot size a buffer item, returns the PI5 diagnostic of `binding_size`.
 fn emit_binding_entry(
     out: &mut String,
     module: &Module,
@@ -303,6 +347,8 @@ fn emit_binding_entry(
     binding: &crate::pipeline::Binding,
     visibility: &str,
 ) -> Result<(), Diagnostic> {
+    // A texture, a storage texture, and a sampler carry no buffer size. The kind decides which
+    // members the entry needs, and the runtime maps them to the API layer's descriptors (TX5).
     let tail = match binding.kind {
         BindingKind::Uniform | BindingKind::Storage | BindingKind::MutStorage => format!(
             "minBindingSize: {}",
@@ -367,6 +413,8 @@ pub(crate) fn support_module(
         || render_pipelines
             .iter()
             .any(|pipeline| !pipeline.layouts.is_empty());
+    // The arms differ only in the imported names. Every name the text below writes must appear in
+    // the arm this program takes, and a program with no declaration imports nothing.
     match (pipelines.is_empty(), render_pipelines.is_empty(), has_layouts) {
         (false, false, true) => out.push_str("import { BindGroupLayoutSpec, COMPUTE_VISIBILITY, ComputePipeline, FRAGMENT_VISIBILITY, RenderPipeline, VERTEX_VISIBILITY, VertexBufferLayoutSpec, bufferResource, createBindGroup, samplerResource, textureResource } from \"./typegpu\";\nimport { GPUBuffer, GPUDevice, GPUBindGroup, GPUSampler, GPUTextureView } from \"./webgpu\";\n\n"),
         (false, true, true) => out.push_str("import { BindGroupLayoutSpec, COMPUTE_VISIBILITY, ComputePipeline, bufferResource, createBindGroup, samplerResource, textureResource } from \"./typegpu\";\nimport { GPUBuffer, GPUDevice, GPUBindGroup, GPUSampler, GPUTextureView } from \"./webgpu\";\n\n"),
@@ -377,6 +425,8 @@ pub(crate) fn support_module(
         (true, true, _) => {}
     }
 
+    // Two declarations can share one layout class, and the resources class carries the layout
+    // class name. The set keeps one declaration of it in the module.
     let mut emitted_resources = BTreeSet::new();
     for layout in pipelines
         .iter()
@@ -392,6 +442,8 @@ pub(crate) fn support_module(
         }
     }
     for schema in schemas {
+        // The C layout is the host type's layout, and SC9 already proved it equal to the WGSL
+        // layout. A program that sizes a buffer from these constants writes the right bytes (SC9).
         let layout = layout::c_layout(&schema.tree);
         out.push_str(&format!(
             "export const {name}_SIZE: u32 = {size};\n\
@@ -521,6 +573,8 @@ pub(crate) fn support_module(
                         pipeline.pos.clone(),
                     )
                 })?;
+            // The vertex buffer layout is the schema's layout: the stride is `X_STRIDE` and each
+            // attribute sits at its member offset (RN4).
             let layout = layout::c_layout(&schema.tree);
             out.push_str(&format!(
                 "\nexport const {}_VERTEX_LAYOUT{}: VertexBufferLayoutSpec = {{\n  arrayStride: {},\n  stepMode: \"{}\",\n  attributes: [\n",

@@ -4,6 +4,10 @@ use crate::naming;
 use crate::patterns::rust_signature;
 use crate::plan::{DescriptorField, DescriptorFieldKind, DescriptorOp, SentinelConst, StructPlan};
 
+/// The yml name of the construct that a field references.
+///
+/// A struct, object, enum, flag, or array-element field carries such a name. An absent name is
+/// a plan defect, so the function returns an `internal:` error.
 fn named(field: &DescriptorField) -> Result<&str, crate::policy::PolicyError> {
     field.named_type.as_deref().ok_or_else(|| {
         crate::internal(
@@ -13,6 +17,11 @@ fn named(field: &DescriptorField) -> Result<&str, crate::policy::PolicyError> {
     })
 }
 
+/// The C type of one scalar or named field of a chain-free struct.
+///
+/// A flag or enum field takes its facade typedef, so the header keeps the pinned numeric
+/// values (F16). A struct-pointer field and an array field return an `internal:` error,
+/// because `c_struct` emits both of those shapes itself.
 fn c_field_type(field: &DescriptorField) -> Result<String, crate::policy::PolicyError> {
     Ok(match field.kind {
         DescriptorFieldKind::StringView => "SubscriptTypegpuStringView".into(),
@@ -45,6 +54,8 @@ fn c_field_type(field: &DescriptorField) -> Result<String, crate::policy::Policy
     })
 }
 
+/// Reports whether the field is one of the three array kinds that expand into a count and a
+/// pointer (B1).
 fn is_array(field: &DescriptorField) -> bool {
     matches!(
         field.kind,
@@ -102,6 +113,11 @@ pub(crate) fn c_decl(op: &DescriptorOp, shape: &StructPlan) -> String {
     )
 }
 
+/// The Rust type of one struct field. `backend` selects the webgpu.h side.
+///
+/// A flag is `u64` and a plain enum is `i32` on both sides (F16). A boolean is `u32` on the
+/// backend side, because the pinned header spells `WGPUBool` as `uint32_t`. An array field is
+/// a `*const` element pointer, and its count travels in a separate field.
 fn rust_field_type(
     field: &DescriptorField,
     backend: bool,
@@ -228,6 +244,11 @@ pub(crate) fn rust_structs(shape: &StructPlan) -> Result<String, crate::policy::
     Ok(out)
 }
 
+/// The expression that converts one public field into its backend field.
+///
+/// A zero-rule field routes through its own substitution function (F15). A struct pointer and
+/// a struct array return an `internal:` error, because `rust_conversion` binds those two
+/// shapes to locals before it builds the struct literal.
 fn conversion_value(
     field: &DescriptorField,
     source: &str,
@@ -267,6 +288,8 @@ fn conversion_value(
 /// substitution function and a `#[doc(hidden)]` probe the suite reads.
 pub(crate) fn rust_conversion(shape: &StructPlan) -> Result<String, crate::policy::PolicyError> {
     let mut out = String::new();
+    // A zero-rule field needs a substitution function of its own, plus the probe that lets a
+    // suite program read the substituted value without a backend (F15).
     for field in &shape.fields {
         if let Some(constant) = &field.zero_constant {
             let converted_access = if shape.owns_storage {
@@ -283,6 +306,8 @@ pub(crate) fn rust_conversion(shape: &StructPlan) -> Result<String, crate::polic
             ));
         }
     }
+    // The holder struct keeps every box, vector, and nested value alive beside the backend
+    // value. Without it, the pointers inside the backend value dangle at the call site.
     if shape.owns_storage {
         out.push_str(&format!(
             "struct Converted{} {{\n    value: {},\n",
@@ -334,6 +359,8 @@ pub(crate) fn rust_conversion(shape: &StructPlan) -> Result<String, crate::polic
         "#[allow(dead_code)]\nfn convert_{}(source: {}) -> {} {{\n",
         shape.source, shape.subscript_typegpu_struct, return_type,
     ));
+    // Storage fields become locals before the struct literal, so each pointer the literal
+    // stores outlives the literal itself.
     for field in &shape.fields {
         let name = naming::rust_ident(&field.name);
         match field.kind {
@@ -379,6 +406,8 @@ pub(crate) fn rust_conversion(shape: &StructPlan) -> Result<String, crate::polic
             _ => {}
         }
     }
+    // The literal keeps the yml field order: the chain head first, then each array count
+    // directly before its pointer (F12, B1).
     let mut fields = String::new();
     if shape.extensible {
         fields.push_str("        next_in_chain: std::ptr::null_mut(),\n");
@@ -459,6 +488,10 @@ pub(crate) fn rust_extern(op: &DescriptorOp, shape: &StructPlan) -> String {
     )
 }
 
+/// Renders the `unsafe` backend create call.
+///
+/// `descriptor` is the argument text, which is a reference to converted storage or a null
+/// pointer.
 fn call(op: &DescriptorOp, recv: &str, descriptor: &str) -> String {
     format!(
         "unsafe {{ {}({recv}.cast(), {descriptor}).cast() }}",

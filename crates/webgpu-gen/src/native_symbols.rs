@@ -87,6 +87,12 @@ pub(crate) fn export_names(plan: &Plan) -> Vec<String> {
     names
 }
 
+/// Reads one export's parameter text, argument names, and result text out of the facade source.
+///
+/// The three parts let the table emit a shim with the same signature as the export. The
+/// parameter scan counts parenthesis depth, so a function-pointer parameter stays whole. A name
+/// the source does not declare, an unclosed parameter list, and a missing body each return an
+/// `internal:` error.
 fn rust_signature<'a>(
     rust: &'a str,
     name: &str,

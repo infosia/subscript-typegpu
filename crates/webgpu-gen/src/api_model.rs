@@ -88,15 +88,22 @@ impl IdlMember {
 }
 
 #[derive(Clone, Debug, Default)]
+/// One IDL interface as declared, before inheritance and mixins resolve.
 struct InterfaceDef {
+    /// A full definition exists. A source with partial definitions only leaves it false.
     defined: bool,
+    /// The declared parent interface.
     inheritance: Option<String>,
+    /// The members of the full definition and of every partial definition, in source order.
     members: Vec<IdlMember>,
 }
 
 #[derive(Clone, Debug, Default)]
+/// One IDL dictionary as declared, before inheritance resolves.
 struct DictionaryDef {
+    /// The declared parent dictionary.
     inheritance: Option<String>,
+    /// The members of the definition and of every partial definition, in source order.
     members: Vec<IdlMember>,
 }
 
@@ -304,6 +311,10 @@ impl IdlModel {
             .collect()
     }
 
+    /// Appends one dictionary's members to `output`, parents first.
+    ///
+    /// `name` walks up the inheritance chain while `owner` stays the dictionary that the caller
+    /// asked for. `visiting` holds the chain in progress, so a cycle becomes a named error.
     fn collect_dictionary_members(
         &self,
         name: &str,
@@ -359,6 +370,7 @@ impl IdlModel {
         Ok(members)
     }
 
+    /// Resolves every type inside one member through the typedef table.
     fn resolve_member(&self, mut member: IdlMember) -> Result<IdlMember, String> {
         member.kind = match member.kind {
             IdlMemberKind::Attribute { ty } => IdlMemberKind::Attribute {
@@ -391,6 +403,11 @@ impl IdlModel {
         Ok(member)
     }
 
+    /// Resolves one type through the typedef table.
+    ///
+    /// A typedef whose target is a scalar, a boolean, or a string collapses to that target. Any
+    /// other typedef keeps its own name, because the API layer emits an alias for it. A sequence
+    /// and a promise resolve their element type. `visiting` makes a typedef cycle a named error.
     fn resolve_type(
         &self,
         ty: &IdlType,
@@ -432,6 +449,7 @@ impl IdlModel {
     }
 }
 
+/// Rejects a repeated member name in one dictionary, namespace, or enum.
 fn ensure_unique_members(owner: &str, members: &[IdlMember]) -> Result<(), String> {
     let mut seen = BTreeSet::new();
     for member in members {
@@ -442,6 +460,10 @@ fn ensure_unique_members(owner: &str, members: &[IdlMember]) -> Result<(), Strin
     Ok(())
 }
 
+/// Rejects a repeated member name in one interface, and admits operation overloads.
+///
+/// Two members with one name are legal only when both are operations. Two operations with the
+/// same signature are a duplicate overload and a named error.
 fn ensure_unique_interface_members(owner: &str, members: &[IdlMember]) -> Result<(), String> {
     let mut by_name: BTreeMap<&str, Vec<&IdlMemberKind>> = BTreeMap::new();
     for member in members {
@@ -467,6 +489,11 @@ fn ensure_unique_interface_members(owner: &str, members: &[IdlMember]) -> Result
     Ok(())
 }
 
+/// Appends one interface body's members to `output`, each owned by `owner`.
+///
+/// A constant, a constructor, an iterable, a maplike, a setlike, and a stringifier become
+/// `Special` members under a reserved `@` name. An anonymous operation takes an index-based `@`
+/// name. Every such name stays addressable by a policy row (J9).
 fn append_interface_members(
     output: &mut Vec<IdlMember>,
     owner: &str,
@@ -515,6 +542,9 @@ fn append_interface_members(
     Ok(())
 }
 
+/// Appends one mixin body's members under the mixin's own name.
+///
+/// An `includes` statement re-owns them later, when `interface_members` runs.
 fn append_mixin_members(
     mixins: &mut BTreeMap<String, Vec<IdlMember>>,
     owner: &str,
@@ -557,6 +587,9 @@ fn append_mixin_members(
     Ok(())
 }
 
+/// Appends one dictionary body's members to `dictionary`, each owned by `owner`.
+///
+/// A default value the subset does not support returns a named error.
 fn append_dictionary_members(
     dictionary: &mut DictionaryDef,
     owner: &str,
@@ -580,6 +613,10 @@ fn append_dictionary_members(
     Ok(())
 }
 
+/// Owns one argument list.
+///
+/// A variadic argument becomes a non-optional argument with no default, because the API layer
+/// rejects a variadic shape at its use site.
 fn own_arguments(arguments: &[Argument<'_>]) -> Vec<IdlArgument> {
     arguments
         .iter()
@@ -603,6 +640,7 @@ fn own_arguments(arguments: &[Argument<'_>]) -> Vec<IdlArgument> {
         .collect()
 }
 
+/// Owns one return declaration. An `undefined` return becomes `IdlType::Undefined`.
 fn own_return_type(value: &ReturnType<'_>) -> IdlType {
     match value {
         ReturnType::Undefined(_) => IdlType::Undefined,
@@ -610,6 +648,8 @@ fn own_return_type(value: &ReturnType<'_>) -> IdlType {
     }
 }
 
+/// Owns one IDL type. Both `any` and a union become `Other`, which the join rejects at the use
+/// site.
 fn own_type(value: &Type<'_>) -> IdlType {
     match value {
         Type::Single(SingleType::Any(_)) | Type::Union(_) => IdlType::Other,
@@ -617,6 +657,10 @@ fn own_type(value: &Type<'_>) -> IdlType {
     }
 }
 
+/// Owns one non-`any` IDL type.
+///
+/// An integer takes its width and its sign from the IDL spelling. Every string type becomes
+/// `IdlType::String`. A type the API join never reads becomes `Other`.
 fn own_non_any_type(value: &NonAnyType<'_>) -> IdlType {
     match value {
         NonAnyType::Promise(promise) => {
@@ -689,6 +733,10 @@ fn own_non_any_type(value: &NonAnyType<'_>) -> IdlType {
     }
 }
 
+/// Renders one IDL default value as subscript source text.
+///
+/// A default outside boolean, string, empty array, empty dictionary, and integer returns a
+/// named error, because the subset defines no lowering for it.
 fn own_default(value: &DefaultValue<'_>) -> Result<String, String> {
     match value {
         DefaultValue::Boolean(value) => Ok(value.0.to_string()),
@@ -888,6 +936,7 @@ impl MirrorModel {
     }
 }
 
+/// Parses one mirror enum value: decimal or `0x` hexadecimal, with an optional minus sign.
 fn parse_mirror_integer(value: &str) -> Result<i64, String> {
     let (negative, magnitude) = value
         .strip_prefix('-')

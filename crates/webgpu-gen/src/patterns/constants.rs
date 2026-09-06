@@ -35,9 +35,11 @@ pub(crate) fn c_const_set(set: &ConstSet) -> String {
     }
 }
 
-/// Renders one policy-listed constant set. These sets are emitted for
-/// the slice's benefit (e.g. `WGPUBufferUsage` bits) and may be unused
-/// by the generated bodies, hence the per-constant `allow(dead_code)`.
+/// Renders one policy-listed constant set as private Rust constants.
+///
+/// A set enters because a suite program reads its values, such as the `WGPUBufferUsage`
+/// bits. The generated bodies can leave a constant unused, so each one carries
+/// `allow(dead_code)`.
 pub(crate) fn rust_const_set(set: &ConstSet) -> String {
     let mut out = String::new();
     for (name, ty, value) in &set.rows {

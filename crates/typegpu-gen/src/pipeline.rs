@@ -216,6 +216,7 @@ pub(crate) struct Pipeline {
     pub(crate) pos: Pos,
 }
 
+/// Builds one author-facing diagnostic that names `rule`, the single rule it enforces (PI13).
 fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -224,6 +225,10 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+/// Builds a diagnostic that names the generator as its source (K15).
+///
+/// The checker already typed the declaration against the library signature, so a shape the
+/// generator cannot read here is a generator defect, never an author mistake.
 fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -299,11 +304,24 @@ pub(crate) fn library_class<'a>(
         .filter(|class| class.pos.file == "typegpu.ts")
 }
 
+/// Classifies one layout field type as a binding wrapper and returns its item type (PI5, TX1).
+///
+/// The result is `None` when the type is not a library wrapper, which the caller reports as a PI3
+/// violation. A buffer wrapper carries its `T` in the host body's `values` array, and a storage
+/// texture carries its format marker in `formats`.
+///
+/// # Errors
+///
+/// Returns a TX1 diagnostic for a comparison sampler, a texture sample type outside `f32`, and a
+/// storage texture format outside the marker set. A library wrapper that lost a marker field gives
+/// a generator diagnostic.
 fn wrapper(
     module: &Module,
     ty: &Type,
     pos: &Pos,
 ) -> Result<Option<(BindingKind, Type)>, Diagnostic> {
+    // A comparison sampler needs a typed comparison operation set that this revision does not
+    // define, so the check precedes the wrapper match (TX1).
     if class_name(module, ty).is_some_and(|name| name == "ComparisonSampler") {
         return Err(diagnostic(
             "TX1",
@@ -418,6 +436,14 @@ fn wrapper(
     Ok(Some((kind, (**item).clone())))
 }
 
+/// Reports whether `ty` is a legal item type for a buffer binding wrapper (PI5).
+///
+/// The set is `f32`, `i32`, `u32`, a schema class, and a library vector or matrix. A library
+/// runtime class and a bool vector are outside it.
+///
+/// # Errors
+///
+/// If the type names a class the module does not hold, returns an internal diagnostic.
 fn allowed_binding_item(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnostic> {
     Ok(match ty {
         Type::F32 | Type::I32 | Type::U32 => true,
@@ -454,6 +480,8 @@ pub(crate) fn layout(
         ));
     };
     let class = crate::class(module, id.0, "pipeline::layout", pos)?;
+    // A layout class is a plain class: not `@CStruct`, not `@Descriptor`, and not a library class
+    // (PI3). The author never instantiates it.
     if class.is_value || class.is_descriptor || class.pos.file == "typegpu.ts" {
         return Err(diagnostic(
             "PI3",
@@ -475,6 +503,8 @@ pub(crate) fn layout(
             class.pos.clone(),
         ));
     }
+    // The binding index is the field's declaration position from 0 (PI3). A guarded declaration
+    // appends its hidden binding after this loop.
     let mut bindings = Vec::new();
     for (index, field) in class.fields.iter().enumerate() {
         let Some((kind, item_ty)) = wrapper(module, &field.ty, &field.pos)? else {
@@ -512,6 +542,8 @@ pub(crate) fn layout(
     })
 }
 
+/// Returns the value of an integer literal that fits a `u32`, and `None` for every other
+/// expression.
 fn literal_u32(expr: &Expr) -> Option<u32> {
     let ExprKind::Int(value) = expr.kind else {
         return None;
@@ -519,6 +551,15 @@ fn literal_u32(expr: &Expr) -> Option<u32> {
     u32::try_from(value).ok()
 }
 
+/// Reads the `workgroupSize` member of a `ComputePipelineSpec` literal (PI1).
+///
+/// The size reaches the WGSL `@workgroup_size` attribute and the generated `_WORKGROUP_*`
+/// constants, so it must be known before emission.
+///
+/// # Errors
+///
+/// Returns a PI1 diagnostic in three cases. The options are not a descriptor literal. The member
+/// is absent, or it is not an array of three integer literals. An axis is zero.
 fn workgroup(module: &Module, expr: &Expr) -> Result<[u32; 3], Diagnostic> {
     let ExprKind::DescriptorLit { .. } = &expr.kind else {
         return Err(diagnostic(
@@ -586,6 +627,15 @@ fn workgroup(module: &Module, expr: &Expr) -> Result<[u32; 3], Diagnostic> {
     Ok([x, y, z])
 }
 
+/// Checks that the spec's `name` member equals the declaration's `const` name.
+///
+/// The runtime names the pipeline from `spec.name` in its CL2 trap, and the generated constants
+/// carry the declaration name. The check keeps one name for one pipeline.
+///
+/// # Errors
+///
+/// Returns a PI1 diagnostic when the member is absent, is not a string literal, or differs from
+/// `declaration`.
 fn validate_pipeline_name(
     module: &Module,
     expr: &Expr,
@@ -628,6 +678,13 @@ fn validate_pipeline_name(
     Ok(())
 }
 
+/// Reads the `guarded` member of a `ComputePipelineSpec` literal, which defaults to false (PI15).
+///
+/// # Errors
+///
+/// Returns a PI15 diagnostic when the options are not a descriptor literal or when the member is
+/// not a boolean literal. The generator emits the guard `if` at compile time, so a computed value
+/// has no meaning.
 fn guarded_option(module: &Module, expr: &Expr) -> Result<bool, Diagnostic> {
     let ExprKind::DescriptorLit { .. } = &expr.kind else {
         return Err(diagnostic(
@@ -664,6 +721,11 @@ pub(crate) fn function<'a>(module: &'a Module, name: &str) -> Option<&'a Functio
         .find(|function| function.name == name)
 }
 
+/// Returns the layout count of a `computePipeline` declaration function, and `None` for every
+/// other call.
+///
+/// The layout count is the group count (PI2). The declaring file identifies the library function,
+/// so a program's own `computePipeline` never matches (PI1).
 fn compute_arity(module: &Module, name: &str) -> Option<usize> {
     let base = crate::base_name(name);
     let declaration = function(module, name)?;
@@ -679,6 +741,9 @@ fn compute_arity(module: &Module, name: &str) -> Option<usize> {
     })
 }
 
+/// Reports whether `expr` holds a `computePipeline` call anywhere inside it.
+///
+/// The caller runs the walk over function bodies alone, where a declaration is a PI1 violation.
 fn call_in_expr(module: &Module, expr: &Expr) -> bool {
     match &expr.kind {
         ExprKind::Call { callee: Callee::Func(name), .. } if compute_arity(module, name).is_some() => true,
@@ -701,6 +766,8 @@ fn call_in_expr(module: &Module, expr: &Expr) -> bool {
     }
 }
 
+/// Reports whether `stmt` holds a `computePipeline` call anywhere inside it, nested bodies
+/// included.
 fn stmt_has_compute(module: &Module, stmt: &Stmt) -> bool {
     match stmt {
         Stmt::Let { init, .. } | Stmt::Expr(init) => call_in_expr(module, init),
@@ -766,6 +833,8 @@ pub(crate) fn discover(
     shells: &crate::shell::ShellProgram,
 ) -> Result<Vec<Pipeline>, Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
+    // A declaration is a module-level `const`, because the generator reads it at compile time. A
+    // call inside a function body reaches no generated constant (PI1).
     for function in &module.functions {
         if function.pos.file != "typegpu.ts"
             && function
@@ -812,6 +881,8 @@ pub(crate) fn discover(
             ));
             continue;
         };
+        // The checker typed the call against the library signature, so the kernel exists and its
+        // parameter count matches the form. Either failure here is a generator defect.
         let Some(kernel) = function(module, entry) else {
             diagnostics.push(generator_diagnostic(
                 format!("kernel `{entry}` disappeared from typed HIR"),
@@ -870,6 +941,8 @@ pub(crate) fn discover(
                 continue;
             }
         };
+        // The guard occupies one binding of the last layout, and the one-layout form is the only
+        // form the rule defines (PI15).
         if guarded && arity != 1 {
             diagnostics.push(diagnostic(
                 "PI15",
@@ -878,6 +951,8 @@ pub(crate) fn discover(
             ));
             continue;
         }
+        // The guard wraps the body in an `if` over the global id, which is non-uniform control
+        // flow. A barrier inside it is illegal, so the two do not combine (PI15, K22).
         if guarded {
             match crate::kernel::reaches_barrier(module, kernel, shells) {
                 Ok(true) => {
@@ -912,6 +987,8 @@ pub(crate) fn discover(
                         ));
                         continue;
                     };
+                    // The guard takes the last layout's highest binding index plus one, so the
+                    // author's own bindings keep their declaration-order indices (PI15).
                     let binding = last
                         .bindings
                         .iter()
@@ -936,6 +1013,8 @@ pub(crate) fn discover(
                     pos: global.pos.clone(),
                 });
             }
+            // A layout failed and pushed its own diagnostic. The run ends in an error, so this
+            // declaration produces nothing.
             Ok(_) => {}
             Err(error) => diagnostics.push(error),
         }

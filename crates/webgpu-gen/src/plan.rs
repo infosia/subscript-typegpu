@@ -534,10 +534,12 @@ impl Ledger {
         Ledger { rows: Vec::new() }
     }
 
+    /// Records one policy row key, unconsumed.
     fn add(&mut self, key: String) {
         self.rows.push((key, false));
     }
 
+    /// Marks every row with this key consumed.
     fn consume(&mut self, key: &str) {
         for (k, consumed) in &mut self.rows {
             if k == key {
@@ -546,6 +548,7 @@ impl Ledger {
         }
     }
 
+    /// The first unconsumed row key, in policy order.
     fn first_dead(&self) -> Option<&str> {
         self.rows
             .iter()
@@ -562,8 +565,9 @@ fn split_construct(construct: &str) -> (&str, Option<&str>) {
     }
 }
 
-/// webgpu.h's generated count spelling singularizes a trailing plural
-/// Derives the webgpu.h count field for an array member.
+/// The webgpu.h count field of an array member.
+///
+/// webgpu.h singularizes a trailing plural and appends `_count`.
 fn backend_array_count(member: &str) -> String {
     let singular = member
         .strip_suffix("ies")
@@ -573,10 +577,17 @@ fn backend_array_count(member: &str) -> String {
     format!("{singular}_count")
 }
 
+/// The public count field of an array member: the camelCase member name plus `Count` (B1).
 fn public_array_count(member: &str) -> String {
     format!("{}Count", naming::camel(member))
 }
 
+/// Checks that the pinned instance descriptor still has the shape the instance create builds.
+///
+/// The descriptor must stay extensible, so the backend-select chain has a head (L4). Each array
+/// member must be an immutable enum array, and each struct member an immutable pointer. Any
+/// other member type returns an invalid error, because the generated struct declares no field
+/// for it.
 fn validate_instance_descriptor(yml: &Yml) -> Result<(), PolicyError> {
     let source = yml
         .struct_("instance_descriptor")
@@ -682,6 +693,8 @@ pub(crate) fn build(yml: &Yml, policy: &Policy) -> Result<Plan, PolicyError> {
         }
     }
 
+    // The ledger holds one row per policy entry. Each generation step consumes the rows it
+    // uses, and the dead check below reports the first row that no step reached (F18).
     let mut ledger = Ledger::new();
     for name in &policy.slice.objects {
         ledger.add(format!("object:{name}"));
@@ -1074,6 +1087,8 @@ pub(crate) fn build(yml: &Yml, policy: &Policy) -> Result<Plan, PolicyError> {
                         message: "reshape rows require a reason".into(),
                     });
                 }
+                // The device-events pattern owns the device callbacks, so it can appear at most
+                // once (F14).
                 if device_events {
                     return Err(PolicyError::Invalid {
                         entry: row.method.clone(),
@@ -1162,6 +1177,8 @@ pub(crate) fn build(yml: &Yml, policy: &Policy) -> Result<Plan, PolicyError> {
         })?;
         for method in &object.methods {
             let key = format!("{object_name}.{}", method.name);
+            // The surface family is host-only. It never enters the facade, so it needs neither
+            // a map row nor an exclusion row (F23, L14).
             if key == "instance.create_surface" {
                 continue;
             }
@@ -1183,10 +1200,13 @@ pub(crate) fn build(yml: &Yml, policy: &Policy) -> Result<Plan, PolicyError> {
         });
     }
 
+    // The device-events pattern emits a concrete `WGPUDeviceDescriptor`, so the opaque block
+    // must not declare that name a second time.
     if device_events {
         pointer_only.retain(|name| name != "WGPUDeviceDescriptor");
     }
 
+    // The instance create builds the descriptor itself, so the pinned shape must still match.
     if creates
         .iter()
         .any(|create| create.returns_object == "instance")
@@ -1212,12 +1232,17 @@ pub(crate) fn build(yml: &Yml, policy: &Policy) -> Result<Plan, PolicyError> {
     })
 }
 
+/// Appends the item when the list does not hold it, so the list keeps first-use order.
 fn push_unique(list: &mut Vec<String>, item: String) {
     if !list.contains(&item) {
         list.push(item);
     }
 }
 
+/// The facade export name of one method.
+///
+/// A `[[renames]]` row that names the method supplies the name. Every other method takes the
+/// derived `subscript_typegpu_<object>_<method>` spelling (F2).
 fn subscript_typegpu_policy_method(policy: &Policy, object: &str, method: &str) -> String {
     let construct = format!("{object}.{method}");
     policy
@@ -1340,6 +1365,8 @@ fn check_unknown(yml: &Yml, policy: &Policy) -> Result<(), PolicyError> {
             return Err(unknown(&row.source));
         }
     }
+    // A rename row names a method, a struct array count, or a method array count. Each count
+    // spelling comes from webgpu.h's own singularization of the pointer field.
     for row in &policy.renames {
         let (owner, field) = split_construct(&row.construct);
         let struct_count_exists = field.is_some_and(|field| {
@@ -1425,6 +1452,10 @@ fn dropped_descriptor(
     }
 }
 
+/// Plans one freestanding create function (pattern `create`).
+///
+/// The yml function must return a subset object. An optional descriptor argument becomes
+/// `dropped_arg`, so the export passes NULL and the descriptor never crosses the boundary.
 fn build_create(
     _yml: &Yml,
     policy: &Policy,
@@ -1460,6 +1491,11 @@ fn build_create(
     })
 }
 
+/// Plans one limits out-fill (pattern `limits-fill`).
+///
+/// The yml function must take one mutable struct pointer and must return `enum.status` (F13,
+/// H2). The limits struct joins the plan through `register_struct`. `receiver` is `None` for a
+/// freestanding fill.
 fn build_limits(
     yml: &Yml,
     policy: &Policy,
@@ -1509,6 +1545,10 @@ fn build_limits(
     })
 }
 
+/// Plans one feature probe (pattern `feature-probe`).
+///
+/// The yml function must take one enum by value and must return `bool` (F16). `receiver` is
+/// `None` for a freestanding probe.
 fn build_feature(receiver: Option<&str>, function: &Function) -> Result<FeatureOp, PolicyError> {
     let entry = receiver.map_or_else(
         || function.name.clone(),
@@ -1550,6 +1590,11 @@ fn build_feature(receiver: Option<&str>, function: &Function) -> Result<FeatureO
     })
 }
 
+/// Plans the adapter-info fill (pattern `adapter-info-fill`).
+///
+/// The method must take a mutable `adapter_info` pointer and must return `enum.status`. The
+/// check pins the ten members by name and by type, and it pins the free-members helper. A
+/// widened record in a later pin fails here instead of truncating the copy silently (H3).
 fn build_adapter_info(
     yml: &Yml,
     receiver: &str,
@@ -1616,6 +1661,11 @@ fn build_adapter_info(
     })
 }
 
+/// Registers the structs and the rename that the public request-device descriptor needs.
+///
+/// The check pins the six yml members of `device_descriptor`, so a new member fails here. The
+/// facade owns the last two, the device-lost and uncaptured-error callback fields, and the
+/// public descriptor drops them (F14).
 fn register_device_descriptor_support(
     yml: &Yml,
     policy: &Policy,
@@ -1700,6 +1750,11 @@ fn register_device_descriptor_support(
     Ok(())
 }
 
+/// Plans one plain sync method (patterns `sync`, `sync-scalar`, and `sync-args`).
+///
+/// `allow_args` admits ordinary arguments. The bare `sync` pattern rejects them, so a method
+/// that needs a reshape carries a reshape row instead. An async method returns an invalid error
+/// that names the pattern to use. A returned handle must be a subset object.
 #[allow(clippy::too_many_arguments)]
 fn build_sync(
     yml: &Yml,
@@ -1765,6 +1820,11 @@ fn build_sync(
     })
 }
 
+/// Plans one ordinary method argument.
+///
+/// A by-value scalar, flag, enum, or subset handle passes verbatim. An immutable struct pointer
+/// registers its struct and records whether that conversion owns storage. Every other shape
+/// returns an invalid error, so no unmapped type reaches the emitters.
 fn build_method_arg(
     yml: &Yml,
     policy: &Policy,
@@ -1835,6 +1895,9 @@ fn build_method_arg(
     })
 }
 
+/// Plans one async method (pattern `future-poll`).
+///
+/// An optional descriptor argument becomes `dropped_arg`, so the request passes NULL.
 fn build_async(
     yml: &Yml,
     policy: &Policy,
@@ -1847,6 +1910,11 @@ fn build_async(
     build_async_core(yml, policy, object, method, index, dropped_arg)
 }
 
+/// Plans the F6 request, poll, and take triple that every async pattern shares.
+///
+/// `index` becomes the slot-kind value. Index 0 also marks the op that carries the shared
+/// protocol declarations in the header. A callback that delivers a handle gains a typed take
+/// export.
 fn build_async_core(
     yml: &Yml,
     policy: &Policy,
@@ -1886,6 +1954,9 @@ fn build_async_core(
     })
 }
 
+/// Resolves the AllowProcessEvents callback-mode constant on the first async op.
+///
+/// Every future callback that the facade registers uses that one mode (L7).
 fn ensure_async_support(
     yml: &Yml,
     mode_const: &mut Option<(String, u32)>,
@@ -1980,6 +2051,10 @@ fn callback_plan(
     })
 }
 
+/// Plans one descriptor-taking create (pattern `descriptor`).
+///
+/// The method must take one immutable struct pointer and must return a subset object. An
+/// optional descriptor lets the export forward NULL to the backend (F12).
 fn build_descriptor(
     yml: &Yml,
     policy: &Policy,
@@ -2042,6 +2117,10 @@ fn build_descriptor(
     })
 }
 
+/// Plans one descriptor-carrying async creation (pattern `descriptor-future-poll`).
+///
+/// The descriptor argument must be a non-optional immutable struct pointer, because the request
+/// always sends one (PL4).
 #[allow(clippy::too_many_arguments)]
 fn build_descriptor_async(
     yml: &Yml,
@@ -2083,6 +2162,11 @@ fn build_descriptor_async(
     })
 }
 
+/// Plans the WGSL shader-module create (pattern `shader-wgsl`).
+///
+/// The check pins both halves of the flattening. The base descriptor carries `label` alone, and
+/// the WGSL extension carries `code` alone. The `[[chain_flattenings]]` row must expose exactly
+/// `code`, so the public descriptor stays chain-free (F12, PL2).
 fn build_shader_wgsl(
     yml: &Yml,
     policy: &Policy,
@@ -2181,6 +2265,12 @@ fn build_shader_wgsl(
     })
 }
 
+/// Registers one boundary struct and every struct it depends on, dependencies first.
+///
+/// The function returns early for a struct already in the plan, so the list stays deduplicated
+/// in dependency order. It rejects an extension struct, an unsupported member type, and an
+/// optional member that is not a handle. An array member needs its `[[renames]]` row, and a u64
+/// sentinel member needs its `[[sentinels]]` row (B1, F15).
 fn register_struct(
     yml: &Yml,
     policy: &Policy,
@@ -2216,6 +2306,8 @@ fn register_struct(
             .and_then(|value| value.strip_suffix('>'));
         if let Some(nested) = direct.or(array) {
             register_struct(yml, policy, entry, nested, structs, sentinel_consts, ledger)?;
+            // A parent reads a storage-owning nested struct out of its holder by value, so the
+            // nested backend struct needs `Copy`.
             if structs
                 .iter()
                 .find(|shape| shape.source == nested)
@@ -2451,6 +2543,8 @@ fn register_struct(
             .and_then(|constant| constant.value.as_str())
             .is_some_and(|value| matches!(value, "uint64_max" | "usize_max"))
         {
+            // The pinned default is a u64 or usize sentinel with no `[[sentinels]]` row. Such a
+            // value crosses the boundary at or above 2^53, which F15 forbids.
             return Err(PolicyError::Unpoliced {
                 construct: sentinel_key,
             });
@@ -2484,6 +2578,10 @@ fn register_struct(
     Ok(())
 }
 
+/// Plans the queue texture upload (pattern `write-texture`).
+///
+/// The yml order is destination, data pointer, data size, layout, and extent. The public order
+/// moves the count-first byte pair last (B3). All three structs register here.
 fn build_write_texture(
     yml: &Yml,
     policy: &Policy,
@@ -2534,6 +2632,9 @@ fn build_write_texture(
     })
 }
 
+/// Plans one label setter (pattern `label`).
+///
+/// The method must take exactly one `string_with_default_empty` argument (F10).
 fn build_label(object: &str, method: &Function) -> Result<LabelOp, PolicyError> {
     let entry = format!("{object}.{}", method.name);
     let [arg] = method.args.as_slice() else {
@@ -2556,6 +2657,11 @@ fn build_label(object: &str, method: &Function) -> Result<LabelOp, PolicyError> 
     })
 }
 
+/// Plans one byte-pair method (pattern `byte-pair`).
+///
+/// The yml method must end with an adjacent `(void*, usize)` pair, and every earlier argument
+/// must be a subset handle or a generator scalar (F20). A mutable data pointer marks a fill. A
+/// method that returns `enum.status` also records the error status for the null path (L9).
 fn build_byte_pair(
     yml: &Yml,
     policy: &Policy,
@@ -2661,6 +2767,12 @@ fn build_byte_pair(
     })
 }
 
+/// Plans one f32 sibling of a byte-pair method, from a `[[typed_pairs]]` row.
+///
+/// The row's element must be `float`, because a script encodes every integer width by hand
+/// (S1). The source method must use the `byte-pair` pattern and must carry a synthetic API
+/// anchor. The source must expose exactly one byte-offset scalar, which the sibling renames
+/// (S3).
 fn build_typed_pair(
     yml: &Yml,
     policy: &Policy,
@@ -2728,6 +2840,11 @@ fn build_typed_pair(
     })
 }
 
+/// Plans one count-first array method (patterns `array` and `empty-array`).
+///
+/// The array is the last argument and must be an immutable pointer to a subset handle or a
+/// generator scalar. A struct-pointer prefix argument is rejected. The `[[renames]]` row must
+/// spell the public count as the pointer name plus `Count` (B1).
 fn build_array(
     yml: &Yml,
     policy: &Policy,
@@ -2834,6 +2951,10 @@ fn build_array(
     })
 }
 
+/// Plans the buffer map request and its whole-buffer sibling (pattern `map-async`).
+///
+/// The yml method must take the map-mode flags, an offset, and a size. The callback must carry
+/// no handle, because the map result is the receiving buffer itself (A3).
 fn build_map_async(
     yml: &Yml,
     policy: &Policy,
@@ -2892,6 +3013,11 @@ fn build_map_async(
     })
 }
 
+/// Plans the error-scope future and the device-event drains (pattern `device-events`).
+///
+/// The pattern maps `device.pop_error_scope` alone. Its callback must be callback-mode and must
+/// carry the status, the error type, and the message (G2). The facade owns the device-lost and
+/// uncaptured-error callbacks separately (F14).
 fn build_device_events(
     yml: &Yml,
     policy: &Policy,
@@ -2967,6 +3093,10 @@ fn build_device_events(
     })
 }
 
+/// The boundary scalar of one yml type name.
+///
+/// A type outside the five generator scalars returns an invalid error, so no unmapped width
+/// reaches the boundary.
 fn scalar_of(entry: &str, ty: &str) -> Result<Scalar, PolicyError> {
     match ty {
         "uint32" => Ok(Scalar::U32),
@@ -2981,6 +3111,10 @@ fn scalar_of(entry: &str, ty: &str) -> Result<Scalar, PolicyError> {
     }
 }
 
+/// Builds one emitted constant set from a `bitflag.<name>` or `enum.<name>` policy source.
+///
+/// A flag set takes `u64` values in compact hex, and an enum set takes `i32` values in the
+/// webgpu.h hex style (F16). Every value comes from the pinned yml and is never typed by hand.
 fn build_const_set(yml: &Yml, source: &str) -> Result<ConstSet, PolicyError> {
     let unknown = || PolicyError::Unknown {
         entry: source.to_string(),

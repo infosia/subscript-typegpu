@@ -22,6 +22,7 @@ pub(crate) const LIBRARY_ORDER: [&str; 12] = [
     "typegpu-ui-atlas.generated.ts",
     "typegpu-ui.ts",
 ];
+/// The count of leading `LIBRARY_ORDER` entries that every program compiles with (LB1).
 const CORE_COUNT: usize = 5;
 
 /// A required library file is unreadable or a source has invalid syntax.
@@ -31,7 +32,9 @@ pub enum LibraryLoadError {
     Read(String),
     /// The compiler parser rejected a source.
     Parse {
+        /// The source the parser rejected.
         file: SourceFile,
+        /// The parser diagnostics, rendered against `file` alone.
         diagnostics: Vec<Diagnostic>,
     },
 }
@@ -49,6 +52,13 @@ impl std::fmt::Display for LibraryLoadError {
 
 impl std::error::Error for LibraryLoadError {}
 
+/// Reads one registered library file from `directory`.
+///
+/// A `.d.ts` name becomes an ambient source. Every other name becomes an ordinary source.
+///
+/// # Errors
+///
+/// If the read fails, returns a message that names the path and the cause.
 fn read_library_file(directory: &Path, name: &str) -> Result<SourceFile, String> {
     let path = directory.join(name);
     let source = std::fs::read_to_string(&path)
@@ -72,8 +82,11 @@ pub fn load_library_files(
     directory: &Path,
     program: &SourceFile,
 ) -> Result<Vec<SourceFile>, LibraryLoadError> {
+    // One slot per `LIBRARY_ORDER` entry. The slots keep load order whatever order the imports
+    // reach the modules in.
     let mut files: [Option<SourceFile>; LIBRARY_ORDER.len()] = std::array::from_fn(|_| None);
     let mut pending = vec![program.clone()];
+    // The core set loads unconditionally. Every other module waits for an import that reaches it.
     for (slot, name) in files.iter_mut().zip(LIBRARY_ORDER).take(CORE_COUNT) {
         let file = read_library_file(directory, name).map_err(LibraryLoadError::Read)?;
         pending.push(file.clone());
@@ -89,6 +102,8 @@ pub fn load_library_files(
             let Some(module) = specifier.strip_prefix("./") else {
                 continue;
             };
+            // A specifier that names no registered module belongs to the program's own files. The
+            // compiler reports it when it cannot resolve it.
             let Some((slot, name)) = files
                 .iter_mut()
                 .zip(LIBRARY_ORDER)

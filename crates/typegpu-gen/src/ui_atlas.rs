@@ -2,6 +2,13 @@
 
 use std::path::Path;
 
+/// Returns the body of the C array initializer that follows `name` in `source`.
+///
+/// The body is the text between the first `{` after `name` and the closing `};`.
+///
+/// # Errors
+///
+/// If `source` holds no such initializer, returns a message that names `name`.
 fn initializer<'a>(source: &'a str, name: &str) -> Result<&'a str, String> {
     source
         .split_once(name)
@@ -15,6 +22,8 @@ fn initializer<'a>(source: &'a str, name: &str) -> Result<&'a str, String> {
 pub fn generate_ui_atlas(root: &Path) -> Result<String, String> {
     let submodule = root.join("third_party/microui");
     let gitpath = submodule.join(".git");
+    // A submodule checkout carries `.git` as a file that points at the real directory. The module
+    // header names the pinned commit, so the generator resolves both shapes.
     let gitdir = if gitpath.is_dir() {
         gitpath
     } else {
@@ -53,6 +62,8 @@ pub fn generate_ui_atlas(root: &Path) -> Result<String, String> {
                 .ok_or_else(|| format!("invalid atlas byte {token}"))
         })
         .collect::<Result<Vec<_>, _>>()?;
+    // The C initializer names fewer bytes than the array holds, and C zero-fills the rest. The
+    // generator zero-fills the same way and rejects an initializer with more bytes (UI2).
     if bytes.len() > 128 * 128 {
         return Err(format!("atlas has {} bytes, expected 16384", bytes.len()));
     }
@@ -78,12 +89,15 @@ pub fn generate_ui_atlas(root: &Path) -> Result<String, String> {
                     .ok_or_else(|| format!("unknown atlas key {key}"))?
                     .parse::<usize>()
                     .map_err(|error| format!("atlas glyph: {error}"))?;
+                // microui's table carries a rect for byte 127 that the module does not export.
                 if byte == 127 {
                     continue;
                 }
                 if !(32..=126).contains(&byte) {
                     return Err(format!("invalid atlas glyph {byte}"));
                 }
+                // Byte 32 is the first glyph and lands at index 5. `UI_ATLAS_FONT` exports the
+                // same shift with the opposite sign, so a reader indexes by byte (UI2).
                 byte - 27
             }
         };
@@ -128,6 +142,8 @@ pub fn generate_ui_atlas(root: &Path) -> Result<String, String> {
         .into_iter()
         .collect::<Option<Vec<_>>>()
         .ok_or("atlas rect is absent")?;
+    // One literal of 32,768 hex digits crosses the MSVC string-literal limit, and the ship tier
+    // then fails on windows-msvc. The alpha reaches the module as chunks of this many digits (UI2).
     const ALPHA_CHUNK: usize = 4096;
     let chunks = bytes
         .chunks(ALPHA_CHUNK / 2)

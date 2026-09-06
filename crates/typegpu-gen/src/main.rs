@@ -9,10 +9,24 @@ use std::process::ExitCode;
 
 use subscript_compiler::SourceFile;
 
+/// Reads one source file into a string.
+///
+/// # Errors
+///
+/// If the read fails, returns a message that names the path and the cause.
 fn read(path: &Path) -> Result<String, String> {
     std::fs::read_to_string(path).map_err(|error| format!("read {}: {error}", path.display()))
 }
 
+/// Runs one subcommand and writes its output files.
+///
+/// `ui-atlas` writes the atlas module (UI2). `gen` writes the support module and one `.wgsl` file
+/// per pipeline declaration (SC13, K16).
+///
+/// # Errors
+///
+/// If an argument is absent or unexpected, returns the usage line. If a read, a check, or a write
+/// fails, returns the rendered diagnostics or the failure message.
 fn run() -> Result<(), String> {
     const USAGE: &str = "usage: subscript-typegpu-gen gen <program.ts> --lib <dir> -o <dir>";
     let mut arguments = std::env::args_os().skip(1);
@@ -61,6 +75,7 @@ fn run() -> Result<(), String> {
     let program_file = SourceFile::new(program_name, read(&program)?);
     let mut files = subscript_typegpu_gen::load_library_files(&library, &program_file)
         .map_err(|error| error.to_string())?;
+    // The program goes last. A module resolves against the files before it in load order (LB1).
     files.push(program_file);
     let generated = subscript_typegpu_gen::generate(&files)
         .map_err(|diagnostics| subscript_compiler::render_diagnostics(&files, &diagnostics))?;

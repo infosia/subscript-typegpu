@@ -1,5 +1,7 @@
 //! The headless development and ship-tier harness.
 
+// T22: library code holds no panic site. An internal failure returns a `ProgramLoadError` or a
+// `String` error. A test module allows the lints again.
 #![deny(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -40,7 +42,12 @@ fn repository_root() -> PathBuf {
     root
 }
 
+/// The worker bound of every program loop (T18).
+///
+/// A ship-tier C compile and a JIT session are memory-bound on the reference machine. The bound
+/// matches the build-job count, not the core count.
 const PROGRAM_WORKER_COUNT: usize = 4;
+/// Holds one program loop at a time, so two test modules never run 8 workers together (T18).
 static PROGRAM_POOL_LOCK: Mutex<()> = Mutex::new(());
 
 /// Runs `body` on a thread with the stack that the subscript compiler needs.
@@ -59,6 +66,7 @@ pub fn run_on_compiler_stack<T: Send + 'static>(
         .map_err(|payload| format!("join compiler thread: {}", panic_message(payload)))
 }
 
+/// Returns the text of a panic payload, or a fixed line when the payload carries no string.
 fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
     if let Some(message) = payload.downcast_ref::<String>() {
         return message.clone();
@@ -95,6 +103,8 @@ where
                     .unwrap_or_else(|poisoned| poisoned.into_inner())
                     .pop_front();
                 let Some(program) = program else { break };
+                // A panic in one program becomes that program's failure. The other workers
+                // finish their queue and the caller reports every failure at once.
                 let outcome =
                     catch_unwind(AssertUnwindSafe(|| task(&program))).map_err(panic_message);
                 outcomes
@@ -107,6 +117,7 @@ where
     let mut outcomes = outcomes
         .into_inner()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
+    // T18: the report follows program order, whatever order the workers finished in.
     outcomes.sort_by(|left, right| left.0.cmp(&right.0));
     let failures = outcomes
         .iter()
@@ -141,6 +152,7 @@ pub struct ProgramLoadError {
 }
 
 impl ProgramLoadError {
+    /// Builds an error that carries a summary alone.
     fn message(message: impl Into<String>) -> Self {
         Self {
             diagnostics: None,
@@ -148,6 +160,10 @@ impl ProgramLoadError {
         }
     }
 
+    /// Builds an error that carries the rendered compiler diagnostics of a rejected program.
+    ///
+    /// `files` must hold every file the diagnostics point into, because the renderer resolves a
+    /// position through that list.
     fn rejected(files: &[SourceFile], diagnostics: Vec<subscript_compiler::Diagnostic>) -> Self {
         Self {
             summary: format!("compile: rejected with {} diagnostic(s)", diagnostics.len()),
@@ -179,6 +195,10 @@ impl std::fmt::Display for ProgramLoadError {
 
 impl std::error::Error for ProgramLoadError {}
 
+/// Builds a cargo command that runs in the repository root with a bounded job count.
+///
+/// The nested build inherits `CARGO` from the outer run, so it runs the same binary. It also
+/// inherits `CARGO_BUILD_JOBS`, so the two builds never oversubscribe the machine.
 fn cargo_command() -> Command {
     let mut command = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
     command.current_dir(repository_root()).env(
@@ -188,6 +208,10 @@ fn cargo_command() -> Command {
     command
 }
 
+/// Runs one nested cargo command and returns its output.
+///
+/// `action` names the step in both error forms. A non-zero exit returns an error that carries
+/// cargo's stderr, because the caller reads the JSON messages on stdout.
 fn run_nested_cargo(command: &mut Command, action: &str) -> Result<Output, String> {
     let output = command
         .output()
@@ -210,6 +234,10 @@ fn staticlib_file_name(package: &str) -> String {
     }
 }
 
+/// Finds the static library that a nested cargo build produced for `package`.
+///
+/// The harness carries no JSON dependency, so the search splits the `compiler-artifact` lines on
+/// the quote character. It returns an error when no line names the expected file.
 fn artifact_path(output: &Output, package: &str) -> Result<PathBuf, String> {
     let wanted = staticlib_file_name(package);
     let crate_name = package.replace('-', "_");
@@ -218,6 +246,7 @@ fn artifact_path(output: &Output, package: &str) -> Result<PathBuf, String> {
             continue;
         }
         for piece in line.split('"') {
+            // A JSON string doubles the Windows path separator. The compare needs the raw form.
             let path = PathBuf::from(piece.replace("\\\\", "\\"));
             if path.file_name() == Some(OsStr::new(&wanted)) {
                 return Ok(path);
@@ -229,6 +258,10 @@ fn artifact_path(output: &Output, package: &str) -> Result<PathBuf, String> {
     ))
 }
 
+/// Builds one package as a release static library and returns the archive path.
+///
+/// The build writes into `target/ship-build`, which the cold-build measurement counts as its own
+/// step (T12).
 fn build_staticlib(package: &str) -> Result<PathBuf, String> {
     let target = repository_root().join("target/ship-build");
     let mut command = cargo_command();
@@ -246,6 +279,10 @@ fn build_staticlib(package: &str) -> Result<PathBuf, String> {
     artifact_path(&output, package)
 }
 
+/// Builds the facade archive and returns it with the platform libraries that it needs.
+///
+/// The facade links `libloading` and the platform dynamic loader (L5), which the C link of a
+/// ship-tier program must repeat. `cargo rustc --print native-static-libs` names them.
 fn facade_link_inputs() -> Result<Vec<String>, String> {
     let target = repository_root().join("target/ship-build");
     let mut command = cargo_command();
@@ -271,6 +308,8 @@ fn facade_link_inputs() -> Result<Vec<String>, String> {
         .chain(String::from_utf8_lossy(&output.stdout).lines())
     {
         if let Some((_, libraries)) = line.split_once("native-static-libs:") {
+            // A JSON message holds the whole note on one line. The list ends at the first
+            // escaped newline.
             let libraries = libraries.split("\\n").next().unwrap_or(libraries);
             let mut inputs = vec![facade.to_string_lossy().into_owned()];
             inputs.extend(libraries.split_whitespace().map(str::to_owned));
@@ -289,18 +328,28 @@ pub fn ensure_runtime_staticlib() -> Result<PathBuf, String> {
         .clone()
 }
 
+/// Returns the directory that holds the generated `subscript-typegpu.h`.
+///
+/// Both tiers compile against that header, so the dev-tier session and the ship-tier C build
+/// receive the same include path.
 fn include_directory() -> PathBuf {
     repository_root().join("crates/facade")
 }
 
+/// The address and element count of the facade coverage counter array.
 #[derive(Clone, Copy)]
 struct CoverageMemory {
     address: usize,
     len: usize,
 }
 
+/// The one coverage allocation of the process. A failure stays recorded and repeats its message.
 static COVERAGE_MEMORY: OnceLock<Result<CoverageMemory, String>> = OnceLock::new();
 
+/// Returns the per-export counter array, and allocates it on the first call.
+///
+/// On Unix the array lives in one anonymous shared mapping, because the dev-tier runner forks
+/// and the child must count into the parent's array. Other platforms leak one boxed slice.
 fn coverage_counts() -> Result<&'static [AtomicU64], String> {
     let memory = COVERAGE_MEMORY
         .get_or_init(|| {
@@ -367,6 +416,7 @@ fn coverage_reset() -> Result<(), String> {
     Ok(())
 }
 
+/// Returns the names of the facade exports whose counter is not zero.
 fn coverage_reached() -> Result<Vec<String>, String> {
     Ok(native_symbols_generated::facade_export_names()
         .iter()
@@ -376,6 +426,10 @@ fn coverage_reached() -> Result<Vec<String>, String> {
         .collect())
 }
 
+/// Returns the facade library for the ship tier, with the archive and its platform libraries.
+///
+/// The link inputs are empty on the dev tier, because the JIT calls the exports that this
+/// process already links.
 fn ship_facade_library() -> Result<NativeLibrary, String> {
     let inputs = ship_link_inputs()?.into_iter().map(PathBuf::from).collect();
     // SAFETY: the generated table contains static facade exports with
@@ -389,6 +443,10 @@ fn ship_facade_library() -> Result<NativeLibrary, String> {
     })
 }
 
+/// Loads the `lib/` modules that `program` reaches through its imports.
+///
+/// A read failure becomes a summary error. A parse failure becomes a rejection that carries the
+/// library file's own diagnostics.
 fn library_files(program: &SourceFile) -> Result<Vec<SourceFile>, ProgramLoadError> {
     subscript_typegpu_gen::load_library_files(&repository_root().join("lib"), program).map_err(
         |error| match error {
@@ -402,6 +460,13 @@ fn library_files(program: &SourceFile) -> Result<Vec<SourceFile>, ProgramLoadErr
     )
 }
 
+/// Builds the source set of one program: the library modules, the program, and its support module.
+///
+/// The support module `./<stem>.typegpu` never exists on disk, so the first check marks that one
+/// import poisoned instead of missing. The generator then produces the module in memory.
+///
+/// Returns a rejection that carries the rendered diagnostics when a check or the generation
+/// fails.
 fn prepare_program(program: &Path) -> Result<Vec<SourceFile>, ProgramLoadError> {
     let stem = program.file_stem().and_then(OsStr::to_str).ok_or_else(|| {
         ProgramLoadError::message(format!("program has no UTF-8 stem: {}", program.display()))
@@ -417,6 +482,7 @@ fn prepare_program(program: &Path) -> Result<Vec<SourceFile>, ProgramLoadError> 
     options.poison_missing_modules = vec![support_module.clone()];
     let discovery = subscript_compiler::check_program_with(&files, &options)
         .map_err(|diagnostics| ProgramLoadError::rejected(&files, diagnostics))?;
+    // A program with no kernel imports no support module, so the generator stays unused.
     if discovery
         .poisoned_imports
         .iter()
@@ -437,6 +503,7 @@ pub fn program_files(program: &Path) -> Result<Vec<SourceFile>, String> {
     prepare_program(program).map_err(|error| error.to_string())
 }
 
+/// Compiles one program into a development session against `library`.
 fn load_program_with_library(
     program: &Path,
     library: NativeLibrary,
@@ -444,6 +511,11 @@ fn load_program_with_library(
     load_program_with_exports_and_library(program, library).map(|(session, _)| session)
 }
 
+/// Compiles one program and returns the session with the exported function names of the program
+/// file.
+///
+/// The names come from the checked module, so no text scan guesses them. A library export never
+/// appears, because the filter keeps the entry file alone.
 fn load_program_with_exports_and_library(
     program: &Path,
     library: NativeLibrary,
@@ -453,6 +525,7 @@ fn load_program_with_exports_and_library(
         .map_err(|diagnostics| ProgramLoadError::rejected(&files, diagnostics))?;
     let entry_file = program.file_name().unwrap_or_default().to_string_lossy();
     let entry_count = files.iter().filter(|file| file.name == entry_file).count();
+    // The export filter below needs exactly one file under the entry name.
     if entry_count != 1 {
         return Err(ProgramLoadError::message(format!(
             "exactly one loaded file must match program {entry_file}, found {entry_count}"
@@ -485,6 +558,10 @@ pub fn load_program_with_exports(
     load_program_with_exports_and_library(program, facade_library())
 }
 
+/// Calls `main`, steps the session until no async work is pending, and returns the raw output.
+///
+/// The API layer pumps the facade inside the program's own wait, so this loop only advances the
+/// session.
 fn run_session(mut session: ReloadSession) -> Result<Vec<u8>, String> {
     session
         .call_export("main")
@@ -508,6 +585,7 @@ pub fn facade_library() -> NativeLibrary {
     }
 }
 
+/// Returns the facade library whose wrappers count each export call for the coverage run.
 fn facade_counting_library() -> NativeLibrary {
     // SAFETY: the generated table contains ABI-preserving wrappers for the same
     // static facade exports declared by the committed ambient mirror.

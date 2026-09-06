@@ -5,6 +5,10 @@ use std::collections::BTreeSet;
 use crate::model::{Arg, Function, Member, Struct, Yml};
 use crate::policy::{Policy, PolicyError};
 
+/// The exact host-only construct set: the ten surface functions and the twelve types they name.
+///
+/// The two-way check rejects a `[[host_only]]` row outside this set and a member of this set
+/// that no row names (L14).
 const REQUIRED: [&str; 22] = [
     "wgpuInstanceCreateSurface",
     "wgpuSurfaceConfigure",
@@ -30,6 +34,10 @@ const REQUIRED: [&str; 22] = [
     "WGPUSurfaceGetCurrentTextureStatus",
 ];
 
+/// Every webgpu.h name the pinned yml defines.
+///
+/// The set holds the freestanding functions, each object with its methods and its two lifetime
+/// calls, each struct with its free-members helper, the enums, and the flag types.
 fn known_constructs(yml: &Yml) -> BTreeSet<String> {
     let mut known = BTreeSet::new();
     for function in &yml.functions {
@@ -65,6 +73,9 @@ fn known_constructs(yml: &Yml) -> BTreeSet<String> {
     known
 }
 
+/// The webgpu.h names that `[[exclude]]` rows remove.
+///
+/// The `addref` row covers every subset object at once, so it expands to one name per object.
 fn excluded_constructs(policy: &Policy) -> BTreeSet<String> {
     let mut excluded = BTreeSet::new();
     for row in &policy.exclude {
@@ -81,6 +92,7 @@ fn excluded_constructs(policy: &Policy) -> BTreeSet<String> {
     excluded
 }
 
+/// Builds a `PolicyError::Invalid` for one construct.
 fn invalid(entry: &str, message: impl Into<String>) -> PolicyError {
     PolicyError::Invalid {
         entry: entry.to_owned(),
@@ -88,6 +100,11 @@ fn invalid(entry: &str, message: impl Into<String>) -> PolicyError {
     }
 }
 
+/// The Rust type of one yml type name, for the surface module.
+///
+/// A scalar name maps directly. A `enum.`, `bitflag.`, `object.`, or `struct.` name resolves
+/// against the yml and returns `PolicyError::Unknown` when the yml lacks it. Any other spelling
+/// returns an invalid-row error, because the surface module supports no wider ABI.
 fn rust_type(yml: &Yml, source: &str) -> Result<String, PolicyError> {
     let scalar = match source {
         "uint16" => Some("u16"),
@@ -127,6 +144,9 @@ fn rust_type(yml: &Yml, source: &str) -> Result<String, PolicyError> {
     Err(invalid(source, "unsupported host-only ABI type"))
 }
 
+/// The Rust type of one member or argument, with the yml pointer attribute applied.
+///
+/// A pointer kind other than `immutable` or `mutable` returns an invalid-row error.
 fn pointed_type(yml: &Yml, source: &str, pointer: Option<&str>) -> Result<String, PolicyError> {
     let base = rust_type(yml, source)?;
     match pointer {
@@ -144,6 +164,10 @@ fn arg_type(yml: &Yml, arg: &Arg) -> Result<String, PolicyError> {
     pointed_type(yml, &arg.ty, arg.pointer.as_deref())
 }
 
+/// The count-field name that webgpu.h gives an array member.
+///
+/// The name is the singular member name plus `_count`. A member ending in `ies` becomes `y`,
+/// and a member ending in `s` drops it.
 fn backend_array_count(member: &str) -> String {
     let singular = member
         .strip_suffix("ies")
@@ -153,6 +177,10 @@ fn backend_array_count(member: &str) -> String {
     format!("{singular}_count")
 }
 
+/// Appends one struct member to the emitted text.
+///
+/// An `array<T>` member expands into a `usize` count and an element pointer, count first. An
+/// array member without a pointer kind returns an invalid-row error.
 fn render_member(out: &mut String, yml: &Yml, member: &Member) -> Result<(), PolicyError> {
     if let Some(element) = member
         .ty
@@ -186,6 +214,10 @@ fn render_member(out: &mut String, yml: &Yml, member: &Member) -> Result<(), Pol
     Ok(())
 }
 
+/// Appends one `#[repr(C)]` struct to the emitted text.
+///
+/// An extensible struct leads with the chain head, and an extension struct leads with the chain
+/// itself. A standalone struct leads with its first member. Any other kind is an invalid row.
 fn render_struct(out: &mut String, yml: &Yml, shape: &Struct) -> Result<(), PolicyError> {
     out.push_str("#[repr(C)]\n#[derive(Clone, Copy)]\n");
     out.push_str(&format!(
@@ -210,6 +242,10 @@ fn render_struct(out: &mut String, yml: &Yml, shape: &Struct) -> Result<(), Poli
     Ok(())
 }
 
+/// Records the object, enum, and flag names that one yml type references.
+///
+/// An `array<T>` type contributes its element type. A scalar type contributes nothing. The
+/// three sets decide which aliases and constant sets the module declares.
 fn collect_type(
     source: &str,
     objects: &mut BTreeSet<String>,
@@ -229,13 +265,23 @@ fn collect_type(
     }
 }
 
+/// One host-only function, resolved against the pinned yml.
 struct HostFunction<'a> {
+    /// The webgpu.h symbol name.
     name: String,
+    /// The receiving object of a method, absent for a freestanding function.
     receiver: Option<&'a str>,
+    /// The yml declaration. AddRef and Release stay implicit in the yml, so both leave it empty.
     function: Option<&'a Function>,
+    /// The struct of a free-members helper, which takes that struct by value.
     free_members: Option<&'a Struct>,
 }
 
+/// Resolves one `wgpu*` name to its yml source.
+///
+/// The search covers the freestanding functions, each object's AddRef and Release, each object
+/// method, and each free-members helper, in that order. A name that matches none of them
+/// returns `PolicyError::Unknown`.
 fn host_function<'a>(yml: &'a Yml, name: &str) -> Result<HostFunction<'a>, PolicyError> {
     for function in &yml.functions {
         if format!("wgpu{}", crate::naming::pascal(&function.name)) == name {
@@ -288,6 +334,10 @@ fn host_function<'a>(yml: &'a Yml, name: &str) -> Result<HostFunction<'a>, Polic
     })
 }
 
+/// The Rust parameter types and the return type of one host-only function.
+///
+/// A method leads with its receiver handle. A free-members helper takes its struct by value and
+/// returns nothing. AddRef and Release take the receiver alone.
 fn function_types(
     yml: &Yml,
     function: &HostFunction<'_>,
@@ -313,6 +363,11 @@ fn function_types(
     Ok((params, None))
 }
 
+/// Validates the `[[host_only]]` rows two ways (F23).
+///
+/// A repeated row is `Duplicate`. A row the yml does not define is `Unknown`. An empty reason
+/// and a row that `[[exclude]]` also names are both `Invalid`. A row outside `REQUIRED` is
+/// `Dead`, and a member of `REQUIRED` that no row names is `Unpoliced`.
 fn validate_policy(yml: &Yml, policy: &Policy) -> Result<(), PolicyError> {
     let known = known_constructs(yml);
     let excluded = excluded_constructs(policy);
@@ -387,6 +442,8 @@ pub(crate) fn render(yml: &Yml, policy: &Policy) -> Result<String, PolicyError> 
         .collect::<Result<Vec<_>, _>>()?;
 
     let mut objects = BTreeSet::new();
+    // Every chained surface struct carries an `s_type` value, so that enum enters the module
+    // even when no member names it.
     let mut enums = BTreeSet::from(["s_type".to_owned()]);
     let mut flags = BTreeSet::new();
     let mut needs_string_view = false;

@@ -471,9 +471,12 @@ pub(crate) enum MethodEmission {
     Swizzle(&'static str),
 }
 
+/// One block of the K10 table: every receiver class carries every method of the block.
 #[derive(Debug)]
 struct MethodGroup {
+    /// The library class names that carry these methods.
     receivers: &'static [&'static str],
+    /// The method names and their emissions.
     methods: &'static [(&'static str, MethodEmission)],
 }
 
@@ -483,6 +486,7 @@ const UNSIGNED_VECTORS: &[&str] = &["Vec2u", "Vec3u", "Vec4u"];
 const BOOL_VECTORS: &[&str] = &["Vec2b", "Vec3b", "Vec4b"];
 const MATRICES: &[&str] = &["Mat2x2f", "Mat3x3f", "Mat4x4f"];
 
+/// The arithmetic methods that every float, signed, and unsigned vector carries (K10).
 const VECTOR_BASE: &[(&str, MethodEmission)] = &[
     ("add", MethodEmission::Binary("+")),
     ("sub", MethodEmission::Binary("-")),
@@ -490,6 +494,10 @@ const VECTOR_BASE: &[(&str, MethodEmission)] = &[
     ("scale", MethodEmission::Binary("*")),
     ("dot", MethodEmission::Builtin("dot")),
 ];
+/// The float-vector methods, each one WGSL builtin of the same name (K10, K25).
+///
+/// `step` and `smoothstep` take the receiver last, because the WGSL signature puts the value
+/// after the edges.
 const FLOAT_METHODS: &[(&str, MethodEmission)] = &[
     ("length", MethodEmission::Builtin("length")),
     ("normalize", MethodEmission::Builtin("normalize")),
@@ -519,17 +527,21 @@ const FLOAT_METHODS: &[(&str, MethodEmission)] = &[
     ("refract", MethodEmission::Builtin("refract")),
     ("faceForward", MethodEmission::Builtin("faceForward")),
 ];
+/// The signed-vector methods that K25 admits. WGSL defines no `abs` for an unsigned vector.
 const SIGNED_METHODS: &[(&str, MethodEmission)] = &[
     ("abs", MethodEmission::Builtin("abs")),
     ("min", MethodEmission::Builtin("min")),
     ("max", MethodEmission::Builtin("max")),
     ("clamp", MethodEmission::Builtin("clamp")),
 ];
+/// The unsigned-vector methods that K25 admits.
 const UNSIGNED_METHODS: &[(&str, MethodEmission)] = &[
     ("min", MethodEmission::Builtin("min")),
     ("max", MethodEmission::Builtin("max")),
     ("clamp", MethodEmission::Builtin("clamp")),
 ];
+/// The componentwise comparisons and `select`, which every float and integer vector carries
+/// (K26). A comparison returns the `Vec*b` of the same width.
 const COMPARISON_METHODS: &[(&str, MethodEmission)] = &[
     ("lt", MethodEmission::Binary("<")),
     ("le", MethodEmission::Binary("<=")),
@@ -539,6 +551,7 @@ const COMPARISON_METHODS: &[(&str, MethodEmission)] = &[
     ("ne", MethodEmission::Binary("!=")),
     ("select", MethodEmission::Builtin("select")),
 ];
+/// The atomic methods, each one WGSL builtin over a pointer to the receiver's place (K21).
 const ATOMIC_METHODS: &[(&str, MethodEmission)] = &[
     ("load", MethodEmission::Atomic("atomicLoad")),
     ("store", MethodEmission::Atomic("atomicStore")),
@@ -548,11 +561,13 @@ const ATOMIC_METHODS: &[(&str, MethodEmission)] = &[
     ("max", MethodEmission::Atomic("atomicMax")),
     ("exchange", MethodEmission::Atomic("atomicExchange")),
 ];
+/// The in-order swizzle accessors of a three-lane vector (K27).
 const VEC3_SWIZZLES: &[(&str, MethodEmission)] = &[
     ("xy", MethodEmission::Swizzle("xy")),
     ("xz", MethodEmission::Swizzle("xz")),
     ("yz", MethodEmission::Swizzle("yz")),
 ];
+/// The in-order swizzle accessors of a four-lane vector (K27).
 const VEC4_SWIZZLES: &[(&str, MethodEmission)] = &[
     ("xy", MethodEmission::Swizzle("xy")),
     ("xz", MethodEmission::Swizzle("xz")),
@@ -565,6 +580,10 @@ const VEC4_SWIZZLES: &[(&str, MethodEmission)] = &[
     ("xzw", MethodEmission::Swizzle("xzw")),
     ("yzw", MethodEmission::Swizzle("yzw")),
 ];
+/// The complete K10 table. A method with no row here is a diagnostic at its call site.
+///
+/// A test reads the method set of every vector, matrix, and atomic class from the HIR. It asserts
+/// that this table has one row per method, and no row for a method that does not exist.
 const METHOD_GROUPS: &[MethodGroup] = &[
     MethodGroup {
         receivers: FLOAT_VECTORS,

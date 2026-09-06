@@ -132,12 +132,19 @@ pub struct Generated {
     pub wgsl_spans: Vec<GeneratedWgslSpan>,
 }
 
+/// The program's import of its own support module, which does not exist during discovery (SC1a).
 #[derive(Debug)]
 struct SupportImport {
+    /// The names the program imports.
     names: BTreeSet<String>,
+    /// The import declaration's position, which carries every diagnostic about a missing name.
     pos: Pos,
 }
 
+/// Builds the diagnostic for a broken generator invariant.
+///
+/// `site` names the function that found the break. The `internal:` prefix marks the generator as
+/// the source, never the author. A reader who sees one has found a generator defect.
 pub(crate) fn internal(site: &str, what: impl std::fmt::Display, pos: &Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -146,6 +153,12 @@ pub(crate) fn internal(site: &str, what: impl std::fmt::Display, pos: &Pos) -> D
     )
 }
 
+/// Resolves one class id against the checked module.
+///
+/// # Errors
+///
+/// If the module holds no class at `index`, returns an internal diagnostic that names `site`. The
+/// checker assigns every class id, so an absent entry is a generator defect.
 pub(crate) fn class<'a>(
     module: &'a Module,
     index: usize,
@@ -159,6 +172,10 @@ pub(crate) fn class<'a>(
         .ok_or_else(|| internal(site, format!("missing class {index}"), pos))
 }
 
+/// Builds one author-facing diagnostic.
+///
+/// `rule` is the single rule id the diagnostic enforces, and the message names the author as the
+/// source (SC14, PI13, K17).
 fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -167,10 +184,20 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+/// Reports whether `name` is a registered library module (LB1).
 fn is_library_file(name: &str) -> bool {
     library::LIBRARY_ORDER.contains(&name)
 }
 
+/// Builds the check options that let the program import a support module that does not exist yet.
+///
+/// The program's own `.ts` file is the one file that is neither ambient, nor a library module, nor
+/// a support module. Its `./<stem>.typegpu` specifier becomes a poisoned module (SC1a).
+///
+/// # Errors
+///
+/// If `files` holds more than one program, returns an SC1 diagnostic. One run generates for one
+/// program.
 fn discovery_options(files: &[SourceFile]) -> Result<CheckOptions, Vec<Diagnostic>> {
     let mut modules = Vec::new();
     for file in files {
@@ -194,6 +221,14 @@ fn discovery_options(files: &[SourceFile]) -> Result<CheckOptions, Vec<Diagnosti
     Ok(options)
 }
 
+/// Reads the program's support-module import from the discovery HIR (SC1a).
+///
+/// The result is `None` when the program imports no support module, which a program with no schema
+/// and no pipeline does.
+///
+/// # Errors
+///
+/// If the module carries a second poisoned import, returns an SC1 diagnostic.
 fn support_import(
     module: &subscript_compiler::hir::Module,
 ) -> Result<Option<SupportImport>, Vec<Diagnostic>> {
@@ -215,7 +250,12 @@ fn support_import(
     }
 }
 
+/// Recovers the schema name from one imported constant name (SC11).
+///
+/// `X_SIZE` and `X_OFFSET_field` both name `X`. A field name never carries an underscore, so the
+/// split is unambiguous. The result is `None` when the name is not a schema constant.
 fn schema_name(export: &str) -> Option<&str> {
+    // A resources class belongs to a layout class, not to a schema (PI8).
     if export.ends_with("Resources") {
         return None;
     }
@@ -230,6 +270,10 @@ fn schema_name(export: &str) -> Option<&str> {
         .map(|(name, _)| name)
 }
 
+/// Returns the schema names the program's import names.
+///
+/// A pipeline declaration produces constants with the same suffixes as a schema (PI8), so the
+/// declaration names drop out. The result seeds schema discovery, which adds the reachable classes.
 fn intended_schemas(
     support: Option<&SupportImport>,
     pipeline_declarations: &BTreeSet<String>,
@@ -243,6 +287,10 @@ fn intended_schemas(
         .collect()
 }
 
+/// Returns the names the generated support module exports.
+///
+/// The generator writes one export per line, so a line scan is exact. The caller compares the set
+/// with the program's imported names and reports each name that no schema or pipeline produces.
 fn support_export_names(source: &str) -> BTreeSet<&str> {
     source
         .lines()
@@ -266,6 +314,8 @@ fn support_export_names(source: &str) -> BTreeSet<&str> {
 ///
 /// Returns compiler or schema diagnostics with source positions.
 pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
+    // One check runs, over a program that imports a module the generator has yet to write. The
+    // poisoned import carries the imported names, and nothing here lowers this HIR (SC1a).
     let options = discovery_options(files)?;
     let module = subscript_compiler::check_program_with(files, &options)?;
     let support = support_import(&module)?;
@@ -282,6 +332,8 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
             ]
         }))
         .collect::<BTreeSet<_>>();
+    // A shell keeps its subscript body for the host lane and never reaches the walker. A kernel is
+    // the opposite, so one function cannot be both (K29).
     if let Some(shell) = shell_program
         .shells
         .iter()
@@ -315,6 +367,8 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
                 .map(|pipeline| pipeline.declaration.clone()),
         )
         .collect::<BTreeSet<_>>();
+    // A class is a schema when a schema use reaches it (SC1). The uses are the program's import,
+    // the binding items, the vertex and instance schemas, and the kernel call graph.
     let mut intended = intended_schemas(support.as_ref(), &pipeline_declarations);
     intended.extend(pipeline::schema_names(&module, &pipeline_definitions));
     intended.extend(render::schema_names(&render_definitions));
@@ -331,6 +385,8 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         );
     }
     let schemas = schema::discover(&module, &intended, support.as_ref().map(|item| &item.pos))?;
+    // Every name the emitter writes at module scope. A shell or a raw declaration that repeats one
+    // of them is a diagnostic, so the set must be complete before the collision check (K30).
     let mut generated_names = schemas
         .iter()
         .map(|schema| schema.name.clone())
@@ -371,6 +427,8 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         );
     }
     shell::validate_collisions(&shell_program, &generated_names)?;
+    // A varyings class carries `@builtin` and `@location` attributes and never gets a layout, so
+    // one class cannot serve as both a varyings class and a schema (RN7).
     if let Some(pipeline) = render_definitions.iter().find(|pipeline| {
         schemas
             .iter()
@@ -393,6 +451,8 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     let emitted_compute = pipeline_definitions
         .iter()
         .map(|pipeline| {
+            /// Appends `tree`'s struct name and its nested struct names to `names`, outermost
+            /// first, with no repeat. `seen` carries the names already appended.
             fn append_tree(tree: &TypeTree, names: &mut Vec<String>, seen: &mut BTreeSet<String>) {
                 let TypeTree::Struct(structure) = tree else {
                     return;
@@ -404,6 +464,8 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
                     append_tree(&member.ty, names, seen);
                 }
             }
+            // Only the structs this module references reach its text, in first-use order (K14). A
+            // referenced struct pulls in the structs its members name.
             let references = kernel::referenced_schema_names(&module, pipeline, &shell_program)?;
             let mut names = Vec::new();
             let mut seen = BTreeSet::new();
@@ -494,6 +556,8 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         &render_texts,
     )
     .map_err(|diagnostic| vec![diagnostic])?;
+    // The check runs on the finished support module. An imported name that no schema and no
+    // pipeline produces reaches here, and the author sees one diagnostic per name (SC1a).
     if let Some(support) = &support {
         let exports = support_export_names(&support_module);
         let missing = support
@@ -542,7 +606,13 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     })
 }
 
+/// `Iterator::any` over a predicate that returns a diagnostic.
 pub(crate) trait TryAny: Iterator + Sized {
+    /// Returns `true` at the first item the predicate accepts, and stops there.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first diagnostic the predicate returns. The remaining items stay unvisited.
     fn try_any(
         mut self,
         mut predicate: impl FnMut(Self::Item) -> Result<bool, Diagnostic>,

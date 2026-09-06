@@ -5,6 +5,10 @@ use crate::naming;
 use crate::patterns::rust_signature;
 use crate::plan::{ByteArg, TypedPairOp};
 
+/// The public count name, the element pointer type, and the pointer name of one float pair.
+///
+/// A mutable pair spells `outCount` and `out`, an immutable one `dataCount` and `data`. The
+/// element type is `float`, so the count counts elements and never bytes (S3).
 fn public_pair(op: &TypedPairOp) -> (&'static str, &'static str, &'static str) {
     if op.mutable {
         ("outCount", "float*", "out")
@@ -13,6 +17,10 @@ fn public_pair(op: &TypedPairOp) -> (&'static str, &'static str, &'static str) {
     }
 }
 
+/// The public spelling of one argument name, with a `Bytes` suffix on the offset parameter.
+///
+/// The float count and the byte offset sit in one parameter list. The suffix keeps the two
+/// units apart (S3).
 fn public_arg_name(op: &TypedPairOp, name: &str) -> String {
     let name = naming::camel(name);
     if name == naming::camel(&op.offset_param) {

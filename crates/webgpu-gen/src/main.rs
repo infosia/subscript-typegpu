@@ -7,10 +7,14 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+/// Reads one input file. The error text names the path that failed.
 fn read(path: &Path) -> Result<String, String> {
     std::fs::read_to_string(path).map_err(|error| format!("read {}: {error}", path.display()))
 }
 
+/// Writes one output file and creates its parent directory first.
+///
+/// The error text names the path that failed.
 fn write(path: &Path, contents: &str) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -19,6 +23,11 @@ fn write(path: &Path, contents: &str) -> Result<(), String> {
     std::fs::write(path, contents).map_err(|error| format!("write {}: {error}", path.display()))
 }
 
+/// Drops the `@subscript-cenum` directive lines from the header text.
+///
+/// A directive makes `subscript bind` spell that enum with its public IDL alias in the mirror.
+/// The API join must read the boundary spelling, so the base mirror comes from a header without
+/// the directives.
 fn without_cenum_directives(header: &str) -> String {
     header
         .split_inclusive('\n')
@@ -26,6 +35,10 @@ fn without_cenum_directives(header: &str) -> String {
         .collect()
 }
 
+/// Runs the first pass and writes the four outputs that need no libclang.
+///
+/// The pass returns the generated artifacts, because the second pass needs the header text and
+/// the CEnum alias list.
 fn write_libclang_free_outputs(
     root: &Path,
 ) -> Result<subscript_typegpu_webgpu_gen::Generated, String> {
@@ -52,6 +65,11 @@ fn write_libclang_free_outputs(
     Ok(generated)
 }
 
+/// Runs the second pass and writes the three `lib/` outputs.
+///
+/// The pass builds the base mirror from the directive-free header, joins it with the pinned
+/// GPUWeb IDL and the API policy, then builds the shipped mirror from the full header. It fails
+/// when the policy-derived alias list and the API-joined alias list disagree.
 fn write_libclang_outputs(
     root: &Path,
     generated: &subscript_typegpu_webgpu_gen::Generated,
@@ -81,6 +99,7 @@ fn write_libclang_outputs(
     Ok(())
 }
 
+/// Parses the one argument, the repository root, and runs the two passes in order.
 fn run() -> Result<(), String> {
     let mut arguments = std::env::args_os().skip(1);
     let root = arguments
@@ -97,6 +116,7 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
+/// Prints a failure on stderr and reports it through the exit code.
 fn main() -> ExitCode {
     match run() {
         Ok(()) => ExitCode::SUCCESS,

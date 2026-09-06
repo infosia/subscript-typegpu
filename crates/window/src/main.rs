@@ -47,17 +47,29 @@ mod macos_colorspace {
     }
 }
 
+/// A failure of one host run (W8).
+///
+/// `Compile` carries the compiler's diagnostics, which the exit path prints before its one line.
+/// `Host` carries a message whose first line names the step that failed.
 enum WindowError {
     Compile(ProgramLoadError),
     Host(String),
 }
 
 impl From<String> for WindowError {
+    /// Treats every host message as a host failure, so that `?` accepts a `Result<_, String>`.
     fn from(message: String) -> Self {
         Self::Host(message)
     }
 }
 
+/// Creates the webgpu.h surface for `window` on `instance` (W9).
+///
+/// macOS attaches a `CAMetalLayer` and sets the layer's color space to sRGB. An unset color space
+/// reaches the display in the display's native gamut. Windows passes the `HWND` and the
+/// `HINSTANCE`. Another platform returns an error.
+///
+/// The caller releases the returned surface before it releases the instance (W4).
 fn create_surface(
     instance: facade::SubscriptTypegpuInstance,
     window: &Window,
@@ -163,6 +175,10 @@ fn create_surface(
     }
 }
 
+/// Pumps the instance until the future completes, and returns when it succeeds.
+///
+/// A failure drops the future, so no slot survives the error. The message names the step and the
+/// backend status.
 fn await_future(
     instance: facade::SubscriptTypegpuInstance,
     future: facade::SubscriptTypegpuFutureId,
@@ -185,6 +201,7 @@ fn await_future(
     }
 }
 
+/// The two async requests of the host. The value selects the names that a failure message holds.
 #[derive(Clone, Copy)]
 enum FutureKind {
     RequestAdapter,
@@ -192,6 +209,7 @@ enum FutureKind {
 }
 
 impl FutureKind {
+    /// Returns the step name for the one failure line (W8).
     fn step(self) -> &'static str {
         match self {
             Self::RequestAdapter => "adapter request",
@@ -199,6 +217,10 @@ impl FutureKind {
         }
     }
 
+    /// Returns the pinned header's constant name for one facade future status.
+    ///
+    /// The facade returns the negated backend status, and -100 for an unknown id (L6). A status
+    /// that no arm names reads as `UnknownStatus`.
     fn status_name(self, status: i32) -> &'static str {
         if status == -100 {
             return "UnknownFuture";
@@ -214,6 +236,10 @@ impl FutureKind {
     }
 }
 
+/// One queued input event that the host delivers before the next frame (W3 Rev 2).
+///
+/// `Wheel` carries pixel deltas. `KeyDown` and `KeyUp` carry one modifier bit. `Text` carries one
+/// Unicode scalar.
 enum InputEvent {
     Wheel(f32, f32),
     KeyDown(u32),
@@ -221,6 +247,11 @@ enum InputEvent {
     Text(u32),
 }
 
+/// The state of one windowed run.
+///
+/// `key`, `pointer_x`, `pointer_y`, and `buttons` are the input that every `frame` call reads
+/// (W3). `input_exports` holds the entry names that the script exports, so the host drops an
+/// event whose optional entry is absent (W2 Rev 3).
 struct Host {
     input_exports: Vec<String>,
     input_events: Vec<InputEvent>,
@@ -245,6 +276,10 @@ struct Host {
 }
 
 impl Host {
+    /// Builds the host state before the event loop starts.
+    ///
+    /// The pointer starts at `-1, -1`, which tells the script that the pointer never entered the
+    /// window (W2 Rev 2). With a `frame_limit` of `None`, the run ends when the window closes.
     fn new(
         session: ReloadSession,
         input_exports: Vec<String>,
@@ -275,6 +310,13 @@ impl Host {
         }
     }
 
+    /// Creates the window, the surface, the adapter, and the device, then configures the surface.
+    ///
+    /// The function selects the format (W7). It then calls `init` with the instance, the device,
+    /// and that format (W2). It drains the async work of `init` and requests the first frame (W6).
+    ///
+    /// The adapter is released as soon as the capabilities query returns, because the device
+    /// alone outlives this function.
     fn initialize(&mut self, event_loop: &ActiveEventLoop) -> Result<(), String> {
         let attributes = WindowAttributes::default()
             .with_title("subscript-typegpu window")
@@ -328,7 +370,9 @@ impl Host {
         if status != surface::WGPUStatus_Success {
             return Err(format!("surface capabilities failed with status {status}"));
         }
+        // W7: bgra8unorm when the surface lists it, and the first listed format otherwise.
         self.format = if capabilities.formatCount == 0 || capabilities.formats.is_null() {
+            // 0 is WGPUTextureFormat_Undefined, which the check below rejects.
             0
         } else {
             // SAFETY: a successful capabilities query supplies formatCount
@@ -349,6 +393,8 @@ impl Host {
             return Err("surface reports no texture format".to_owned());
         }
         self.configure()?;
+        // The flag precedes the call, so a script that fails inside `init` still receives its
+        // `shutdown` call (W2).
         self.initialized = true;
         self.call_entry(
             "init",
@@ -366,6 +412,9 @@ impl Host {
         Ok(())
     }
 
+    /// Configures the surface for the current window size, with Fifo presentation.
+    ///
+    /// A window can report a zero extent, so the width and the height hold a minimum of 1.
     fn configure(&mut self) -> Result<(), String> {
         let size = self
             .window
@@ -392,6 +441,7 @@ impl Host {
         Ok(())
     }
 
+    /// Writes the script's buffered `print` output to the host's stdout and flushes it (W6).
     fn write_output(&mut self) -> Result<(), String> {
         let output = self.session.take_output();
         let mut stdout = std::io::stdout().lock();
@@ -401,6 +451,10 @@ impl Host {
             .map_err(|error| format!("write script output: {error}"))
     }
 
+    /// Calls one script entry and writes the output that the call produced.
+    ///
+    /// The output reaches stdout even when the call fails, so the script's own line stays visible
+    /// before the host's error line (W6).
     fn call_entry(&mut self, name: &str, args: &[EntryArg]) -> Result<(), String> {
         let called = self
             .session
@@ -411,6 +465,10 @@ impl Host {
         output
     }
 
+    /// Pumps the facade and steps the session until the script holds no pending async work (W6).
+    ///
+    /// The pump runs before the first step, so a request that the entry started can complete
+    /// without another frame. The output reaches stdout even when a step fails.
     fn drain_async(&mut self) -> Result<(), String> {
         let drained: Result<(), String> = (|| {
             facade::subscript_typegpu_instance_process_events(self.instance);
@@ -427,6 +485,9 @@ impl Host {
         output
     }
 
+    /// Delivers the queued input events in event order, then leaves the queue empty (W3 Rev 2).
+    ///
+    /// An event whose optional entry the script does not export is dropped.
     fn deliver_input(&mut self) -> Result<(), String> {
         for event in std::mem::take(&mut self.input_events) {
             let (name, args) = match event {
@@ -442,6 +503,13 @@ impl Host {
         Ok(())
     }
 
+    /// Acquires one surface texture, calls `frame`, and presents the result (W5).
+    ///
+    /// `Timeout` skips the frame and `Outdated` reconfigures first. Both keep the input queue, so
+    /// it reaches the next presented frame (W3 Rev 3). `Lost` and `Error` end the run.
+    ///
+    /// The view and the texture are released on every path. The key slot clears after a
+    /// presented frame (W3).
     fn frame(&mut self) -> Result<(), String> {
         let table = surface::table()?;
         // SAFETY: zero is the webgpu.h initializer for the out structure.
@@ -468,6 +536,7 @@ impl Host {
             | surface::WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal => {}
             status => return Err(format!("surface acquisition status {status}")),
         }
+        // W5: the host never calls `frame` without a texture.
         if acquired.texture.is_null() {
             return Err("surface acquisition returned null texture".to_owned());
         }
@@ -504,6 +573,7 @@ impl Host {
             return Err(format!("surface present failed with status {presented}"));
         }
         self.frames += 1;
+        // The presented frame read the key slot, so the next frame starts with no key (W3).
         self.key = 0;
         self.drain_async()?;
         Ok(())
@@ -513,6 +583,10 @@ impl Host {
         self.frame_limit.is_some_and(|limit| self.frames >= limit)
     }
 
+    /// Records the run's result and asks the event loop to exit.
+    ///
+    /// The first call wins, so a later event cannot replace the recorded failure. The shutdown
+    /// sequence runs on the loop's exiting path (W8 Rev 2).
     fn finish(&mut self, event_loop: &ActiveEventLoop, result: Result<(), String>) {
         if self.exit_requested {
             return;
@@ -522,6 +596,11 @@ impl Host {
         event_loop.exit();
     }
 
+    /// Calls `shutdown`, then releases the device, the surface, and the instance in that order
+    /// (W4).
+    ///
+    /// The body runs once. It keeps the first error, so a release failure never hides the failure
+    /// that ended the run. The frame count prints only after a run with no error (W11).
     fn shutdown(&mut self) {
         if self.shutdown_complete {
             return;
@@ -554,6 +633,7 @@ impl Host {
             facade::subscript_typegpu_instance_release(self.instance);
             self.instance = std::ptr::null_mut();
         }
+        // W4: the window goes last, because the surface holds a layer of the window.
         self.window.take();
         if result.is_ok() {
             println!("window:frames={}", self.frames);
@@ -561,12 +641,17 @@ impl Host {
         self.result = result;
     }
 
+    /// Records `error` as the run's result and asks the event loop to exit.
     fn fail(&mut self, event_loop: &ActiveEventLoop, error: String) {
         self.finish(event_loop, Err(error));
     }
 }
 
 impl ApplicationHandler for Host {
+    /// Runs the one-time initialization on the first resume of the application.
+    ///
+    /// A limit of zero frames ends the run here, so `--frames 0` covers the whole path with no
+    /// presented frame.
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_none() && !self.exit_requested {
             match self.initialize(event_loop) {
@@ -577,6 +662,13 @@ impl ApplicationHandler for Host {
         }
     }
 
+    /// Translates one window event into host state, into a queued input event, or into one frame.
+    ///
+    /// A close ends the loop and a resize reconfigures the surface (W3). A redraw request encodes
+    /// and presents one frame (W5). The pointer position and the button bits are level state, so
+    /// nothing clears them.
+    ///
+    /// The host ignores an event of another window and every event after the exit request.
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
@@ -596,12 +688,15 @@ impl ApplicationHandler for Host {
             WindowEvent::KeyboardInput { event, .. } => {
                 let pressed = event.state == ElementState::Pressed;
                 if pressed {
+                    // W3: one slot holds the key. A second press before the next frame replaces
+                    // the first.
                     self.key = match &event.logical_key {
                         Key::Character(value) => value.chars().next().map_or(0, u32::from),
                         Key::Named(NamedKey::Space) => u32::from(' '),
                         _ => 0,
                     };
                 }
+                // The modifier bit set of W3 Rev 2. A key repeat counts as a press.
                 let bit = match &event.logical_key {
                     Key::Named(NamedKey::Shift) => Some(1),
                     Key::Named(NamedKey::Control) => Some(2),
@@ -618,6 +713,8 @@ impl ApplicationHandler for Host {
                     });
                 }
                 if pressed {
+                    // W3 Rev 3: the text comes from the produced text of the event, so a control
+                    // chord produces none. A control character is not text either.
                     if let Some(text) = &event.text {
                         self.input_events.extend(
                             text.chars()
@@ -628,6 +725,7 @@ impl ApplicationHandler for Host {
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
+                // W3 Rev 2: one line is 30 pixels, and a pixel delta passes as is.
                 let (x, y) = match delta {
                     MouseScrollDelta::LineDelta(x, y) => (x * 30.0, y * 30.0),
                     MouseScrollDelta::PixelDelta(position) => {
@@ -640,8 +738,10 @@ impl ApplicationHandler for Host {
                 self.pointer_x = position.x as f32;
                 self.pointer_y = position.y as f32;
             }
+            // The pointer position is level state (W3), so a leave event keeps the last position.
             WindowEvent::CursorLeft { .. } => {}
             WindowEvent::MouseInput { state, button, .. } => {
+                // The button bit set of W2 Rev 2: bit 0 left, bit 1 right, bit 2 middle.
                 let bit = match button {
                     MouseButton::Left => Some(1_u32 << 0),
                     MouseButton::Right => Some(1_u32 << 1),
@@ -658,6 +758,7 @@ impl ApplicationHandler for Host {
             WindowEvent::RedrawRequested => match self.frame() {
                 Ok(()) if self.reached_frame_limit() => self.finish(event_loop, Ok(())),
                 Ok(()) => {
+                    // Each frame asks for the next one, so the host runs a continuous loop.
                     if let Some(window) = &self.window {
                         window.request_redraw();
                     }
@@ -668,11 +769,18 @@ impl ApplicationHandler for Host {
         }
     }
 
+    /// Runs the shutdown sequence on the event loop's exiting path.
+    ///
+    /// An application quit takes this path too, so a quit reports like a close (W8 Rev 2).
     fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
         self.shutdown();
     }
 }
 
+/// Reads the program path and the optional frame limit from the command line (W11).
+///
+/// The path defaults to the example program. A repeated `--frames`, an unknown argument, or a
+/// missing count returns the usage line.
 fn arguments() -> Result<(PathBuf, Option<u64>), String> {
     let mut arguments = std::env::args_os().skip(1);
     let program = arguments
@@ -697,6 +805,9 @@ fn arguments() -> Result<(PathBuf, Option<u64>), String> {
     Ok((program, frame_limit))
 }
 
+/// Builds the event loop on Windows, where the host runs on a thread with the compiler's stack.
+///
+/// The host starts the loop off the main thread there, so the builder must accept any thread.
 #[cfg(windows)]
 fn event_loop() -> Result<EventLoop<()>, winit::error::EventLoopError> {
     use winit::platform::windows::EventLoopBuilderExtWindows;
@@ -704,11 +815,16 @@ fn event_loop() -> Result<EventLoop<()>, winit::error::EventLoopError> {
     EventLoop::builder().with_any_thread(true).build()
 }
 
+/// Builds the event loop on the main thread (W10).
 #[cfg(not(windows))]
 fn event_loop() -> Result<EventLoop<()>, winit::error::EventLoopError> {
     EventLoop::new()
 }
 
+/// Compiles the program, creates the instance, and runs the event loop to its end.
+///
+/// A compile failure carries its diagnostics, which the exit path prints before the one host line
+/// (W8). The returned error is the result that the host recorded.
 fn run() -> Result<(), WindowError> {
     let (program, frame_limit) = arguments()?;
     let (session, exports) = subscript_typegpu_harness::load_program_with_exports(&program)
@@ -726,6 +842,10 @@ fn run() -> Result<(), WindowError> {
     Ok(())
 }
 
+/// Runs the host, prints one line for a failure, and exits with a non-zero code (W8).
+///
+/// Windows runs the host on a thread with the compiler's stack. Every other platform runs it on
+/// the main thread (W10).
 fn main() {
     #[cfg(windows)]
     let result = subscript_typegpu_harness::run_on_compiler_stack(run)

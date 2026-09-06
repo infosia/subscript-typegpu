@@ -16,6 +16,10 @@ use crate::pipeline::{
 use crate::render::RenderPipeline;
 use crate::schema::Schema;
 
+/// Statements that must run before an expression, each with its indent relative to the statement.
+///
+/// A lowered conditional puts its `if`/`else` here, so both sides keep short-circuit evaluation
+/// (K9).
 type Prelude = Vec<(usize, String)>;
 
 /// One author-WGSL line range inside an emitted module (K31).
@@ -51,6 +55,8 @@ pub(crate) struct Snippet {
 }
 
 impl Snippet {
+    /// Builds a snippet whose text needs parentheses below `precedence`. A higher number binds
+    /// tighter.
     fn new(text: String, precedence: u8) -> Self {
         Self {
             text,
@@ -59,11 +65,13 @@ impl Snippet {
         }
     }
 
+    /// Builds a snippet that never needs parentheses, such as a literal, a name, or a call.
     fn atom(text: String) -> Self {
         Self::new(text, 10)
     }
 }
 
+/// Builds one author-facing diagnostic that names `rule`, the single rule it enforces (K17).
 fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -72,6 +80,9 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+/// Builds a diagnostic that names the generator as its source (K15).
+///
+/// The author's program passed the checker, so a reader who sees one has found a generator defect.
 fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -80,6 +91,7 @@ fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+/// Returns the module-level function of this name, and `None` when the module declares none.
 fn function<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
     module
         .functions
@@ -87,11 +99,13 @@ fn function<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
         .find(|function| function.name == name)
 }
 
+/// Returns the class name of a class type, and `None` for every other type.
 fn class_name<'a>(module: &'a Module, ty: &Type) -> Option<&'a str> {
     let Type::Class(id) = ty else { return None };
     module.classes.get(id.0).map(|class| class.name.as_str())
 }
 
+/// Returns the source position of one statement. A block gives its first statement's position.
 fn statement_pos(statement: &Stmt) -> Option<&Pos> {
     match statement {
         Stmt::Let { pos, .. }
@@ -108,6 +122,11 @@ fn statement_pos(statement: &Stmt) -> Option<&Pos> {
     }
 }
 
+/// Reports whether the named function comes from `file`.
+///
+/// The generator recognizes a library function by declaring file, never by name alone (RN1). A
+/// generic instantiation can carry a position outside the library, so a parameter's file and the
+/// first statement's file both count.
 fn function_declared_in(module: &Module, name: &str, file: &str) -> bool {
     function(module, name).is_some_and(|function| {
         function.pos.file == file
@@ -120,6 +139,11 @@ fn function_declared_in(module: &Module, name: &str, file: &str) -> bool {
     })
 }
 
+/// Returns the WGSL scalar of an atomic library class, and `None` for every other type (K21).
+///
+/// # Errors
+///
+/// If the type names a class the module does not hold, returns an internal diagnostic.
 fn atomic_scalar(
     module: &Module,
     ty: &Type,
@@ -140,7 +164,16 @@ fn atomic_scalar(
     })
 }
 
+/// Reports whether `ty` holds an atomic at any depth (K21).
+///
+/// An atomic cannot be copied to a local or written as a whole, so a schema that holds one is
+/// restricted wherever a plain schema is not.
+///
+/// # Errors
+///
+/// If a field names a class the module does not hold, returns an internal diagnostic.
 fn type_contains_atomic(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnostic> {
+    /// Descends one type. `seen` holds the class ids already visited, so a cycle terminates.
     fn visit(
         module: &Module,
         ty: &Type,
@@ -164,26 +197,38 @@ fn type_contains_atomic(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, D
     visit(module, ty, &mut BTreeSet::new(), pos)
 }
 
+/// Reports whether `ty` is the `PrivateVar<T>` wrapper that `privateVar` returns (K20).
 fn is_private_var(module: &Module, ty: &Type) -> bool {
     library_class(module, ty).is_some_and(|class| class.name.starts_with("PrivateVar<"))
 }
 
+/// The WGSL form of one module-level declaration that a kernel reads (K19, K20).
 #[derive(Debug, Clone)]
 enum KernelGlobalKind {
+    /// A `const` whose initializer the generator folds.
     Constant(Expr),
+    /// A `var<private>` and its initializer expression.
     Private(Expr),
+    /// A `var<workgroup>` of one value, which takes no initializer.
     WorkgroupVar,
+    /// A `var<workgroup>` array of this literal length.
     WorkgroupArray(u32),
 }
 
+/// One module-level declaration that a kernel's call graph reads.
 #[derive(Debug, Clone)]
 struct KernelGlobal {
+    /// The author's declaration name, which the emitter mangles (K14).
     name: String,
+    /// The value type. A wrapper gives the `T` it carries, never the wrapper class.
     ty: Type,
+    /// The WGSL form.
     kind: KernelGlobalKind,
+    /// The declaration position.
     pos: Pos,
 }
 
+/// Collects the module-level declaration names that `expr` reads.
 fn global_names_expr(expr: &Expr, out: &mut BTreeSet<String>) {
     if let ExprKind::Global(name) = &expr.kind {
         out.insert(name.clone());
@@ -238,6 +283,7 @@ fn global_names_expr(expr: &Expr, out: &mut BTreeSet<String>) {
     }
 }
 
+/// Runs `global_names_expr` over every expression the statement holds, nested bodies included.
 fn global_names_stmt(statement: &Stmt, out: &mut BTreeSet<String>) {
     match statement {
         Stmt::Let { init, .. } | Stmt::Expr(init) => global_names_expr(init, out),
@@ -310,6 +356,14 @@ fn global_names_stmt(statement: &Stmt, out: &mut BTreeSet<String>) {
     }
 }
 
+/// Returns the `T` that a library wrapper class carries in its host-body field.
+///
+/// `field_name` is that field, `value` for one value and `values` for an array. A `T[]` field
+/// gives the element type. The result is `None` when the class holds no such field.
+///
+/// # Errors
+///
+/// If the type names a class the module does not hold, returns an internal diagnostic.
 fn wrapper_item_type(
     module: &Module,
     ty: &Type,
@@ -328,6 +382,15 @@ fn wrapper_item_type(
         }))
 }
 
+/// Returns the module-level declarations that one kernel's call graph reads (K19, K20).
+///
+/// The result follows the module's declaration order, which the emitter writes them in (K14).
+///
+/// # Errors
+///
+/// A kernel that reads a mutable global gives a K19 diagnostic. A variable wrapper with no value
+/// type or a non-literal length gives a K20 diagnostic. A cycle in the call graph gives a K2
+/// diagnostic.
 fn kernel_globals(
     module: &Module,
     kernel: &Function,
@@ -345,6 +408,8 @@ fn kernel_globals(
             }
         }
     }
+    // A reached constant's initializer can read another constant, which the kernel never names.
+    // The set grows until it stops, so the emitted module declares every name it uses (K19).
     loop {
         let before = reached.len();
         for global in &module.globals {
@@ -370,6 +435,8 @@ fn kernel_globals(
                 global.pos.clone(),
             ));
         }
+        // The three library factories decide the address space (K20). Every other initializer is
+        // a module constant, which the emitter folds (K19).
         let wrapper = match &global.init.kind {
             ExprKind::Call {
                 callee: Callee::Func(name),
@@ -443,6 +510,14 @@ fn kernel_globals(
     Ok(globals)
 }
 
+/// Returns the declarations that both render entry points read, with no repeat (RN9).
+///
+/// One module carries both entry points, so the union reaches it once, in the module's declaration
+/// order (K14).
+///
+/// # Errors
+///
+/// Returns the diagnostics of `kernel_globals`.
 fn render_kernel_globals(
     module: &Module,
     kernels: [&Function; 2],
@@ -503,6 +578,14 @@ pub(crate) fn reached_render_global_names(
         .collect())
 }
 
+/// Reports whether `expr` holds a construct that sequential host simulation cannot keep (CL2).
+///
+/// A barrier call, an atomic method, and a write to a private variable each give `true`. The host
+/// lane runs invocations in sequence, which is not the GPU's per-invocation state.
+///
+/// # Errors
+///
+/// If a receiver type names a class the module does not hold, returns an internal diagnostic.
 fn expression_blocks_host(module: &Module, expression: &Expr) -> Result<bool, Diagnostic> {
     Ok(match &expression.kind {
         ExprKind::AbsenceTest { value: operand, .. }
@@ -557,6 +640,12 @@ fn expression_blocks_host(module: &Module, expression: &Expr) -> Result<bool, Di
     })
 }
 
+/// Runs `expression_blocks_host` over every expression the statements hold, nested bodies
+/// included.
+///
+/// # Errors
+///
+/// Returns the internal diagnostics of `expression_blocks_host`.
 fn statements_block_host(module: &Module, statements: &[Stmt]) -> Result<bool, Diagnostic> {
     statements.iter().try_any(|statement| {
         Ok(match statement {
@@ -767,6 +856,13 @@ pub(crate) fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String,
     })
 }
 
+/// Returns the `@group @binding var` declaration line of one binding (PI5, TX1).
+///
+/// The emitter writes these in group and binding order, which K14 fixes.
+///
+/// # Errors
+///
+/// Returns the diagnostics of `wgsl_type` for a buffer item type outside the kernel value set.
 fn binding_declaration(
     module: &Module,
     group: u32,
@@ -808,10 +904,17 @@ fn binding_declaration(
     ))
 }
 
+/// Renders one type the way the checker prints it, for a diagnostic message.
+///
+/// # Errors
+///
+/// If the type names a class, an enum, or a string alias the module does not hold, returns an
+/// internal diagnostic.
 fn type_name(module: &Module, ty: &Type, pos: &Pos) -> Result<String, Diagnostic> {
     crate::pipeline::type_name(module, ty, pos)
 }
 
+/// Returns the WGSL spelling of one binary operator, and `None` for an operator outside K9.
 fn binop(op: BinOp) -> Option<&'static str> {
     Some(match op {
         BinOp::Add => "+",
@@ -834,6 +937,10 @@ fn binop(op: BinOp) -> Option<&'static str> {
     })
 }
 
+/// Returns the precedence of the emitted WGSL operator. A higher number binds tighter.
+///
+/// The emitter judges parentheses on the emitted operator, never on the subscript expression kind
+/// (K14). An operator outside the binary set gives 0.
 fn binary_precedence(op: BinOp) -> u8 {
     match op {
         BinOp::Or => 1,
@@ -872,6 +979,11 @@ fn is_arithmetic_or_comparison_operator(op: BinOp) -> bool {
     )
 }
 
+/// Reports whether `operand` needs parentheses inside a `parent` bitwise expression (K14).
+///
+/// WGSL gives two different bitwise operators no relative precedence, and Tint refuses a bitwise
+/// operator mixed with an arithmetic or a comparison operator. `naga` accepts both forms, so the
+/// emitter parenthesizes on the stricter side.
 fn mixed_bitwise_chain(parent: BinOp, operand: &Expr) -> bool {
     let ExprKind::Binary { op: child, .. } = &operand.kind else {
         return false;
@@ -881,6 +993,12 @@ fn mixed_bitwise_chain(parent: BinOp, operand: &Expr) -> bool {
             || (is_bitwise_operator(*child) && parent != *child))
 }
 
+/// Returns one operand's text, parenthesized where the emitted WGSL needs it (K14).
+///
+/// `parent` is the enclosing operator's precedence and `right` marks the right operand, which
+/// takes parentheses at equal precedence so that the emitted tree keeps the source's grouping.
+/// `mixed_bitwise` comes from `mixed_bitwise_chain`. A mixed `&&` and `||` chain also takes them,
+/// because Tint requires them and `naga` does not.
 fn binary_operand(value: &Snippet, parent: u8, right: bool, mixed_bitwise: bool) -> String {
     let mixed_logical = matches!((parent, value.precedence), (1, 2) | (2, 1));
     if mixed_logical
@@ -894,6 +1012,12 @@ fn binary_operand(value: &Snippet, parent: u8, right: bool, mixed_bitwise: bool)
     }
 }
 
+/// Returns the WGSL spelling of one literal, with the suffix its HIR type gives (K6, K14).
+///
+/// # Errors
+///
+/// Returns a K5 diagnostic for an `f64` literal, and a K6 diagnostic when the literal and its type
+/// do not pair.
 fn literal(expr: &Expr) -> Result<String, Diagnostic> {
     match (&expr.kind, &expr.ty) {
         (ExprKind::Int(value), Type::U32) => Ok(crate::wgsl_u32_literal(value)),
@@ -913,6 +1037,7 @@ fn literal(expr: &Expr) -> Result<String, Diagnostic> {
     }
 }
 
+/// Returns the WGSL `f32` spelling of a value, with a fraction part and the `f` suffix (K14).
 fn f32_literal(value: f64) -> String {
     let mut text = value.to_string();
     if !text.contains('.') && !text.contains('e') && !text.contains('E') {
@@ -921,6 +1046,14 @@ fn f32_literal(value: f64) -> String {
     format!("{text}f")
 }
 
+/// Reports whether `ty` can reach a kernel as a WGSL `const` (K19).
+///
+/// The set is a scalar, a library vector or matrix, and a `FixedArray` of a foldable type. An
+/// atomic is outside it.
+///
+/// # Errors
+///
+/// If the type names a class the module does not hold, returns an internal diagnostic.
 fn constant_type(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnostic> {
     Ok(match ty {
         Type::F32 | Type::I32 | Type::U32 | Type::Bool => true,
@@ -935,19 +1068,27 @@ fn constant_type(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnost
     })
 }
 
+/// The value of one folded module constant initializer (K19).
 #[derive(Clone)]
 enum FoldedConstant {
     Bool(bool),
     I32(i32),
     U32(u32),
     F32(f32),
+    /// A vector, a matrix, or an array, which folds its arguments and keeps the call form.
     Construct {
+        /// The emitted WGSL type spelling, such as `vec3<f32>`.
         constructor: String,
+        /// The folded arguments, in order.
         args: Vec<FoldedConstant>,
     },
 }
 
 impl FoldedConstant {
+    /// Returns the WGSL text of this value.
+    ///
+    /// A negative `i32` takes the precedence of a unary negation, so an enclosing operator
+    /// parenthesizes it (K14).
     fn snippet(&self) -> Snippet {
         match self {
             Self::Bool(value) => Snippet::atom(value.to_string()),
@@ -977,6 +1118,7 @@ impl FoldedConstant {
     }
 }
 
+/// Builds the K19 diagnostic for constant arithmetic that leaves the constant's type.
 fn constant_overflow(ty: &str, pos: &Pos) -> Diagnostic {
     diagnostic(
         "K19",
@@ -985,6 +1127,15 @@ fn constant_overflow(ty: &str, pos: &Pos) -> Diagnostic {
     )
 }
 
+/// Folds one binary operation over two constant values (K19).
+///
+/// The arithmetic is checked in the constant's own type, so the folded value is the value the GPU
+/// reads.
+///
+/// # Errors
+///
+/// Returns a K19 diagnostic for an overflow, a division by zero, an operator the type does not
+/// carry, and a pair of operands of different types.
 fn fold_binary(
     op: BinOp,
     left: FoldedConstant,
@@ -1096,6 +1247,15 @@ fn fold_binary(
     }
 }
 
+/// Folds one module constant initializer expression to a value (K19).
+///
+/// The admitted forms are a literal, a unary or binary expression over folded values, another
+/// module constant, a vector factory, a value-class construction, and an array literal. `cache`
+/// holds the constants already folded and `visiting` holds the ones on the current path.
+///
+/// # Errors
+///
+/// Returns a K19 diagnostic for every other initializer, and the diagnostics of `fold_binary`.
 fn fold_constant_expr(
     module: &Module,
     globals: &BTreeMap<String, KernelGlobal>,
@@ -1212,6 +1372,13 @@ fn fold_constant_expr(
     }
 }
 
+/// Folds one named module constant, through the cache (K19).
+///
+/// # Errors
+///
+/// Returns a K19 diagnostic when the name is a variable rather than a constant, and when its type
+/// is outside `constant_type`. A cycle gives a generator diagnostic: subscript rejects a module
+/// initializer that reads a declaration after it, so a cycle never reaches a checked program.
 fn fold_global_constant(
     module: &Module,
     globals: &BTreeMap<String, KernelGlobal>,
@@ -1258,6 +1425,15 @@ fn fold_global_constant(
     Ok(value)
 }
 
+/// Emits one constant expression as WGSL text, with no fold (K20).
+///
+/// A private variable's initializer keeps its expression form, so a named constant stays a name.
+/// The parentheses follow the emitted operator, as in a kernel body (K14).
+///
+/// # Errors
+///
+/// Returns a K19 diagnostic for an operator or a call outside the constant set, and for a read of
+/// a variable.
 fn constant_snippet(
     module: &Module,
     globals: &BTreeMap<String, KernelGlobal>,
@@ -1377,6 +1553,15 @@ fn constant_snippet(
     }
 }
 
+/// Emits the module constant, private, and workgroup declarations, in declaration order (K14).
+///
+/// The text ends with one blank line when it holds a declaration, and is empty otherwise.
+///
+/// # Errors
+///
+/// A constant type or an initializer outside the fold gives a K19 diagnostic. A private
+/// initializer that does not evaluate gives a K20 diagnostic, as does a zero-length workgroup
+/// array. An atomic in the private address space gives a K21 diagnostic.
 fn emit_kernel_globals(module: &Module, globals: &[KernelGlobal]) -> Result<String, Diagnostic> {
     let by_name = globals
         .iter()
@@ -1420,6 +1605,8 @@ fn emit_kernel_globals(module: &Module, globals: &[KernelGlobal]) -> Result<Stri
                     ));
                 }
                 let ty = wgsl_type(module, &global.ty, &global.pos)?;
+                // A private variable's initializer keeps its expression form, so a K19 failure
+                // here belongs to the K20 declaration the author wrote.
                 let value = constant_snippet(module, &by_name, init).map_err(|_| {
                     diagnostic(
                         "K20",
@@ -1458,6 +1645,10 @@ fn emit_kernel_globals(module: &Module, globals: &[KernelGlobal]) -> Result<Stri
     Ok(out)
 }
 
+/// Returns the barrier name when `expr` calls `workgroupBarrier` or `storageBarrier` (K22).
+///
+/// The declaring file and the empty argument list both must match, so a program's own function of
+/// the same name is not a barrier.
 fn barrier_call<'a>(module: &Module, expr: &'a Expr) -> Option<&'a str> {
     let ExprKind::Call {
         callee: Callee::Func(name),
@@ -1474,6 +1665,7 @@ fn barrier_call<'a>(module: &Module, expr: &'a Expr) -> Option<&'a str> {
 }
 
 // K18 permits continue because WGSL targets the enclosing loop through a switch.
+/// Reports whether a switch case body ends with `break`, `continue`, or `return` (K18).
 fn case_terminates(body: &[Stmt]) -> bool {
     match body.last() {
         Some(Stmt::Break(_) | Stmt::Continue(_) | Stmt::Return { .. }) => true,
@@ -1482,6 +1674,12 @@ fn case_terminates(body: &[Stmt]) -> bool {
     }
 }
 
+/// Rejects a statement outside the kernel statement set, before emission (K7).
+///
+/// # Errors
+///
+/// Returns a K7 diagnostic for a `for...of` over anything but a `FixedArray`. The emitter rejects
+/// the remaining statements as it writes them.
 fn validate_statement_subset(statements: &[Stmt]) -> Result<(), Diagnostic> {
     for statement in statements {
         match statement {
@@ -1513,13 +1711,21 @@ fn validate_statement_subset(statements: &[Stmt]) -> Result<(), Diagnostic> {
     Ok(())
 }
 
+/// One binding as the emitter needs it: the emitted name, the kind, and the item type.
 #[derive(Debug, Clone)]
 struct BindingRef {
+    /// The mangled WGSL variable name (K14).
     name: String,
+    /// The address space and the resource kind, which decides the legal methods.
     kind: BindingKind,
+    /// The wrapper's item type `T`.
     item_ty: Type,
 }
 
+/// Collects the local names that the statements declare, in declaration order.
+///
+/// A block-scoped local and a `for` variable both count, because WGSL and subscript scope them
+/// differently and the emitted names must stay distinct (K14).
 fn local_declarations(statements: &[Stmt], out: &mut Vec<String>) {
     for statement in statements {
         match statement {
@@ -1556,6 +1762,11 @@ fn local_declarations(statements: &[Stmt], out: &mut Vec<String>) {
     }
 }
 
+/// Maps each parameter and local of one function to the name the emitter writes (K14).
+///
+/// `module_names` is the module-scope name set, fixed before any body is emitted. A local whose
+/// mangled name is in that set, or that another local already took, gains a `_` until it is free.
+/// A binding read therefore never resolves to a local.
 fn local_names(function: &Function, module_names: &BTreeSet<String>) -> BTreeMap<String, String> {
     let mut originals = function
         .params
@@ -1579,22 +1790,36 @@ fn local_names(function: &Function, module_names: &BTreeSet<String>) -> BTreeMap
     names
 }
 
+/// Emits the WGSL of one function body, entry point or helper.
 struct Emitter<'a> {
     module: &'a Module,
+    /// Each layout parameter name and its group index, so a field access on one is a binding.
     layout_params: BTreeMap<String, usize>,
+    /// The layout class names, which a kernel local must never take (PI6).
     layout_names: BTreeSet<String>,
+    /// The invocation parameter name, whose field reads are builtins (PI4, RN3).
     invocation_param: String,
+    /// The entry point kind, which decides the legal builtins and the legal texture methods.
     invocation_kind: InvocationKind,
+    /// Every binding, by group and field name.
     bindings: BTreeMap<(usize, String), BindingRef>,
+    /// Every module-level declaration the call graph reads, by name.
     globals: BTreeMap<String, KernelGlobal>,
+    /// The emitted name of each parameter and local (K14).
     local_names: BTreeMap<String, String>,
+    /// The builtins the body reads. The entry point declares these parameters and no other (PI4).
     used_builtins: BTreeSet<String>,
+    /// The counter behind each lowered conditional's placeholder name (K9).
     conditional_index: u32,
+    /// The enclosing loop count, which `break` and `continue` need (K18).
     loop_depth: u32,
+    /// The enclosing switch count, which `break` needs (K18).
     switch_depth: u32,
+    /// Whether this body is a helper, where a barrier is illegal (K22).
     in_helper: bool,
 }
 
+/// The entry point kind that a body belongs to. A helper belongs to none.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum InvocationKind {
     None,
@@ -1604,6 +1829,16 @@ enum InvocationKind {
 }
 
 impl<'a> Emitter<'a> {
+    /// Builds the emitter of one entry point.
+    ///
+    /// `invocation_index` is the invocation parameter's position, which follows the layouts and,
+    /// for a vertex kernel, the vertex and instance values (PI2, RN2). `module_names` fixes the
+    /// module-scope names before any body is emitted (K14).
+    ///
+    /// # Errors
+    ///
+    /// If the kernel has fewer parameters than the declaration promises, returns an internal
+    /// diagnostic. Pipeline discovery already checked the count.
     fn entry(
         module: &'a Module,
         layouts: &'a [crate::pipeline::Layout],
@@ -1677,6 +1912,10 @@ impl<'a> Emitter<'a> {
         })
     }
 
+    /// Builds the emitter of one helper body.
+    ///
+    /// A helper takes no layout class and no invocation, so it reaches no binding and no builtin
+    /// (K2). It reads the module declarations like an entry point.
     fn helper(
         module: &'a Module,
         helper: &Function,
@@ -1703,6 +1942,7 @@ impl<'a> Emitter<'a> {
         }
     }
 
+    /// Returns the emitted name of one local or parameter (K14).
     fn local_name(&self, name: &str) -> String {
         self.local_names
             .get(name)
@@ -1710,6 +1950,9 @@ impl<'a> Emitter<'a> {
             .unwrap_or_else(|| mapping::ident(name))
     }
 
+    /// Returns the binding that `expr` names, when `expr` is a field access on a layout parameter.
+    ///
+    /// `res.particles` gives the binding. Any other expression gives `None` (PI6).
     fn binding_ref(&self, expr: &Expr) -> Option<BindingRef> {
         let ExprKind::Field { obj, name } = &expr.kind else {
             return None;
@@ -1721,6 +1964,10 @@ impl<'a> Emitter<'a> {
         self.bindings.get(&(group, name.clone())).cloned()
     }
 
+    /// Returns the binding at the root of a place expression.
+    ///
+    /// `res.particles[i].value` and `res.particles.get(i)` both give the binding, so a nested place
+    /// keeps the address space of the binding it lives in (K21, K22).
     fn binding_root(&self, expr: &Expr) -> Option<BindingRef> {
         if let Some(binding) = self.binding_ref(expr) {
             return Some(binding);
@@ -1735,6 +1982,10 @@ impl<'a> Emitter<'a> {
         }
     }
 
+    /// Returns the module-level declaration at the root of a place expression.
+    ///
+    /// The accessor calls `$` and `get` pass through, because they are the authored access forms
+    /// of a private or workgroup variable (K20).
     fn global_root(&self, expr: &Expr) -> Option<KernelGlobal> {
         match &expr.kind {
             ExprKind::Global(name) => self.globals.get(name).cloned(),
@@ -1749,6 +2000,9 @@ impl<'a> Emitter<'a> {
         }
     }
 
+    /// Returns the private or workgroup variable that `expr` names directly (K20).
+    ///
+    /// A module constant gives `None`, because a constant carries no accessor methods.
     fn wrapper_ref(&self, expr: &Expr) -> Option<KernelGlobal> {
         let ExprKind::Global(name) = &expr.kind else {
             return None;
@@ -1758,6 +2012,13 @@ impl<'a> Emitter<'a> {
         })
     }
 
+    /// Returns the emitted place of an atomic method receiver, which the builtin takes by pointer.
+    ///
+    /// # Errors
+    ///
+    /// Returns a K21 diagnostic when the receiver sits behind a uniform or read-only storage
+    /// binding. A receiver that is neither a storage place nor a workgroup place gives the same
+    /// diagnostic, because an atomic on a local has no address to take.
     fn atomic_place(&mut self, recv: &Expr) -> Result<Snippet, Diagnostic> {
         let binding = self.binding_root(recv);
         if binding
@@ -1798,6 +2059,11 @@ impl<'a> Emitter<'a> {
         self.snippet(recv)
     }
 
+    /// Emits every argument and returns their texts with one merged prelude, in argument order.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first diagnostic that an argument gives.
     fn snippets(&mut self, args: &[Expr]) -> Result<(Vec<String>, Prelude), Diagnostic> {
         let mut texts = Vec::with_capacity(args.len());
         let mut prelude = Vec::new();
@@ -1809,6 +2075,14 @@ impl<'a> Emitter<'a> {
         Ok((texts, prelude))
     }
 
+    /// Emits the argument of a `Math.fround` call, which lowers to the argument alone (K11).
+    ///
+    /// The checker types a JavaScript `Math` argument as `f64`, so this walk spells the literals
+    /// and the operators as `f32`. `f64` stays outside the kernel value types (K5).
+    ///
+    /// # Errors
+    ///
+    /// Returns a K11 diagnostic for an operator outside K11, and the diagnostics of `snippet`.
     fn fround_argument(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
         match (&expr.kind, &expr.ty) {
             (ExprKind::Float(value), Type::F64) => Ok(Snippet::atom(f32_literal(*value))),
@@ -1842,6 +2116,17 @@ impl<'a> Emitter<'a> {
         }
     }
 
+    /// Emits one expression as a WGSL snippet (K9).
+    ///
+    /// The returned prelude holds the statements that must precede the expression, which only a
+    /// lowered conditional produces. The caller writes them at the place the expression is
+    /// evaluated, so both sides keep short-circuit evaluation.
+    ///
+    /// # Errors
+    ///
+    /// An expression outside the set gives a K9 diagnostic. A string and a reference class give a
+    /// K5 diagnostic. A cast outside `f32`, `i32`, and `u32` gives a K12 diagnostic. A whole-value
+    /// write to an atomic gives a K21 diagnostic.
     fn snippet(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
         if let ExprKind::Cast(value) = &expr.kind {
             let fround_to_f32 = matches!(
@@ -2083,6 +2368,10 @@ impl<'a> Emitter<'a> {
                 let cond = self.snippet(cond)?;
                 let then = self.snippet(then)?;
                 let els = self.snippet(els)?;
+                // The conditional lowers to a `var` and an `if`/`else` in the prelude, which the
+                // caller writes where the expression is evaluated. Both sides then keep
+                // short-circuit evaluation (K9). The `_g_` prefix mangles, so no author name
+                // collides with the placeholder (K14).
                 let result = format!("_g_conditional_{}", self.conditional_index);
                 self.conditional_index += 1;
                 let mut prelude = cond.prelude;
@@ -2137,6 +2426,18 @@ impl<'a> Emitter<'a> {
         }
     }
 
+    /// Emits one call (K10, K11, K21, PI6, TX3).
+    ///
+    /// The arms run in check order. An atomic receiver comes first, then a private or workgroup
+    /// variable, then a binding, then a library method through the K10 table. A helper call falls
+    /// through to the plain call form.
+    ///
+    /// # Errors
+    ///
+    /// A `Math` member outside K11 gives a K11 diagnostic. A barrier in an expression gives a K22
+    /// diagnostic. An atomic method outside K21 gives a K21 diagnostic. A variable method that the
+    /// wrapper does not carry gives a K20 diagnostic. A texture method the access forbids gives a
+    /// TX3 or a TX11 diagnostic. A method with no table row gives a K10 diagnostic.
     fn call(&mut self, expr: &Expr, callee: &Callee, args: &[Expr]) -> Result<Snippet, Diagnostic> {
         match callee {
             Callee::Math(function) => {
@@ -2585,6 +2886,11 @@ impl<'a> Emitter<'a> {
         }
     }
 
+    /// Emits a statement list at `indent`, in order.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first diagnostic that a statement gives.
     fn statements(
         &mut self,
         statements: &[Stmt],
@@ -2597,18 +2903,30 @@ impl<'a> Emitter<'a> {
         Ok(())
     }
 
+    /// Appends one line with two-space indentation and no trailing space (K14).
     fn line(out: &mut String, indent: usize, text: &str) {
         out.push_str(&"  ".repeat(indent));
         out.push_str(text);
         out.push('\n');
     }
 
+    /// Appends a prelude's lines, each at `indent` plus its own relative indent.
     fn emit_prelude(out: &mut String, indent: usize, prelude: Prelude) {
         for (relative, text) in prelude {
             Self::line(out, indent + relative, &text);
         }
     }
 
+    /// Emits one statement at `indent` (K7, K8, K18).
+    ///
+    /// A `let` binding emits a WGSL `let`, and a mutable binding or a value-class local emits a
+    /// `var`, because the kernel assigns its fields (K8).
+    ///
+    /// # Errors
+    ///
+    /// A `using` declaration gives a K5 diagnostic. A layout class as a local gives a PI6
+    /// diagnostic. A copy of a schema that holds an atomic gives a K21 diagnostic. A barrier in a
+    /// helper gives a K22 diagnostic. `switch`, `break`, and `continue` give K18 diagnostics.
     fn statement(
         &mut self,
         statement: &Stmt,
@@ -2703,6 +3021,9 @@ impl<'a> Emitter<'a> {
                 Self::line(out, indent, "}");
             }
             Stmt::While { cond, body, .. } => {
+                // A condition with a prelude must run its statements on every iteration, and a
+                // WGSL `while` header holds no statements. The `loop` form with an explicit
+                // `break` gives the same semantics.
                 let cond = self.snippet(cond)?;
                 if cond.prelude.is_empty() {
                     Self::line(out, indent, &format!("while ({}) {{", cond.text));
@@ -2784,6 +3105,8 @@ impl<'a> Emitter<'a> {
                 };
                 let cond = cond.as_ref().map(|value| self.snippet(value)).transpose()?;
                 let step = step.as_ref().map(|value| self.snippet(value)).transpose()?;
+                // A `for` header holds no statements either, so a condition or a step with a
+                // prelude takes the `loop` form. The outer block scopes the initializer.
                 let loop_prelude = cond.as_ref().is_some_and(|value| !value.prelude.is_empty())
                     || step.as_ref().is_some_and(|value| !value.prelude.is_empty());
                 if loop_prelude {
@@ -2872,6 +3195,8 @@ impl<'a> Emitter<'a> {
                 let disc = self.snippet(disc)?;
                 Self::emit_prelude(out, indent, disc.prelude);
                 Self::line(out, indent, &format!("switch ({}) {{", disc.text));
+                // An empty case shares the next case's body, which WGSL writes as one selector
+                // with several values. The labels accumulate until a body arrives (K18).
                 let mut labels = Vec::new();
                 for case in cases {
                     let label = if let Some(test) = &case.test {
@@ -2919,6 +3244,7 @@ impl<'a> Emitter<'a> {
                     Self::line(out, indent + 1, "}");
                     labels.clear();
                 }
+                // Labels remain when the last case is empty, so no body follows to share.
                 if !labels.is_empty() {
                     return Err(diagnostic(
                         "K18",
@@ -2961,13 +3287,17 @@ impl<'a> Emitter<'a> {
     }
 }
 
+/// Whether a value is uniform across the workgroup, and the reason when it is not (K22).
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum UniformityTaint {
     Uniform,
+    /// The reason, which the diagnostic quotes so that the author finds the value.
     NonUniform(String),
 }
 
 impl UniformityTaint {
+    /// Combines two taints. One non-uniform side makes the result non-uniform and keeps its
+    /// reason.
     fn merge(self, other: Self) -> Self {
         match (self, other) {
             (Self::NonUniform(reason), _) | (_, Self::NonUniform(reason)) => {
@@ -2977,6 +3307,7 @@ impl UniformityTaint {
         }
     }
 
+    /// Returns the non-uniform reason, and `None` when the taint is uniform.
     fn reason(&self) -> Option<&str> {
         match self {
             Self::Uniform => None,
@@ -2985,20 +3316,31 @@ impl UniformityTaint {
     }
 }
 
+/// One enclosing statement that a `break` or a `continue` can target (K18, K22).
 #[derive(Debug, Clone, Copy)]
 enum UniformityTarget {
+    /// A loop, and whether its body holds a barrier.
     Loop { has_barrier: bool },
+    /// A switch, which `break` targets and `continue` passes through.
     Switch,
 }
 
-// K22 uses a conservative taint analysis that accepts no non-uniform barrier placement.
+/// Checks barrier placement in one kernel body (K22).
+///
+/// The analysis is a conservative taint: it rejects some uniform programs and accepts no
+/// non-uniform barrier. `naga` did not reject a barrier after a non-uniform early return, and
+/// both backends refuse such a module at shader-module creation.
 struct BarrierValidator<'emitter, 'module> {
+    /// The emitter of the same kernel, which resolves bindings, globals, and the invocation.
     emitter: &'emitter Emitter<'module>,
+    /// The taint of each local, merged over every assignment the collect pass found.
     locals: BTreeMap<String, UniformityTaint>,
+    /// The line and column of the last barrier in the body, which bounds the `return` check.
     last_barrier: Option<(u32, u32)>,
 }
 
 impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
+    /// Builds the validator of one kernel body.
     fn new(emitter: &'emitter Emitter<'module>, kernel: &Function) -> Self {
         Self {
             emitter,
@@ -3007,6 +3349,14 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
         }
     }
 
+    /// Runs the two passes over one kernel body and returns the first violation (K22).
+    ///
+    /// The collect pass must precede the check pass: a local's taint depends on every assignment
+    /// in the body. An assignment that follows the barrier in source order counts too.
+    ///
+    /// # Errors
+    ///
+    /// Returns a K22 diagnostic that names the statement and the non-uniform value.
     fn validate(mut self, kernel: &Function) -> Result<(), Diagnostic> {
         self.collect_statements(&kernel.body, UniformityTaint::Uniform);
         self.validate_statements(
@@ -3017,6 +3367,11 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
         )
     }
 
+    /// Returns the taint of one expression (K22).
+    ///
+    /// A literal, a module constant, a `Uniform<T>` read, and `length()` of a binding are uniform.
+    /// A builtin, a storage read, a variable read, and a helper result are non-uniform. A local
+    /// takes the taint the collect pass recorded, and an unknown local is non-uniform.
     fn expression(&self, expr: &Expr) -> UniformityTaint {
         match &expr.kind {
             ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) => UniformityTaint::Uniform,
@@ -3126,6 +3481,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
         }
     }
 
+    /// Returns the merged taint of a list of expressions.
     fn expressions(&self, expressions: &[Expr]) -> UniformityTaint {
         expressions
             .iter()
@@ -3134,6 +3490,10 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
             })
     }
 
+    /// Merges `value` into the recorded taint of the local that `target` writes.
+    ///
+    /// A taint never falls back to uniform, so a local assigned once under a non-uniform condition
+    /// stays non-uniform for the complete body.
     fn record_assignment(&mut self, target: &Expr, value: UniformityTaint) {
         let Some(name) = assigned_local(target) else {
             return;
@@ -3146,6 +3506,10 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
         self.locals.insert(name.to_owned(), prior.merge(value));
     }
 
+    /// Records one assignment expression's effect on its target local.
+    ///
+    /// `control` is the taint of the enclosing conditions, so an assignment under a non-uniform
+    /// branch taints its target.
     fn collect_assignment(&mut self, expr: &Expr, control: UniformityTaint) {
         let ExprKind::Assign { op, target, value } = &expr.kind else {
             return;
@@ -3159,6 +3523,11 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
         self.record_assignment(target, taint);
     }
 
+    /// Returns the taint of every early exit from one loop body (K22).
+    ///
+    /// `nested_loops` and `switches` count the statements between here and the loop, so only a
+    /// `break` or a `continue` that targets this loop counts. A `for...of` body carries its own
+    /// non-uniform control. The caller taints every local the loop writes with the result.
     fn loop_exit_taint(
         &self,
         statements: &[Stmt],
@@ -3225,6 +3594,10 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
         result
     }
 
+    /// Taints every local that the loop writes with `taint`, and does nothing when it is uniform.
+    ///
+    /// A `break` or a `continue` under a non-uniform condition makes every local the loop writes
+    /// non-uniform, because the iteration count then differs between invocations (K22).
     fn taint_loop_writes(&mut self, body: &[Stmt], step: Option<&Expr>, taint: UniformityTaint) {
         if taint == UniformityTaint::Uniform {
             return;
@@ -3244,6 +3617,10 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
         }
     }
 
+    /// Records the taint of every local the statements write (K22).
+    ///
+    /// `control` is the taint of the enclosing conditions. A loop body repeats until no taint
+    /// changes, because a later iteration can taint a local an earlier one read.
     fn collect_statements(&mut self, statements: &[Stmt], control: UniformityTaint) {
         for statement in statements {
             match statement {
@@ -3325,6 +3702,18 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
         }
     }
 
+    /// Checks every barrier and every early exit against the recorded taints (K22).
+    ///
+    /// `control` is the taint of the enclosing conditions. `barrier_scope_allowed` is false inside
+    /// a `switch` and a `for...of`, where a barrier is illegal whatever the taint. `targets` is
+    /// the stack of enclosing loops and switches, so a `break` or a `continue` resolves to the
+    /// statement it leaves.
+    ///
+    /// # Errors
+    ///
+    /// Returns a K22 diagnostic in three cases. A barrier runs under non-uniform control. A
+    /// `return` precedes a barrier under a non-uniform taint. A `break` or a `continue` leaves a
+    /// loop that holds a barrier, under non-uniform control.
     fn validate_statements(
         &self,
         statements: &[Stmt],
@@ -3488,6 +3877,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
     }
 }
 
+/// Returns the local name at the root of an assignment target, and `None` for every other target.
 fn assigned_local(expr: &Expr) -> Option<&str> {
     match &expr.kind {
         ExprKind::Local(name) => Some(name),
@@ -3496,6 +3886,7 @@ fn assigned_local(expr: &Expr) -> Option<&str> {
     }
 }
 
+/// Adds the local that `expr` assigns to `out`, when `expr` is an assignment.
 fn written_locals_expr(expr: &Expr, out: &mut BTreeSet<String>) {
     if let ExprKind::Assign { target, .. } = &expr.kind {
         if let Some(name) = assigned_local(target) {
@@ -3504,6 +3895,7 @@ fn written_locals_expr(expr: &Expr, out: &mut BTreeSet<String>) {
     }
 }
 
+/// Collects every local that the statements assign, nested bodies included.
 fn written_locals(statements: &[Stmt], out: &mut BTreeSet<String>) {
     for statement in statements {
         match statement {
@@ -3534,6 +3926,11 @@ fn written_locals(statements: &[Stmt], out: &mut BTreeSet<String>) {
     }
 }
 
+/// Returns the taint that an assignment target contributes, apart from the assigned value (K22).
+///
+/// A plain write replaces the local's value, so the target's own place is uniform. An index
+/// expression still contributes the index's taint, because it decides which element the write
+/// reaches.
 fn assignment_target_taint(validator: &BarrierValidator<'_, '_>, target: &Expr) -> UniformityTaint {
     match &target.kind {
         ExprKind::Local(_) => UniformityTaint::Uniform,
@@ -3545,6 +3942,7 @@ fn assignment_target_taint(validator: &BarrierValidator<'_, '_>, target: &Expr) 
     }
 }
 
+/// Reports whether the statements hold a barrier call at any depth (K22).
 fn contains_barrier(module: &Module, statements: &[Stmt]) -> bool {
     statements.iter().any(|statement| match statement {
         Stmt::Expr(expr) => barrier_call(module, expr).is_some(),
@@ -3565,6 +3963,10 @@ fn contains_barrier(module: &Module, statements: &[Stmt]) -> bool {
     })
 }
 
+/// Returns the line and column of the last barrier in the statements, at any depth (K22).
+///
+/// A `return` before that position ends some invocations while others reach the barrier, which
+/// the check rejects.
 fn last_barrier_position(module: &Module, statements: &[Stmt]) -> Option<(u32, u32)> {
     let mut last = None;
     for statement in statements {
@@ -3594,6 +3996,7 @@ fn last_barrier_position(module: &Module, statements: &[Stmt]) -> Option<(u32, u
     last
 }
 
+/// Collects the names of the functions that `expr` calls directly.
 fn called_functions_expr(expr: &Expr, out: &mut BTreeSet<String>) {
     match &expr.kind {
         ExprKind::Call { callee, args } => {
@@ -3647,6 +4050,7 @@ fn called_functions_expr(expr: &Expr, out: &mut BTreeSet<String>) {
     }
 }
 
+/// Runs `called_functions_expr` over every expression the statement holds, nested bodies included.
 fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<String>) {
     match stmt {
         Stmt::Let { init, .. } | Stmt::Expr(init) => called_functions_expr(init, out),
@@ -3714,6 +4118,14 @@ fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<String>) {
     }
 }
 
+/// Appends the schema name that `ty` names to `out`, once, in first-use order (K14).
+///
+/// A library class carries its own WGSL spelling and declares no struct, so it never enters.
+/// `seen` holds the names already appended.
+///
+/// # Errors
+///
+/// If the type names a class the module does not hold, returns an internal diagnostic.
 fn collect_schema_type(
     module: &Module,
     ty: &Type,
@@ -3739,6 +4151,13 @@ fn collect_schema_type(
     Ok(())
 }
 
+/// Appends the schema names that `expr` and its sub-expressions carry, in first-use order.
+///
+/// Every expression carries its own type, so the walk reads the type first and then descends.
+///
+/// # Errors
+///
+/// Returns the internal diagnostics of `collect_schema_type`.
 fn collect_schema_expr(
     module: &Module,
     expr: &Expr,
@@ -3811,6 +4230,11 @@ fn collect_schema_expr(
     Ok(())
 }
 
+/// Appends the schema names that one statement carries, its declared types included.
+///
+/// # Errors
+///
+/// Returns the internal diagnostics of `collect_schema_type`.
 fn collect_schema_stmt(
     module: &Module,
     stmt: &Stmt,
@@ -3942,11 +4366,22 @@ pub(crate) fn referenced_schema_names(
     Ok(out)
 }
 
+/// Returns the functions that one kernel's call graph reaches, in dependency order (K2).
+///
+/// A callee precedes its caller, so the emitter writes each helper after the helpers it calls. A
+/// shell is a leaf: the emitter never walks its subscript body (K29). A library function is not
+/// GPU code and does not enter.
+///
+/// # Errors
+///
+/// Returns a K2 diagnostic that names the cycle when the graph is not acyclic.
 fn dependencies(
     module: &Module,
     kernel: &Function,
     shells: &crate::shell::ShellProgram,
 ) -> Result<Vec<String>, Diagnostic> {
+    /// Visits one function and appends it after the functions it calls. `stack` holds the current
+    /// path, which detects a cycle, and `done` holds the functions already appended.
     fn visit(
         module: &Module,
         name: &str,
@@ -4015,6 +4450,10 @@ fn dependencies(
     Ok(order)
 }
 
+/// Returns the `@builtin` parameter declaration of one invocation field (PI4, RN3).
+///
+/// An entry point declares the parameters its body reads and no other. A name outside the set
+/// gives the empty string.
 fn builtin_parameter(name: &str) -> &'static str {
     match name {
         "globalId" => "@builtin(global_invocation_id) globalId: vec3<u32>",
@@ -4029,6 +4468,11 @@ fn builtin_parameter(name: &str) -> &'static str {
     }
 }
 
+/// Returns every name the emitted module declares at module scope, in emitted spelling (K14).
+///
+/// The set is fixed before any body is emitted, so a local that collides with one of these names
+/// gains a `_` and shadows nothing. The builtin parameter names join the set, because an entry
+/// point declares them beside the module declarations.
 fn module_scope_names(
     structs: &[(String, String)],
     layouts: &[crate::pipeline::Layout],
@@ -4072,10 +4516,15 @@ fn module_scope_names(
     names
 }
 
+/// Returns the one-based line number that the next appended character starts on.
 fn next_line(out: &str) -> u32 {
     out.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1
 }
 
+/// Appends author WGSL and records its line range under `label` (K31).
+///
+/// The harness reads the ranges to attribute a `naga` error to the shell or to the declarations.
+/// A line outside every range stays a generator defect (K15).
 fn append_recorded_text(out: &mut String, text: &str, label: String, spans: &mut Vec<WgslSpan>) {
     let start_line = next_line(out);
     out.push_str(text);
@@ -4090,6 +4539,16 @@ fn append_recorded_text(out: &mut String, text: &str, label: String, spans: &mut
     });
 }
 
+/// Emits one WGSL shell: the `fn` line from the typed signature and the author body (K29).
+///
+/// The body keeps its own relative indentation. The generator removes the common leading
+/// blankspace of the non-empty lines and adds one level. A body inside a template literal then
+/// lands at the function's indent.
+///
+/// # Errors
+///
+/// Returns the K29 diagnostics of `validate_signature`, and the diagnostics of `wgsl_type` for a
+/// parameter or a return type outside the kernel value set.
 fn emit_shell(
     module: &Module,
     shell: &crate::shell::Shell,
@@ -4271,8 +4730,11 @@ pub(crate) fn emit(
         helper_emitter.statements(&helper.body, 1, &mut helper_text)?;
         helper_text.push_str("}\n\n");
     }
+    // The body is emitted before the module text, because the walk records which builtins the
+    // entry point declares and which locals took a mangled name (K14).
     let mut entry_body = String::new();
     if pipeline.guarded {
+        // The guard reads the global invocation id whether the author's body does or not (PI15).
         emitter.used_builtins.insert("globalId".to_owned());
         let guard = pipeline
             .layouts
@@ -4298,8 +4760,13 @@ pub(crate) fn emit(
     } else {
         emitter.statements(&kernel.body, 1, &mut entry_body)?;
     }
+    // The check resolves bindings and globals through the emitter, so it reads the same maps the
+    // emitted text did (K22).
     BarrierValidator::new(&emitter, kernel).validate(kernel)?;
 
+    // The order below is K14's, the same for every module. It runs from the `enable` directives
+    // to the raw declarations, the schema structs, the shells, the bindings, the module variables,
+    // the helpers, and the entry point.
     let mut out = String::new();
     let mut spans = Vec::new();
     if uses_f16
@@ -4338,6 +4805,8 @@ pub(crate) fn emit(
     out.push('\n');
     out.push_str(&emit_kernel_globals(module, &globals)?);
     out.push_str(&helper_text);
+    // The entry point declares the builtins the body reads and no other (PI4). The order is this
+    // list's, not the order the body reads them in, so the emitted signature is deterministic.
     let parameters = [
         "globalId",
         "localId",
@@ -4429,6 +4898,9 @@ pub(crate) fn referenced_render_schema_names(
     for global in render_kernel_globals(module, [vertex, fragment], shells)? {
         collect_schema_type(module, &global.ty, &mut seen, &mut out, &global.pos)?;
     }
+    // A vertex schema and the varyings class reach the module as attributed structs, which
+    // `render_interface_structs` writes (RN4, RN7). A plain struct for either repeats the
+    // name.
     let interface_names = pipeline
         .vertex_buffers
         .iter()
@@ -4439,6 +4911,15 @@ pub(crate) fn referenced_render_schema_names(
     Ok(out)
 }
 
+/// Emits the vertex input structs and the varyings struct of one render pipeline (RN4, RN7).
+///
+/// A vertex field takes `@location(n)` from the buffer's attribute list. The varyings `position`
+/// field takes `@builtin(position)`, and an integer varying takes `@interpolate(flat)`.
+///
+/// # Errors
+///
+/// If a vertex schema is absent from the module, returns a generator diagnostic. A field type
+/// outside the kernel value set gives the diagnostics of `wgsl_type`.
 fn render_interface_structs(
     module: &Module,
     pipeline: &RenderPipeline,
@@ -4503,6 +4984,15 @@ fn render_interface_structs(
     Ok(out)
 }
 
+/// Emits the helpers that both render entry points reach, once each, in dependency order (RN9).
+///
+/// The vertex graph comes first, then the fragment graph, so a helper both entry points call
+/// keeps the vertex position.
+///
+/// # Errors
+///
+/// Returns a K2 diagnostic for a helper that is `async` or a generator, and for one that takes a
+/// layout class or an invocation class. A body gives the emitter's own diagnostics.
 fn render_helpers(
     module: &Module,
     pipeline: &RenderPipeline,
@@ -4645,6 +5135,8 @@ pub(crate) fn emit_render(
         &globals,
         &module_names,
     )?;
+    // Both bodies are emitted before the module text, because each walk records the builtins its
+    // entry point declares (RN3).
     let mut vertex_body = String::new();
     vertex_emitter.statements(&vertex.body, 1, &mut vertex_body)?;
     let mut fragment_body = String::new();
@@ -4654,6 +5146,8 @@ pub(crate) fn emit_render(
         .iter()
         .map(|(name, _)| name.as_str())
         .collect::<BTreeSet<_>>();
+    // `enable f16;` depends on every type this module names: a schema struct, a binding item, a
+    // vertex attribute, and a varying (RN9, LY15).
     let uses_f16 = schemas
         .iter()
         .filter(|schema| selected_names.contains(schema.name.as_str()))
@@ -4742,6 +5236,7 @@ pub(crate) fn emit_render(
             .map(builtin_parameter)
             .map(str::to_owned),
     );
+    // The vertex entry precedes the fragment entry, which K14 fixes for every render module.
     out.push_str("@vertex\n");
     out.push_str(&format!(
         "fn {}({}) -> {} {{\n",

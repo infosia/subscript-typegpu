@@ -12,8 +12,16 @@ use std::sync::{Mutex, OnceLock};
 
 use crate::generated;
 
+/// The status that a poll of an unknown future id returns (L6).
+///
+/// A doomed slot and a slot of another instance return the same value.
 const STATUS_UNKNOWN_FUTURE: i32 = -100;
 
+/// One pending or completed async request.
+///
+/// `userdata` holds the callback's box pointer until the callback consumes it. `doomed` marks a
+/// slot that a script dropped before its callback arrived. `device_event_id` names the device
+/// callback state that instance release must reclaim with the slot.
 struct Slot {
     instance: usize,
     kind: u32,
@@ -23,6 +31,11 @@ struct Slot {
     device_event_id: Option<usize>,
 }
 
+/// The recorded result of one completed callback.
+///
+/// `status` is 1 for success and the negated backend status for a failure. `handle` is 0 unless
+/// the request produced an owned handle. `record_value` carries the enum of an F11 record. The
+/// facade owns `message`, because a callback copies every string view before it returns (F7).
 struct Outcome {
     status: i32,
     handle: usize,
@@ -31,11 +44,16 @@ struct Outcome {
     message: String,
 }
 
+/// One device-event value with the message string that the callback copied (F7).
 struct EventRecord {
     value: i32,
     message: String,
 }
 
+/// The event state of one device, addressed by a numeric callback key.
+///
+/// `device` stays `None` until the request for the device completes. `filled_message` holds the
+/// bytes of the last fill, which stay valid until the next fill on the same device (G3).
 struct DeviceEvents {
     device: Option<usize>,
     uncaptured: VecDeque<EventRecord>,
@@ -43,6 +61,7 @@ struct DeviceEvents {
     filled_message: String,
 }
 
+/// The device-event state of every device, reachable by callback key and by device handle.
 struct DeviceEventTable {
     by_id: BTreeMap<usize, DeviceEvents>,
     by_device: BTreeMap<usize, usize>,
@@ -62,23 +81,35 @@ pub(crate) struct OwnedHandle {
 }
 
 static FUTURES: Mutex<BTreeMap<u64, Slot>> = Mutex::new(BTreeMap::new());
+/// The owned handles of results that no script can take. The next pump releases them (L8).
 static DEFERRED_HANDLES: Mutex<Vec<OwnedHandle>> = Mutex::new(Vec::new());
+/// The owning instance of every live handle (L11). An instance maps to itself.
 static HANDLE_INSTANCES: Mutex<BTreeMap<usize, usize>> = Mutex::new(BTreeMap::new());
 static DEVICE_EVENTS: Mutex<DeviceEventTable> = Mutex::new(DeviceEventTable {
     by_id: BTreeMap::new(),
     by_device: BTreeMap::new(),
 });
+/// The record-fill buffer of each instance. A take overwrites the previous bytes (F11 Rev 1).
 static FUTURE_FILLED_MESSAGES: Mutex<BTreeMap<usize, String>> = Mutex::new(BTreeMap::new());
+/// The four copied adapter-info strings of each adapter handle (H3).
 static ADAPTER_INFO_STRINGS: Mutex<BTreeMap<usize, [String; 4]>> = Mutex::new(BTreeMap::new());
+/// The next future id. The count starts at 1, so 0 never names a slot.
 static NEXT_FUTURE_ID: AtomicU64 = AtomicU64::new(1);
+/// The next device-event key. The count starts at 1, so 0 means no callback state.
 static NEXT_DEVICE_EVENT_ID: AtomicUsize = AtomicUsize::new(1);
+/// Counts the deferred handles that the generated release path frees.
 static OWNED_HANDLE_RELEASE_COUNT: AtomicUsize = AtomicUsize::new(0);
 static WEBGPU_TABLE: OnceLock<generated::WebgpuTable> = OnceLock::new();
 
+/// Returns the backend function table, or `None` before a successful load (L3).
 pub(crate) fn table() -> Option<&'static generated::WebgpuTable> {
     WEBGPU_TABLE.get()
 }
 
+/// Loads the library that `SUBSCRIPT_TYPEGPU_BACKEND_LIB` names and fills the function table (L1).
+///
+/// Returns false after one stderr line when the variable is absent, when the library fails to
+/// load, or when a symbol is missing (L2). A call after a successful load returns true at once.
 pub(crate) fn initialize_table() -> bool {
     if WEBGPU_TABLE.get().is_some() {
         return true;
@@ -103,6 +134,14 @@ pub(crate) fn initialize_table() -> bool {
     WEBGPU_TABLE.set(loaded).is_ok() || WEBGPU_TABLE.get().is_some()
 }
 
+/// Resolves one host-only surface symbol from the loaded library on demand (L14).
+///
+/// `name` is the symbol name with its terminal nul byte. The error text names the missing
+/// symbol, or reports that the backend function table is unavailable.
+///
+/// # Safety
+///
+/// `T` must be the function-pointer type that the pinned header declares for `name`.
 pub(crate) unsafe fn surface_symbol<T: Copy>(name: &'static [u8]) -> Result<T, String> {
     if !initialize_table() {
         return Err("backend function table is unavailable".to_owned());
@@ -119,6 +158,9 @@ pub(crate) unsafe fn surface_symbol<T: Copy>(name: &'static [u8]) -> Result<T, S
         })
 }
 
+// No facade export can unwind (L10), so each accessor below takes the value out of a poisoned
+// lock and continues. The crate denies every panic lint (T22), so no writer leaves a table
+// half-written.
 fn futures() -> std::sync::MutexGuard<'static, BTreeMap<u64, Slot>> {
     FUTURES
         .lock()
@@ -179,10 +221,15 @@ pub(crate) fn release_adapter_info_strings(parent: usize) {
     adapter_info_strings().remove(&parent);
 }
 
+/// Returns the instance that owns `handle`, or 0 when no instance owns it.
 pub(crate) fn instance_for_handle(handle: usize) -> usize {
     handle_instances().get(&handle).copied().unwrap_or(0)
 }
 
+/// Gives `child` the instance that owns `parent`, so instance release reaches the child too
+/// (L11).
+///
+/// Ignores a null child and a parent with no recorded owner.
 pub(crate) fn inherit_handle_instance(parent: usize, child: usize) {
     if child == 0 {
         return;
@@ -194,12 +241,17 @@ pub(crate) fn inherit_handle_instance(parent: usize, child: usize) {
     owners.insert(child, instance);
 }
 
+/// Records a created instance as its own owner. Ignores a null instance.
 pub(crate) fn register_instance(instance: usize) {
     if instance != 0 {
         handle_instances().insert(instance, instance);
     }
 }
 
+/// Creates one pending slot and returns its future id with the userdata pointer for the callback.
+///
+/// The pointer is one box that the callback consumes exactly once. Release of the instance
+/// reclaims the box of a slot whose callback never arrives.
 pub(crate) fn new_pending_slot(instance: usize, kind: u32) -> (u64, *mut c_void) {
     let id = NEXT_FUTURE_ID.fetch_add(1, Ordering::Relaxed);
     let userdata = Box::into_raw(Box::new(id)).cast::<c_void>();
@@ -225,6 +277,9 @@ pub(crate) fn attach_device_event_to_future(future: u64, event_id: usize) {
     }
 }
 
+/// Runs one callback body inside the single unwind boundary of the facade.
+///
+/// A panic aborts the process, because no unwind can cross the C ABI (L7, L10).
 pub(crate) fn callback_guard(f: impl FnOnce()) {
     if catch_unwind(AssertUnwindSafe(f)).is_err() {
         std::process::abort();
@@ -277,6 +332,15 @@ pub(crate) unsafe fn complete_record_from_callback(
     }
 }
 
+/// Records one callback outcome into its slot and reclaims the userdata box.
+///
+/// A slot that instance release removed and a doomed slot both discard the result. An owned
+/// handle of such a result moves to the deferred list, which the next pump releases (L8).
+///
+/// # Safety
+///
+/// `userdata1` is the unique pointer returned with this request and is passed exactly once by
+/// the registered callback.
 unsafe fn complete_outcome_from_callback(
     userdata1: *mut c_void,
     raw_status: i32,
@@ -291,14 +355,18 @@ unsafe fn complete_outcome_from_callback(
     let owned = if success { handle } else { 0 };
     let mut table = futures();
     let Some(slot) = table.get_mut(&future_id) else {
+        // Instance release removed the slot. No path holds two of these locks at once, so this
+        // one goes first.
         drop(table);
         if owned != 0 {
             deferred_handles().push(OwnedHandle { kind, value: owned });
         }
         return;
     };
+    // The box is gone above, so instance release must not free it a second time.
     slot.userdata = None;
     if slot.doomed {
+        // A script dropped this future before the callback arrived (F8).
         table.remove(&future_id);
         drop(table);
         if owned != 0 {
@@ -307,6 +375,7 @@ unsafe fn complete_outcome_from_callback(
         return;
     }
     slot.outcome = Some(Outcome {
+        // L6: 1 for success, the negated backend status for a failure.
         status: if success { 1 } else { -raw_status },
         handle: owned,
         record_value,
@@ -318,6 +387,9 @@ fn belongs_to_instance(slot: &Slot, instance: usize) -> bool {
     slot.instance == instance
 }
 
+/// Returns 0 for a pending slot, 1 for success, and a negative backend status for a failure (L6).
+///
+/// An unknown id, a doomed slot, and a slot of another instance return `STATUS_UNKNOWN_FUTURE`.
 pub(crate) fn future_status(instance: usize, future: u64) -> i32 {
     let mut table = futures();
     let Some(slot) = table.get_mut(&future) else {
@@ -350,6 +422,7 @@ pub(crate) fn take_handle(instance: usize, future: u64, kind: u32) -> usize {
         .map_or(0, |outcome| outcome.handle);
     drop(table);
     if handle != 0 {
+        // The instance that requested the handle owns it from here (L11).
         handle_instances().insert(handle, instance);
     }
     handle
@@ -398,10 +471,12 @@ pub(crate) fn drop_future(instance: usize, future: u64) -> Option<OwnedHandle> {
     })
 }
 
+/// Removes and returns the handles that the pump releases after `wgpuInstanceProcessEvents` (L8).
 pub(crate) fn drain_deferred_handles() -> Vec<OwnedHandle> {
     std::mem::take(&mut *deferred_handles())
 }
 
+/// Counts one release of a deferred handle for the test that proves the F8 slot lifetime.
 pub(crate) fn note_owned_handle_release() {
     OWNED_HANDLE_RELEASE_COUNT.fetch_add(1, Ordering::Relaxed);
 }
@@ -422,6 +497,7 @@ pub(crate) fn release_all_slots(instance: usize) -> Vec<OwnedHandle> {
             continue;
         };
         if let Some(event_id) = slot.device_event_id {
+            // A device request that never completed still holds its callback state.
             discard_device_event_slot(event_id);
         }
         if let Some(userdata) = slot.userdata {
@@ -447,6 +523,7 @@ pub(crate) fn release_all_slots(instance: usize) -> Vec<OwnedHandle> {
     owners.retain(|_, owner| *owner != instance);
     drop(owners);
     for handle in released_handles {
+        // Instance release also drops the per-handle state of every handle it owns.
         release_device_events(handle);
         release_adapter_info_strings(handle);
     }
@@ -454,6 +531,9 @@ pub(crate) fn release_all_slots(instance: usize) -> Vec<OwnedHandle> {
     owned
 }
 
+/// Copies `message` into `storage` and returns a view of the stored bytes.
+///
+/// The bytes stay valid until the next fill on the same storage (F11 Rev 1).
 fn fill_record(storage: &mut String, value: i32, message: &str) -> RecordFill {
     storage.clear();
     storage.push_str(message);

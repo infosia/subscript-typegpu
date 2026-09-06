@@ -3,6 +3,7 @@
 use crate::naming;
 use crate::plan::{ArrayElement, ArrayOp, MethodArg};
 
+/// The stored yml name of one prefix argument, before any casing conversion.
 fn arg_name(arg: &MethodArg) -> &str {
     match arg {
         MethodArg::Scalar(name, _) | MethodArg::Bitflag(name, _) | MethodArg::Enum(name, _) => name,
@@ -10,6 +11,10 @@ fn arg_name(arg: &MethodArg) -> &str {
     }
 }
 
+/// Renders one prefix parameter of the array method for `subscript-typegpu.h`.
+///
+/// A nullable handle carries the `_Nullable` marker (C1). A struct-pointer argument returns an
+/// `internal:` error, because the plan never gives an array method that shape.
 fn c_arg(arg: &MethodArg) -> Result<String, crate::policy::PolicyError> {
     let name = naming::camel(arg_name(arg));
     Ok(match arg {
@@ -33,6 +38,10 @@ fn c_arg(arg: &MethodArg) -> Result<String, crate::policy::PolicyError> {
     })
 }
 
+/// The Rust type of one prefix argument. `backend` selects the webgpu.h side.
+///
+/// A flag argument is `u64` and a plain enum is `i32` (F16). A handle argument takes the
+/// webgpu.h type or the facade type. A struct-pointer argument returns an `internal:` error.
 fn rust_arg_type(arg: &MethodArg, backend: bool) -> Result<String, crate::policy::PolicyError> {
     Ok(match arg {
         MethodArg::Scalar(_, scalar) => scalar.rust_name().into(),
@@ -54,6 +63,7 @@ fn rust_arg_type(arg: &MethodArg, backend: bool) -> Result<String, crate::policy
     })
 }
 
+/// The C element type of the array: a facade handle type or a language scalar (B1).
 fn c_element(element: &ArrayElement) -> String {
     match element {
         ArrayElement::Scalar(scalar) => scalar.c_name().into(),
@@ -61,6 +71,7 @@ fn c_element(element: &ArrayElement) -> String {
     }
 }
 
+/// The Rust element type of the array. `backend` selects the webgpu.h handle type.
 fn rust_element(element: &ArrayElement, backend: bool) -> String {
     match element {
         ArrayElement::Scalar(scalar) => scalar.rust_name().into(),

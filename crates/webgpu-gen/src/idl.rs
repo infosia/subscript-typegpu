@@ -120,11 +120,16 @@ pub fn extract_gpuweb_idl(document: &str) -> Result<ExtractedIdl, String> {
     })
 }
 
+/// Returns the identifier of a `namespace <name> {` line, or `None` for any other line.
 fn parse_namespace_open(line: &str) -> Option<&str> {
     let namespace = line.strip_prefix("namespace ")?.strip_suffix(" {")?;
     is_identifier(namespace).then_some(namespace)
 }
 
+/// Parses one `const GPUFlagsConstant <name> = 0x<digits>;` member into its name and value.
+///
+/// The pin spells every namespace constant this way. The error text names the defect, so a
+/// grammar change in a later pin reports what it added.
 fn parse_namespace_constant(line: &str) -> Result<(String, u64), String> {
     let body = line
         .strip_prefix("const GPUFlagsConstant ")
@@ -149,6 +154,7 @@ fn parse_namespace_constant(line: &str) -> Result<(String, u64), String> {
     Ok((name.to_owned(), value))
 }
 
+/// Reports whether the text is an ASCII WebIDL identifier.
 fn is_identifier(value: &str) -> bool {
     let mut bytes = value.bytes();
     bytes
@@ -157,6 +163,9 @@ fn is_identifier(value: &str) -> bool {
         && bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
 }
 
+/// Reports whether the line is a `[...]` extended-attribute line.
+///
+/// Such a line binds to the namespace that follows it, so it leaves with the namespace.
 fn is_extended_attribute_line(line: &str) -> bool {
     line.starts_with('[') && line.ends_with(']')
 }

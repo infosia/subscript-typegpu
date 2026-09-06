@@ -44,6 +44,11 @@ pub(crate) fn rust_extern(op: &MapAsyncOp) -> String {
     ) + "\n"
 }
 
+/// Renders one of the two map-request bodies.
+///
+/// `whole` selects the whole-buffer variant, which passes offset 0 and `usize::MAX` as the
+/// size, so the sentinel never crosses the boundary (A3, F15). Both variants reserve a pending
+/// slot on the buffer's owning instance and register the AllowProcessEvents callback (F6, L7).
 fn rust_one_export(op: &MapAsyncOp, whole: bool, mode_const: &str) -> String {
     let async_op = &op.async_op;
     let recv = naming::camel(&async_op.receiver);

@@ -14,6 +14,7 @@ pub enum Scalar {
 }
 
 impl Scalar {
+    /// Returns the byte size, which is also the scalar alignment (LY2).
     fn size(self) -> u32 {
         match self {
             Self::F16 => 2,
@@ -125,6 +126,7 @@ pub fn round_up(value: u32, modulo: u32) -> u32 {
     (value + modulo - 1) & !(modulo - 1)
 }
 
+/// Returns the layout of one scalar (LY2). Size and alignment are equal, and it serves both sides.
 fn scalar_layout(scalar: Scalar) -> Layout {
     let size = scalar.size();
     Layout {
@@ -135,11 +137,16 @@ fn scalar_layout(scalar: Scalar) -> Layout {
     }
 }
 
+/// Returns the WGSL layout of one vector (LY3).
+///
+/// A three-lane vector aligns like a four-lane vector and keeps its three-component size. The C
+/// alignment override plays no part here.
 fn wgsl_vector_layout(vector: &Vector) -> Layout {
     let component = vector.scalar.size();
     let align = match vector.lanes {
         2 => component * 2,
         3 | 4 => component * 4,
+        // The library declares two, three, and four lanes only (SC5). No other width reaches here.
         _ => 1,
     };
     Layout {
@@ -150,6 +157,10 @@ fn wgsl_vector_layout(vector: &Vector) -> Layout {
     }
 }
 
+/// Returns the C layout of one vector (LY10).
+///
+/// The natural alignment is the component size. An `@CStruct` alignment override raises it, and it
+/// never lowers it. The size rounds up to the result.
 fn c_vector_layout(vector: &Vector) -> Layout {
     let component = vector.scalar.size();
     let natural_align = component;
@@ -165,6 +176,11 @@ fn c_vector_layout(vector: &Vector) -> Layout {
     }
 }
 
+/// Walks the members in declaration order and returns the struct layout (LY6, LY10).
+///
+/// `member_layout` computes one member, so the same walk serves the WGSL side and the C side.
+/// `honor_override` raises the struct alignment by the `@CStruct` override, which the C side does
+/// and the WGSL side does not. Declaration order is layout order (SC2).
 fn struct_layout(
     structure: &Struct,
     member_layout: impl Fn(&TypeTree) -> Layout,
@@ -208,6 +224,8 @@ pub fn wgsl_layout(tree: &TypeTree) -> Layout {
                 lanes: matrix.rows,
                 c_alignment: None,
             });
+            // The column stride rounds the column size up to the column alignment, so a `mat3x3f`
+            // column is a `vec3f` with a four-byte tail (LY4).
             let stride = round_up(column.size, column.align);
             Layout {
                 align: column.align,
@@ -257,6 +275,8 @@ pub fn c_layout(tree: &TypeTree) -> Layout {
             }
         }
         TypeTree::Array(element, length) => {
+            // The C element size already rounds up to the element alignment, so the stride is the
+            // element size. WGSL rounds at the array instead (LY5, LY10).
             let element = c_layout(element);
             Layout {
                 align: element.align,

@@ -11,11 +11,17 @@ use crate::api_model::{
 use crate::naming;
 use crate::policy::{ApiDeviationRow, ApiSection, Policy};
 
+/// The reserved member key of the `GPUDevice` constructor, which the host seam uses.
 const GPU_DEVICE_CONSTRUCTOR: &str = "GPUDevice.@constructor";
+/// The deviation pattern that opens the host seam (J13).
 const HOST_OWNED_WRAPPER_PATTERN: &str = "host-owned-wrapper";
+/// The synthetic API member of the typed f32 buffer write (S3).
 const GPU_QUEUE_WRITE_BUFFER_F32: &str = "GPUQueue.writeBufferF32";
+/// The synthetic API member of the typed f32 mapped read (S3).
 const GPU_BUFFER_READ_MAPPED_RANGE_F32: &str = "GPUBuffer.readMappedRangeF32";
+/// The deviation pattern of the typed f32 write member.
 const TYPED_WRITE_F32_PATTERN: &str = "typed-write-f32";
+/// The deviation pattern of the typed f32 read member.
 const TYPED_READ_F32_PATTERN: &str = "typed-read-f32";
 
 /// One IDL-joined enum mapping consumed by the facade header generator.
@@ -156,6 +162,7 @@ impl From<ApiPolicyError> for ApiError {
 }
 
 #[derive(Clone, Debug)]
+/// What one selected IDL member is under J9: generated, deviation-rowed, or excluded.
 enum Classification {
     Generate(String),
     Deviation(Box<ApiDeviationRow>),
@@ -163,26 +170,38 @@ enum Classification {
 }
 
 #[derive(Clone, Debug)]
+/// One selected IDL member with its J9 classification.
 struct ClassifiedMember {
     classification: Classification,
 }
 
 #[derive(Clone, Debug)]
+/// One field of an emitted descriptor class, with the conversion that lowers it.
 struct DescriptorFieldPlan {
+    /// The IDL dictionary member name, which is also the emitted field name.
     name: String,
+    /// The emitted API type text.
     ty: String,
+    /// The field is definite, so the emitted class gives it no default.
     required: bool,
+    /// The default, already rendered as subscript source text.
     default: Option<String>,
+    /// How the constructor lowers this field into the boundary struct.
     conversion: DescriptorFieldConversion,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One limits field that the required-limits conversion copies (H2).
 struct RequiredLimitFieldPlan {
     name: String,
     ty: String,
 }
 
 #[derive(Clone, Debug)]
+/// How one descriptor field lowers from its API type into its boundary field.
+///
+/// `Direct` copies the value. Every other variant carries the names the emitted constructor
+/// needs: a boundary class, a public class, a raw handle field, or the absent-value list.
 enum DescriptorFieldConversion {
     Direct,
     Enum,
@@ -225,27 +244,43 @@ enum DescriptorFieldConversion {
 }
 
 #[derive(Clone, Debug)]
+/// One emitted descriptor class, joined from an IDL dictionary and its mirror boundary struct.
 struct DescriptorPlan {
+    /// The canonical IDL dictionary name.
     idl_name: String,
+    /// The IDL type name that a field-type join names, which a mapping row can override.
     idl_type: String,
+    /// The other IDL dictionary names that alias this one.
     idl_aliases: Vec<String>,
+    /// The emitted API class name.
     name: String,
+    /// The mirror boundary class name, empty for a public-only dictionary.
     boundary_name: String,
+    /// The dictionary has no boundary struct, so the policy row supplies its field types.
     public_only: bool,
+    /// The emitted fields, in IDL member order.
     fields: Vec<DescriptorFieldPlan>,
+    /// The mirror class fields, in declaration order, which is the constructor order.
     boundary_fields: Vec<MirrorField>,
+    /// Boundary field name to literal, for a field that no IDL member fills.
     boundary_defaults: BTreeMap<String, String>,
+    /// The boundary fields that hold a nested aggregate built from several IDL members.
     nested_boundaries: Vec<NestedBoundaryPlan>,
 }
 
 #[derive(Clone, Debug)]
+/// One boundary field that holds a nested aggregate built from several IDL members.
 struct NestedBoundaryPlan {
+    /// The boundary field name.
     field_name: String,
+    /// The nested mirror class name.
     boundary_name: String,
+    /// The IDL members that fill it, in the nested constructor order.
     members: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
+/// One IDL namespace, emitted as a singleton object of flag constants.
 struct NamespacePlan {
     name: String,
     value_type: String,
@@ -253,21 +288,31 @@ struct NamespacePlan {
 }
 
 #[derive(Clone, Debug)]
+/// One enum member, joined from its IDL spelling to its mirror constant.
 struct EnumMemberPlan {
+    /// The IDL member name, which is the public string value.
     idl_name: String,
+    /// The mirror constant name.
     mirror_name: String,
+    /// The numeric value the constant carries at the boundary.
     wire_value: i64,
 }
 
 #[derive(Clone, Debug)]
+/// One IDL enum joined to its mirror constant set.
 struct EnumPlan {
+    /// The public IDL enum name.
     name: String,
+    /// The mirror enum name.
     mirror_name: String,
+    /// The members that an IDL member produced.
     members: Vec<EnumMemberPlan>,
+    /// The boundary-only members, from `[[enum_exclusions]]` rows.
     exclusions: Vec<EnumMemberPlan>,
 }
 
 #[derive(Clone, Debug)]
+/// One enum that the mirror carries and the IDL does not, emitted for a result record.
 struct SyntheticEnumPlan {
     name: String,
     mirror_name: String,
@@ -276,6 +321,7 @@ struct SyntheticEnumPlan {
 }
 
 #[derive(Clone, Debug)]
+/// How one result-record field converts from its boundary field.
 enum ResultRecordFieldConversion {
     Direct,
     Enum,
@@ -283,6 +329,7 @@ enum ResultRecordFieldConversion {
 }
 
 #[derive(Clone, Debug)]
+/// One field of an emitted result-record class.
 struct ResultRecordFieldPlan {
     name: String,
     ty: String,
@@ -290,22 +337,31 @@ struct ResultRecordFieldPlan {
 }
 
 #[derive(Clone, Debug)]
+/// One facade-filled record, emitted as a public class with a conversion function (F11 Rev 1).
 struct ResultRecordPlan {
+    /// The public class name, which is the IDL interface name.
     name: String,
+    /// The mirror boundary class name.
     boundary_name: String,
+    /// The public fields, in mirror field order, which is the constructor order.
     fields: Vec<ResultRecordFieldPlan>,
+    /// The enum that the mirror carries and the IDL does not.
     synthetic_enum: Option<SyntheticEnumPlan>,
+    /// The conversion returns `null` for at least one synthetic enum constant.
     nullable: bool,
+    /// One literal per boundary field, for the record a script builds before the fill call.
     seed_values: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
+/// How one fill export reports success: a boolean return, or the status value 1.
 enum RecordFillSuccess {
     Boolean,
     StatusOne,
 }
 
 #[derive(Clone, Debug)]
+/// One `default<Name>` helper that supplies a descriptor field's default at the call site.
 struct DefaultHelperPlan {
     name: String,
     ty: String,
@@ -313,6 +369,10 @@ struct DefaultHelperPlan {
 }
 
 #[derive(Clone, Debug)]
+/// One emitted method, by shape.
+///
+/// Each variant carries the mirror export names and the plans that its renderer needs. The
+/// shape decides the renderer, not the IDL member kind alone.
 enum MethodPlan {
     Async {
         name: String,
@@ -380,6 +440,11 @@ enum MethodPlan {
     },
 }
 
+/// Builds the mapped-range read and write pair from the IDL `getMappedRange` operation.
+///
+/// The IDL returns an `ArrayBuffer` over `offset` and `size`. Neither an `ArrayBuffer` nor a
+/// raw pointer is available, so the API layer emits two range methods instead. Both mirror
+/// exports take the receiver, a u64 offset, and a byte array, and both return an i32 status.
 fn build_mapped_range_method(
     mirror: &MirrorModel,
     member: &IdlMember,
@@ -467,6 +532,7 @@ fn build_mapped_range_method(
 }
 
 impl MethodPlan {
+    /// The wrapper class this method constructs, or `None` when it constructs none.
     fn result_class(&self) -> Option<&str> {
         match self {
             MethodPlan::Async { result_class, .. }
@@ -483,15 +549,22 @@ impl MethodPlan {
 }
 
 #[derive(Clone, Debug)]
+/// One emitted method parameter.
 struct MethodParamPlan {
+    /// The parameter name, taken from the IDL argument.
     name: String,
+    /// The emitted API type text.
     api_type: String,
+    /// The expression that lowers the parameter into the boundary call.
     expression: String,
+    /// The default, already rendered as subscript source text.
     default: Option<String>,
+    /// The lowering helper this parameter needs, when its expression calls one.
     helper: Option<MethodParamHelper>,
 }
 
 #[derive(Clone, Debug)]
+/// A lowering helper that one method parameter needs beside the emitted method.
 enum MethodParamHelper {
     HandleArray {
         boundary_name: String,
@@ -510,23 +583,33 @@ enum MethodParamHelper {
 }
 
 #[derive(Clone, Debug)]
+/// A second method that passes a null descriptor, for an operation whose descriptor defaults.
 struct DefaultVariantPlan {
     name: String,
     descriptor_expression: String,
 }
 
 #[derive(Clone, Debug)]
+/// One emitted API class, joined from an IDL interface and its mirror handle.
 struct InterfacePlan {
+    /// The public class name, which is the IDL interface name.
     name: String,
+    /// The boundary name, without the `SubscriptTypegpu` prefix.
     boundary: String,
+    /// The public field that holds the boundary handle (J13).
     raw_field: String,
+    /// The emitted methods, in IDL member order.
     methods: Vec<MethodPlan>,
+    /// The class holds the instance handle, because it polls futures or builds a class that does.
     needs_instance: bool,
+    /// The class also emits the host-owned wrapper form (J13).
     host_owned: bool,
+    /// The class tolerates a repeated `dispose()`, because a host-owned device disposes it too.
     idempotent_dispose: bool,
 }
 
 #[derive(Clone, Debug)]
+/// The resolved API emission plan.
 struct ApiPlan {
     policy: ApiSection,
     descriptors: Vec<DescriptorPlan>,
@@ -541,6 +624,7 @@ struct ApiPlan {
 }
 
 #[derive(Clone, Debug)]
+/// One `[api]` policy row, tracked for the dead check (J9).
 struct LedgerRow {
     key: String,
     consumed: bool,
@@ -614,6 +698,12 @@ pub fn generate_api(
     })
 }
 
+/// Joins the pinned IDL, the generated mirror, and the API policy into the emission plan.
+///
+/// The function collects every selected member, classifies each one under J9, then builds the
+/// enums, the result records, the descriptors, the namespaces, and the interfaces. That order
+/// is fixed, because each stage reads the plans that the stages before it produced. A member
+/// with no classification is `Unpoliced`, and a policy row that no stage consumed is `Dead`.
 fn build_plan(
     idl: &IdlModel,
     mirror: &MirrorModel,
@@ -623,6 +713,8 @@ fn build_plan(
     check_reasons(&policy)?;
     validate_interface_parents(idl, &policy)?;
 
+    // Every member of every selected construct enters `reachable`. A policy row that names no
+    // key in it is `Unknown`, and a key with no row is `Unpoliced` (J9).
     let mut reachable = BTreeMap::new();
     let mut ordered_interface_members = BTreeMap::new();
     let mut ordered_result_record_members = BTreeMap::new();
@@ -743,6 +835,8 @@ fn build_plan(
         consume(&mut ledger, &format!("deviation:{}", row.member));
     }
 
+    // The J9 trichotomy: each reachable member is generated, deviation-rowed, or excluded.
+    // The pattern check runs here, so a row that names a member of the wrong kind fails early.
     let mut classified = BTreeMap::new();
     for (key, member) in &reachable {
         if let Some(row) = policy.generate.iter().find(|row| row.member == *key) {
@@ -778,6 +872,8 @@ fn build_plan(
             });
         }
     }
+    // A row that no classification reached is dead policy. It names a construct the join no
+    // longer selects, so the record and the code disagree.
     if let Some(dead) = ledger.iter().find(|row| !row.consumed) {
         let entry = dead
             .key
@@ -789,6 +885,8 @@ fn build_plan(
     }
 
     validate_common_mirror(mirror, &policy)?;
+    // The build order is a dependency order. Enums feed the result records and the descriptors.
+    // The descriptors and the result records feed the interfaces.
     let enums = build_enums(mirror, &policy, &ordered_enum_members, &classified)?;
     let result_records = build_result_records(
         mirror,
@@ -836,6 +934,10 @@ fn build_plan(
     })
 }
 
+/// The IDL member that a typed f32 deviation row attaches to, or `None` for any other row.
+///
+/// A typed f32 member has no IDL declaration. It attaches to the IDL member of its byte-form
+/// sibling, so the emitted method lands in the right class (S3).
 fn synthetic_typed_anchor(row: &ApiDeviationRow) -> Option<&'static str> {
     match (row.member.as_str(), row.pattern.as_str()) {
         (GPU_QUEUE_WRITE_BUFFER_F32, TYPED_WRITE_F32_PATTERN) => Some("GPUQueue.writeBuffer"),
@@ -870,6 +972,10 @@ pub(crate) fn has_synthetic_typed_anchor(policy: &Policy, member: &str) -> bool 
     })
 }
 
+/// Rejects a typed f32 deviation row that carries any reshape control.
+///
+/// The row has no IDL member to reshape, so member, pattern, and reason are the only fields it
+/// accepts.
 fn validate_synthetic_typed_deviation(row: &ApiDeviationRow) -> Result<(), ApiPolicyError> {
     let controls_are_empty = row.boundary_receiver.is_none()
         && row.drop_arguments.is_empty()
@@ -899,6 +1005,11 @@ fn validate_synthetic_typed_deviation(row: &ApiDeviationRow) -> Result<(), ApiPo
     }
 }
 
+/// Rejects a migrated enum in a C-to-script array-read position.
+///
+/// A migrated enum crosses as a string union through `@subscript-cenum`. That alias supplies a
+/// function-position wire mapping and a script-to-C descriptor array. An array that the backend
+/// fills has no such mapping, so the join refuses it.
 fn validate_no_migrated_enum_array_reads(
     mirror: &MirrorModel,
     enums: &[EnumPlan],
@@ -950,6 +1061,11 @@ fn validate_no_migrated_enum_array_reads(
     Ok(())
 }
 
+/// Keeps one overload per IDL operation name.
+///
+/// An overloaded operation needs a deviation row whose `overload_arguments` names exactly one
+/// overload by its argument names. A selector that matches no overload, that matches several,
+/// or that names an operation without overloads is an invalid row.
 fn select_operation_overloads(
     interface: &str,
     members: Vec<IdlMember>,
@@ -1021,6 +1137,9 @@ fn select_operation_overloads(
         .collect())
 }
 
+/// The argument names of one IDL operation, in declaration order.
+///
+/// Any other member kind gives an empty list.
 fn operation_argument_names(member: &IdlMember) -> Vec<String> {
     match &member.kind {
         IdlMemberKind::Operation { arguments, .. } => arguments
@@ -1031,12 +1150,18 @@ fn operation_argument_names(member: &IdlMember) -> Vec<String> {
     }
 }
 
+/// Builds an `Unknown` policy error for one join key.
 fn unknown(entry: &str) -> ApiPolicyError {
     ApiPolicyError::Unknown {
         entry: entry.to_owned(),
     }
 }
 
+/// Decides whether the API layer emits the host seam, and validates its row (J13).
+///
+/// The seam applies when `GPUDevice.queue` is selected. It then needs the `host-owned-wrapper`
+/// deviation row on the reserved constructor member, and that row accepts no reshape control. A
+/// row without the selected attribute is `Unknown`, and a missing row is `Unpoliced`.
 fn validate_host_owned_device_policy(
     policy: &ApiSection,
     ordered_interfaces: &BTreeMap<String, Vec<IdlMember>>,
@@ -1093,6 +1218,11 @@ fn validate_host_owned_device_policy(
     Ok(true)
 }
 
+/// Checks every selected interface's IDL parent against its `[[api.interface_parents]]` row.
+///
+/// An interface that inherits needs a row that names the parent the pinned IDL declares. A row
+/// for an interface that inherits nothing is `Dead`. Inheritance therefore never passes
+/// unrecorded.
 fn validate_interface_parents(idl: &IdlModel, policy: &ApiSection) -> Result<(), ApiPolicyError> {
     for row in &policy.interface_parents {
         idl.interface_parent(&row.interface)
@@ -1158,6 +1288,7 @@ fn validate_interface_parents(idl: &IdlModel, policy: &ApiSection) -> Result<(),
     Ok(())
 }
 
+/// Checks one mirror function's parameter types against the expected list, in order.
 fn validate_parameter_types(
     function: &crate::api_model::MirrorFunction,
     expected: &[String],
@@ -1177,12 +1308,17 @@ fn validate_parameter_types(
     }
 }
 
+/// Marks one ledger row consumed. A key that no row carries changes nothing.
 fn consume(ledger: &mut [LedgerRow], key: &str) {
     if let Some(row) = ledger.iter_mut().find(|row| row.key == key) {
         row.consumed = true;
     }
 }
 
+/// Rejects a repeated key in every `[api]` policy section (J9).
+///
+/// Each section carries its own key space. A dictionary mapping claims its dictionary, its API
+/// name, its IDL type, and its boundary name, so two rows collide on none of the four.
 fn check_policy_duplicates(policy: &ApiSection) -> Result<(), ApiPolicyError> {
     for names in [
         &policy.interfaces,
@@ -1333,6 +1469,10 @@ fn check_policy_duplicates(policy: &ApiSection) -> Result<(), ApiPolicyError> {
     Ok(())
 }
 
+/// Rejects an empty reason in every `[api]` policy row that carries one (F18).
+///
+/// A reason records why the emitted shape leaves the IDL shape. An empty reason erases that
+/// record.
 fn check_reasons(policy: &ApiSection) -> Result<(), ApiPolicyError> {
     let mut required = vec![
         ("api.singleton", policy.singleton_reason.as_str()),
@@ -1446,6 +1586,11 @@ fn check_reasons(policy: &ApiSection) -> Result<(), ApiPolicyError> {
     Ok(())
 }
 
+/// Checks that the emission pattern matches the IDL member kind.
+///
+/// `deviation` selects the pattern set. A generate row admits the faithful patterns, and a
+/// deviation row admits the reshaping ones. `result-record-field` is the one pattern both
+/// sets admit.
 fn validate_pattern(
     member: &IdlMember,
     pattern: &str,
@@ -1502,6 +1647,11 @@ fn validate_pattern(
     }
 }
 
+/// Checks one deviation row's controls against the IDL member it names.
+///
+/// An operation row reshapes arguments and results. A dictionary-field row reshapes the field,
+/// and each dictionary pattern requires its own controls. Every other member kind accepts
+/// neither group. A control outside the member's group is an invalid row.
 fn validate_deviation(member: &IdlMember, row: &ApiDeviationRow) -> Result<(), ApiPolicyError> {
     let arguments = match &member.kind {
         IdlMemberKind::Operation { arguments, .. } => arguments,
@@ -1668,6 +1818,10 @@ fn validate_deviation(member: &IdlMember, row: &ApiDeviationRow) -> Result<(), A
     Ok(())
 }
 
+/// Checks that the mirror declares the instance create, the pump, and the two future exports.
+///
+/// Every async method the API layer emits calls all four (F6, L8). The singleton's handle type
+/// must exist too, because each wrapper reaches the instance through it.
 fn validate_common_mirror(mirror: &MirrorModel, policy: &ApiSection) -> Result<(), ApiPolicyError> {
     for function in [
         "subscript_typegpu_create_instance",
@@ -1686,6 +1840,12 @@ fn validate_common_mirror(mirror: &MirrorModel, policy: &ApiSection) -> Result<(
     Ok(())
 }
 
+/// Builds one descriptor class plan per selected IDL dictionary.
+///
+/// Each dictionary joins a mirror boundary class, unless a `[[public_only_dictionaries]]` row
+/// supplies the field types instead. An alias dictionary contributes no plan of its own. A
+/// boundary field with no generated IDL member, no boundary default, and no nesting row is an
+/// error, so the join stays total in both directions (J9).
 fn build_descriptors(
     mirror: &MirrorModel,
     policy: &ApiSection,
@@ -1868,6 +2028,8 @@ fn build_descriptors(
                 });
             };
             if let Classification::Deviation(row) = &classified_member.classification {
+                // `GPUBindingResource` is an IDL union. The boundary spells it as five flat
+                // fields, each nullable, and the backend validates the combination (C2).
                 if row.pattern == "binding-resource" {
                     if name != "GPUBindGroupEntry"
                         || !matches!(ty, IdlType::Named { name, .. } if name == "GPUBindingResource")
@@ -2107,6 +2269,11 @@ fn build_descriptors(
     Ok(plans)
 }
 
+/// Plans the boundary fields that hold a nested aggregate built from several IDL members.
+///
+/// Each `[[dictionary_nestings]]` row names one boundary field, its class, and the members that
+/// fill it in constructor order. The nested class's field names must equal that member list
+/// exactly.
 fn nested_boundaries_for(
     mirror: &MirrorModel,
     policy: &ApiSection,
@@ -2179,6 +2346,10 @@ fn nested_boundaries_for(
     Ok(plans)
 }
 
+/// Checks that an alias dictionary matches its canonical dictionary member for member.
+///
+/// The names, the kinds, and the J9 classifications must all agree. The alias emits no class of
+/// its own, so a script that names it reaches the canonical class.
 fn validate_dictionary_aliases(
     policy: &ApiSection,
     ordered: &BTreeMap<String, Vec<IdlMember>>,
@@ -2234,6 +2405,10 @@ fn validate_dictionary_aliases(
     Ok(())
 }
 
+/// A comparable text form of one member's classification, for the alias equality check.
+///
+/// The text carries the pattern and every deviation control, so two rows compare equal only
+/// when they reshape their member the same way.
 fn classification_shape(classified: &ClassifiedMember) -> String {
     match &classified.classification {
         Classification::Generate(pattern) => format!("generate:{pattern}"),
@@ -2260,6 +2435,12 @@ fn classification_shape(classified: &ClassifiedMember) -> String {
     }
 }
 
+/// The API type and the lowering plan of one descriptor field.
+///
+/// The join reads the IDL type, the mirror field type, and the pattern together. A pattern that
+/// claims no conversion for the mirror type is an error. Direct emission stays restricted to a
+/// non-null scalar, boolean, or string field, so every handle, descriptor, array, and record
+/// shape needs its own deviation row.
 #[allow(clippy::too_many_arguments)]
 fn descriptor_field_shape(
     mirror: &MirrorModel,
@@ -2947,6 +3128,8 @@ fn descriptor_field_shape(
         }
         _ => {}
     }
+    // Nothing above claimed the field. Direct emission is the last resort, and it covers only a
+    // non-null scalar, boolean, or string. Every other shape needs a policy row.
     let direct_pattern = matches!(
         pattern,
         "dictionary-field"
@@ -2976,6 +3159,9 @@ fn descriptor_field_shape(
     Err(unclaimed_dictionary_field(member, pattern, mirror_field))
 }
 
+/// Rewrites a `<boundary enum>.<constant>` policy value as the public string member.
+///
+/// A value in any other form passes through unchanged.
 fn cenum_boundary_value(value: &str, enums: &[EnumPlan]) -> String {
     let Some((boundary_name, member_name)) = value.split_once('.') else {
         return value.to_owned();
@@ -2996,12 +3182,14 @@ fn cenum_boundary_value(value: &str, enums: &[EnumPlan]) -> String {
         )
 }
 
+/// Reports whether one descriptor plan answers to this IDL type name, alias names included.
 fn descriptor_matches_idl_type(descriptor: &DescriptorPlan, name: &str) -> bool {
     descriptor.idl_type == name
         || descriptor.idl_name == name
         || descriptor.idl_aliases.iter().any(|alias| alias == name)
 }
 
+/// Builds the error for a dictionary field that its pattern gives no conversion plan.
 fn unclaimed_dictionary_field(
     member: &IdlMember,
     pattern: &str,
@@ -3016,6 +3204,11 @@ fn unclaimed_dictionary_field(
     }
 }
 
+/// Builds one namespace plan per selected IDL namespace.
+///
+/// subscript has no user-defined namespace and no static field, so the flag constants become a
+/// singleton object. The value type comes from the mirror alias that the
+/// `[[namespace_mappings]]` row names.
 fn build_namespaces(
     mirror: &MirrorModel,
     policy: &ApiSection,
@@ -3070,6 +3263,7 @@ fn build_namespaces(
     Ok(plans)
 }
 
+/// The `SUBSCRIPT_TYPEGPU_<ENUM>_` prefix that every constant of one mirror enum carries.
 fn facade_enum_prefix(mirror_name: &str) -> String {
     let suffix = mirror_name
         .strip_prefix("SubscriptTypegpu")
@@ -3080,6 +3274,7 @@ fn facade_enum_prefix(mirror_name: &str) -> String {
     )
 }
 
+/// The mirror constant name of one enum member, from the enum name and the member name.
 fn facade_enum_member(mirror_name: &str, member: &str) -> String {
     format!(
         "{}{}",
@@ -3088,6 +3283,12 @@ fn facade_enum_member(mirror_name: &str, member: &str) -> String {
     )
 }
 
+/// Builds one enum plan per selected IDL enum, joined to its mirror constant set.
+///
+/// Each IDL member maps to a mirror constant through an `[[enum_mappings]]` row, through the
+/// derived spelling, or through a unique normalized match. A mirror constant with no IDL member
+/// needs an `[[enum_exclusions]]` row, which becomes a boundary-only alias member. The join is
+/// total in both directions, so no constant and no member stays unaccounted.
 fn build_enums(
     mirror: &MirrorModel,
     policy: &ApiSection,
@@ -3130,6 +3331,9 @@ fn build_enums(
             } else if mirror_enum.members.contains_key(&derived) {
                 derived
             } else {
+                // Neither a mapping row nor the derived spelling matched. The IDL spelling and
+                // the constant spelling can differ only in case and punctuation, so a unique
+                // normalized match resolves the member.
                 let normalized_idl = normalize_enum_spelling(&member.name);
                 let candidates = mirror_enum
                     .members
@@ -3262,6 +3466,10 @@ fn build_enums(
     Ok(plans)
 }
 
+/// Reduces a name to lowercase alphanumerics, for the fallback enum match.
+///
+/// The IDL spells a member `rgba8unorm-srgb` where the facade constant spells it
+/// `RGBA8_UNORM_SRGB`. The reduction makes the two comparable.
 fn normalize_enum_spelling(value: &str) -> String {
     value
         .chars()
@@ -3270,6 +3478,10 @@ fn normalize_enum_spelling(value: &str) -> String {
         .collect()
 }
 
+/// The public string member name of a boundary-only enum constant.
+///
+/// An all-uppercase suffix lowercases, and its underscores become hyphens. A mixed-case suffix
+/// gains a hyphen before each uppercase letter.
 fn cenum_boundary_member_name(value: &str) -> String {
     if !value
         .chars()
@@ -3293,6 +3505,11 @@ fn cenum_boundary_member_name(value: &str) -> String {
     out
 }
 
+/// Checks each `[[flattened_interfaces]]` row against the IDL and the result-record plans.
+///
+/// A flattened error subclass must target a selected result record, must name that target as
+/// its IDL parent, and must declare its constructor alone. That constructor must carry an
+/// exclusion row, because the subclass itself never reaches the emitted source.
 fn validate_flattened_interfaces(
     policy: &ApiSection,
     flattened: &BTreeMap<String, Vec<IdlMember>>,
@@ -3359,6 +3576,12 @@ fn validate_flattened_interfaces(
     Ok(())
 }
 
+/// Builds one result-record class plan per `[[api.result_records]]` row.
+///
+/// The mirror boundary class fixes the field order, which is also the constructor order and the
+/// seed order. A synthetic field adds an enum that the mirror carries and the IDL does not, and
+/// its exclusions are the constants that lower to `null`. The selected IDL attributes must
+/// cover the mirror fields exactly.
 fn build_result_records(
     mirror: &MirrorModel,
     policy: &ApiSection,
@@ -3690,6 +3913,10 @@ fn build_result_records(
     Ok(records)
 }
 
+/// The seed literal for one boundary field that no public field reads.
+///
+/// A script constructs the record before the fill call, so every boundary field needs a value.
+/// An enum field seeds with its lowest constant, ordered by value and then by name.
 fn result_record_boundary_seed(
     mirror: &MirrorModel,
     field: &crate::api_model::MirrorField,
@@ -3727,6 +3954,11 @@ fn result_record_boundary_seed(
     }
 }
 
+/// Builds one class plan per selected IDL interface.
+///
+/// The boundary name comes from the interface name, except for the singleton, which the policy
+/// names. Each classified member contributes one method, and a typed f32 deviation adds its
+/// synthetic method beside the anchor member (S3).
 fn build_interfaces(
     mirror: &MirrorModel,
     policy: &ApiSection,
@@ -3817,6 +4049,10 @@ fn build_interfaces(
     Ok(plans)
 }
 
+/// Builds the method plan of one typed f32 deviation (S3).
+///
+/// The two members are fixed, and each one pins its mirror export's parameter types and its
+/// result. A row on any other receiver is an invalid row.
 fn build_synthetic_typed_method(
     mirror: &MirrorModel,
     row: &ApiDeviationRow,
@@ -3879,6 +4115,10 @@ fn build_synthetic_typed_method(
     }
 }
 
+/// Builds one method plan from a classified interface member.
+///
+/// `pattern` selects the builder. A deviation row moves the call to another boundary handle
+/// through `boundary_receiver`, and the mirror must declare that handle.
 #[allow(clippy::too_many_arguments)]
 fn build_method(
     mirror: &MirrorModel,
@@ -3937,6 +4177,10 @@ fn build_method(
     }
 }
 
+/// Builds the feature-probe method of one plural IDL attribute.
+///
+/// The attribute `features` becomes the method `hasFeature` over the `GPUFeatureName` enum. The
+/// mirror export must take the receiver and the enum, and must return a boolean.
 fn build_feature_probe_method(
     mirror: &MirrorModel,
     member: &IdlMember,
@@ -4019,6 +4263,10 @@ fn build_feature_probe_method(
     })
 }
 
+/// Builds a method that reads one record through an out-parameter fill (F11 Rev 1).
+///
+/// The mirror export takes the receiver and a nullable record. It reports success as a boolean
+/// or as the status value 1.
 fn build_result_record_fill_method(
     mirror: &MirrorModel,
     member: &IdlMember,
@@ -4083,6 +4331,10 @@ fn build_result_record_fill_method(
     })
 }
 
+/// Builds the label setter of the IDL `label` attribute.
+///
+/// The facade exposes no label getter, so the member stays a method and never becomes an
+/// accessor (J14).
 fn build_label_method(
     mirror: &MirrorModel,
     member: &IdlMember,
@@ -4132,6 +4384,11 @@ fn build_label_method(
     })
 }
 
+/// Builds the error-scope pop method (G2).
+///
+/// The operation takes no argument and its promise result is nullable. The begin export returns
+/// a future id, and the take export fills the record and returns a boolean. The delivery status
+/// and the captured error stay separate axes.
 fn build_error_scope_pop_method(
     mirror: &MirrorModel,
     member: &IdlMember,
@@ -4233,6 +4490,11 @@ fn build_error_scope_pop_method(
     })
 }
 
+/// Builds one device-event drain method.
+///
+/// `device-lost-poll` reads the lost record and pumps first, because the loss arrives through a
+/// future callback (G4). `uncaptured-error-drain` reads the next queued record and never pumps
+/// (G3). Both return `null` when no record is present.
 fn build_record_drain_method(
     mirror: &MirrorModel,
     member: &IdlMember,
@@ -4379,6 +4641,11 @@ fn build_record_drain_method(
     })
 }
 
+/// Builds one async method plan (F6).
+///
+/// The begin export takes the instance and then the receiver, unless the receiver is the
+/// instance itself. A deviation row drops IDL arguments, renames the begin export, and reshapes
+/// the result into a boolean or a nullable wrapper.
 fn build_async_method(
     mirror: &MirrorModel,
     policy: &ApiSection,
@@ -4631,6 +4898,10 @@ fn build_async_method(
     }
 }
 
+/// Builds one read accessor from an IDL attribute (J14).
+///
+/// The getter export derives from the receiver and the attribute name, and it takes the
+/// receiver alone. An enum attribute must join the mirror enum that its IDL enum maps to.
 fn build_attribute_accessor(
     mirror: &MirrorModel,
     policy: &ApiSection,
@@ -4686,6 +4957,11 @@ fn build_attribute_accessor(
     })
 }
 
+/// Builds one synchronous operation method.
+///
+/// The mirror export leads with the receiver, and its remaining parameters join the kept IDL
+/// arguments one for one. A descriptor argument lowers through its `to<Boundary>` helper. A
+/// `default_variant` row adds a second method that passes a null descriptor.
 fn build_operation_method(
     mirror: &MirrorModel,
     policy: &ApiSection,
@@ -4872,6 +5148,10 @@ fn build_operation_method(
     })
 }
 
+/// Reports whether a deviation row relaxes the type join of one argument.
+///
+/// The two flags admit a named mismatch and a scalar mismatch. A dropped argument and a
+/// `boundary_arguments` mapping each relax both.
 fn operation_argument_deviation(row: &ApiDeviationRow, argument: &str) -> (bool, bool) {
     if row.drop_arguments.iter().any(|name| name == argument) {
         return (true, true);
@@ -4886,6 +5166,11 @@ fn operation_argument_deviation(row: &ApiDeviationRow, argument: &str) -> (bool,
     }
 }
 
+/// Pairs each kept IDL argument with its mirror parameter.
+///
+/// Without a `boundary_arguments` mapping, the names must match in order. With one, each
+/// mapping names an IDL argument and a mirror parameter, and every remaining pair joins by
+/// equal names. An argument or a parameter that joins nothing is an error.
 fn join_operation_arguments<'a>(
     member: &IdlMember,
     arguments: &[&'a IdlArgument],
@@ -4974,6 +5259,7 @@ fn join_operation_arguments<'a>(
     Ok(joined)
 }
 
+/// Checks that the kept IDL argument names equal the mirror parameter names, in order.
 fn validate_argument_names(
     member: &IdlMember,
     arguments: &[&IdlArgument],
@@ -4999,6 +5285,12 @@ fn validate_argument_names(
     }
 }
 
+/// Builds one method parameter plan from an IDL argument and its mirror parameter.
+///
+/// A scalar, a boolean, a string, and a scalar sequence pass through. A handle lowers through
+/// its raw field, and a handle array and a nullable handle lower through emitted helpers. The
+/// two deviation flags admit a mismatch that a policy row already justified. `keep_required`
+/// drops the IDL default, so the emitted parameter stays required.
 #[allow(clippy::too_many_arguments)]
 fn method_param_from_mirror(
     mirror: &MirrorModel,
@@ -5224,6 +5516,10 @@ fn method_param_from_mirror(
     })
 }
 
+/// The API return type of one mirror type, plus the wrapper class the caller constructs.
+///
+/// A mirror handle gives its public wrapper name twice: once as the type, once as the class.
+/// Every other type resolves through the mirror aliases and needs no wrapper.
 fn api_return_from_mirror(
     mirror: &MirrorModel,
     policy: &ApiSection,
@@ -5249,6 +5545,9 @@ fn api_return_from_mirror(
     Ok((api_type_from_mirror(mirror, ty)?, None))
 }
 
+/// Resolves one mirror type through the alias chain to its final spelling.
+///
+/// An alias cycle returns an invalid error that names the chain.
 fn api_type_from_mirror(mirror: &MirrorModel, ty: &str) -> Result<String, ApiPolicyError> {
     let mut chain = Vec::new();
     let mut current = ty;
@@ -5266,6 +5565,11 @@ fn api_type_from_mirror(mirror: &MirrorModel, ty: &str) -> Result<String, ApiPol
     Ok(current.to_owned())
 }
 
+/// Marks each class that must hold the instance handle.
+///
+/// The singleton needs it. So does a class with an async method or with the error-scope pop,
+/// because both poll futures on the instance (F6). A class that constructs such a class needs
+/// it too, so the pass repeats until nothing changes.
 fn compute_instance_needs(interfaces: &mut [InterfacePlan], singleton: &str) {
     for interface in interfaces.iter_mut() {
         interface.needs_instance = interface.name == singleton
@@ -5276,6 +5580,8 @@ fn compute_instance_needs(interfaces: &mut [InterfacePlan], singleton: &str) {
                 )
             });
     }
+    // A class that constructs an instance-holding class needs the instance too. The pass repeats
+    // until it adds nothing, because such a chain can run several classes deep.
     loop {
         let needs: BTreeSet<String> = interfaces
             .iter()
@@ -5301,6 +5607,12 @@ fn compute_instance_needs(interfaces: &mut [InterfacePlan], singleton: &str) {
     }
 }
 
+/// Renders the whole `lib/webgpu.ts` text from the plan.
+///
+/// The banner lists every policy deviation with its reason (J9). The declarations follow in
+/// dependency order: the result records, the record entries, the required limits, the
+/// descriptors, the shared helpers, the descriptor conversions, the namespaces, the default
+/// helpers, and the classes. The singleton export comes last.
 fn render(plan: &ApiPlan) -> Result<String, ApiPolicyError> {
     let default_helpers = collect_default_helpers(&plan.descriptors, &plan.policy)?;
     let mut out = String::from(
@@ -5408,6 +5720,10 @@ fn render(plan: &ApiPlan) -> Result<String, ApiPolicyError> {
     Ok(out)
 }
 
+/// Renders one result-record class and the function that builds it from its boundary struct.
+///
+/// A record with a synthetic enum switches on that field. Each mapped constant builds the
+/// class, and each excluded constant returns `null`.
 fn render_result_record(out: &mut String, record: &ResultRecordPlan) -> Result<(), ApiPolicyError> {
     if let Some(enum_plan) = &record.synthetic_enum {
         out.push_str(&format!(
@@ -5496,6 +5812,10 @@ fn render_result_record(out: &mut String, record: &ResultRecordPlan) -> Result<(
     Ok(())
 }
 
+/// The expression that reads one result-record field from the boundary value.
+///
+/// A synthetic-enum field returns an error, because `render_result_record` emits its value once
+/// per switch arm.
 fn result_record_field_expression(field: &ResultRecordFieldPlan) -> Result<String, ApiPolicyError> {
     Ok(match &field.conversion {
         ResultRecordFieldConversion::Direct => format!("value.{}", field.name),
@@ -5509,6 +5829,9 @@ fn result_record_field_expression(field: &ResultRecordFieldPlan) -> Result<Strin
     })
 }
 
+/// Renders the handle-array and nullable-handle helpers that method parameters need.
+///
+/// A helper that the descriptor conversions already emit is skipped, so each name appears once.
 fn render_method_param_helpers(
     out: &mut String,
     descriptors: &[DescriptorPlan],
@@ -5563,6 +5886,7 @@ fn render_method_param_helpers(
     }
 }
 
+/// The parameter plans of one method, or an empty slice for a method that takes none.
 fn method_params(method: &MethodPlan) -> &[MethodParamPlan] {
     match method {
         MethodPlan::Async { params, .. } | MethodPlan::Operation { params, .. } => params,
@@ -5576,6 +5900,10 @@ fn method_params(method: &MethodPlan) -> &[MethodParamPlan] {
     }
 }
 
+/// Renders the public class of each record-entry aggregate.
+///
+/// One boundary aggregate that maps to two API names is an error, so the emitted class stays
+/// unambiguous.
 fn render_record_entries(
     out: &mut String,
     descriptors: &[DescriptorPlan],
@@ -5611,6 +5939,10 @@ fn render_record_entries(
     Ok(())
 }
 
+/// Renders the required-limits public class, its lowering, and its emptiness probe (H2).
+///
+/// A field value of 0 means unspecified. A u32 limit lowers 0 to the undefined constant, and a
+/// u64 limit passes 0 through. An all-zero value makes the whole aggregate absent.
 fn render_required_limits(
     out: &mut String,
     descriptors: &[DescriptorPlan],
@@ -5689,6 +6021,10 @@ fn render_required_limits(
     Ok(())
 }
 
+/// Renders the ambient `CEnum` aliases that map each public enum member to its wire value.
+///
+/// The boundary-only members follow the IDL members. A script never names them, and the wire
+/// mapping still covers every mirror constant.
 fn render_wire_enum_aliases(plan: &ApiPlan) -> Result<String, ApiPolicyError> {
     let mut out = String::from(
         "// GENERATED FILE — DO NOT EDIT.\n\
@@ -5708,6 +6044,11 @@ fn render_wire_enum_aliases(plan: &ApiPlan) -> Result<String, ApiPolicyError> {
     Ok(out)
 }
 
+/// Collects one default helper per distinct defaulted descriptor field.
+///
+/// Two fields that share a helper name must share the type and the default. A
+/// `[[default_helper_renames]]` row resolves a collision, and a row that no defaulted field
+/// reaches is `Dead`.
 fn collect_default_helpers(
     descriptors: &[DescriptorPlan],
     policy: &ApiSection,
@@ -5761,6 +6102,10 @@ fn collect_default_helpers(
     Ok(helpers)
 }
 
+/// Renders one public descriptor class.
+///
+/// A defaulted field is optional with its default, a required field is definite, and an
+/// absence-capable enum field is optional without a default. Any other combination is an error.
 fn render_descriptor(out: &mut String, descriptor: &DescriptorPlan) -> Result<(), ApiPolicyError> {
     out.push_str("@Descriptor\n");
     out.push_str(&format!("export class {} {{\n", descriptor.name));
@@ -5786,6 +6131,11 @@ fn render_descriptor(out: &mut String, descriptor: &DescriptorPlan) -> Result<()
     Ok(())
 }
 
+/// Renders the `to<Boundary>` conversion function of one descriptor.
+///
+/// An absence-capable enum field gains a resolver function first. A nullable aggregate and a
+/// required-limits aggregate bind to a local, because each constructor argument is a
+/// conditional expression.
 fn render_descriptor_conversion(
     out: &mut String,
     descriptor: &DescriptorPlan,
@@ -5835,6 +6185,9 @@ fn render_descriptor_conversion(
     Ok(())
 }
 
+/// The expression that reads one field from the public descriptor value.
+///
+/// A defaulted field reads through its default helper, so an absent field still lowers.
 fn descriptor_raw_expression(
     field: &DescriptorFieldPlan,
     descriptor: &DescriptorPlan,
@@ -5855,6 +6208,11 @@ fn descriptor_raw_expression(
     }
 }
 
+/// Renders the boundary constructor call of one descriptor.
+///
+/// The arguments follow the mirror field order exactly. A boundary default supplies its
+/// literal, a nesting row builds its nested class in place, and every other field lowers its
+/// IDL member.
 fn render_descriptor_constructor(
     out: &mut String,
     descriptor: &DescriptorPlan,
@@ -5901,6 +6259,10 @@ fn render_descriptor_constructor(
     Ok(())
 }
 
+/// The lowering expression of one descriptor field, by conversion.
+///
+/// `overrides` carries the conditional expressions that `render_descriptor_conversion` bound to
+/// locals. A conversion that needs one and finds none is a generator defect.
 fn descriptor_field_expression(
     field: &DescriptorFieldPlan,
     descriptor: &DescriptorPlan,
@@ -5960,6 +6322,9 @@ fn descriptor_field_expression(
     })
 }
 
+/// The name of the resolver that lowers one absence-capable enum field.
+///
+/// The name carries the descriptor and the field, so two fields never share a resolver.
 fn optional_enum_helper_name(
     descriptor: &DescriptorPlan,
     field: &DescriptorFieldPlan,
@@ -5972,6 +6337,10 @@ fn optional_enum_helper_name(
     )
 }
 
+/// Renders the shared lowering helpers that descriptor fields need.
+///
+/// Each helper emits once, keyed by its boundary class, so two descriptors that need one helper
+/// share it.
 fn render_descriptor_helpers(out: &mut String, descriptors: &[DescriptorPlan]) {
     let mut emitted = BTreeSet::new();
     for descriptor in descriptors {
@@ -6042,6 +6411,7 @@ fn render_descriptor_helpers(out: &mut String, descriptors: &[DescriptorPlan]) {
     }
 }
 
+/// Renders one IDL namespace as a singleton class with one field per flag constant.
 fn render_namespace(out: &mut String, namespace: &NamespacePlan) {
     out.push_str(&format!("class {}Namespace {{\n", namespace.name));
     for (name, _) in &namespace.constants {
@@ -6059,6 +6429,7 @@ fn render_namespace(out: &mut String, namespace: &NamespacePlan) {
     ));
 }
 
+/// Renders one public class, and the host-owned wrapper beside it when the seam applies (J13).
 fn render_interface(
     out: &mut String,
     interface: &InterfacePlan,
@@ -6078,6 +6449,11 @@ fn render_interface(
     Ok(())
 }
 
+/// Renders one public class: its fields, its constructor, its methods, and its disposal (J7).
+///
+/// `host_owned` emits the wrapper form, which holds its handles privately, drops `destroy`, and
+/// declares no disposal. An attribute with a wrapper result caches that wrapper in a field, so
+/// a property read allocates nothing.
 fn render_interface_class(
     out: &mut String,
     interface: &InterfacePlan,
@@ -6318,6 +6694,8 @@ fn render_interface_class(
             ),
         }
     }
+    // The host-owned wrapper declares no disposal. The host owns the device handle, so the
+    // script must not release it (J13).
     if host_owned {
     } else if interface.host_owned {
         out.push_str(&format!(
@@ -6343,6 +6721,10 @@ fn render_interface_class(
     Ok(())
 }
 
+/// Renders one async method: begin, pump, poll, then take (F6, L8).
+///
+/// The loop suspends the script between pumps. A boolean result reports the status alone. Every
+/// other result drops the future and returns `null` when the status is not success.
 #[allow(clippy::too_many_arguments)]
 fn render_async_method(
     out: &mut String,
@@ -6407,6 +6789,10 @@ fn render_async_method(
     out.push_str("  }\n\n");
 }
 
+/// Renders the mapped-range read and write methods.
+///
+/// The read allocates the byte array first, because the facade fills a caller-owned buffer
+/// (F20).
 fn render_mapped_range_methods(
     out: &mut String,
     interface: &InterfacePlan,
@@ -6436,6 +6822,9 @@ fn render_mapped_range_methods(
     out.push_str("  }\n\n");
 }
 
+/// Renders the typed f32 buffer write (S3).
+///
+/// The offset counts bytes and the data length counts f32 elements.
 fn render_typed_write_f32(out: &mut String, interface: &InterfacePlan, function: &str) {
     out.push_str("  // bufferOffset counts bytes; data length counts f32 elements.\n");
     out.push_str("  writeBufferF32(buffer: GPUBuffer, bufferOffset: u64, data: f32[]): void {\n");
@@ -6446,6 +6835,10 @@ fn render_typed_write_f32(out: &mut String, interface: &InterfacePlan, function:
     out.push_str("  }\n\n");
 }
 
+/// Renders the typed f32 mapped read (S3).
+///
+/// The method allocates the element array first, because the facade fills a caller-owned
+/// buffer. The offset counts bytes and the count counts f32 elements.
 fn render_typed_read_f32(out: &mut String, interface: &InterfacePlan, function: &str) {
     out.push_str("  // offset counts bytes; count counts f32 elements.\n");
     out.push_str("  readMappedRangeF32(offset: u64, count: u64): f32[] {\n");
@@ -6465,6 +6858,10 @@ fn render_typed_read_f32(out: &mut String, interface: &InterfacePlan, function: 
     out.push_str("  }\n\n");
 }
 
+/// Renders the error-scope pop method (G2).
+///
+/// The host-owned form is synchronous, because it holds no suspend point. Both forms construct
+/// the record from its seed values before the take call.
 #[allow(clippy::too_many_arguments)]
 fn render_error_scope_pop_method(
     out: &mut String,
@@ -6513,6 +6910,10 @@ fn render_error_scope_pop_method(
     out.push_str("  }\n\n");
 }
 
+/// Renders one device-event drain method (G3, G4).
+///
+/// `pump` runs process-events first, which the device-lost poll needs. The method constructs
+/// the record from its seed values, then returns `null` when the fill reports no record.
 #[allow(clippy::too_many_arguments)]
 fn render_record_drain_method(
     out: &mut String,
@@ -6541,6 +6942,9 @@ fn render_record_drain_method(
     out.push_str("  }\n\n");
 }
 
+/// Renders one record-fill method (F11 Rev 1).
+///
+/// The success test follows the mirror return: a boolean, or the status value 1.
 #[allow(clippy::too_many_arguments)]
 fn render_result_record_fill_method(
     out: &mut String,
@@ -6575,6 +6979,10 @@ fn render_result_record_fill_method(
     out.push_str("  }\n\n");
 }
 
+/// Renders one synchronous operation method, and its default variant when a row names one.
+///
+/// A nullable descriptor parameter becomes a branch, so the null case passes a null pointer
+/// instead of a converted aggregate.
 #[allow(clippy::too_many_arguments)]
 fn render_operation_method(
     out: &mut String,
@@ -6649,6 +7057,10 @@ fn render_operation_method(
     Ok(())
 }
 
+/// Renders the nested null branches of an operation's nullable descriptor parameters.
+///
+/// The function recurses once per such parameter, so every combination of null and present
+/// reaches its own call. Each parameter's expression must match exactly one call argument.
 #[allow(clippy::too_many_arguments)]
 fn render_operation_nullable_descriptor_branches(
     out: &mut String,
@@ -6729,6 +7141,10 @@ fn render_operation_nullable_descriptor_branches(
     Ok(())
 }
 
+/// Renders the return statement of one operation call.
+///
+/// A wrapper result constructs its class, and passes the instance first when that class needs
+/// it. A `void` call inside a branch also returns, so the branch never falls through.
 fn render_operation_result(
     out: &mut String,
     call: &str,
@@ -6754,6 +7170,7 @@ fn render_operation_result(
     }
 }
 
+/// Renders one parameter declaration, with its default when the plan carries one.
 fn render_method_param(param: &MethodParamPlan) -> String {
     match &param.default {
         Some(default) => format!("{}: {} = {default}", param.name, param.api_type),
@@ -6761,6 +7178,7 @@ fn render_method_param(param: &MethodParamPlan) -> String {
     }
 }
 
+/// The public field that holds one wrapper's boundary handle (J13).
 fn raw_field_for_api(api: &str, policy: &ApiSection) -> String {
     if api == policy.singleton_interface {
         lower_first(&policy.singleton_boundary)
@@ -6777,6 +7195,10 @@ fn lower_first(value: &str) -> String {
     }
 }
 
+/// Builds the `internal:` API error that reports a broken generator invariant.
+///
+/// `site` names the function that found the defect. The error reaches the driver as a policy
+/// error, so no generator path panics.
 fn internal(site: &str, what: impl std::fmt::Display) -> ApiPolicyError {
     ApiPolicyError::Invalid {
         entry: site.to_owned(),

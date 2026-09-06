@@ -9,6 +9,10 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::time::Instant;
 
+/// Times one `mapAsync` wait of a program that exports the four measurement entries.
+///
+/// Returns the program's raw output. The measurement line goes to stderr, so it never reaches a
+/// golden. An output whose last line is not `PASS` returns an error.
 fn measure_map_async(program: &Path) -> Result<Vec<u8>, String> {
     let mut session =
         subscript_typegpu_harness::load_program(program).map_err(|error| error.to_string())?;
@@ -18,6 +22,8 @@ fn measure_map_async(program: &Path) -> Result<Vec<u8>, String> {
     session
         .call_export("prepareMapAsync")
         .map_err(|error| error.to_string())?;
+    // Every request of the preparation completes before the clock starts, so the number covers
+    // the wait alone.
     while session.async_pending() != 0 {
         session.async_step().map_err(|error| error.to_string())?;
     }
@@ -26,6 +32,7 @@ fn measure_map_async(program: &Path) -> Result<Vec<u8>, String> {
         .call_export("measureMapAsync")
         .map_err(|error| error.to_string())?;
     let started = Instant::now();
+    // The step count separates a slow backend from a wait that needs many pumps.
     let mut async_step_calls = 0;
     while session.async_pending() != 0 {
         async_step_calls += 1;
@@ -37,6 +44,7 @@ fn measure_map_async(program: &Path) -> Result<Vec<u8>, String> {
         .call_export("cleanupMapAsync")
         .map_err(|error| error.to_string())?;
     let output = session.take_output();
+    // A program that failed its own checks must not report a time.
     if !output.ends_with(b"PASS\n") {
         return Err(format!(
             "mapAsync measurement program did not pass:\n{}",
@@ -51,6 +59,10 @@ fn measure_map_async(program: &Path) -> Result<Vec<u8>, String> {
     Ok(output)
 }
 
+/// Parses the arguments and runs one program on the named tier.
+///
+/// Returns the program's raw output bytes. A missing argument, an unknown mode, or an extra
+/// argument returns the usage line. The ship tier rejects both extra modes.
 fn run() -> Result<Vec<u8>, String> {
     const USAGE: &str =
         "usage: subscript-typegpu-harness <dev|ship> <program> [--coverage|--measure-map-async]";
@@ -82,6 +94,8 @@ fn run() -> Result<Vec<u8>, String> {
             Err("measurement and coverage modes require the dev tier".to_owned())
         }
         Some("ship") => {
+            // The C link needs the subscript runtime archive, which the variable names for the
+            // code generator.
             let runtime = subscript_typegpu_harness::ensure_runtime_staticlib()?;
             std::env::set_var(subscript_codegen::RUNTIME_STATICLIB_ENV, runtime);
             subscript_typegpu_harness::run_ship(Path::new(&program))
@@ -90,6 +104,9 @@ fn run() -> Result<Vec<u8>, String> {
     }
 }
 
+/// Runs the command on a thread with the compiler's stack and writes the program output to stdout.
+///
+/// Any failure prints one stderr line and returns a failure exit code.
 fn main() -> ExitCode {
     match subscript_typegpu_harness::run_on_compiler_stack(run).and_then(|result| result) {
         Ok(bytes) => match std::io::stdout().write_all(&bytes) {

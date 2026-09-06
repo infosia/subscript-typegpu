@@ -69,6 +69,7 @@ pub(crate) struct RenderPipeline {
     pub(crate) pos: Pos,
 }
 
+/// Builds one author-facing diagnostic that names `rule`, the single rule it enforces (RN16).
 fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -77,6 +78,10 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+/// Builds a diagnostic that names the generator as its source (K15).
+///
+/// The checker already typed the declaration against the library signature, so a shape the
+/// generator cannot read here is a generator defect, never an author mistake.
 fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -85,6 +90,11 @@ fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+/// Returns the vertex kernel's parameter shape of a render declaration function (RN1, RN2).
+///
+/// The tuple is the layout count, the vertex schema's parameter index after the layouts, and the
+/// instance schema's index after the layouts when the form takes one. Every other call gives
+/// `None`. The declaring file identifies the library function, never the name alone.
 fn render_shape(module: &Module, name: &str) -> Option<(usize, usize, Option<usize>)> {
     let declaration = pipeline::function(module, name)?;
     if declaration.params.first()?.pos.file != "typegpu.ts" {
@@ -98,12 +108,28 @@ fn render_shape(module: &Module, name: &str) -> Option<(usize, usize, Option<usi
     })
 }
 
+/// Reports whether `ty` is the library class of this name.
+///
+/// The class must come from `typegpu-types.ts` or `typegpu.ts`, so a program class of the same
+/// name never matches (RN1).
+///
+/// # Errors
+///
+/// If the type names a class the module does not hold, returns an internal diagnostic.
 fn library_named(module: &Module, ty: &Type, name: &str, pos: &Pos) -> Result<bool, Diagnostic> {
     Ok(
         matches!(ty, Type::Class(id) if matches!(crate::class(module, id.0, "render::library_named", pos)?.pos.file.as_str(), "typegpu-types.ts" | "typegpu.ts") && crate::class(module, id.0, "render::library_named", pos)?.name == name),
     )
 }
 
+/// Returns the program's `@CStruct` class that `ty` names.
+///
+/// A library vector or matrix class gives `None`, so a vertex schema and a varyings class are
+/// always the author's own (RN4, RN7).
+///
+/// # Errors
+///
+/// If the type names a class the module does not hold, returns an internal diagnostic.
 fn value_class<'a>(
     module: &'a Module,
     ty: &Type,
@@ -120,6 +146,14 @@ fn value_class<'a>(
     Ok(Some(class))
 }
 
+/// Returns the `GPUVertexFormat` of one vertex attribute type (RN5).
+///
+/// A matrix, a nested schema, a `FixedArray`, `f16`, and `Vec3h` are not vertex attributes and
+/// give `None`, which the caller reports as an RN5 diagnostic.
+///
+/// # Errors
+///
+/// If the type names a class the module does not hold, returns an internal diagnostic.
 fn vertex_format(
     module: &Module,
     ty: &Type,
@@ -157,6 +191,15 @@ fn vertex_format(
     }))
 }
 
+/// Reads one vertex schema into a vertex buffer slot (RN4).
+///
+/// `first_location` is the first shader location of this slot. The instance schema's locations
+/// continue after the vertex schema's, so the caller passes the vertex schema's attribute count.
+///
+/// # Errors
+///
+/// Returns an RN4 diagnostic when the type is not a program `@CStruct` class, and an RN5
+/// diagnostic when a field type is not a vertex attribute.
 fn vertex_buffer(
     module: &Module,
     ty: &Type,
@@ -200,6 +243,15 @@ fn vertex_buffer(
     })
 }
 
+/// Reads the varyings class into its name and its fields (RN7).
+///
+/// The `position` field emits `@builtin(position)` and takes no location, so the other fields
+/// number from 0 in declaration order. An integer field emits `@interpolate(flat)`.
+///
+/// # Errors
+///
+/// Returns an RN7 diagnostic when the type is not a program `@CStruct` class, when it has no
+/// `position: Vec4f` field, or when a field type is outside RN7.
 fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varying>), Diagnostic> {
     let class = value_class(module, ty, pos)?.ok_or_else(|| {
         diagnostic(
@@ -220,6 +272,8 @@ fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varyin
             class.pos.clone(),
         ));
     }
+    // WGSL admits one `@builtin(position)` per entry point, so the `position` field takes no
+    // location and the other fields number from 0 in declaration order (RN7).
     let mut location = 0;
     let mut fields = Vec::new();
     for field in &class.fields {
@@ -253,6 +307,14 @@ fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varyin
     Ok((class.name.clone(), fields))
 }
 
+/// Reports whether `ty` is a legal varying field type (RN7).
+///
+/// The set is `f32`, `i32`, `u32`, and the library `f32`, `i32`, `u32`, and `f16` vectors. A
+/// matrix, a schema class, a `FixedArray`, `boolean`, and scalar `f16` are outside it.
+///
+/// # Errors
+///
+/// If the type names a class the module does not hold, returns an internal diagnostic.
 fn varying_type(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnostic> {
     Ok(match ty {
         Type::F32 | Type::I32 | Type::U32 => true,
@@ -290,6 +352,16 @@ pub(crate) fn type_uses_f16(module: &Module, ty: &Type, pos: &Pos) -> Result<boo
         || matches!(ty, Type::Class(id) if crate::class(module, id.0, "render::type_uses_f16", pos)?.pos.file == "typegpu-types.ts" && matches!(crate::class(module, id.0, "render::type_uses_f16", pos)?.name.as_str(), "Vec2h" | "Vec3h" | "Vec4h")))
 }
 
+/// Reads one string-valued member of a `RenderPipelineSpec` literal (RN12).
+///
+/// A member reaches the HIR as a string literal, an enum member, or an integer over a string
+/// alias, so all three forms resolve to the same text. `required` decides whether an unset member
+/// is a diagnostic or gives `default`.
+///
+/// # Errors
+///
+/// Returns an RN1 diagnostic in four cases. The options are not a descriptor literal. The class
+/// holds no such member. A required member is unset. The value is not a literal.
 fn descriptor_string(
     module: &Module,
     expr: &Expr,
@@ -361,6 +433,16 @@ fn descriptor_string(
     }
 }
 
+/// Reads the `indexFormat` member of a `RenderPipelineSpec` literal (RN18).
+///
+/// The member defaults to `undefined`, which gives `None`, and the generator then emits no
+/// `_INDEX_FORMAT` constant. The runtime traps when a program sets an index buffer on such a
+/// pipeline.
+///
+/// # Errors
+///
+/// Returns an RN18 diagnostic when the options are not a descriptor literal or when the value is
+/// not a literal.
 fn index_format(module: &Module, expr: &Expr) -> Result<Option<String>, Diagnostic> {
     let ExprKind::DescriptorLit { .. } = &expr.kind else {
         return Err(diagnostic(
@@ -412,6 +494,7 @@ fn index_format(module: &Module, expr: &Expr) -> Result<Option<String>, Diagnost
     }
 }
 
+/// Reports whether `expr` holds a render pipeline declaration call anywhere inside it (RN1).
 fn contains_render_call_expr(module: &Module, expr: &Expr) -> bool {
     if matches!(&expr.kind, ExprKind::Call { callee: Callee::Func(name), .. } if render_shape(module, name).is_some())
     {
@@ -460,6 +543,7 @@ fn contains_render_call_expr(module: &Module, expr: &Expr) -> bool {
     }
 }
 
+/// Reports whether `stmt` holds a render pipeline declaration call, nested bodies included.
 fn contains_render_call_stmt(module: &Module, stmt: &Stmt) -> bool {
     match stmt {
         Stmt::Let { init, .. } | Stmt::Expr(init) => contains_render_call_expr(module, init),
@@ -534,6 +618,8 @@ fn contains_render_call_stmt(module: &Module, stmt: &Stmt) -> bool {
 /// class with no `position` field also give one.
 pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
+    // A declaration is a module-level `const`, because the generator reads it at compile time. A
+    // call inside a function body reaches no generated constant (RN1).
     for function in &module.functions {
         if function.pos.file != "typegpu.ts"
             && function
@@ -597,6 +683,8 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             ));
             continue;
         };
+        // Under `renderPipelineL` the layout class is the vertex kernel's first parameter, and it
+        // is group 0 (RN2, TX2).
         let mut layouts = Vec::new();
         if layout_count == 1 {
             match pipeline::layout(
@@ -637,6 +725,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
                 continue;
             }
         };
+        // The instance schema's locations continue after the vertex schema's (RN4).
         let first_location = first.attributes.len() as u32;
         let mut vertex_buffers = vec![first];
         if let Some(instance_index) = instance_index {
@@ -675,6 +764,8 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
                 pipeline::class_name(module, &binding.item_ty)
                     .is_some_and(|name| name == varyings_name)
             });
+        // A varyings class carries `@location` attributes and gets no layout, so one class never
+        // serves as both a varyings class and a vertex schema or a binding item (RN7).
         if overlaps_vertex || overlaps_binding {
             diagnostics.push(diagnostic(
                 "RN7",
@@ -705,6 +796,8 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
                 continue;
             }
         };
+        // The generator emits none of these three. The read rejects a non-literal value here,
+        // and the runtime passes the values into the pipeline descriptor (RN12).
         for (field, default) in [
             ("topology", "triangle-list"),
             ("cullMode", "none"),
@@ -748,6 +841,10 @@ pub(crate) fn schema_names(pipelines: &[RenderPipeline]) -> BTreeSet<String> {
         .collect()
 }
 
+/// Collects the bindings that `expr` reads, as `(group, field name)` pairs.
+///
+/// `layout_params` maps each layout parameter name to its group index, so a field access on a
+/// layout parameter is a binding access (PI6). Any other field access descends without a record.
 fn binding_reads_expr(
     expr: &Expr,
     layout_params: &BTreeMap<String, usize>,
@@ -808,6 +905,7 @@ fn binding_reads_expr(
     }
 }
 
+/// Runs `binding_reads_expr` over every expression the statement holds, nested bodies included.
 fn binding_reads_stmt(
     stmt: &Stmt,
     layout_params: &BTreeMap<String, usize>,
@@ -879,6 +977,15 @@ fn binding_reads_stmt(
     }
 }
 
+/// Returns the bindings that one entry point reaches, as `(group, field name)` pairs (RN9).
+///
+/// An entry point the module does not declare gives an empty set, and emission then reports the
+/// missing kernel.
+///
+/// # Errors
+///
+/// If the kernel has fewer parameters than the declaration has layouts, returns an internal
+/// diagnostic.
 fn stage_bindings(
     module: &Module,
     pipeline: &RenderPipeline,
@@ -935,6 +1042,14 @@ pub(crate) fn binding_visibility(
     ))
 }
 
+/// Returns the RN9 diagnostic of the first binding that neither entry point reaches.
+///
+/// The binding's visibility comes from the stages that read it, so a binding with no reader has no
+/// visibility to emit.
+///
+/// # Errors
+///
+/// Returns the internal diagnostics of `stage_bindings`.
 fn unreached_binding(
     module: &Module,
     pipeline: &RenderPipeline,
@@ -959,6 +1074,10 @@ fn unreached_binding(
     Ok(None)
 }
 
+/// Returns the `(group, field name)` pair that an assignment target names, or `None`.
+///
+/// `res.particles` and `res.particles[i]` both give the binding, because an index expression is a
+/// place inside it (PI6).
 fn binding_key(expr: &Expr, layout_params: &BTreeMap<String, usize>) -> Option<(usize, String)> {
     match &expr.kind {
         ExprKind::Field { obj, name } => {
@@ -972,6 +1091,10 @@ fn binding_key(expr: &Expr, layout_params: &BTreeMap<String, usize>) -> Option<(
     }
 }
 
+/// Collects the bindings that `expr` writes, as `(group, field name)` pairs.
+///
+/// A write is an assignment whose target is a binding place, or a `set` call on one. `set` is the
+/// accessor behind the authored index form (PI5).
 fn written_binding_expr(
     expr: &Expr,
     layout_params: &BTreeMap<String, usize>,
@@ -1040,6 +1163,7 @@ fn written_binding_expr(
     }
 }
 
+/// Runs `written_binding_expr` over every expression the statement holds, nested bodies included.
 fn written_binding_stmt(
     stmt: &Stmt,
     layout_params: &BTreeMap<String, usize>,
@@ -1147,6 +1271,7 @@ pub(crate) fn reject_vertex_storage_writes(
             ))
         })
         .collect::<Result<BTreeMap<_, _>, Diagnostic>>()?;
+    // The walk covers the complete body, so a write in any statement reaches the check (RN16).
     let mut writes = Vec::new();
     for statement in &vertex.body {
         written_binding_stmt(statement, &layout_params, &mut writes);

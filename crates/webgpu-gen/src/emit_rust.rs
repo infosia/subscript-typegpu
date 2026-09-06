@@ -7,24 +7,45 @@ use crate::patterns::{
 use crate::plan::{Chunk, Plan};
 use std::collections::BTreeSet;
 
+/// The module header of `generated.rs` for a plan without device events.
 const MODULE_DOC: &str = "//! GENERATED FILE — DO NOT EDIT.\n//!\n//! `tools/regen.sh` emits this file from the pinned inputs and policy.\n//! The regeneration test compares the committed bytes.\n//!\n//! Async callbacks use AllowProcessEvents and copy borrowed messages.\n//! Backend handle cleanup occurs after each callback returns.\n";
 
+/// The module header of `generated.rs` for a plan that installs the device callbacks (F14).
+///
+/// The pinned header gives the uncaptured-error callback no mode field, so the text names it
+/// apart from the future callbacks (L7).
 const MODULE_DOC_DEVICE_EVENTS: &str = "//! GENERATED FILE — DO NOT EDIT.\n//!\n//! `tools/regen.sh` emits this file from the pinned inputs and policy.\n//! The regeneration test compares the committed bytes.\n//!\n//! Future and lost callbacks use AllowProcessEvents.\n//! The uncaptured-error callback only records copied data.\n//! Backend handle cleanup occurs after each callback returns.\n";
 
+/// The banner above the private webgpu.h declarations.
 const FFI_SEPARATOR: &str = "// ---------------------------------------------------------------------\n// webgpu.h FFI subset (emitted from webgpu.yml for the policy subset;\n// no rust-bindgen). webgpu.h names stay private to this module.\n// ---------------------------------------------------------------------\n";
 
+/// The banner above the public boundary types and the export bodies.
 const SUBSCRIPT_TYPEGPU_SEPARATOR: &str = "// ---------------------------------------------------------------------\n// subscript-typegpu.h surface and panic-free export bodies.\n// ---------------------------------------------------------------------\n";
 
+/// The private `WGPUFuture` declaration. Each async backend call returns one by value.
 const FUTURE_STRUCT: &str = "/// webgpu.h `WGPUFuture { uint64_t id; }`.\n#[repr(C)]\nstruct WGPUFuture {\n    id: u64,\n}\n";
 
+/// One parsed webgpu.h declaration, split into the parts the table, the shim, and the call
+/// each need.
 struct FunctionSignature {
+    /// The webgpu.h symbol name, which is also the table field name.
     name: String,
+    /// The parameter list as `name: type` text, for the shim's own signature.
     params: String,
+    /// The parameter types alone, for the function-pointer type of the table field.
     param_types: String,
+    /// The parameter names alone, for the call the shim makes through the table.
     args: String,
+    /// The return text, empty for a `void` function.
     result: String,
 }
 
+/// Parses the emitted webgpu.h declaration block back into one signature per function.
+///
+/// `declarations` holds the `fn name(a: T) -> R;` lines that the pattern modules produced. A
+/// repeated name keeps its first declaration, because two chunks can name one webgpu.h
+/// function. A malformed declaration returns an `internal:` error, so no defect reaches the
+/// emitted table as a broken field.
 fn function_signatures(
     declarations: &str,
 ) -> Result<Vec<FunctionSignature>, crate::policy::PolicyError> {
@@ -61,6 +82,7 @@ fn function_signatures(
                 )
             })?
             .to_owned();
+        // Two chunks can name one webgpu.h function. The table holds one field per name.
         if !seen.insert(name.clone()) {
             continue;
         }
@@ -84,6 +106,8 @@ fn function_signatures(
             })?
             .trim()
             .to_owned();
+        // The parameter split counts bracket depth, so a comma inside a function-pointer type
+        // or a generic argument never splits a pair.
         let mut pairs = Vec::new();
         let mut start = 0;
         let mut depth = 0_u32;
@@ -153,6 +177,11 @@ fn function_signatures(
     Ok(signatures)
 }
 
+/// Renders `struct WebgpuTable`, its loader, and one module-level shim per function.
+///
+/// The loader resolves every symbol or returns an error, so a partial table never exists (L3).
+/// It also probes the yawgpu marker symbol, which decides whether the instance create sends
+/// the backend-select chain (L4).
 fn render_webgpu_table(declarations: &str) -> Result<String, crate::policy::PolicyError> {
     let signatures = function_signatures(declarations)?;
     let mut out = String::from(
@@ -166,6 +195,8 @@ fn render_webgpu_table(declarations: &str) -> Result<String, crate::policy::Poli
         ));
     }
     out.push_str("}\n\nimpl WebgpuTable {\n    pub(crate) fn load(path: &std::path::Path) -> Result<Self, String> {\n        #[cfg(windows)]\n        // SAFETY: The library stays owned by the returned table.\n        // The Windows flag searches the backend directory for dependent libraries.\n        let library = unsafe {\n            libloading::os::windows::Library::load_with_flags(\n                path,\n                libloading::os::windows::LOAD_WITH_ALTERED_SEARCH_PATH,\n            )\n        }\n        .map(libloading::Library::from);\n        #[cfg(not(windows))]\n        // SAFETY: The library stays owned by the returned table.\n        let library = unsafe { libloading::Library::new(path) };\n        let library = library\n            .map_err(|error| format!(\"load {}: {error}\", path.display()))?;\n        fn symbol<T: Copy>(\n            library: &libloading::Library,\n            path: &std::path::Path,\n            name: &'static [u8],\n        ) -> Result<T, String> {\n            // SAFETY: each call uses the pinned webgpu.h signature for this symbol.\n            unsafe { library.get::<T>(name) }\n                .map(|value| *value)\n                .map_err(|error| {\n                    let name = name.get(..name.len().saturating_sub(1))\n                        .and_then(|bytes| std::str::from_utf8(bytes).ok())\n                        .unwrap_or(\"<invalid>\");\n                    format!(\"missing symbol {name} in {}: {error}\", path.display())\n                })\n        }\n        Ok(Self {\n");
+    // The marker probe belongs inside `load`, above the first symbol resolution. It identifies
+    // a yawgpu library and decides whether the instance create sends the chain (L4).
     out = out.replace(
         "        fn symbol<T: Copy>(",
         "        // SAFETY: the marker is probed but never called.\n\
@@ -183,6 +214,8 @@ fn render_webgpu_table(declarations: &str) -> Result<String, crate::policy::Poli
         ));
     }
     out.push_str("            library,\n            is_yawgpu,\n        })\n    }\n}\n\n");
+    // A shim with no loaded table prints one line and aborts. An abort never unwinds across the
+    // C ABI (L2, L10).
     for signature in &signatures {
         out.push_str(&format!(
             "unsafe fn {name}({params}){result} {{\n    let Some(table) = crate::runtime::table() else {{\n        eprintln!(\"subscript-typegpu: cannot call {name}: set SUBSCRIPT_TYPEGPU_BACKEND_LIB\");\n        std::process::abort();\n    }};\n    // SAFETY: the table stores the pinned signature for this symbol.\n    unsafe {{ (table.{name})({args}) }}\n}}\n\n",
@@ -289,6 +322,8 @@ pub(crate) fn render(
         .chunks
         .iter()
         .any(|chunk| matches!(chunk, Chunk::BytePair(_) | Chunk::WriteTexture(_)));
+    // A shader chunk already declares a concrete `WGPUChainedStruct`, so the opaque block must
+    // not declare the same name a second time.
     let needs_opaque_chain =
         shader_ops.is_empty() && (has_async || plan.structs.iter().any(|shape| shape.extensible));
     let mut all_objects = plan.objects.clone();
@@ -334,6 +369,8 @@ pub(crate) fn render(
         .find(|create| create.returns_object == "instance")
         .and_then(|create| create.dropped_arg.as_ref())
         .map(|(_, descriptor)| descriptor.as_str());
+    // The facade builds the instance descriptor and the adapter options itself, so neither type
+    // stays pointer-only in the opaque block.
     let mut pointer_only = plan.pointer_only.clone();
     if let Some(instance_descriptor) = instance_descriptor {
         pointer_only.retain(|name| name != instance_descriptor);
@@ -425,6 +462,8 @@ pub(crate) fn render(
         out.push_str(&descriptor::rust_conversion(shape)?);
     }
 
+    // This text feeds the function table. An excluded export contributes no declaration, so the
+    // loader resolves no symbol that only that export needed (F22).
     let mut declarations = String::new();
     for create in &plan.creates {
         if !excluded_exports.contains(&create.subscript_typegpu_fn) {
@@ -511,6 +550,8 @@ pub(crate) fn render(
     if !info_ops.is_empty() {
         declarations.push_str(adapter_limits::rust_info_free_extern());
     }
+    // The release declarations follow the reverse object order. The anchor's release already
+    // stands above, with the creates.
     for object in plan
         .objects
         .iter()
@@ -741,6 +782,7 @@ pub(crate) fn render(
             }
         }
     }
+    // The release bodies keep the same reverse order as their declarations.
     for object in plan
         .objects
         .iter()

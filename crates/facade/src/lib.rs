@@ -1,5 +1,7 @@
 //! The generated WebGPU facade.
 
+// T22: library code holds no panic site. An export that cannot return an error clamps or ignores
+// the value and never unwinds. A test module allows the lints again.
 #![deny(
     clippy::unwrap_used,
     clippy::expect_used,

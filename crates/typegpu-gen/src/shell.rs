@@ -38,6 +38,7 @@ pub(crate) struct ShellProgram {
     pub(crate) declarations: Option<Declarations>,
 }
 
+/// Builds one author-facing diagnostic that names `rule`, the single rule it enforces (K28).
 fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -46,6 +47,11 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+/// Reports whether `name` calls the library function `expected` that `typegpu.ts` declares.
+///
+/// The generator recognizes a declaration function by declaring file and name, never by name alone
+/// (RN1). `name` carries the generic arguments, so the comparison drops them first. The declaring
+/// file is the function's own position, or the position of its first parameter.
 fn library_call(module: &Module, name: &str, expected: &str) -> bool {
     crate::base_name(name) == expected
         && module
@@ -61,6 +67,13 @@ fn library_call(module: &Module, name: &str, expected: &str) -> bool {
             })
 }
 
+/// Reads the `body` member of a `WgslShellSpec` descriptor literal (K29).
+///
+/// # Errors
+///
+/// Returns a K29 diagnostic when `expr` is not a descriptor literal, when the literal leaves
+/// `body` unset, or when `body` is not a string literal. The emitter inserts the text unchanged,
+/// so a computed body has no meaning.
 fn descriptor_body(module: &Module, expr: &Expr) -> Result<String, Diagnostic> {
     let ExprKind::DescriptorLit { .. } = &expr.kind else {
         return Err(diagnostic(
@@ -103,6 +116,17 @@ pub(crate) fn is_wgsl_blankspace(ch: char) -> bool {
     )
 }
 
+/// Runs the lexical fence over one author-WGSL text and returns its tokens (K30).
+///
+/// An identifier token is one token. Every other character is its own token, which lets the caller
+/// read the `@group` and `var<` pairs. The fence is lexical and nothing more: `naga` validates the
+/// composed module (K15).
+///
+/// # Errors
+///
+/// Returns a K30 diagnostic for an unclosed comment, unbalanced braces, a forbidden identifier,
+/// and a forbidden pair. A `var<` declaration or a `@group` attribute places a binding that the
+/// generated declarations already own.
 fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
     let bytes = text.as_bytes();
     let mut out = Vec::new();
@@ -189,6 +213,8 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
             pos.clone(),
         ));
     }
+    // A shell is a helper, and a barrier is legal in the kernel body alone (K22). A barrier token
+    // inside author WGSL reaches the emitted module without that analysis.
     for token in &out {
         if matches!(
             token.as_str(),
@@ -201,6 +227,8 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
             ));
         }
     }
+    // The bindings belong to the layout classes, and the emitter numbers them (PI3). Author WGSL
+    // that declares a module variable or an explicit group collides with that numbering.
     for (first, second) in out.iter().zip(out.iter().skip(1)) {
         if (*first == "@" && matches!(second.as_str(), "group" | "binding"))
             || (*first == "var" && *second == "<")
@@ -218,6 +246,10 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
     Ok(out)
 }
 
+/// Returns the names that a raw declaration text declares (K30).
+///
+/// A name is the token after `const`, `fn`, `struct`, or `alias`. The caller rejects a name that
+/// repeats a generated declaration.
 fn declaration_names(tokens: &[String]) -> BTreeSet<String> {
     tokens
         .iter()
@@ -227,6 +259,10 @@ fn declaration_names(tokens: &[String]) -> BTreeSet<String> {
         .collect()
 }
 
+/// Finds a `wgslShell` or `wgslDeclarations` call inside `expr` and records a diagnostic for it.
+///
+/// `location` names the forbidden place in the message. Both calls are module-level declarations,
+/// so a call anywhere else is a K29 or a K30 violation. The walk descends every sub-expression.
 fn visit_expr(module: &Module, expr: &Expr, diagnostics: &mut Vec<Diagnostic>, location: &str) {
     match &expr.kind {
         ExprKind::Call { callee, args } => {
@@ -292,6 +328,7 @@ fn visit_expr(module: &Module, expr: &Expr, diagnostics: &mut Vec<Diagnostic>, l
     }
 }
 
+/// Runs `visit_expr` over every expression the statements hold, nested bodies included.
 fn visit_statements(
     module: &Module,
     statements: &[Stmt],
@@ -366,6 +403,8 @@ fn visit_statements(
 /// `wgslDeclarations` call also give one.
 pub(crate) fn discover(module: &Module) -> Result<ShellProgram, Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
+    // First pass: reject a call in a place the rules forbid. The library's own file declares the
+    // two functions, so its bodies stay unvisited.
     for function in &module.functions {
         if function.pos.file != "typegpu.ts" {
             visit_statements(
@@ -376,6 +415,8 @@ pub(crate) fn discover(module: &Module) -> Result<ShellProgram, Vec<Diagnostic>>
             );
         }
     }
+    // A global whose initializer is the call itself is the legal form, so the walk skips it. Any
+    // deeper call, such as one inside an argument, reaches the walk and gets its diagnostic.
     for global in &module.globals {
         let direct_shell = matches!(
             &global.init.kind,
@@ -413,6 +454,8 @@ pub(crate) fn discover(module: &Module) -> Result<ShellProgram, Vec<Diagnostic>>
             );
         }
     }
+    // Second pass: read the legal declarations. The shells keep declaration order, which the
+    // emitter writes them in (K14).
     let mut shells = Vec::new();
     for global in &module.globals {
         let ExprKind::Call {
@@ -476,6 +519,8 @@ pub(crate) fn discover(module: &Module) -> Result<ShellProgram, Vec<Diagnostic>>
         if !library_call(module, callee, "wgslDeclarations") {
             continue;
         }
+        // The text precedes the generated declarations of every module of the program, so a second
+        // call has no defined place (K30).
         if declarations.is_some() {
             diagnostics.push(diagnostic(
                 "K30",
