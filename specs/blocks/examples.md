@@ -25,14 +25,22 @@ plan's P10 list.
   (`Ported from microui's demo
   (https://github.com/rxi/microui/blob/<commit>/demo/main.c).`). The
   header form is the `// example: <name>` line form every example
-  uses, with the citation last. Comments
-  through the file explain what the code does, and, where the shape
-  differs from TypeGPU, one comment states the difference in one or
-  two sentences at the point of divergence. A comment never
-  explains subscript syntax, never repeats the code in words, and
-  never exceeds three lines. The header block is exempt from the
-  line cap: it carries the name, the purpose, the reductions, and
-  the citation (Rev 1).
+  uses, with the citation last. Rev 3: the examples are the
+  tutorial, so comments inside functions explain each step for a
+  reader who knows TypeGPU and reads the example instead of a guide.
+  A step comment states what the step does, why it is here, and the
+  fact the code does not show: a unit, an owner of a handle, an order
+  the GPU needs, the reason for a constant. Density follows the
+  lesson: every logical section of a function carries a comment
+  (resource creation, the layout and pipeline declarations, the
+  per-frame flow, readback, disposal), and a line whose meaning is
+  plain carries none. Where the shape differs from TypeGPU, the
+  comment at that point states the difference in one or two
+  sentences. A comment never explains subscript syntax, never repeats
+  the code in words, never exceeds three lines, and follows the
+  Simplified Technical English rules of CLAUDE.md. The header block
+  is exempt from the line cap: it carries the name, the purpose, the
+  reductions, and the citation (Rev 1).
 - **EX3 — Examples use the public layers only.** The API layer, the
   TypeGPU layer, and `typegpu-types`. No facade name, no mirror
   name, no `Context.suspend` (the layers own the polling). The
