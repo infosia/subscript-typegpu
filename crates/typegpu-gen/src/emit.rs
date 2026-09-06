@@ -227,7 +227,8 @@ fn emit_nested_offsets(
     base_offset: u32,
     members: &[Member],
     layout: &layout::Layout,
-) {
+    pos: &Pos,
+) -> Result<(), Diagnostic> {
     for (member, member_layout) in members.iter().zip(&layout.members) {
         let path = if prefix.is_empty() {
             member.name.clone()
@@ -238,13 +239,15 @@ fn emit_nested_offsets(
         out.push_str(&format!(
             "export const {schema_name}_OFFSET_{path}: u32 = {offset};\n"
         ));
+        // Every array member layout contains its element stride.
         if matches!(member.ty, TypeTree::Array(_, _)) {
             out.push_str(&format!(
                 "export const {schema_name}_STRIDE_{path}: u32 = {};\n",
-                member_layout
-                    .layout
-                    .stride
-                    .expect("array layout has a stride")
+                member_layout.layout.stride.ok_or_else(|| crate::internal(
+                    "emit::emit_nested_offsets",
+                    "array layout has no stride",
+                    pos
+                ))?
             ));
         }
         if let TypeTree::Struct(nested) = &member.ty {
@@ -255,9 +258,12 @@ fn emit_nested_offsets(
                 offset,
                 &nested.members,
                 &member_layout.layout,
-            );
+                pos,
+            )?;
         }
     }
+
+    Ok(())
 }
 
 fn binding_size(
@@ -271,7 +277,7 @@ fn binding_size(
         Type::I32 => Some(TypeTree::Scalar(Scalar::I32)),
         Type::U32 => Some(TypeTree::Scalar(Scalar::U32)),
         Type::Class(id) => {
-            let class = &module.classes[id.0];
+            let class = crate::class(module, id.0, "emit::binding_size", pos)?;
             schemas
                 .iter()
                 .find(|schema| schema.name == class.name)
@@ -399,7 +405,15 @@ pub(crate) fn support_module(
         let TypeTree::Struct(structure) = &schema.tree else {
             continue;
         };
-        emit_nested_offsets(&mut out, &schema.name, "", 0, &structure.members, &layout);
+        emit_nested_offsets(
+            &mut out,
+            &schema.name,
+            "",
+            0,
+            &structure.members,
+            &layout,
+            &schema.pos,
+        )?;
         let text = wgsl
             .iter()
             .find(|(name, _)| name == &schema.name)
@@ -476,7 +490,7 @@ pub(crate) fn support_module(
                     pipeline,
                     layout.group as usize,
                     &binding.name,
-                );
+                )?;
                 let visibility = match (vertex, fragment) {
                     (true, true) => "VERTEX_VISIBILITY + FRAGMENT_VISIBILITY",
                     (true, false) => "VERTEX_VISIBILITY",

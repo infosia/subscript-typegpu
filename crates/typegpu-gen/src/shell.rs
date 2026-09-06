@@ -69,7 +69,7 @@ fn descriptor_body(module: &Module, expr: &Expr) -> Result<String, Diagnostic> {
             expr.pos.clone(),
         ));
     };
-    let Some(field) = crate::descriptor_field(module, expr, "body") else {
+    let Some(field) = crate::descriptor_field(module, expr, "body")? else {
         return Err(diagnostic(
             "K29",
             "WgslShellSpec has no body field",
@@ -108,19 +108,21 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
     let mut out = Vec::new();
     let mut index = 0;
     let mut braces = 0_i32;
-    while index < bytes.len() {
-        let byte = bytes[index];
-        let ch = text[index..]
+    // Tokens end at character boundaries. Comments end at ASCII delimiters or the end of text.
+    while let Some(&byte) = bytes.get(index) {
+        let ch = text
+            .get(index..)
+            .ok_or_else(|| crate::internal("shell::tokens", "invalid character boundary", pos))?
             .chars()
             .next()
-            .expect("token index is a character boundary");
+            .ok_or_else(|| crate::internal("shell::tokens", "missing character", pos))?;
         if is_wgsl_blankspace(ch) {
             index += ch.len_utf8();
             continue;
         }
         if byte == b'/' && bytes.get(index + 1) == Some(&b'/') {
             index += 2;
-            while index < bytes.len() && bytes[index] != b'\n' {
+            while bytes.get(index).is_some_and(|byte| *byte != b'\n') {
                 index += 1;
             }
             continue;
@@ -129,10 +131,10 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
             index += 2;
             let mut depth = 1_u32;
             while index < bytes.len() && depth > 0 {
-                if bytes[index] == b'/' && bytes.get(index + 1) == Some(&b'*') {
+                if bytes.get(index) == Some(&b'/') && bytes.get(index + 1) == Some(&b'*') {
                     depth += 1;
                     index += 2;
-                } else if bytes[index] == b'*' && bytes.get(index + 1) == Some(&b'/') {
+                } else if bytes.get(index) == Some(&b'*') && bytes.get(index + 1) == Some(&b'/') {
                     depth -= 1;
                     index += 2;
                 } else {
@@ -151,12 +153,17 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
         if byte.is_ascii_alphabetic() || byte == b'_' {
             let start = index;
             index += 1;
-            while index < bytes.len()
-                && (bytes[index].is_ascii_alphanumeric() || bytes[index] == b'_')
+            while bytes
+                .get(index)
+                .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
             {
                 index += 1;
             }
-            out.push(text[start..index].to_owned());
+            out.push(
+                text.get(start..index)
+                    .ok_or_else(|| crate::internal("shell::tokens", "invalid token range", pos))?
+                    .to_owned(),
+            );
             continue;
         }
         let token = ch.to_string();
@@ -194,15 +201,15 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
             ));
         }
     }
-    for pair in out.windows(2) {
-        if (pair[0] == "@" && matches!(pair[1].as_str(), "group" | "binding"))
-            || (pair[0] == "var" && pair[1] == "<")
+    for (first, second) in out.iter().zip(out.iter().skip(1)) {
+        if (*first == "@" && matches!(second.as_str(), "group" | "binding"))
+            || (*first == "var" && *second == "<")
         {
             return Err(diagnostic(
                 "K30",
                 format!(
                     "WGSL text contains forbidden token sequence `{}{}`",
-                    pair[0], pair[1]
+                    *first, *second
                 ),
                 pos.clone(),
             ));
@@ -213,9 +220,10 @@ fn tokens(text: &str, pos: &Pos) -> Result<Vec<String>, Diagnostic> {
 
 fn declaration_names(tokens: &[String]) -> BTreeSet<String> {
     tokens
-        .windows(2)
-        .filter(|pair| matches!(pair[0].as_str(), "const" | "fn" | "struct" | "alias"))
-        .map(|pair| pair[1].clone())
+        .iter()
+        .zip(tokens.iter().skip(1))
+        .filter(|(first, _)| matches!(first.as_str(), "const" | "fn" | "struct" | "alias"))
+        .map(|(_, second)| second.clone())
         .collect()
 }
 
@@ -614,6 +622,15 @@ pub(crate) fn validate_signature<'a>(
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::indexing_slicing
+    )]
     use super::tokens;
     use subscript_compiler::Pos;
 

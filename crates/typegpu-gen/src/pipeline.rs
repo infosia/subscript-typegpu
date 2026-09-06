@@ -239,13 +239,50 @@ pub(crate) fn class_name<'a>(module: &'a Module, ty: &Type) -> Option<&'a str> {
 }
 
 /// Renders one type the way the checker prints it, for a diagnostic message.
-pub(crate) fn type_name(module: &Module, ty: &Type) -> String {
-    subscript_compiler::types::display_type(
+pub(crate) fn type_name(module: &Module, ty: &Type, pos: &Pos) -> Result<String, Diagnostic> {
+    // Type display requires infallible callbacks. A missing name invalidates the complete result.
+    let error = std::cell::RefCell::new(None);
+    let name = |value: Option<&str>, table: &str, index: usize| {
+        value.map(str::to_owned).unwrap_or_else(|| {
+            *error.borrow_mut() = Some(crate::internal(
+                "pipeline::type_name",
+                format!("missing {table} {index}"),
+                pos,
+            ));
+            String::new()
+        })
+    };
+    let text = subscript_compiler::types::display_type(
         ty,
-        &|id| module.classes[id.0].name.clone(),
-        &|id| module.enums[id.0].name.clone(),
-        &|id| module.string_aliases[id.0].name.clone(),
-    )
+        &|id| {
+            name(
+                module.classes.get(id.0).map(|item| item.name.as_str()),
+                "class",
+                id.0,
+            )
+        },
+        &|id| {
+            name(
+                module.enums.get(id.0).map(|item| item.name.as_str()),
+                "enum",
+                id.0,
+            )
+        },
+        &|id| {
+            name(
+                module
+                    .string_aliases
+                    .get(id.0)
+                    .map(|item| item.name.as_str()),
+                "string alias",
+                id.0,
+            )
+        },
+    );
+    match error.into_inner() {
+        Some(error) => Err(error),
+        None => Ok(text),
+    }
 }
 
 /// Returns the class definition when the type is a class that `typegpu.ts` declares.
@@ -381,18 +418,18 @@ fn wrapper(
     Ok(Some((kind, (**item).clone())))
 }
 
-fn allowed_binding_item(module: &Module, ty: &Type) -> bool {
-    match ty {
+fn allowed_binding_item(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnostic> {
+    Ok(match ty {
         Type::F32 | Type::I32 | Type::U32 => true,
         Type::Class(id) => {
-            let class = &module.classes[id.0];
+            let class = crate::class(module, id.0, "pipeline::allowed_binding_item", pos)?;
             class.is_value
                 && (class.pos.file != "typegpu.ts")
                 && (class.pos.file != "webgpu.ts")
-                && !crate::schema::is_bool_vector(module, ty)
+                && !crate::schema::is_bool_vector(module, ty, pos)?
         }
         _ => false,
-    }
+    })
 }
 
 /// Reads one layout class into its bindings (PI3).
@@ -403,7 +440,12 @@ fn allowed_binding_item(module: &Module, ty: &Type) -> bool {
 ///
 /// A class that is not a plain class of binding wrappers gives a PI3 diagnostic. A class with no
 /// field gives a TX2 diagnostic. A buffer item type outside PI5 gives a PI5 diagnostic.
-pub(crate) fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, Diagnostic> {
+pub(crate) fn layout(
+    module: &Module,
+    ty: &Type,
+    group: u32,
+    pos: &Pos,
+) -> Result<Layout, Diagnostic> {
     let Type::Class(id) = ty else {
         return Err(diagnostic(
             "PI3",
@@ -411,7 +453,7 @@ pub(crate) fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, D
             Pos::new("", 1, 1),
         ));
     };
-    let class = &module.classes[id.0];
+    let class = crate::class(module, id.0, "pipeline::layout", pos)?;
     if class.is_value || class.is_descriptor || class.pos.file == "typegpu.ts" {
         return Err(diagnostic(
             "PI3",
@@ -445,7 +487,7 @@ pub(crate) fn layout(module: &Module, ty: &Type, group: u32) -> Result<Layout, D
                 field.pos.clone(),
             ));
         };
-        if kind.is_buffer() && !allowed_binding_item(module, &item_ty) {
+        if kind.is_buffer() && !allowed_binding_item(module, &item_ty, &field.pos)? {
             return Err(diagnostic(
                 "PI5",
                 format!(
@@ -485,7 +527,7 @@ fn workgroup(module: &Module, expr: &Expr) -> Result<[u32; 3], Diagnostic> {
             expr.pos.clone(),
         ));
     };
-    let Some(field) = crate::descriptor_field(module, expr, "workgroupSize") else {
+    let Some(field) = crate::descriptor_field(module, expr, "workgroupSize")? else {
         return Err(diagnostic(
             "PI1",
             "pipeline options omit workgroupSize",
@@ -506,32 +548,32 @@ fn workgroup(module: &Module, expr: &Expr) -> Result<[u32; 3], Diagnostic> {
             value.pos.clone(),
         ));
     };
-    if values.len() != 3 {
+    let [x_value, y_value, z_value] = values.as_slice() else {
         return Err(diagnostic(
             "PI1",
             "pipeline workgroup size requires three literals",
             value.pos.clone(),
         ));
-    }
-    let Some(x) = literal_u32(&values[0]) else {
+    };
+    let Some(x) = literal_u32(x_value) else {
         return Err(diagnostic(
             "PI1",
             "pipeline workgroup size is not literal",
-            values[0].pos.clone(),
+            x_value.pos.clone(),
         ));
     };
-    let Some(y) = literal_u32(&values[1]) else {
+    let Some(y) = literal_u32(y_value) else {
         return Err(diagnostic(
             "PI1",
             "pipeline workgroup size is not literal",
-            values[1].pos.clone(),
+            y_value.pos.clone(),
         ));
     };
-    let Some(z) = literal_u32(&values[2]) else {
+    let Some(z) = literal_u32(z_value) else {
         return Err(diagnostic(
             "PI1",
             "pipeline workgroup size is not literal",
-            values[2].pos.clone(),
+            z_value.pos.clone(),
         ));
     };
     if x == 0 || y == 0 || z == 0 {
@@ -556,7 +598,7 @@ fn validate_pipeline_name(
             expr.pos.clone(),
         ));
     };
-    let Some(field) = crate::descriptor_field(module, expr, "name") else {
+    let Some(field) = crate::descriptor_field(module, expr, "name")? else {
         return Err(generator_diagnostic(
             "library ComputePipelineSpec lost its name field",
             expr.pos.clone(),
@@ -594,7 +636,7 @@ fn guarded_option(module: &Module, expr: &Expr) -> Result<bool, Diagnostic> {
             expr.pos.clone(),
         ));
     };
-    let Some(field) = crate::descriptor_field(module, expr, "guarded") else {
+    let Some(field) = crate::descriptor_field(module, expr, "guarded")? else {
         return Err(generator_diagnostic(
             "library ComputePipelineSpec lost its guarded field",
             expr.pos.clone(),
@@ -785,19 +827,27 @@ pub(crate) fn discover(
             continue;
         }
         let mut layouts = Vec::new();
-        for (group, param) in kernel.params[..arity].iter().enumerate() {
-            match layout(module, &param.ty, group as u32) {
+        for (group, param) in kernel.params.iter().take(arity).enumerate() {
+            match layout(module, &param.ty, group as u32, &param.pos) {
                 Ok(layout) => layouts.push(layout),
                 Err(error) => diagnostics.push(error),
             }
         }
-        let invocation_ok = class_name(module, &kernel.params[arity].ty)
+        // The parameter count check includes the invocation after all layouts.
+        let invocation = kernel.params.get(arity).ok_or_else(|| {
+            vec![crate::internal(
+                "pipeline::discover",
+                "missing invocation parameter",
+                &kernel.pos,
+            )]
+        })?;
+        let invocation_ok = class_name(module, &invocation.ty)
             .is_some_and(|name| name == "ComputeInvocation")
-            && library_class(module, &kernel.params[arity].ty).is_some();
+            && library_class(module, &invocation.ty).is_some();
         if !invocation_ok {
             diagnostics.push(generator_diagnostic(
                 format!("kernel `{entry}` lost its ComputeInvocation parameter"),
-                kernel.params[arity].pos.clone(),
+                invocation.pos.clone(),
             ));
             continue;
         }

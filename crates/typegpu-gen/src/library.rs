@@ -74,10 +74,10 @@ pub fn load_library_files(
 ) -> Result<Vec<SourceFile>, LibraryLoadError> {
     let mut files: [Option<SourceFile>; LIBRARY_ORDER.len()] = std::array::from_fn(|_| None);
     let mut pending = vec![program.clone()];
-    for (index, name) in LIBRARY_ORDER.iter().take(CORE_COUNT).enumerate() {
+    for (slot, name) in files.iter_mut().zip(LIBRARY_ORDER).take(CORE_COUNT) {
         let file = read_library_file(directory, name).map_err(LibraryLoadError::Read)?;
         pending.push(file.clone());
-        files[index] = Some(file);
+        *slot = Some(file);
     }
     while let Some(file) = pending.pop() {
         let imports =
@@ -89,17 +89,18 @@ pub fn load_library_files(
             let Some(module) = specifier.strip_prefix("./") else {
                 continue;
             };
-            let Some(index) = LIBRARY_ORDER
-                .iter()
-                .position(|name| name.strip_suffix(".ts") == Some(module))
+            let Some((slot, name)) = files
+                .iter_mut()
+                .zip(LIBRARY_ORDER)
+                .find(|(_, name)| name.strip_suffix(".ts") == Some(module))
             else {
                 continue;
             };
-            if files[index].is_none() {
-                let dependency = read_library_file(directory, LIBRARY_ORDER[index])
-                    .map_err(LibraryLoadError::Read)?;
+            if slot.is_none() {
+                let dependency =
+                    read_library_file(directory, name).map_err(LibraryLoadError::Read)?;
                 pending.push(dependency.clone());
-                files[index] = Some(dependency);
+                *slot = Some(dependency);
             }
         }
     }

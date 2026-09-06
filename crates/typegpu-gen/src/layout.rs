@@ -271,6 +271,15 @@ pub fn c_layout(tree: &TypeTree) -> Layout {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::indexing_slicing
+    )]
     use super::*;
 
     fn vector(scalar: Scalar, lanes: u8, c_alignment: u32) -> TypeTree {

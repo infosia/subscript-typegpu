@@ -58,10 +58,11 @@ pub fn generate_ui_atlas(root: &Path) -> Result<String, String> {
     }
     bytes.resize(128 * 128, 0);
     let mut rects = [None; 100];
-    for line in initializer(&source, "atlas[]")?
+    for (line_index, line) in initializer(&source, "atlas[]")?
         .lines()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
+        .enumerate()
+        .map(|(index, line)| (index, line.trim()))
+        .filter(|(_, line)| !line.is_empty())
     {
         let (key, values) = line.split_once(']').ok_or("invalid atlas rect key")?;
         let key = key.trim_start_matches('[').trim();
@@ -102,7 +103,24 @@ pub fn generate_ui_atlas(root: &Path) -> Result<String, String> {
         let rect: [i32; 4] = values
             .try_into()
             .map_err(|_| "atlas rect needs four values")?;
-        if rects[index].replace(rect).is_some() {
+        // Icon indices are 0 through 4. Valid glyph indices are 5 through 99.
+        if rects
+            .get_mut(index)
+            .ok_or_else(|| {
+                crate::internal(
+                    "ui_atlas::generate_ui_atlas",
+                    format!("missing rect {index}"),
+                    &subscript_compiler::Pos::new(
+                        "third_party/microui/demo/atlas.inl",
+                        line_index as u32 + 1,
+                        1,
+                    ),
+                )
+                .message
+            })?
+            .replace(rect)
+            .is_some()
+        {
             return Err(format!("duplicate atlas rect {key}"));
         }
     }
@@ -120,12 +138,17 @@ pub fn generate_ui_atlas(root: &Path) -> Result<String, String> {
         .collect::<Vec<_>>()
         .join(",\n");
     let mut output = format!("// Generated from third_party/microui/demo/atlas.inl.\n// Source commit: {commit}.\n\nexport const UI_ATLAS_WIDTH: i32 = 128;\nexport const UI_ATLAS_HEIGHT: i32 = 128;\nexport const UI_ATLAS_ALPHA_CHUNK: i32 = {ALPHA_CHUNK};\nexport const UI_ATLAS_ALPHA_HEX: string[] = [\n{chunks}\n];\nexport const UI_ATLAS_WHITE: i32 = 4;\nexport const UI_ATLAS_FONT: i32 = -27;\nexport const UI_TEXT_HEIGHT: i32 = 18;\n");
-    for (column, name) in ["X", "Y", "W", "H"].iter().enumerate() {
-        let values = rects
-            .iter()
-            .map(|rect| rect[column].to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
+    let columns = rects.iter().fold(
+        [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
+        |mut columns, rect| {
+            for (column, value) in columns.iter_mut().zip(rect) {
+                column.push(value.to_string());
+            }
+            columns
+        },
+    );
+    for (values, name) in columns.iter().zip(["X", "Y", "W", "H"]) {
+        let values = values.join(", ");
         output.push_str(&format!(
             "export const UI_ATLAS_RECT_{name}: i32[] = [{values}];\n"
         ));

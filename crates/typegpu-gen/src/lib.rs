@@ -1,5 +1,15 @@
 //! Typed schema layout and WGSL support generation.
 
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::indexing_slicing
+)]
+
 mod emit;
 mod kernel;
 pub mod layout;
@@ -53,15 +63,17 @@ pub(crate) fn descriptor_field<'a>(
     module: &Module,
     expr: &'a Expr,
     field_name: &str,
-) -> Option<Option<&'a Expr>> {
+) -> Result<Option<Option<&'a Expr>>, Diagnostic> {
     let ExprKind::DescriptorLit { class, fields } = &expr.kind else {
-        return None;
+        return Ok(None);
     };
-    module.classes[class.0]
-        .fields
-        .iter()
-        .position(|field| field.name == field_name)
-        .map(|index| fields.get(index).and_then(Option::as_ref))
+    Ok(
+        crate::class(module, class.0, "descriptor_field", &expr.pos)?
+            .fields
+            .iter()
+            .position(|field| field.name == field_name)
+            .map(|index| fields.get(index).and_then(Option::as_ref)),
+    )
 }
 
 /// The generated layouts for one schema.
@@ -126,6 +138,27 @@ struct SupportImport {
     pos: Pos,
 }
 
+pub(crate) fn internal(site: &str, what: impl std::fmt::Display, pos: &Pos) -> Diagnostic {
+    Diagnostic::new(
+        RuleCode::S100,
+        format!("internal: {site}: {what}"),
+        pos.clone(),
+    )
+}
+
+pub(crate) fn class<'a>(
+    module: &'a Module,
+    index: usize,
+    site: &str,
+    pos: &Pos,
+) -> Result<&'a subscript_compiler::hir::ClassDef, Diagnostic> {
+    // The checker assigns each class id to an entry in this module.
+    module
+        .classes
+        .get(index)
+        .ok_or_else(|| internal(site, format!("missing class {index}"), pos))
+}
+
 fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     Diagnostic::new(
         RuleCode::S100,
@@ -149,11 +182,11 @@ fn discovery_options(files: &[SourceFile]) -> Result<CheckOptions, Vec<Diagnosti
         };
         modules.push((file.name.as_str(), format!("./{stem}.typegpu")));
     }
-    if modules.len() > 1 {
+    if let Some((file, _)) = modules.get(1) {
         return Err(vec![diagnostic(
             "SC1",
             "one generator run received more than one program file",
-            Pos::new(modules[1].0, 1, 1),
+            Pos::new(*file, 1, 1),
         )]);
     }
     let mut options = CheckOptions::default();
@@ -174,10 +207,10 @@ fn support_import(
                 .collect(),
             pos: support.pos.clone(),
         })),
-        supports => Err(vec![diagnostic(
+        [_, second, ..] => Err(vec![diagnostic(
             "SC1",
             "one generator run found more than one support-module import",
-            supports[1].pos.clone(),
+            second.pos.clone(),
         )]),
     }
 }
@@ -507,4 +540,59 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         compute_pipelines,
         wgsl_spans,
     })
+}
+
+pub(crate) trait TryAny: Iterator + Sized {
+    fn try_any(
+        mut self,
+        mut predicate: impl FnMut(Self::Item) -> Result<bool, Diagnostic>,
+    ) -> Result<bool, Diagnostic> {
+        for item in &mut self {
+            if predicate(item)? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+}
+impl<I: Iterator> TryAny for I {}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::indexing_slicing
+    )]
+
+    use super::*;
+    use subscript_compiler::types::ClassId;
+    use subscript_compiler::Type;
+
+    #[test]
+    fn missing_hir_class_returns_internal_diagnostics() {
+        let module = subscript_compiler::check_program(&[SourceFile::new("empty.ts", "")])
+            .expect("empty module");
+        let pos = Pos::new("broken.ts", 7, 11);
+        let ty = Type::Class(ClassId(module.classes.len()));
+        let errors = [
+            class(&module, module.classes.len(), "test lookup", &pos).unwrap_err(),
+            kernel::wgsl_type(&module, &ty, &pos).unwrap_err(),
+            pipeline::type_name(&module, &ty, &pos).unwrap_err(),
+            pipeline::layout(&module, &ty, 0, &pos).unwrap_err(),
+            render::type_uses_f16(&module, &ty, &pos).unwrap_err(),
+            schema::is_bool_vector(&module, &ty, &pos).unwrap_err(),
+        ];
+        for error in errors {
+            assert_eq!(error.code, RuleCode::S100);
+            assert!(error.message.starts_with("internal:"));
+            assert!(!error.message.contains("(author)"));
+            assert!(!error.message.contains("(generator)"));
+            assert_eq!(error.pos, pos);
+        }
+    }
 }

@@ -56,6 +56,16 @@ fn fixture_rules(root: &Path) -> BTreeSet<String> {
                 continue;
             }
             let source = read(&path);
+            for line in source
+                .lines()
+                .filter(|line| line.starts_with("// expected-"))
+            {
+                assert!(
+                    !line.contains("internal:"),
+                    "{} expects an internal diagnostic",
+                    path.display()
+                );
+            }
             let mut named = false;
             for rule in source
                 .lines()
@@ -134,6 +144,10 @@ fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
                 continue;
             }
             if line.contains("Diagnostic::new(") {
+                let tail = lines[line_index..lines.len().min(line_index + 8)].join("\n");
+                if quoted_argument(&tail).is_some_and(|message| message.starts_with("internal:")) {
+                    continue;
+                }
                 let preceding = lines[..line_index].iter().rev().take(3);
                 assert!(
                     preceding.into_iter().any(|line| {

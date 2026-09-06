@@ -713,6 +713,15 @@ pub(crate) fn free_function(name: &str) -> Option<&'static str> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::indexing_slicing
+    )]
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 

@@ -31,10 +31,10 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
 /// Reports whether the type is a `Vec2b`, `Vec3b`, or `Vec4b` of `typegpu-types.ts` (K26).
 ///
 /// WGSL gives `bool` no host-shareable layout, so a bool vector is never a schema field.
-pub(crate) fn is_bool_vector(module: &Module, ty: &Type) -> bool {
-    matches!(ty, Type::Class(id)
-        if module.classes[id.0].pos.file == "typegpu-types.ts"
-            && matches!(module.classes[id.0].name.as_str(), "Vec2b" | "Vec3b" | "Vec4b"))
+pub(crate) fn is_bool_vector(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnostic> {
+    Ok(matches!(ty, Type::Class(id)
+        if crate::class(module, id.0, "schema::is_bool_vector", pos)?.pos.file == "typegpu-types.ts"
+            && matches!(crate::class(module, id.0, "schema::is_bool_vector", pos)?.name.as_str(), "Vec2b" | "Vec3b" | "Vec4b")))
 }
 
 fn is_indirect_schema(class: &ClassDef) -> bool {
@@ -145,33 +145,32 @@ impl Walker<'_> {
                 Box::new(self.type_tree(element, field_name, pos)?),
                 *length,
             )),
-            Type::Class(id) if is_bool_vector(self.module, ty) => Err(diagnostic(
+            Type::Class(id) if is_bool_vector(self.module, ty, pos)? => Err(diagnostic(
                 "SC5",
                 format!(
                     "field `{field_name}` has non-host-shareable boolean vector type `{}`",
-                    self.module.classes[id.0].name
+                    crate::class(self.module, id.0, "schema::type_tree", pos)?.name
                 ),
                 pos.clone(),
             )),
-            Type::Class(id) if self.module.classes[id.0].is_value => self.class_tree(id.0),
+            Type::Class(id)
+                if crate::class(self.module, id.0, "schema::type_tree", pos)?.is_value =>
+            {
+                self.class_tree(id.0, pos)
+            }
             other => Err(diagnostic(
                 "SC3",
                 format!(
                     "field `{field_name}` has illegal schema type `{}`",
-                    subscript_compiler::types::display_type(
-                        other,
-                        &|id| self.module.classes[id.0].name.clone(),
-                        &|id| self.module.enums[id.0].name.clone(),
-                        &|id| self.module.string_aliases[id.0].name.clone(),
-                    )
+                    crate::pipeline::type_name(self.module, other, pos)?
                 ),
                 pos.clone(),
             )),
         }
     }
 
-    fn class_tree(&mut self, index: usize) -> Result<TypeTree, Diagnostic> {
-        let class = &self.module.classes[index];
+    fn class_tree(&mut self, index: usize, pos: &Pos) -> Result<TypeTree, Diagnostic> {
+        let class = crate::class(self.module, index, "schema::class_tree", pos)?;
         if let Some(tree) = library_tree(self.module, class) {
             return Ok(tree);
         }
@@ -208,42 +207,44 @@ impl Walker<'_> {
     }
 }
 
-fn identity_diagnostic(schema: &Schema) -> Option<Diagnostic> {
+fn identity_diagnostic(schema: &Schema) -> Result<Option<Diagnostic>, Diagnostic> {
     let wgsl = layout::wgsl_layout(&schema.tree);
     let c = layout::c_layout(&schema.tree);
+    // Field positions and layout members follow the same schema field order.
     for (index, (wgsl_member, c_member)) in wgsl.members.iter().zip(&c.members).enumerate() {
         if wgsl_member.offset != c_member.offset {
-            return Some(diagnostic(
+            return Ok(Some(diagnostic(
                 "SC9",
                 format!(
                     "schema `{}` field `{}` has C offset {} and WGSL offset {}. Add an alignment override to the field class or reorder fields",
                     schema.name, wgsl_member.name, c_member.offset, wgsl_member.offset
                 ),
-                schema.field_positions[index].clone(),
-            ));
+                schema.field_positions.get(index).ok_or_else(|| crate::internal("schema::identity_diagnostic", "missing field position", &schema.pos))?.clone(),
+            )));
         }
     }
     if wgsl.align != c.align {
-        return Some(diagnostic(
+        return Ok(Some(diagnostic(
             "SC9",
             format!(
                 "schema `{}` has C alignment {} and WGSL alignment {}. Add an alignment override to the field class or reorder fields",
                 schema.name, c.align, wgsl.align
             ),
             schema.pos.clone(),
-        ));
+        )));
     }
     if wgsl.size != c.size {
-        return Some(diagnostic(
+        return Ok(Some(diagnostic(
             "SC9",
             format!(
                 "schema `{}` has C size {} and WGSL size {}. Add an alignment override to the field class or reorder fields",
                 schema.name, c.size, wgsl.size
             ),
             schema.pos.clone(),
-        ));
+        )));
     }
-    None
+
+    Ok(None)
 }
 
 fn uniform_violation(tree: &TypeTree, path: &str) -> Option<String> {
@@ -285,46 +286,69 @@ fn uniform_violation(tree: &TypeTree, path: &str) -> Option<String> {
     }
 }
 
-fn uniform_schema_names(module: &Module) -> BTreeSet<String> {
-    module
-        .classes
-        .iter()
-        .filter(|class| {
-            class.pos.file == "typegpu.ts" && !class.is_value && class.name.starts_with("Uniform<")
-        })
-        .filter_map(|class| class.fields.iter().find(|field| field.name == "values"))
-        .filter_map(|field| match &field.ty {
-            Type::Class(id) => Some(module.classes[id.0].name.clone()),
-            Type::Array(element) => match &**element {
-                Type::Class(id) => Some(module.classes[id.0].name.clone()),
-                _ => None,
-            },
-            _ => None,
-        })
-        .collect()
+fn uniform_schema_names(module: &Module) -> Result<BTreeSet<String>, Diagnostic> {
+    let mut names = BTreeSet::new();
+    for class in &module.classes {
+        if class.pos.file != "typegpu.ts" || class.is_value || !class.name.starts_with("Uniform<") {
+            continue;
+        }
+        let Some(field) = class.fields.iter().find(|field| field.name == "values") else {
+            continue;
+        };
+        let ty = match &field.ty {
+            Type::Array(element) => element.as_ref(),
+            ty => ty,
+        };
+        if let Type::Class(id) = ty {
+            names.insert(
+                crate::class(module, id.0, "schema::uniform_schema_names", &field.pos)?
+                    .name
+                    .clone(),
+            );
+        }
+    }
+    Ok(names)
 }
 
-fn collect_reachable(module: &Module, index: usize, reachable: &mut BTreeSet<usize>) {
+fn collect_reachable(
+    module: &Module,
+    index: usize,
+    reachable: &mut BTreeSet<usize>,
+    pos: &Pos,
+) -> Result<(), Diagnostic> {
     if !reachable.insert(index) {
-        return;
+        return Ok(());
     }
-    for field in &module.classes[index].fields {
-        collect_type_reachable(module, &field.ty, reachable);
+    for field in &crate::class(module, index, "schema::collect_reachable", pos)?.fields {
+        collect_type_reachable(module, &field.ty, reachable, &field.pos)?;
     }
+
+    Ok(())
 }
 
-fn collect_type_reachable(module: &Module, ty: &Type, reachable: &mut BTreeSet<usize>) {
+fn collect_type_reachable(
+    module: &Module,
+    ty: &Type,
+    reachable: &mut BTreeSet<usize>,
+    pos: &Pos,
+) -> Result<(), Diagnostic> {
     match ty {
-        Type::FixedArray(element, _) => collect_type_reachable(module, element, reachable),
+        Type::FixedArray(element, _) => collect_type_reachable(module, element, reachable, pos)?,
         Type::Class(id)
-            if module.classes[id.0].is_value
-                && library_tree(module, &module.classes[id.0]).is_none()
-                && !is_bool_vector(module, ty) =>
+            if crate::class(module, id.0, "schema::collect_type_reachable", pos)?.is_value
+                && library_tree(
+                    module,
+                    crate::class(module, id.0, "schema::collect_type_reachable", pos)?,
+                )
+                .is_none()
+                && !is_bool_vector(module, ty, pos)? =>
         {
-            collect_reachable(module, id.0, reachable);
+            collect_reachable(module, id.0, reachable, pos)?;
         }
         _ => {}
     }
+
+    Ok(())
 }
 
 /// Collects every schema class that the intended names reach, with its layout tree.
@@ -343,7 +367,7 @@ pub(crate) fn discover(
     intended: &BTreeSet<String>,
     import_pos: Option<&Pos>,
 ) -> Result<Vec<Schema>, Vec<Diagnostic>> {
-    let uniform_names = uniform_schema_names(module);
+    let uniform_names = uniform_schema_names(module).map_err(|error| vec![error])?;
     let mut schemas = Vec::new();
     let mut diagnostics = Vec::new();
     let mut reachable = BTreeSet::new();
@@ -369,7 +393,8 @@ pub(crate) fn discover(
             ));
             continue;
         }
-        collect_reachable(module, index, &mut reachable);
+        collect_reachable(module, index, &mut reachable, &class.pos)
+            .map_err(|error| vec![error])?;
     }
     for (index, class) in module.classes.iter().enumerate() {
         if !reachable.contains(&index) {
@@ -391,7 +416,7 @@ pub(crate) fn discover(
             module,
             stack: HashSet::new(),
         };
-        match walker.class_tree(index) {
+        match walker.class_tree(index, &class.pos) {
             Ok(tree) => {
                 let schema = Schema {
                     name: class.name.clone(),
@@ -399,7 +424,7 @@ pub(crate) fn discover(
                     pos: class.pos.clone(),
                     field_positions: class.fields.iter().map(|field| field.pos.clone()).collect(),
                 };
-                if let Some(error) = identity_diagnostic(&schema) {
+                if let Some(error) = identity_diagnostic(&schema).map_err(|error| vec![error])? {
                     diagnostics.push(error);
                 } else if uniform_names.contains(&schema.name) {
                     if let Some(message) = uniform_violation(&schema.tree, "") {

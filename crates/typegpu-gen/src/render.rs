@@ -98,26 +98,47 @@ fn render_shape(module: &Module, name: &str) -> Option<(usize, usize, Option<usi
     })
 }
 
-fn library_named(module: &Module, ty: &Type, name: &str) -> bool {
-    matches!(ty, Type::Class(id) if matches!(module.classes[id.0].pos.file.as_str(), "typegpu-types.ts" | "typegpu.ts") && module.classes[id.0].name == name)
+fn library_named(module: &Module, ty: &Type, name: &str, pos: &Pos) -> Result<bool, Diagnostic> {
+    Ok(
+        matches!(ty, Type::Class(id) if matches!(crate::class(module, id.0, "render::library_named", pos)?.pos.file.as_str(), "typegpu-types.ts" | "typegpu.ts") && crate::class(module, id.0, "render::library_named", pos)?.name == name),
+    )
 }
 
-fn value_class<'a>(module: &'a Module, ty: &Type) -> Option<&'a subscript_compiler::hir::ClassDef> {
-    let Type::Class(id) = ty else { return None };
-    let class = &module.classes[id.0];
+fn value_class<'a>(
+    module: &'a Module,
+    ty: &Type,
+    pos: &Pos,
+) -> Result<Option<&'a subscript_compiler::hir::ClassDef>, Diagnostic> {
+    let Type::Class(id) = ty else {
+        return Ok(None);
+    };
+    let class = crate::class(module, id.0, "render::value_class", pos)?;
     if !class.is_value || class.pos.file == "typegpu-types.ts" {
-        return None;
+        return Ok(None);
     }
-    Some(class)
+
+    Ok(Some(class))
 }
 
-fn vertex_format(module: &Module, ty: &Type) -> Option<&'static str> {
-    Some(match ty {
+fn vertex_format(
+    module: &Module,
+    ty: &Type,
+    pos: &Pos,
+) -> Result<Option<&'static str>, Diagnostic> {
+    Ok(Some(match ty {
         Type::F32 => "float32",
         Type::U32 => "uint32",
         Type::I32 => "sint32",
-        Type::Class(id) if module.classes[id.0].pos.file == "typegpu-types.ts" => {
-            match module.classes[id.0].name.as_str() {
+        Type::Class(id)
+            if crate::class(module, id.0, "render::vertex_format", pos)?
+                .pos
+                .file
+                == "typegpu-types.ts" =>
+        {
+            match crate::class(module, id.0, "render::vertex_format", pos)?
+                .name
+                .as_str()
+            {
                 "Vec2f" => "float32x2",
                 "Vec3f" => "float32x3",
                 "Vec4f" => "float32x4",
@@ -129,11 +150,11 @@ fn vertex_format(module: &Module, ty: &Type) -> Option<&'static str> {
                 "Vec4i" => "sint32x4",
                 "Vec2h" => "float16x2",
                 "Vec4h" => "float16x4",
-                _ => return None,
+                _ => return Ok(None),
             }
         }
-        _ => return None,
-    })
+        _ => return Ok(None),
+    }))
 }
 
 fn vertex_buffer(
@@ -144,7 +165,7 @@ fn vertex_buffer(
     step_mode: &'static str,
     pos: &Pos,
 ) -> Result<VertexBuffer, Diagnostic> {
-    let class = value_class(module, ty).ok_or_else(|| {
+    let class = value_class(module, ty, pos)?.ok_or_else(|| {
         diagnostic(
             "RN4",
             "vertex input is not a program @CStruct class",
@@ -153,18 +174,19 @@ fn vertex_buffer(
     })?;
     let mut attributes = Vec::new();
     for (index, field) in class.fields.iter().enumerate() {
-        let format = vertex_format(module, &field.ty).ok_or_else(|| {
-            diagnostic(
+        let format = vertex_format(module, &field.ty, &field.pos)?;
+        let Some(format) = format else {
+            return Err(diagnostic(
                 "RN5",
                 format!(
                     "vertex attribute `{}.{}` has unsupported type `{}`",
                     class.name,
                     field.name,
-                    pipeline::type_name(module, &field.ty)
+                    pipeline::type_name(module, &field.ty, &field.pos)?
                 ),
                 field.pos.clone(),
-            )
-        })?;
+            ));
+        };
         attributes.push(VertexAttribute {
             format,
             location: first_location + index as u32,
@@ -179,17 +201,18 @@ fn vertex_buffer(
 }
 
 fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varying>), Diagnostic> {
-    let class = value_class(module, ty).ok_or_else(|| {
+    let class = value_class(module, ty, pos)?.ok_or_else(|| {
         diagnostic(
             "RN7",
             "varyings is not a program @CStruct class",
             pos.clone(),
         )
     })?;
-    let position = class
-        .fields
-        .iter()
-        .find(|field| field.name == "position" && library_named(module, &field.ty, "Vec4f"));
+    let position = class.fields.iter().find(|field| field.name == "position");
+    let position = match position {
+        Some(field) if library_named(module, &field.ty, "Vec4f", &field.pos)? => Some(field),
+        _ => None,
+    };
     if position.is_none() {
         return Err(diagnostic(
             "RN7",
@@ -200,14 +223,14 @@ fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varyin
     let mut location = 0;
     let mut fields = Vec::new();
     for field in &class.fields {
-        if !varying_type(module, &field.ty) {
+        if !varying_type(module, &field.ty, &field.pos)? {
             return Err(diagnostic(
                 "RN7",
                 format!(
                     "varying field `{}.{}` has unsupported type `{}`",
                     class.name,
                     field.name,
-                    pipeline::type_name(module, &field.ty)
+                    pipeline::type_name(module, &field.ty, &field.pos)?
                 ),
                 field.pos.clone(),
             ));
@@ -218,7 +241,7 @@ fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varyin
             location += 1;
         }
         let flat = matches!(field.ty, Type::I32 | Type::U32)
-            || matches!(&field.ty, Type::Class(id) if module.classes[id.0].pos.file == "typegpu-types.ts" && matches!(module.classes[id.0].name.as_str(), "Vec2i" | "Vec3i" | "Vec4i" | "Vec2u" | "Vec3u" | "Vec4u"));
+            || matches!(&field.ty, Type::Class(id) if crate::class(module, id.0, "render::varyings", &field.pos)?.pos.file == "typegpu-types.ts" && matches!(crate::class(module, id.0, "render::varyings", &field.pos)?.name.as_str(), "Vec2i" | "Vec3i" | "Vec4i" | "Vec2u" | "Vec3u" | "Vec4u"));
         fields.push(Varying {
             name: field.name.clone(),
             ty: field.ty.clone(),
@@ -230,32 +253,41 @@ fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varyin
     Ok((class.name.clone(), fields))
 }
 
-fn varying_type(module: &Module, ty: &Type) -> bool {
-    match ty {
+fn varying_type(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnostic> {
+    Ok(match ty {
         Type::F32 | Type::I32 | Type::U32 => true,
-        Type::Class(id) if module.classes[id.0].pos.file == "typegpu-types.ts" => matches!(
-            module.classes[id.0].name.as_str(),
-            "Vec2f"
-                | "Vec3f"
-                | "Vec4f"
-                | "Vec2i"
-                | "Vec3i"
-                | "Vec4i"
-                | "Vec2u"
-                | "Vec3u"
-                | "Vec4u"
-                | "Vec2h"
-                | "Vec3h"
-                | "Vec4h"
-        ),
+        Type::Class(id)
+            if crate::class(module, id.0, "render::varying_type", pos)?
+                .pos
+                .file
+                == "typegpu-types.ts" =>
+        {
+            matches!(
+                crate::class(module, id.0, "render::varying_type", pos)?
+                    .name
+                    .as_str(),
+                "Vec2f"
+                    | "Vec3f"
+                    | "Vec4f"
+                    | "Vec2i"
+                    | "Vec3i"
+                    | "Vec4i"
+                    | "Vec2u"
+                    | "Vec3u"
+                    | "Vec4u"
+                    | "Vec2h"
+                    | "Vec3h"
+                    | "Vec4h"
+            )
+        }
         _ => false,
-    }
+    })
 }
 
 /// Reports whether the type is `f16` or an `f16` vector, which puts `enable f16;` on the module.
-pub(crate) fn type_uses_f16(module: &Module, ty: &Type) -> bool {
-    matches!(ty, Type::F16)
-        || matches!(ty, Type::Class(id) if module.classes[id.0].pos.file == "typegpu-types.ts" && matches!(module.classes[id.0].name.as_str(), "Vec2h" | "Vec3h" | "Vec4h"))
+pub(crate) fn type_uses_f16(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnostic> {
+    Ok(matches!(ty, Type::F16)
+        || matches!(ty, Type::Class(id) if crate::class(module, id.0, "render::type_uses_f16", pos)?.pos.file == "typegpu-types.ts" && matches!(crate::class(module, id.0, "render::type_uses_f16", pos)?.name.as_str(), "Vec2h" | "Vec3h" | "Vec4h")))
 }
 
 fn descriptor_string(
@@ -272,7 +304,7 @@ fn descriptor_string(
             expr.pos.clone(),
         ));
     };
-    let Some(field) = crate::descriptor_field(module, expr, field_name) else {
+    let Some(field) = crate::descriptor_field(module, expr, field_name)? else {
         return Err(diagnostic(
             "RN1",
             format!("render options have no `{field_name}` member"),
@@ -294,7 +326,9 @@ fn descriptor_string(
             pos,
             ..
         }) => {
-            let definition = &module.string_aliases[alias.0];
+            let definition = module.string_aliases.get(alias.0).ok_or_else(|| {
+                crate::internal("render::descriptor_string", "missing string alias", pos)
+            })?;
             let index = if let Some(wire_values) = &definition.wire_values {
                 wire_values
                     .iter()
@@ -335,7 +369,7 @@ fn index_format(module: &Module, expr: &Expr) -> Result<Option<String>, Diagnost
             expr.pos.clone(),
         ));
     };
-    let Some(field) = crate::descriptor_field(module, expr, "indexFormat") else {
+    let Some(field) = crate::descriptor_field(module, expr, "indexFormat")? else {
         return Err(generator_diagnostic(
             "library RenderPipelineSpec lost its indexFormat field",
             expr.pos.clone(),
@@ -353,7 +387,9 @@ fn index_format(module: &Module, expr: &Expr) -> Result<Option<String>, Diagnost
             pos,
             ..
         }) => {
-            let definition = &module.string_aliases[alias.0];
+            let definition = module.string_aliases.get(alias.0).ok_or_else(|| {
+                crate::internal("render::index_format", "missing string alias", pos)
+            })?;
             let index = if let Some(wire_values) = &definition.wire_values {
                 wire_values
                     .iter()
@@ -563,12 +599,36 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
         };
         let mut layouts = Vec::new();
         if layout_count == 1 {
-            match pipeline::layout(module, &vertex.params[0].ty, 0) {
+            match pipeline::layout(
+                module,
+                &vertex
+                    .params
+                    .first()
+                    .ok_or_else(|| {
+                        vec![crate::internal(
+                            "render::discover",
+                            "missing vertex parameter",
+                            &vertex.pos,
+                        )]
+                    })?
+                    .ty,
+                0,
+                &vertex.pos,
+            ) {
                 Ok(layout) => layouts.push(layout),
                 Err(error) => diagnostics.push(error),
             }
         }
-        let vertex_param = &vertex.params[layout_count + vertex_index];
+        let vertex_param = vertex
+            .params
+            .get(layout_count + vertex_index)
+            .ok_or_else(|| {
+                vec![crate::internal(
+                    "render::discover",
+                    "missing vertex parameter",
+                    &vertex.pos,
+                )]
+            })?;
         let first = match vertex_buffer(module, &vertex_param.ty, 0, 0, "vertex", &vertex_param.pos)
         {
             Ok(value) => value,
@@ -577,10 +637,19 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
                 continue;
             }
         };
+        let first_location = first.attributes.len() as u32;
         let mut vertex_buffers = vec![first];
         if let Some(instance_index) = instance_index {
-            let param = &vertex.params[layout_count + instance_index];
-            let first_location = vertex_buffers[0].attributes.len() as u32;
+            let param = vertex
+                .params
+                .get(layout_count + instance_index)
+                .ok_or_else(|| {
+                    vec![crate::internal(
+                        "render::discover",
+                        "missing vertex parameter",
+                        &vertex.pos,
+                    )]
+                })?;
             match vertex_buffer(module, &param.ty, 1, first_location, "instance", &param.pos) {
                 Ok(value) => vertex_buffers.push(value),
                 Err(error) => {
@@ -657,7 +726,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             index_format,
             pos: global.pos.clone(),
         };
-        if let Some(error) = unreached_binding(module, &pipeline) {
+        if let Some(error) = unreached_binding(module, &pipeline).map_err(|error| vec![error])? {
             diagnostics.push(error);
             continue;
         }
@@ -814,21 +883,38 @@ fn stage_bindings(
     module: &Module,
     pipeline: &RenderPipeline,
     entry: &str,
-) -> BTreeSet<(usize, String)> {
+) -> Result<BTreeSet<(usize, String)>, Diagnostic> {
     let Some(kernel) = pipeline::function(module, entry) else {
-        return BTreeSet::new();
+        return Ok(BTreeSet::new());
     };
     let layout_params = pipeline
         .layouts
         .iter()
         .enumerate()
-        .map(|(group, _)| (kernel.params[group].name.clone(), group))
-        .collect::<BTreeMap<_, _>>();
+        .map(|(group, _)| {
+            Ok((
+                kernel
+                    .params
+                    .get(group)
+                    .ok_or_else(|| {
+                        crate::internal(
+                            "render::stage_bindings",
+                            "missing layout parameter",
+                            &kernel.pos,
+                        )
+                    })?
+                    .name
+                    .clone(),
+                group,
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>, Diagnostic>>()?;
     let mut out = BTreeSet::new();
     for stmt in &kernel.body {
         binding_reads_stmt(stmt, &layout_params, &mut out);
     }
-    out
+
+    Ok(out)
 }
 
 /// Reports which entry points read one binding, as `(vertex, fragment)` (RN9).
@@ -840,32 +926,37 @@ pub(crate) fn binding_visibility(
     pipeline: &RenderPipeline,
     group: usize,
     name: &str,
-) -> (bool, bool) {
+) -> Result<(bool, bool), Diagnostic> {
     let key = (group, name.to_owned());
-    (
-        stage_bindings(module, pipeline, &pipeline.vertex_entry).contains(&key),
-        stage_bindings(module, pipeline, &pipeline.fragment_entry).contains(&key),
-    )
+
+    Ok((
+        stage_bindings(module, pipeline, &pipeline.vertex_entry)?.contains(&key),
+        stage_bindings(module, pipeline, &pipeline.fragment_entry)?.contains(&key),
+    ))
 }
 
-fn unreached_binding(module: &Module, pipeline: &RenderPipeline) -> Option<Diagnostic> {
+fn unreached_binding(
+    module: &Module,
+    pipeline: &RenderPipeline,
+) -> Result<Option<Diagnostic>, Diagnostic> {
     for layout in &pipeline.layouts {
         for binding in &layout.bindings {
-            if binding_visibility(module, pipeline, layout.group as usize, &binding.name)
+            if binding_visibility(module, pipeline, layout.group as usize, &binding.name)?
                 == (false, false)
             {
-                return Some(diagnostic(
+                return Ok(Some(diagnostic(
                     "RN9",
                     format!(
                         "binding `{}` is not reached by either render kernel",
                         binding.name
                     ),
                     binding.pos.clone(),
-                ));
+                )));
             }
         }
     }
-    None
+
+    Ok(None)
 }
 
 fn binding_key(expr: &Expr, layout_params: &BTreeMap<String, usize>) -> Option<(usize, String)> {
@@ -1038,14 +1129,39 @@ pub(crate) fn reject_vertex_storage_writes(
         .layouts
         .iter()
         .enumerate()
-        .map(|(group, _)| (vertex.params[group].name.clone(), group))
-        .collect::<BTreeMap<_, _>>();
+        .map(|(group, _)| {
+            Ok((
+                vertex
+                    .params
+                    .get(group)
+                    .ok_or_else(|| {
+                        crate::internal(
+                            "render::reject_vertex_storage_writes",
+                            "missing layout parameter",
+                            &vertex.pos,
+                        )
+                    })?
+                    .name
+                    .clone(),
+                group,
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>, Diagnostic>>()?;
     let mut writes = Vec::new();
     for statement in &vertex.body {
         written_binding_stmt(statement, &layout_params, &mut writes);
     }
     for (group, name) in writes {
-        let mutable = pipeline.layouts[group]
+        let mutable = pipeline
+            .layouts
+            .get(group)
+            .ok_or_else(|| {
+                crate::internal(
+                    "render::reject_vertex_storage_writes",
+                    "missing layout",
+                    &vertex.pos,
+                )
+            })?
             .bindings
             .iter()
             .any(|binding| binding.name == name && binding.kind == BindingKind::MutStorage);
