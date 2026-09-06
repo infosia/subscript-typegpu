@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Rev 9 (branch review: UI4 Rev 3, UI9 Rev 1, UI11, UI12 Rev 2, UI15 Rev 5, UI18, UI20), 2026-09-05. Rev 10 (UI2 Rev 1: the alpha is an array of hex chunks, W8), 2026-09-05. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Rev 9 (branch review: UI4 Rev 3, UI9 Rev 1, UI11, UI12 Rev 2, UI15 Rev 5, UI18, UI20), 2026-09-05. Rev 10 (UI2 Rev 1: the alpha is an array of hex chunks, W8), 2026-09-05. Rev 11 (UI6, UI20 from the comment pass), 2026-09-06. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -82,7 +82,8 @@ tiers with no GPU. The renderer is the only GPU code.
 - **UI6 — Hover and focus.** Rev 1. For a widget with rect `r` and
   id `id`: the widget is under the pointer when the pointer is inside
   `r`, inside the current clip rect, and the widget's root container
-  is the hover root. The rules apply in this order. If it is under
+  is the hover root. A widget outside every root container is never
+  under the pointer. The rules apply in this order. If it is under
   the pointer and no button is down, hover is `id`. If focus is `id`
   and a press happened outside `r`, focus clears. If focus is `id`,
   no button is down, and the widget lacks `UI_OPT_HOLD_FOCUS`, focus
@@ -342,7 +343,8 @@ tiers with no GPU. The renderer is the only GPU code.
   `UiViewport`, `UiVarying`, `UiRenderLayout`, `UiPipelineFacts`,
   `UiDrawRange`, `UiRenderer`. Functions: `uiVertex`, `uiFragment`,
   `uiNumberText`. The custom-widget surface of `UiContext` is the set
-  microui exposes for the same purpose: `getId`, `setFocus`,
+  microui exposes for the same purpose: `getId`, `pushId`, `popId`,
+  `setFocus`,
   `mouseOver`, `updateControl`, `getClip`, `pushClip`, `popClip`,
   `pushLayout`, `popLayout`, `layoutRow`, `layoutNext`,
   `layoutSetNext`, `layoutBeginColumn`, `layoutEndColumn`,
@@ -359,8 +361,8 @@ tiers with no GPU. The renderer is the only GPU code.
   `scrollY`, `zindex`, `start`, `end`. `UiRenderer` exposes
   `create`, `createHost`, `capacity`, `quadCount`, `indexCount`,
   `rangeCount`, `ranges`, `vertexBytes`, `build`, `render`,
-  `dispose`. A name outside this rule is a defect, in the code or in
-  the rule.
+  `dispose`, and `[Symbol.dispose]` for `using`. A name outside this
+  rule is a defect, in the code or in the rule.
 
 ## Tests
 
