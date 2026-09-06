@@ -139,3 +139,7 @@ comment lines moved with the code. Evidence: `tools/gate.sh
 --require-backend` green, 283 passed, 1 ignored, 220.1 s wall.
 `tools/window.sh --frames 30` prints `window:frames=30` with no `FAIL`.
 The visual result waits for the owner's run.
+
+The owner ran `fluid-double-buffering` on yawgpu Metal (963 frames)
+and accepted the visual result: the fluid falls from the top source
+and flows around the obstacle. The open item is closed.
