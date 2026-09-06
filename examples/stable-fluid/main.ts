@@ -1,8 +1,11 @@
 // example: stable-fluid
 // Advances a stable-fluid velocity and ink field through texture-backed compute passes.
-// The upstream photo is reduced to a 512-square host-generated Perlin image (EX6).
-// EX7 keeps both advections sampling through the linear filter in compute.
-// Keys 1, 2, and 3 select display modes, and the pointer drives the brush.
+// The upstream photo is reduced to a 512-square host-generated Perlin image, and the
+// simulation grid is 256 where upstream runs 512. Both advections sample through the
+// linear filter in compute, as upstream does. The upstream sliders for the time step,
+// the viscosity, and the Jacobi iterations commit to 0.5, 0.000001, and 10, and the
+// pause toggle does not port. Keys 1, 2, and 3 select display modes, and the pointer
+// drives the brush.
 // Ported from TypeGPU's stable-fluid example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -104,10 +107,14 @@ import {
   viscosityJacobi_WGSL,
 } from "./main.typegpu";
 
+// The committed sizes. The simulation grid is 256 cells square and the background image is
+// 512 pixels square. TypeGPU runs a 512-cell grid against a 2048-pixel photo.
 const SIM_N: u32 = 256;
 const BACKGROUND_N: u32 = 512;
 const BACKGROUND_NOISE_N: u32 = 128;
 const WORKGROUP_N: u32 = 16;
+// The solver constants. `DT` is one frame of simulated time and `VISCOSITY` is the kinematic
+// viscosity. TypeGPU exposes the three of them as sliders, and this port fixes them.
 const DT: f32 = 0.5;
 const VISCOSITY: f32 = 0.000001;
 const JACOBI_ITERATIONS: u32 = 10;
@@ -115,10 +122,13 @@ const BRUSH_RADIUS: f32 = 16.0; // SIM_N / 16.
 const INK_AMOUNT: f32 = 0.02;
 const FORCE_SCALE: f32 = 1.0;
 
+// The three display modes. The upstream select control becomes key 1, key 2, and key 3.
 const DISPLAY_INK: u32 = 1;
 const DISPLAY_VELOCITY: u32 = 2;
 const DISPLAY_IMAGE: u32 = 3;
 
+// The index names for the texture list, the pipeline lists, and the bind group lists. Every
+// handle lives in an array, so one loop releases each list.
 const TEXTURE_VELOCITY_A: i32 = 0;
 const TEXTURE_VELOCITY_B: i32 = 1;
 const TEXTURE_INK_A: i32 = 2;
@@ -145,6 +155,8 @@ const RENDER_INK: i32 = 0;
 const RENDER_VELOCITY: i32 = 1;
 const RENDER_IMAGE: i32 = 2;
 
+// Every source and target pair of the ping-pong owns a bind group, built once in `init`. A
+// frame selects a group and never builds one.
 const GROUP_BRUSH: i32 = 0;
 const GROUP_INK_AB: i32 = 1;
 const GROUP_INK_BA: i32 = 2;
@@ -166,6 +178,7 @@ const GROUP_ADVECT_INK_IA_VB: i32 = 17;
 const GROUP_ADVECT_INK_IB_VA: i32 = 18;
 const GROUP_ADVECT_INK_IB_VB: i32 = 19;
 
+// One render group per display mode and per current texture.
 const RENDER_GROUP_INK_A: i32 = 0;
 const RENDER_GROUP_INK_B: i32 = 1;
 const RENDER_GROUP_VELOCITY_A: i32 = 2;
@@ -173,6 +186,8 @@ const RENDER_GROUP_VELOCITY_B: i32 = 3;
 const RENDER_GROUP_IMAGE_A: i32 = 4;
 const RENDER_GROUP_IMAGE_B: i32 = 5;
 
+// One clip-space corner of the full-screen triangle. The generator derives the vertex
+// attribute layout and the `Vertex_STRIDE` byte stride from this class.
 @CStruct
 class Vertex {
   position: Vec2f;
@@ -182,6 +197,8 @@ class Vertex {
   }
 }
 
+// The brush state of one frame: the pointer cell, the movement since the last frame in
+// cells, and 1.0 while a button is down.
 @CStruct
 class BrushParams {
   point: Vec2f;
@@ -195,6 +212,8 @@ class BrushParams {
   }
 }
 
+// The vertex output. The `Vec4f` field named `position` becomes the WGSL builtin position,
+// and every other field becomes an interpolated location.
 @CStruct
 class Varyings {
   position: Vec4f;
@@ -206,18 +225,24 @@ class Varyings {
   }
 }
 
+// The layout classes replace TypeGPU's run-time bind group layout objects. The field
+// order is the binding order, and the generator emits one `_LAYOUT0` spec per class.
 class BrushLayout {
   force!: StorageTexture2d<Rgba16float>;
   addedInk!: StorageTexture2d<Rgba16float>;
   params!: Uniform<BrushParams>;
 }
 
+// The ink pass and the force pass share one layout. Each reads a field and an addition and
+// writes the sum to a third texture.
 class AddLayout {
   source!: Texture2d<f32>;
   addition!: Texture2d<f32>;
   target!: StorageTexture2d<Rgba16float>;
 }
 
+// The velocity advection writes its result twice: to the next velocity, and to the fixed
+// right-hand side of the viscosity solve.
 class VelocityAdvectionLayout {
   quantity!: Texture2d<f32>;
   velocity!: Texture2d<f32>;
@@ -233,6 +258,7 @@ class AdvectionLayout {
   target!: StorageTexture2d<Rgba16float>;
 }
 
+// `rhs` holds the advected velocity and stays fixed through the ten Jacobi steps.
 class ViscosityLayout {
   rhs!: Texture2d<f32>;
   source!: Texture2d<f32>;
@@ -260,6 +286,8 @@ class GradientLayout {
   target!: StorageTexture2d<Rgba16float>;
 }
 
+// The ink view and the velocity view read one texture each, so one layout class serves both
+// render pipelines.
 class FieldRenderLayout {
   field!: Texture2d<f32>;
   linear!: Sampler;
@@ -271,6 +299,7 @@ class ImageRenderLayout {
   linear!: Sampler;
 }
 
+// A neighbor read clamps at the border. That clamp is the boundary condition of this solver.
 function clampCell(value: i32): i32 {
   let result: i32 = value;
   if (result < 0) result = 0;
@@ -279,13 +308,17 @@ function clampCell(value: i32): i32 {
 }
 
 // While a button is down, a Gaussian of force and ink lands at the pointer.
-// An idle brush clears both transient fields.
+// An idle brush clears both transient fields. Every cell takes a value here, so neither
+// transient texture needs a clear pass.
 function brushSplatKernel(res: BrushLayout, ctx: ComputeInvocation): void {
   const params: BrushParams = res.params.$;
+  // The brush works in grid cells, so the host converts the pointer position before the write.
   const cell = new Vec2f(ctx.globalId.x as f32, ctx.globalId.y as f32);
   const offset: Vec2f = cell.sub(params.point);
   const distanceSquared: f32 = offset.dot(offset);
   const radiusSquared: f32 = BRUSH_RADIUS * BRUSH_RADIUS;
+  // The Gaussian falls to `exp(-0.5)` at one radius and never reaches zero. TypeGPU cuts its
+  // stamp off at the radius instead.
   const exponent: f32 = -distanceSquared / (2.0 * radiusSquared);
   const gaussian: f32 = new Vec2f(exponent, exponent).exp().x * params.active;
   const coords = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);
@@ -339,12 +372,16 @@ function advectVelocityKernel(res: VelocityAdvectionLayout, ctx: ComputeInvocati
     return;
   }
   const velocity: Vec4f = res.velocity.load(coords, 0);
+  // The sample point is this cell center minus one step of its velocity, in cells, and the
+  // division normalizes it for the sampler.
   const uv = new Vec2f(
     ((x as f32) + 0.5 - velocity.x * DT) / (SIM_N as f32),
     ((y as f32) + 0.5 - velocity.y * DT) / (SIM_N as f32),
   );
   const advected: Vec4f = res.quantity.sampleLevel(res.linear, uv, 0.0);
   const value = new Vec4f(advected.x, advected.y, 0.0, 0.0);
+  // The advected velocity is also the right-hand side of the viscosity solve, so the kernel
+  // stores it twice. The second target is the divergence texture, still unused this frame.
   res.target.store(coords, value);
   res.viscosityRhs.store(coords, value);
 }
@@ -358,6 +395,8 @@ function viscosityJacobiKernel(res: ViscosityLayout, ctx: ComputeInvocation): vo
   const down: Vec4f = res.source.load(new Vec2i(x, clampCell(y - 1)), 0);
   const up: Vec4f = res.source.load(new Vec2i(x, clampCell(y + 1)), 0);
   const rhs: Vec4f = res.rhs.load(new Vec2i(x, y), 0);
+  // `alpha` is the viscosity times the time step over the squared cell size, and the cell size
+  // is 1 over `SIM_N`. TypeGPU normalizes the same step differently.
   const alpha: f32 = VISCOSITY * DT * (SIM_N as f32) * (SIM_N as f32);
   const denominator: f32 = 1.0 + 4.0 * alpha;
   res.target.store(
@@ -438,6 +477,8 @@ function advectInkKernel(res: AdvectionLayout, ctx: ComputeInvocation): void {
   res.target.store(coords, ink);
 }
 
+// The oversized triangle covers the clip square, and the uv maps clip space [-1, 1] to the
+// field's [0, 1]. The two entries differ only in the layout class each stage shares.
 function fieldVertex(
   res: FieldRenderLayout,
   value: Vertex,
@@ -545,6 +586,9 @@ function imageFragment(
   );
 }
 
+// The thirteen declarations are the generator's input. It walks the typed program before the
+// run and emits `main.typegpu.ts`: the WGSL text, the entry names, and the layout specs.
+// TypeGPU resolves the same shaders from the kernel functions at run time.
 export const brushSplat: ComputePipelineSpec = computePipeline<BrushLayout>(
   brushSplatKernel,
   { name: "brushSplat", workgroupSize: [16, 16, 1] },
@@ -595,6 +639,8 @@ export const advectInk: ComputePipelineSpec = computePipeline<AdvectionLayout>(
   { name: "advectInk", workgroupSize: [16, 16, 1] },
 );
 
+// The three render pipelines share the vertex entry and differ in the fragment entry.
+// `renderPipelineL` adds the layout class, so both stages read the same bindings.
 export const inkRender: RenderPipelineSpec = renderPipelineL<
   FieldRenderLayout,
   Vertex,
@@ -613,6 +659,8 @@ export const imageRender: RenderPipelineSpec = renderPipelineL<
   Varyings
 >(imageVertex, imageFragment, { format: "bgra8unorm" });
 
+// One object holds every handle a frame needs. Scripts own their handles, so `shutdown`
+// releases each one. TypeGPU leaves that to garbage collection and `root.destroy`.
 class StableFluidState {
   device: GPUHostOwnedDevice;
   compute: ComputePipeline[];
@@ -650,7 +698,11 @@ class StableFluidState {
   }
 }
 
+// `init` fills this binding and `frame` reads it. A failed `init` leaves it `null`, because
+// this library reports a failure by value and never by an exception.
 let activeState: StableFluidState | null = null;
+// The ping-pong state. A true flag names texture A as the field that holds the current
+// values, and every pass that writes the pair flips its flag.
 let velocityAIsCurrent: boolean = true;
 let inkAIsCurrent: boolean = true;
 let displayMode: u32 = DISPLAY_IMAGE;
@@ -658,6 +710,7 @@ let previousPointerX: f32 = -1.0;
 let previousPointerY: f32 = -1.0;
 let wasDrawing: boolean = false;
 
+// A new texture holds undefined contents, so every simulation field takes an explicit zero.
 function zeroField(): Vec4f[] {
   const pixels: Vec4f[] = [];
   let index: u32 = 0;
@@ -668,6 +721,8 @@ function zeroField(): Vec4f[] {
   return pixels;
 }
 
+// The background comes from host code. An example generates its assets and fetches nothing,
+// and TypeGPU loads a photo through `createImageBitmap` instead.
 function backgroundPixels(): Vec4f[] {
   const noiseSamples: f32[] = [];
   let sampleY: u32 = 0;
@@ -683,6 +738,8 @@ function backgroundPixels(): Vec4f[] {
     }
     sampleY += 1;
   }
+  // The noise grid is 128 square and the bilinear step stretches it to 512, because the host
+  // computes one noise sample at a time.
   const pixels: Vec4f[] = [];
   let y: u32 = 0;
   while (y < BACKGROUND_N) {
@@ -718,6 +775,8 @@ function backgroundPixels(): Vec4f[] {
   return pixels;
 }
 
+// Every simulation field is rgba16float with a storage binding, a texture binding, and a
+// copy target. One pass writes it, the next pass samples it, and `init` zeroes it.
 function createFieldTexture(device: GPUHostOwnedDevice, label: string): GPUTexture {
   return device.createTexture({
     label,
@@ -729,6 +788,8 @@ function createFieldTexture(device: GPUHostOwnedDevice, label: string): GPUTextu
   });
 }
 
+// The pipeline owns the bind group layout, and `using` borrows it for the group creation
+// only.
 function bindCompute(
   device: GPUHostOwnedDevice,
   pipeline: ComputePipeline,
@@ -749,6 +810,7 @@ function bindRender(
   return createBindGroupHost(device, layout, spec, resources);
 }
 
+// The release helpers give `shutdown` and the `init` failure path one shape.
 function disposeGroups(groups: GPUBindGroup[]): void {
   let index: i32 = 0;
   while (index < groups.length) {
@@ -794,6 +856,8 @@ export function init(
   device: SubscriptTypegpuDevice,
   format: GPUTextureFormat,
 ): void {
+  // The three render pipelines share one generated target format. A surface with another
+  // format is a failure here, not a reason to rebuild them.
   if (
     format !== inkRender_TARGET_FORMAT
     || format !== velocityRender_TARGET_FORMAT
@@ -802,18 +866,25 @@ export function init(
     print(`FAIL format expected=${imageRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
+  // The window host owns the device. The wrapper adds the API-layer methods and has neither
+  // `dispose` nor `destroy`.
   const hostDevice = hostOwnedGPUDevice(instance, device);
+  // One oversized triangle covers the screen. `Vertex_STRIDE` comes from the generator, so
+  // the size never restates the layout.
   const vertices = hostDevice.createBuffer({
     label: "stable-fluid-fullscreen",
     size: (Vertex_STRIDE * 3) as u64,
     usage: GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
+  // The brush uniform. Every frame rewrites it before the first dispatch.
   const brushParams = hostDevice.createBuffer({
     label: "stable-fluid-brush-params",
     size: BrushParams_SIZE as u64,
     usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
   });
 
+  // Nine simulation fields and the background. Velocity, ink, and pressure come in pairs,
+  // because one dispatch cannot read and write the same texture.
   const textures: GPUTexture[] = [
     createFieldTexture(hostDevice, "stable-fluid-velocity-a"),
     createFieldTexture(hostDevice, "stable-fluid-velocity-b"),
@@ -831,12 +902,15 @@ export function init(
       usage: GPUTextureUsage.TEXTURE_BINDING + GPUTextureUsage.COPY_DST,
     }),
   ];
+  // One view per texture in the same order, so a `TEXTURE_` name indexes both lists.
   const views: GPUTextureView[] = [];
   let textureIndex: i32 = 0;
   while (textureIndex < textures.length) {
     views.push(textures[textureIndex].createView());
     textureIndex += 1;
   }
+  // A linear filter with clamp-to-edge. The advection samples between cells, and a backtrace
+  // that leaves the grid then reads the border cell.
   const samplerDescriptor: GPUSamplerDescriptor = {
     addressModeU: "clamp-to-edge",
     addressModeV: "clamp-to-edge",
@@ -845,7 +919,11 @@ export function init(
   };
   const linearSampler = hostDevice.createSampler(samplerDescriptor);
 
+  // The queue handle is borrowed for this block, and `using` releases it at the end of `init`.
+  // The resources it fills stay.
   using queue = hostDevice.queue();
+  // `Context.bytesOf<T>` produces the exact bytes of the value in the generated layout.
+  // TypeGPU converts a JavaScript object to buffer bytes at run time instead.
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>([
     new Vertex(new Vec2f(-1.0, -1.0)),
     new Vertex(new Vec2f(3.0, -1.0)),
@@ -858,12 +936,16 @@ export function init(
       new BrushParams(new Vec2f(0.0, 0.0), new Vec2f(0.0, 0.0), 0.0),
     ),
   );
+  // The nine simulation fields start at zero. `TEXTURE_BACKGROUND` is the first index past
+  // them, so the loop stops before the background.
   const zeros: Vec4f[] = zeroField();
   let fieldIndex: i32 = 0;
   while (fieldIndex < TEXTURE_BACKGROUND) {
     writeTexturePixels(queue, textures[fieldIndex], zeros, SIM_N, SIM_N);
     fieldIndex += 1;
   }
+  // `writeTexturePixels` converts each `Vec4f` into the texture's format and uploads the rows.
+  // The background never changes after this write.
   writeTexturePixels(
     queue,
     textures[TEXTURE_BACKGROUND],
@@ -872,7 +954,11 @@ export function init(
     BACKGROUND_N,
   );
 
+  // The scope catches a backend rejection of the WGSL or the layout. The API layer returns
+  // the error as a value, so the code reads the popped result.
   hostDevice.pushErrorScope("validation");
+  // Each pipeline takes generated WGSL text, a generated entry name, and a generated layout
+  // spec. This file holds no shader text.
   const compute: ComputePipeline[] = [
     createComputePipelineHost(
       hostDevice,
@@ -945,6 +1031,7 @@ export function init(
       [WORKGROUP_N, WORKGROUP_N, 1],
     ),
   ];
+  // A render pipeline also takes the vertex layout the generator derived from `Vertex`.
   const render: RenderPipeline[] = [
     createRenderPipelineHost(
       hostDevice,
@@ -975,6 +1062,8 @@ export function init(
     ),
   ];
 
+  // Every bind group is built once, in the order of the `GROUP_` names. A pass that flips the
+  // ping-pong gets two groups, one per direction.
   const groups: GPUBindGroup[] = [
     bindCompute(hostDevice, compute[COMPUTE_BRUSH], brushSplat_LAYOUT0, [
       textureResource(views[TEXTURE_FORCE]),
@@ -1083,6 +1172,8 @@ export function init(
       textureResource(views[TEXTURE_INK_A]),
     ]),
   ];
+  // Each render group adds the linear sampler, so a fragment samples the field and the
+  // window size never has to match the grid.
   const renderGroups: GPUBindGroup[] = [
     bindRender(hostDevice, render[RENDER_INK], inkRender_LAYOUT0, [
       textureResource(views[TEXTURE_INK_A]),
@@ -1111,6 +1202,8 @@ export function init(
       samplerResource(linearSampler),
     ]),
   ];
+  // The failure path releases every handle this function created, newest first. Nothing else
+  // frees them, because the state never received them.
   const validationError = hostDevice.popErrorScope();
   if (validationError !== null) {
     disposeGroups(renderGroups);
@@ -1126,6 +1219,8 @@ export function init(
     return;
   }
 
+  // The state takes every handle above. `frame` and `shutdown` reach them through this module
+  // binding.
   activeState = new StableFluidState(
     hostDevice,
     compute,
@@ -1155,24 +1250,33 @@ export function frame(
   pointerY: f32,
   buttons: u32,
 ): void {
+  // A failed `init` leaves no state. The host still calls `frame`, so the guard returns.
   if (activeState === null) return;
   const active = activeState;
+  // The host reports one key per frame and clears the slot, so a press acts once. 49, 50, and
+  // 51 are the Unicode scalars of `1`, `2`, and `3`.
   if (key === 49) displayMode = DISPLAY_INK;
   if (key === 50) displayMode = DISPLAY_VELOCITY;
   if (key === 51) displayMode = DISPLAY_IMAGE;
 
+  // An idle pointer leaves the brush inactive. The splat kernel then writes zeros over the
+  // force and the added ink, so no force survives into the next frame.
   let point = new Vec2f(0.0, 0.0);
   let delta = new Vec2f(0.0, 0.0);
   let brushActive: f32 = 0.0;
   const pointerValid: boolean = pointerX >= 0.0 && pointerY >= 0.0
     && width > 0 && height > 0;
   const drawing: boolean = pointerValid && buttons !== 0;
+  // The host reports surface pixels with y down. The grid runs from 0 to `SIM_N` with y up,
+  // so the y axis flips here.
   if (pointerValid) {
     const currentX: f32 = (pointerX / (width as f32)) * (SIM_N as f32);
     const currentY: f32 = (1.0 - pointerY / (height as f32)) * (SIM_N as f32);
     point = new Vec2f(currentX, currentY);
     if (drawing) {
       brushActive = 1.0;
+      // The delta is the pointer movement in cells since the last frame, and it becomes the force
+      // direction. A stroke that starts this frame has no delta yet.
       if (wasDrawing) {
         delta = new Vec2f(
           currentX - previousPointerX,
@@ -1185,6 +1289,7 @@ export function frame(
   }
   wasDrawing = drawing;
 
+  // The queue and the encoder live for this frame only.
   using queue = active.device.queue();
   queue.writeBuffer(
     active.brushParams,
@@ -1192,8 +1297,13 @@ export function frame(
     Context.bytesOf<BrushParams>(new BrushParams(point, delta, brushActive)),
   );
   using encoder = active.device.createCommandEncoderDefault();
+  // A dispatch count is a workgroup count. 256 cells over a workgroup of 16 give 16 by 16
+  // workgroups per pass.
   const workgroups: u32 = SIM_N / WORKGROUP_N;
 
+  // The dispatch order is the solver order: splat the brush, add the ink and the force, advect
+  // the velocity, diffuse it, project it, then advect the ink. Each `dispatch` records its own
+  // compute pass, and that pass order is the dependency order.
   active.compute[COMPUTE_BRUSH].dispatch(
     encoder,
     [active.groups[GROUP_BRUSH]],
@@ -1202,6 +1312,8 @@ export function frame(
     1,
   );
 
+  // The flag names the texture that holds the current ink. The group reads it and writes the
+  // other one, so the flip follows the dispatch.
   const inkAddGroup: GPUBindGroup = inkAIsCurrent
     ? active.groups[GROUP_INK_AB]
     : active.groups[GROUP_INK_BA];
@@ -1214,6 +1326,7 @@ export function frame(
   );
   inkAIsCurrent = !inkAIsCurrent;
 
+  // The force enters the velocity as an acceleration over one time step.
   const forceGroup: GPUBindGroup = velocityAIsCurrent
     ? active.groups[GROUP_FORCE_AB]
     : active.groups[GROUP_FORCE_BA];
@@ -1226,6 +1339,8 @@ export function frame(
   );
   velocityAIsCurrent = !velocityAIsCurrent;
 
+  // The advection moves the velocity through itself, so its two texture bindings name the same
+  // current field.
   const velocityAdvectionGroup: GPUBindGroup = velocityAIsCurrent
     ? active.groups[GROUP_ADVECT_VELOCITY_AB]
     : active.groups[GROUP_ADVECT_VELOCITY_BA];
@@ -1238,6 +1353,8 @@ export function frame(
   );
   velocityAIsCurrent = !velocityAIsCurrent;
 
+  // Ten Jacobi steps solve the implicit viscosity against the fixed right-hand side. The count
+  // is host code, so the WGSL holds one step and the loop lives here.
   let viscosityIteration: u32 = 0;
   while (viscosityIteration < JACOBI_ITERATIONS) {
     const viscosityGroup: GPUBindGroup = velocityAIsCurrent
@@ -1254,6 +1371,8 @@ export function frame(
     viscosityIteration += 1;
   }
 
+  // The divergence pass overwrites the viscosity right-hand side. Every reader of that texture
+  // is done by this point.
   const divergenceGroup: GPUBindGroup = velocityAIsCurrent
     ? active.groups[GROUP_DIVERGENCE_A]
     : active.groups[GROUP_DIVERGENCE_B];
@@ -1265,6 +1384,7 @@ export function frame(
     1,
   );
 
+  // TypeGPU keeps the previous frame's pressure and warm starts the solve from it.
   active.compute[COMPUTE_CLEAR_PRESSURE].dispatch(
     encoder,
     [active.groups[GROUP_CLEAR_PRESSURE_A]],
@@ -1272,6 +1392,8 @@ export function frame(
     workgroups,
     1,
   );
+  // The pressure ping-pong lives in the frame, because the solve starts fresh. Ten steps are
+  // even, so texture A holds the result and both gradient groups read it.
   let pressureAIsCurrent: boolean = true;
   let pressureIteration: u32 = 0;
   while (pressureIteration < JACOBI_ITERATIONS) {
@@ -1289,6 +1411,7 @@ export function frame(
     pressureIteration += 1;
   }
 
+  // The projection subtracts the pressure gradient and leaves a divergence-free velocity.
   const gradientGroup: GPUBindGroup = velocityAIsCurrent
     ? active.groups[GROUP_GRADIENT_AB]
     : active.groups[GROUP_GRADIENT_BA];
@@ -1301,6 +1424,8 @@ export function frame(
   );
   velocityAIsCurrent = !velocityAIsCurrent;
 
+  // The group depends on both flags, so four groups cover the four combinations of current
+  // ink and current velocity.
   let inkAdvectionGroup: GPUBindGroup = active.groups[GROUP_ADVECT_INK_IA_VA];
   if (inkAIsCurrent && !velocityAIsCurrent) {
     inkAdvectionGroup = active.groups[GROUP_ADVECT_INK_IA_VB];
@@ -1318,6 +1443,8 @@ export function frame(
   );
   inkAIsCurrent = !inkAIsCurrent;
 
+  // The display mode selects the pipeline and the group. The ink view and the image view read
+  // the current ink, and the velocity view reads the current velocity.
   let renderPipeline: RenderPipeline = active.render[RENDER_IMAGE];
   let renderGroup: GPUBindGroup = inkAIsCurrent
     ? active.renderGroups[RENDER_GROUP_IMAGE_A]
@@ -1334,7 +1461,10 @@ export function frame(
       : active.renderGroups[RENDER_GROUP_VELOCITY_B];
   }
 
+  // The host owns the frame's view and presents it. The wrapper adds the API-layer methods
+  // and disposes nothing.
   const target = new GPUTextureView(view);
+  // The color attachment clears on load, so no separate clear pass exists.
   using renderPass = encoder.beginRenderPass({
     colorAttachments: [{
       view: target,
@@ -1343,15 +1473,22 @@ export function frame(
       storeOp: "store",
     }],
   });
+  // The grid commits to 256 cells. The viewport stretches the field over the current window
+  // instead of a resize of the simulation.
   renderPass.setViewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
   renderPass.setScissorRect(0, 0, width, height);
+  // `bind` sets the pipeline, the bind groups, and the vertex buffers on the pass in one call.
   renderPipeline.bind(renderPass, [renderGroup], [active.vertices]);
   renderPass.draw(3);
   renderPass.end();
+  // One submit sends every pass of this frame. TypeGPU submits one command buffer per dispatch
+  // and per draw.
   using command = encoder.finishDefault();
   queue.submit([command]);
 }
 
+// Releases every handle in the reverse order of creation: groups, sampler, views, textures,
+// buffers, then pipelines. The device and the frame view belong to the host.
 export function shutdown(): void {
   if (activeState === null) return;
   const active = activeState;
@@ -1364,6 +1501,8 @@ export function shutdown(): void {
   active.vertices.dispose();
   disposeRender(active.render);
   disposeCompute(active.compute);
+  // The cleared binding makes a later `frame` call return at its guard, and the ping-pong
+  // state starts over.
   activeState = null;
   velocityAIsCurrent = true;
   inkAIsCurrent = true;
