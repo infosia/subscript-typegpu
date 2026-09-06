@@ -5,7 +5,8 @@ review), 2026-08-23. Rev 2 (W8, W13 after the first `--frames` run),
 2026-08-23. Rev 3 (W8 Rev 2 exiting path, W9 Rev 1 sRGB), 2026-08-24. Rev 4
 (W2 Rev 2, W3 Rev 1 pointer input), 2026-08-24. Rev 5 (W2 Rev 3, W3
 Rev 2, W13 Rev 2 optional input entries), 2026-09-05. Rev 6 (W3 Rev 3, W13
-Rev 3 from the U3 review), 2026-09-05. Plan §8 P9 and
+Rev 3 from the U3 review), 2026-09-05. Rev 7 (W5 Rev 1, W9 Rev 2 from the
+comment pass), 2026-09-07. Plan §8 P9 and
 §8 U3 govern this block. The
 facade side is `facade.md` L14 and `facade-generator.md` F23. The
 script side is the API layer (`api-layer.md`) and the TypeGPU layer.
@@ -87,7 +88,9 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   presents, and releases the view and the texture. On `Outdated` it
   reconfigures with the current window size and skips the frame. On
   `Timeout` it skips the frame. On `Lost` or `Error` it prints one
-  message with the status name and exits with a non-zero code. The
+  message that names the failure and exits with a non-zero code
+  (Rev 1: the message is prose, and an unknown status prints its
+  number). The
   host never calls `frame` without a texture.
 - **W6 — The host steps async work after every frame.** After
   `frame` returns and the host presents, the host pumps
@@ -126,8 +129,9 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   to sRGB (Rev 1): an unset layer is interpreted in the display's
   native gamut, while a browser color-matches canvas content as
   sRGB, measured as a visible saturation difference. Windows passes
-  the `HWND` and `HINSTANCE`. `create_surface` is the only platform-conditional
-  code. On another platform the binary prints one line and exits
+  the `HWND` and `HINSTANCE`. `create_surface`, the macOS color space module, the event loop
+  construction, and the `main` entry are the platform-conditional
+  code (Rev 2). On another platform the binary prints one line and exits
   with a non-zero code. The crate has no cargo feature.
 - **W10 — The dev tier runs in process.** The host runs the script
   through `ReloadSession` on the main thread inside the event loop,
