@@ -231,8 +231,10 @@ F12, F16, or E1.
 
 - **H2 — Limits.** A limits fill returns an `i32` status. The output
   values pass verbatim, u64 fields included. On input a field value of
-  0 means unspecified for the three u64 limits. A u32 limit uses the
-  undefined constant verbatim.
+  0 means unspecified for the three u64 limits. A u32 limit crosses
+  the boundary as the undefined constant, and the API layer lowers a
+  script value of 0 to that constant (`toRequiredLimitU32`) before the
+  call, so a script never spells it (Rev 1).
 - **H3 — Adapter info.** The adapter-info export fills a record. The
   facade copies all four strings. The facade calls the backend
   free-members function internally before it returns. The string
