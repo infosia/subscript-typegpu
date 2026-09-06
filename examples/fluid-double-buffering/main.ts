@@ -3,7 +3,7 @@
 // obstacle that follows the pointer or the A and D keys. Each cell picks the cheapest open
 // neighbor as its velocity and sends density there, as upstream does. The source tracks the
 // obstacle, where upstream holds it at a fixed position, and the wall slider becomes a fixed
-// value. The grid is 32 by 32.
+// value. The grid is 256 by 256, as upstream.
 // Ported from TypeGPU's fluid-double-buffering example (https://github.com/software-mansion/TypeGPU).
 
 import {
@@ -55,9 +55,9 @@ import {
   obstacle_WGSL,
 } from "./main.typegpu";
 
-// The grid commits to 32 by 32 cells, so one compute dispatch covers it with 4 by 4 workgroups.
+// The grid is 256 by 256 cells, so one compute dispatch covers it with 32 by 32 workgroups.
 // TypeGPU runs a 256-square grid inside an array sized for 1024 squared cells.
-const GRID_SIZE: u32 = 32;
+const GRID_SIZE: u32 = 256;
 const CELL_COUNT: u32 = GRID_SIZE * GRID_SIZE;
 
 // One corner of the render strip. The generator derives `Vertex_STRIDE` from this class, and
@@ -240,7 +240,8 @@ function evaporateKernel(res: FluidLayout, ctx: ComputeInvocation): void {
 }
 
 // The third pass applies the two boundary rules. The obstacle box holds its cells at zero.
-// The bottom three rows near the same X hold density at 1.0, so the source follows the obstacle.
+// The top three rows near the same X hold density at 1.0 with a downward velocity, so the
+// source follows the obstacle and the fluid falls onto it.
 // TypeGPU moves four obstacle boxes in a separate pass and holds its source at one fixed point.
 function obstacleKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   const x: u32 = ctx.globalId.x;
@@ -259,8 +260,8 @@ function obstacleKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   if (distanceX < 0.12 && distanceY < 0.35) {
     cell.velocity = new Vec2f(0.0, 0.0);
     cell.density = 0.0;
-  } else if (y < 3 && distanceX < 0.18) {
-    cell.velocity.y += 0.012;
+  } else if (y >= GRID_SIZE - 3 && distanceX < 0.18) {
+    cell.velocity = new Vec2f(0.0, -1.0);
     cell.density = 1.0;
   }
   res.target[index] = cell;
@@ -408,7 +409,7 @@ export function init(
     const x: u32 = index % GRID_SIZE;
     const y: u32 = index / GRID_SIZE;
     let density: f32 = 0.0;
-    if (x > 12 && x < 20 && y < 8) density = 0.8;
+    if (x > GRID_SIZE * 3 / 8 && x < GRID_SIZE * 5 / 8 && y < GRID_SIZE / 4) density = 0.8;
     const cell = new FluidCell(new Vec2f(0.0, 0.0), density);
     const bytes: u8[] = Context.bytesOf<FluidCell>(cell);
     for (let byteIndex: i32 = 0; byteIndex < bytes.length; byteIndex += 1) {
@@ -633,7 +634,7 @@ export function frame(
   const obstacleGroup: GPUBindGroup = writesToB ? obstacleAB : obstacleBA;
   const displayGroup: GPUBindGroup = writesToB ? renderB : renderA;
   // Each dispatch records its own compute pass, and the passes run in record order.
-  // The counts are workgroups, so 32 cells over a workgroup of 8 need four groups per axis.
+  // The counts are workgroups, so 256 cells over a workgroup of 8 need 32 groups per axis.
   using encoder = device.createCommandEncoderDefault();
   flowPipeline.dispatch(encoder, [flowGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
   evaporatePipeline.dispatch(encoder, [evaporateGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
