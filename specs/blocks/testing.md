@@ -230,3 +230,16 @@ principles" govern this block.
   it, and the diagnostics test exempts that prefix. Generated
   library files carry the lints through their generator. Arithmetic
   overflow is outside this rule.
+
+- **T23 — Every public item carries a documentation comment.** Rev 0,
+  2026-09-07. Every library crate root (`crates/typegpu-gen`,
+  `crates/harness`, `crates/webgpu-gen`, `crates/facade`) denies
+  `missing_docs`, and `cargo clippy --workspace -- -D warnings` is the
+  gate. A generated module carries its comments through its
+  generator, so the generator emits a `///` line for every public item
+  it writes. A comment states what the item does or returns, the
+  meaning of its inputs, and the error it returns, in one to three
+  sentences, and never repeats the signature in words. Private items
+  carry a comment when the name does not say everything. The
+  subscript-facing modules under `lib/` follow the same rule without a
+  compiler gate, and the phase review checks them.
