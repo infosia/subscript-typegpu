@@ -30,7 +30,10 @@ fn line_comment(doc: &str) -> String {
 /// fill records, and the boundary structs. One declaration group per chunk in policy order
 /// follows, and the releases come last. Each entry of `cenum_aliases` adds the
 /// `@subscript-cenum` pragma that `subscript bind` reads beside its constant set.
-pub(crate) fn render(plan: &Plan, cenum_aliases: &[CEnumAlias]) -> String {
+pub(crate) fn render(
+    plan: &Plan,
+    cenum_aliases: &[CEnumAlias],
+) -> Result<String, crate::policy::PolicyError> {
     let has_async = plan.chunks.iter().any(|chunk| {
         matches!(
             chunk,
@@ -82,7 +85,7 @@ pub(crate) fn render(plan: &Plan, cenum_aliases: &[CEnumAlias]) -> String {
     }
     for shape in &plan.structs {
         out.push('\n');
-        out.push_str(&descriptor::c_struct(shape));
+        out.push_str(&descriptor::c_struct(shape)?);
         out.push('\n');
     }
     if plan.device_descriptor {
@@ -159,7 +162,9 @@ pub(crate) fn render(plan: &Plan, cenum_aliases: &[CEnumAlias]) -> String {
                     .structs
                     .iter()
                     .find(|shape| shape.source == op.descriptor)
-                    .expect("descriptor shape exists");
+                    .ok_or_else(|| {
+                        crate::internal("emit_header::render", "missing descriptor shape")
+                    })?;
                 chunks.push(vec![Item::new(None, descriptor::c_decl(op, shape))]);
             }
             Chunk::DescriptorAsync(op) => {
@@ -167,7 +172,9 @@ pub(crate) fn render(plan: &Plan, cenum_aliases: &[CEnumAlias]) -> String {
                     .structs
                     .iter()
                     .find(|shape| shape.source == op.descriptor)
-                    .expect("descriptor shape exists");
+                    .ok_or_else(|| {
+                        crate::internal("emit_header::render", "missing descriptor shape")
+                    })?;
                 let mut items = vec![Item::new(
                     None,
                     descriptor_async::c_request_decl(op, shape, &plan.anchor),
@@ -191,7 +198,7 @@ pub(crate) fn render(plan: &Plan, cenum_aliases: &[CEnumAlias]) -> String {
                 )]);
             }
             Chunk::Array(op) => {
-                chunks.push(vec![Item::new(None, handle_array::c_decl(op))]);
+                chunks.push(vec![Item::new(None, handle_array::c_decl(op)?)]);
             }
             Chunk::MapAsync(op) => chunks.push(
                 map_async::c_decls(op)
@@ -204,15 +211,17 @@ pub(crate) fn render(plan: &Plan, cenum_aliases: &[CEnumAlias]) -> String {
                     plan.structs
                         .iter()
                         .find(|shape| shape.source == name)
-                        .expect("write-texture shape exists")
+                        .ok_or_else(|| {
+                            crate::internal("emit_header::render", "missing write-texture shape")
+                        })
                 };
                 chunks.push(vec![Item::new(
                     None,
                     write_texture::c_decl(
                         op,
-                        find(&op.destination),
-                        find(&op.layout),
-                        find(&op.extent),
+                        find(&op.destination)?,
+                        find(&op.layout)?,
+                        find(&op.extent)?,
                     ),
                 )]);
             }
@@ -229,7 +238,9 @@ pub(crate) fn render(plan: &Plan, cenum_aliases: &[CEnumAlias]) -> String {
                     .structs
                     .iter()
                     .find(|shape| shape.source == op.shape)
-                    .expect("limits shape exists");
+                    .ok_or_else(|| {
+                        crate::internal("emit_header::render", "missing limits shape")
+                    })?;
                 chunks.push(vec![Item::new(
                     None,
                     adapter_limits::c_limits_decl(op, shape),
@@ -267,5 +278,5 @@ pub(crate) fn render(plan: &Plan, cenum_aliases: &[CEnumAlias]) -> String {
         }
     }
     out.push_str("\n#endif /* SUBSCRIPT_TYPEGPU_H_ */\n");
-    out
+    Ok(out)
 }

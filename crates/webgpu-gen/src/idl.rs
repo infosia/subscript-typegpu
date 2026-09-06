@@ -38,12 +38,17 @@ pub fn extract_gpuweb_idl(document: &str) -> Result<ExtractedIdl, String> {
     let mut rest = document;
     let mut blocks = Vec::new();
     while let Some(open_offset) = rest.find(OPEN) {
-        rest = &rest[open_offset + OPEN.len()..];
+        rest = rest.get(open_offset + OPEN.len()..).ok_or_else(|| {
+            "internal: idl::extract_gpuweb_idl: invalid block range open_offset + OPEN.len().."
+                .to_owned()
+        })?;
         let close_offset = rest
             .find(CLOSE)
             .ok_or_else(|| "unterminated <script type=idl> block".to_owned())?;
-        blocks.push(&rest[..close_offset]);
-        rest = &rest[close_offset + CLOSE.len()..];
+        blocks.push(rest.get(..close_offset).ok_or_else(|| {
+            "internal: idl::extract_gpuweb_idl: invalid block range ..close_offset".to_owned()
+        })?);
+        rest = rest.get(close_offset + CLOSE.len()..).ok_or_else(|| "internal: idl::extract_gpuweb_idl: invalid block range close_offset + CLOSE.len()..".to_owned())?;
     }
 
     let source = blocks.join("\n");
@@ -53,8 +58,7 @@ pub fn extract_gpuweb_idl(document: &str) -> Result<ExtractedIdl, String> {
     let mut namespace_count = 0;
     let mut index = 0;
 
-    while index < lines.len() {
-        let line = lines[index];
+    while let Some(&line) = lines.get(index) {
         let trimmed = line.trim();
         let Some(namespace) = parse_namespace_open(trimmed) else {
             remainder.push(line);
@@ -65,8 +69,8 @@ pub fn extract_gpuweb_idl(document: &str) -> Result<ExtractedIdl, String> {
         let mut namespace_constants = Vec::new();
         let mut cursor = index + 1;
         let mut closed = false;
-        while cursor < lines.len() {
-            let member = lines[cursor].trim();
+        while let Some(line) = lines.get(cursor) {
+            let member = line.trim();
             if member == "};" {
                 closed = true;
                 break;

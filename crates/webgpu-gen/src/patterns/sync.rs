@@ -156,7 +156,7 @@ pub(crate) fn rust_sync_extern(op: &SyncOp) -> String {
 }
 
 /// The exported create wrapper (NULL descriptor when dropped).
-pub(crate) fn rust_create_export(op: &CreateOp) -> String {
+pub(crate) fn rust_create_export(op: &CreateOp) -> Result<String, crate::policy::PolicyError> {
     let subscript_typegpu_ret = naming::subscript_typegpu_type(&op.returns_object);
     let doc = op
         .doc
@@ -166,7 +166,12 @@ pub(crate) fn rust_create_export(op: &CreateOp) -> String {
         let instance_descriptor = &op
             .dropped_arg
             .as_ref()
-            .expect("instance creation has its validated descriptor")
+            .ok_or_else(|| {
+                crate::internal(
+                    "patterns::sync::rust_create_export",
+                    "missing validated instance descriptor",
+                )
+            })?
             .1;
         (
             concat!(
@@ -233,12 +238,12 @@ pub(crate) fn rust_create_export(op: &CreateOp) -> String {
             ),
         }
     };
-    format!(
+    Ok(format!(
         "/// `subscript-typegpu.h`: {doc}\n\
          #[no_mangle]\n\
          pub extern \"C\" fn {}() -> {subscript_typegpu_ret} {{\n{safety}{call}}}\n",
         op.subscript_typegpu_fn
-    )
+    ))
 }
 
 /// The exported sync wrapper (NULL-tolerant receiver).
@@ -359,6 +364,15 @@ pub(crate) fn rust_sync_export(op: &SyncOp, drain_callbacks: bool) -> String {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::indexing_slicing
+)]
 mod tests {
     use super::{rust_create_export, rust_instance_backend_types};
     use crate::plan::CreateOp;
@@ -390,7 +404,8 @@ mod tests {
                 "PinnedInstanceDescriptor".to_owned(),
             )),
             doc: None,
-        });
+        })
+        .unwrap();
         for expected in [
             "var_os(\"SUBSCRIPT_TYPEGPU_BACKEND\")",
             "Some(\"metal\")",

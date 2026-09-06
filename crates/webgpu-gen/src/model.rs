@@ -216,12 +216,19 @@ impl Yml {
 impl Enum {
     /// The numeric value of a named entry: its index in `entries`
     /// (nulls occupy slots), per the webgpu.yml value scheme.
-    pub fn value_of(&self, entry: &str) -> Option<u32> {
-        self.entries.iter().enumerate().find_map(|(i, e)| {
-            e.as_ref()
-                .filter(|e| e.name == entry)
-                .map(|_| u32::try_from(i).expect("enum entry index fits u32"))
-        })
+    pub fn value_of(&self, entry: &str) -> Result<Option<u32>, crate::policy::PolicyError> {
+        self.entries
+            .iter()
+            .position(|value| value.as_ref().is_some_and(|value| value.name == entry))
+            .map(|index| {
+                u32::try_from(index).map_err(|_| {
+                    crate::internal(
+                        "model::Enum::value_of",
+                        format!("enum `{}` entry `{entry}` index exceeds u32", self.name),
+                    )
+                })
+            })
+            .transpose()
     }
 }
 

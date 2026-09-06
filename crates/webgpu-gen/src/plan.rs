@@ -741,7 +741,12 @@ pub(crate) fn build(yml: &Yml, policy: &Policy) -> Result<Plan, PolicyError> {
     let mut creates = Vec::new();
     let mut function_chunks = Vec::new();
     for row in &policy.functions {
-        let function = yml.function(&row.name).expect("checked by check_unknown");
+        let function = yml.function(&row.name).ok_or_else(|| {
+            crate::internal(
+                "plan::build",
+                "missing construct validated by check_unknown",
+            )
+        })?;
         match row.pattern.as_str() {
             "create" => creates.push(build_create(yml, policy, function, row.doc.clone())?),
             "limits-fill" => function_chunks.push(Chunk::Limits(build_limits(
@@ -783,7 +788,12 @@ pub(crate) fn build(yml: &Yml, policy: &Policy) -> Result<Plan, PolicyError> {
 
     for row in &policy.map {
         let (object, method) = split_construct(&row.method);
-        let method = method.expect("checked by check_unknown");
+        let method = method.ok_or_else(|| {
+            crate::internal(
+                "plan::build",
+                "missing construct validated by check_unknown",
+            )
+        })?;
         if !policy.slice.objects.iter().any(|o| o == object) {
             return Err(PolicyError::Invalid {
                 entry: row.method.clone(),
@@ -793,7 +803,12 @@ pub(crate) fn build(yml: &Yml, policy: &Policy) -> Result<Plan, PolicyError> {
         let function = yml
             .object(object)
             .and_then(|o| o.methods.iter().find(|m| m.name == method))
-            .expect("checked by check_unknown");
+            .ok_or_else(|| {
+                crate::internal(
+                    "plan::build",
+                    "missing construct validated by check_unknown",
+                )
+            })?;
         match row.pattern.as_str() {
             "sync" => {
                 let op = build_sync(
@@ -883,12 +898,11 @@ pub(crate) fn build(yml: &Yml, policy: &Policy) -> Result<Plan, PolicyError> {
                     let mode_enum = yml.enum_("callback_mode").ok_or(PolicyError::Unknown {
                         entry: "enum.callback_mode".into(),
                     })?;
-                    let value =
-                        mode_enum
-                            .value_of("allow_process_events")
-                            .ok_or(PolicyError::Unknown {
-                                entry: "callback_mode.allow_process_events".into(),
-                            })?;
+                    let value = mode_enum.value_of("allow_process_events")?.ok_or(
+                        PolicyError::Unknown {
+                            entry: "callback_mode.allow_process_events".into(),
+                        },
+                    )?;
                     mode_const = Some((
                         naming::wgpu_enum_member("callback_mode", "allow_process_events"),
                         value,
@@ -917,7 +931,9 @@ pub(crate) fn build(yml: &Yml, policy: &Policy) -> Result<Plan, PolicyError> {
                 let descriptor = structs
                     .iter()
                     .find(|shape| shape.source == op.descriptor)
-                    .expect("descriptor shape was registered");
+                    .ok_or_else(|| {
+                        crate::internal("plan::build", "missing registered descriptor shape")
+                    })?;
                 needs_string_view |= descriptor
                     .fields
                     .iter()
@@ -1019,12 +1035,11 @@ pub(crate) fn build(yml: &Yml, policy: &Policy) -> Result<Plan, PolicyError> {
                     let mode_enum = yml.enum_("callback_mode").ok_or(PolicyError::Unknown {
                         entry: "enum.callback_mode".into(),
                     })?;
-                    let value =
-                        mode_enum
-                            .value_of("allow_process_events")
-                            .ok_or(PolicyError::Unknown {
-                                entry: "callback_mode.allow_process_events".into(),
-                            })?;
+                    let value = mode_enum.value_of("allow_process_events")?.ok_or(
+                        PolicyError::Unknown {
+                            entry: "callback_mode.allow_process_events".into(),
+                        },
+                    )?;
                     mode_const = Some((
                         naming::wgpu_enum_member("callback_mode", "allow_process_events"),
                         value,
@@ -1139,7 +1154,12 @@ pub(crate) fn build(yml: &Yml, policy: &Policy) -> Result<Plan, PolicyError> {
         });
     }
     for object_name in &policy.slice.objects {
-        let object = yml.object(object_name).expect("checked by check_unknown");
+        let object = yml.object(object_name).ok_or_else(|| {
+            crate::internal(
+                "plan::build",
+                "missing construct validated by check_unknown",
+            )
+        })?;
         for method in &object.methods {
             let key = format!("{object_name}.{}", method.name);
             if key == "instance.create_surface" {
@@ -1581,7 +1601,9 @@ fn build_adapter_info(
     }
     let success_value = yml
         .enum_("status")
-        .and_then(|status| status.value_of("success"))
+        .map(|status| status.value_of("success"))
+        .transpose()?
+        .flatten()
         .ok_or(PolicyError::Unknown {
             entry: "status.success".into(),
         })?;
@@ -1625,9 +1647,14 @@ fn register_device_descriptor_support(
             .iter()
             .zip(expected)
             .any(|(member, (name, ty))| member.name != name || member.ty != ty)
-        || descriptor.members[1].pointer.as_deref() != Some("immutable")
-        || descriptor.members[2].pointer.as_deref() != Some("immutable")
-        || !descriptor.members[2].optional
+        || descriptor
+            .members
+            .get(1)
+            .is_none_or(|member| member.pointer.as_deref() != Some("immutable"))
+        || descriptor
+            .members
+            .get(2)
+            .is_none_or(|member| member.pointer.as_deref() != Some("immutable") || !member.optional)
     {
         return Err(PolicyError::Invalid {
             entry: entry.to_owned(),
@@ -1787,7 +1814,12 @@ fn build_method_arg(
             let owns_storage = structs
                 .iter()
                 .find(|shape| shape.source == name)
-                .expect("method argument shape was registered")
+                .ok_or_else(|| {
+                    crate::internal(
+                        "plan::build_method_arg",
+                        "missing registered method argument shape",
+                    )
+                })?
                 .owns_storage;
             return Ok(MethodArg::StructPointer {
                 name: arg.name.clone(),
@@ -1863,7 +1895,7 @@ fn ensure_async_support(
             entry: "enum.callback_mode".into(),
         })?;
         let value = mode_enum
-            .value_of("allow_process_events")
+            .value_of("allow_process_events")?
             .ok_or(PolicyError::Unknown {
                 entry: "callback_mode.allow_process_events".into(),
             })?;
@@ -1932,7 +1964,9 @@ fn callback_plan(
     }
     let status_value = yml
         .enum_(status_enum)
-        .and_then(|e| e.value_of("success"))
+        .map(|e| e.value_of("success"))
+        .transpose()?
+        .flatten()
         .ok_or(PolicyError::Unknown {
             entry: format!("{status_enum}.success"),
         })?;
@@ -2072,12 +2106,14 @@ fn build_shader_wgsl(
             message: "shader-wgsl requires shader_module_descriptor by immutable pointer".into(),
         });
     }
-    let base = yml
-        .struct_("shader_module_descriptor")
-        .expect("checked by method shape");
+    let base = yml.struct_("shader_module_descriptor").ok_or_else(|| {
+        crate::internal("plan::build_shader_wgsl", "missing validated method shape")
+    })?;
     if base.members.len() != 1
-        || base.members[0].name != "label"
-        || base.members[0].ty != "string_with_default_empty"
+        || base
+            .members
+            .first()
+            .is_none_or(|member| member.name != "label" || member.ty != "string_with_default_empty")
     {
         return Err(PolicyError::Invalid {
             entry,
@@ -2097,12 +2133,17 @@ fn build_shader_wgsl(
             message: "WGSL flattening must expose exactly the `code` field".into(),
         });
     }
-    let extension = yml
-        .struct_("shader_source_WGSL")
-        .expect("checked by check_unknown");
+    let extension = yml.struct_("shader_source_WGSL").ok_or_else(|| {
+        crate::internal(
+            "plan::build_shader_wgsl",
+            "missing construct validated by check_unknown",
+        )
+    })?;
     if extension.members.len() != 1
-        || extension.members[0].name != "code"
-        || extension.members[0].ty != "string_with_default_empty"
+        || extension
+            .members
+            .first()
+            .is_none_or(|member| member.name != "code" || member.ty != "string_with_default_empty")
     {
         return Err(PolicyError::Invalid {
             entry: row.construct.clone(),
@@ -2120,7 +2161,9 @@ fn build_shader_wgsl(
         })?;
     let s_type_value = yml
         .enum_("s_type")
-        .and_then(|enum_| enum_.value_of("shader_source_WGSL"))
+        .map(|enum_| enum_.value_of("shader_source_WGSL"))
+        .transpose()?
+        .flatten()
         .ok_or_else(|| PolicyError::Unknown {
             entry: "s_type.shader_source_WGSL".into(),
         })?;
@@ -2181,7 +2224,9 @@ fn register_struct(
                 structs
                     .iter_mut()
                     .find(|shape| shape.source == nested)
-                    .expect("nested struct was registered")
+                    .ok_or_else(|| {
+                        crate::internal("plan::register_struct", "missing registered nested struct")
+                    })?
                     .backend_copy = true;
             }
         }
@@ -2206,7 +2251,9 @@ fn register_struct(
             nested_owns_storage = structs
                 .iter()
                 .find(|shape| shape.source == name)
-                .expect("nested struct was registered")
+                .ok_or_else(|| {
+                    crate::internal("plan::register_struct", "missing registered nested struct")
+                })?
                 .owns_storage;
             if member.pointer.is_some() {
                 if member.pointer.as_deref() != Some("immutable") {
@@ -2254,7 +2301,12 @@ fn register_struct(
                 nested_owns_storage = structs
                     .iter()
                     .find(|shape| shape.source == name)
-                    .expect("array element struct was registered")
+                    .ok_or_else(|| {
+                        crate::internal(
+                            "plan::register_struct",
+                            "missing registered array element struct",
+                        )
+                    })?
                     .owns_storage;
                 (DescriptorFieldKind::StructArray, name)
             } else if let Some(name) = inner.strip_prefix("object.") {
@@ -2355,13 +2407,18 @@ fn register_struct(
                     ),
                 });
             }
-            let constant_name = row
-                .zero_maps_to
-                .strip_prefix("constant.")
-                .expect("checked by check_unknown");
-            let constant = yml
-                .constant(constant_name)
-                .expect("checked by check_unknown");
+            let constant_name = row.zero_maps_to.strip_prefix("constant.").ok_or_else(|| {
+                crate::internal(
+                    "plan::register_struct",
+                    "missing construct validated by check_unknown",
+                )
+            })?;
+            let constant = yml.constant(constant_name).ok_or_else(|| {
+                crate::internal(
+                    "plan::register_struct",
+                    "missing construct validated by check_unknown",
+                )
+            })?;
             let value = constant.value.as_str();
             if value != Some("uint64_max") {
                 return Err(PolicyError::Invalid {
@@ -2520,7 +2577,10 @@ fn build_byte_pair(
             entry: entry.clone(),
             message: "byte-pair pattern requires a void pointer".into(),
         })?;
-    let data = &method.args[pair_index];
+    let data = method
+        .args
+        .get(pair_index)
+        .ok_or_else(|| crate::internal("plan::build_byte_pair", "missing located data argument"))?;
     if method
         .args
         .get(pair_index + 1)
@@ -2543,7 +2603,11 @@ fn build_byte_pair(
         }
     };
     let mut args = Vec::new();
-    for arg in &method.args[..pair_index] {
+    for arg in method
+        .args
+        .get(..pair_index)
+        .ok_or_else(|| crate::internal("plan::build_byte_pair", "missing data argument prefix"))?
+    {
         if let Some(target) = arg.ty.strip_prefix("object.") {
             if !policy
                 .slice
@@ -2579,7 +2643,7 @@ fn build_byte_pair(
             entry: "enum.status".into(),
         })?;
         status
-            .value_of("error")
+            .value_of("error")?
             .ok_or_else(|| PolicyError::Unknown {
                 entry: "status.error".into(),
             })? as i32
@@ -2882,7 +2946,9 @@ fn build_device_events(
         })?;
     let status_value = yml
         .enum_(status_enum)
-        .and_then(|values| values.value_of("success"))
+        .map(|values| values.value_of("success"))
+        .transpose()?
+        .flatten()
         .ok_or_else(|| PolicyError::Unknown {
             entry: format!("{status_enum}.success"),
         })?;
@@ -2926,14 +2992,16 @@ fn build_const_set(yml: &Yml, source: &str) -> Result<ConstSet, PolicyError> {
                 .entries
                 .iter()
                 .map(|e| {
-                    let value = bitflag.value_of(&e.name).expect("entry exists");
-                    (
+                    let value = bitflag.value_of(&e.name).ok_or_else(|| {
+                        crate::internal("plan::build_const_set", "missing constant entry value")
+                    })?;
+                    Ok((
                         naming::wgpu_enum_member(name, &e.name),
                         "u64",
                         naming::hex_flag(value),
-                    )
+                    ))
                 })
-                .collect();
+                .collect::<Result<Vec<_>, PolicyError>>()?;
             Ok(ConstSet {
                 source: source.to_string(),
                 rows,
@@ -2948,14 +3016,16 @@ fn build_const_set(yml: &Yml, source: &str) -> Result<ConstSet, PolicyError> {
                 .iter()
                 .flatten()
                 .map(|e| {
-                    let value = enum_.value_of(&e.name).expect("entry exists");
-                    (
+                    let value = enum_.value_of(&e.name)?.ok_or_else(|| {
+                        crate::internal("plan::build_const_set", "missing constant entry value")
+                    })?;
+                    Ok((
                         naming::wgpu_enum_member(name, &e.name),
                         "i32",
                         naming::hex_enum(value),
-                    )
+                    ))
                 })
-                .collect();
+                .collect::<Result<Vec<_>, PolicyError>>()?;
             Ok(ConstSet {
                 source: source.to_string(),
                 rows,

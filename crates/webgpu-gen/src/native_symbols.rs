@@ -87,16 +87,37 @@ pub(crate) fn export_names(plan: &Plan) -> Vec<String> {
     names
 }
 
-fn rust_signature<'a>(rust: &'a str, name: &str) -> (&'a str, Vec<&'a str>, &'a str) {
+fn rust_signature<'a>(
+    rust: &'a str,
+    name: &str,
+) -> Result<(&'a str, Vec<&'a str>, &'a str), crate::policy::PolicyError> {
     let marker = format!("pub extern \"C\" fn {name}(");
-    let start = rust
-        .find(&marker)
-        .unwrap_or_else(|| panic!("facade Rust lacks export `{name}`"));
-    let signature = &rust[start + marker.len() - 1..];
+    let start = rust.find(&marker).ok_or_else(|| {
+        crate::internal(
+            "native_symbols::rust_signature",
+            format!("facade Rust lacks export `{name}`"),
+        )
+    })?;
+    let signature = rust.get(start + marker.len() - 1..).ok_or_else(|| {
+        crate::internal(
+            "native_symbols::rust_signature",
+            "invalid rust range start + marker.len() - 1..",
+        )
+    })?;
     let open = 0;
     let mut depth = 0usize;
     let mut close = None;
-    for (offset, byte) in signature[open..].bytes().enumerate() {
+    for (offset, byte) in signature
+        .get(open..)
+        .ok_or_else(|| {
+            crate::internal(
+                "native_symbols::rust_signature",
+                "invalid signature range open..",
+            )
+        })?
+        .bytes()
+        .enumerate()
+    {
         match byte {
             b'(' => depth += 1,
             b')' => {
@@ -109,29 +130,54 @@ fn rust_signature<'a>(rust: &'a str, name: &str) -> (&'a str, Vec<&'a str>, &'a 
             _ => {}
         }
     }
-    let close = close.unwrap_or_else(|| panic!("facade export `{name}` has unclosed parameters"));
-    let params = &signature[open + 1..close];
-    let result_tail = &signature[close + 1..];
-    let body = result_tail
-        .find('{')
-        .unwrap_or_else(|| panic!("facade export `{name}` lacks a body"));
-    let result = result_tail[..body].trim();
+    let close = close.ok_or_else(|| {
+        crate::internal(
+            "native_symbols::rust_signature",
+            format!("facade export `{name}` has unclosed parameters"),
+        )
+    })?;
+    let params = signature.get(open + 1..close).ok_or_else(|| {
+        crate::internal(
+            "native_symbols::rust_signature",
+            "invalid signature range open + 1..close",
+        )
+    })?;
+    let result_tail = signature.get(close + 1..).ok_or_else(|| {
+        crate::internal(
+            "native_symbols::rust_signature",
+            "invalid signature range close + 1..",
+        )
+    })?;
+    let body = result_tail.find('{').ok_or_else(|| {
+        crate::internal(
+            "native_symbols::rust_signature",
+            format!("facade export `{name}` lacks a body"),
+        )
+    })?;
+    let result = result_tail
+        .get(..body)
+        .ok_or_else(|| {
+            crate::internal(
+                "native_symbols::rust_signature",
+                "invalid result_tail range ..body",
+            )
+        })?
+        .trim();
     let arguments = params
         .split(',')
         .map(str::trim)
         .filter(|param| !param.is_empty())
         .map(|param| {
-            param
-                .split_once(':')
-                .map_or_else(
-                    || panic!("facade export `{name}` has malformed `{param}`"),
-                    |item| item.0,
+            let (argument, _) = param.split_once(':').ok_or_else(|| {
+                crate::internal(
+                    "native_symbols::rust_signature",
+                    format!("facade export `{name}` has malformed `{param}`"),
                 )
-                .trim()
-                .trim_start_matches("mut ")
+            })?;
+            Ok(argument.trim().trim_start_matches("mut "))
         })
-        .collect();
-    (params, arguments, result)
+        .collect::<Result<Vec<_>, crate::policy::PolicyError>>()?;
+    Ok((params, arguments, result))
 }
 
 /// Renders the harness symbol table from the plan and the emitted facade source.
@@ -143,7 +189,7 @@ pub(crate) fn render(
     plan: &Plan,
     rust: &str,
     excluded_exports: &std::collections::BTreeSet<String>,
-) -> GeneratedNativeSymbols {
+) -> Result<GeneratedNativeSymbols, crate::policy::PolicyError> {
     let names = export_names(plan)
         .into_iter()
         .filter(|name| !excluded_exports.contains(name))
@@ -154,7 +200,7 @@ pub(crate) fn render(
     source
         .push_str("use subscript_typegpu_facade as facade;\nuse subscript_typegpu_facade::*;\n\n");
     for (index, name) in names.iter().enumerate() {
-        let (params, arguments, result) = rust_signature(rust, name);
+        let (params, arguments, result) = rust_signature(rust, name)?;
         let result = if result.is_empty() {
             String::new()
         } else {
@@ -184,5 +230,32 @@ pub(crate) fn render(
         ));
     }
     source.push_str("    ]\n}\n");
-    GeneratedNativeSymbols { source, names }
+    Ok(GeneratedNativeSymbols { source, names })
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::indexing_slicing
+)]
+mod tests {
+    #[test]
+    fn malformed_exports_return_internal_errors() {
+        for source in [
+            "",
+            "pub extern \"C\" fn broken(",
+            "pub extern \"C\" fn broken()",
+            "pub extern \"C\" fn broken(value) {}",
+        ] {
+            let error = super::rust_signature(source, "broken").unwrap_err();
+            let message = error.to_string();
+            assert!(message.starts_with("internal: native_symbols::rust_signature:"));
+            assert!(message.contains("broken"));
+        }
+    }
 }

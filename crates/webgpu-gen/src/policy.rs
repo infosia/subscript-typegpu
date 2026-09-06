@@ -560,6 +560,9 @@ impl fmt::Display for PolicyError {
                 f,
                 "policy error (unpoliced): `{construct}` is reachable from the subset but has neither a rule pattern nor a policy entry"
             ),
+            PolicyError::Invalid { message, .. } if message.starts_with("internal:") => {
+                write!(f, "{message}")
+            }
             PolicyError::Invalid { entry, message } => {
                 write!(f, "policy error (invalid): `{entry}`: {message}")
             }

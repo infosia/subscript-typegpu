@@ -404,7 +404,12 @@ impl IdlModel {
                 if !visiting.insert(name.clone()) {
                     return Err(format!("IDL typedef cycle at `{name}`"));
                 }
-                let resolved = self.resolve_type(&self.typedefs[name], visiting)?;
+                let resolved = self.resolve_type(
+                    self.typedefs.get(name).ok_or_else(|| {
+                        format!("internal: api_model::resolve_type: missing typedef `{name}`")
+                    })?,
+                    visiting,
+                )?;
                 visiting.remove(name);
                 if matches!(
                     resolved,
@@ -764,8 +769,8 @@ impl MirrorModel {
         let mut model = MirrorModel::default();
         let lines: Vec<&str> = source.lines().collect();
         let mut index = 0;
-        while index < lines.len() {
-            let line = lines[index].trim();
+        while let Some(line) = lines.get(index) {
+            let line = line.trim();
             if let Some(name) = line
                 .strip_prefix("interface ")
                 .and_then(|line| line.strip_suffix(" {"))
@@ -779,8 +784,11 @@ impl MirrorModel {
             {
                 let mut fields = Vec::new();
                 index += 1;
-                while index < lines.len() && lines[index].trim() != "}" {
-                    let member = lines[index].trim();
+                while let Some(line) = lines.get(index) {
+                    let member = line.trim();
+                    if member == "}" {
+                        break;
+                    }
                     if !member.starts_with("constructor(") {
                         if let Some((field, ty)) = member
                             .strip_suffix(';')
@@ -810,10 +818,14 @@ impl MirrorModel {
             {
                 let mut members = BTreeMap::new();
                 index += 1;
-                while index < lines.len() && lines[index].trim() != "}" {
-                    let member = lines[index].trim().strip_suffix(',').ok_or_else(|| {
-                        format!("malformed mirror enum member `{}`", lines[index].trim())
-                    })?;
+                while let Some(line) = lines.get(index) {
+                    let member = line.trim();
+                    if member == "}" {
+                        break;
+                    }
+                    let member = member
+                        .strip_suffix(',')
+                        .ok_or_else(|| format!("malformed mirror enum member `{member}`"))?;
                     let (member_name, value) = member
                         .split_once(" = ")
                         .ok_or_else(|| format!("malformed mirror enum member `{member}`"))?;

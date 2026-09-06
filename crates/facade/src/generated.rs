@@ -3957,7 +3957,9 @@ impl WebgpuTable {
             unsafe { library.get::<T>(name) }
                 .map(|value| *value)
                 .map_err(|error| {
-                    let name = std::str::from_utf8(&name[..name.len() - 1]).unwrap_or("<invalid>");
+                    let name = name.get(..name.len().saturating_sub(1))
+                        .and_then(|bytes| std::str::from_utf8(bytes).ok())
+                        .unwrap_or("<invalid>");
                     format!("missing symbol {name} in {}: {error}", path.display())
                 })
         }

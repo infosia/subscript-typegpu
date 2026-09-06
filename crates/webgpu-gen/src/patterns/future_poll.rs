@@ -489,13 +489,22 @@ pub(crate) fn rust_drop_export(anchor: &str) -> String {
 /// Renders the typed take export body for one async op.
 ///
 /// The take transfers the handle once and frees the slot. A second take returns null (F8).
-pub(crate) fn rust_take_export(op: &AsyncOp, anchor: &str) -> String {
-    let object = op
-        .cb
-        .handle_object
-        .as_ref()
-        .expect("take export requires a handle callback");
-    let take_fn = op.take_fn.as_ref().expect("handle callback has a take");
+pub(crate) fn rust_take_export(
+    op: &AsyncOp,
+    anchor: &str,
+) -> Result<String, crate::policy::PolicyError> {
+    let object = op.cb.handle_object.as_ref().ok_or_else(|| {
+        crate::internal(
+            "patterns::future_poll::rust_take_export",
+            "missing take-export handle callback",
+        )
+    })?;
+    let take_fn = op.take_fn.as_ref().ok_or_else(|| {
+        crate::internal(
+            "patterns::future_poll::rust_take_export",
+            "missing handle callback take export",
+        )
+    })?;
     let handle_ty = naming::subscript_typegpu_type(object);
     let sig = rust_signature(
         &format!("pub extern \"C\" fn {take_fn}"),
@@ -509,7 +518,7 @@ pub(crate) fn rust_take_export(op: &AsyncOp, anchor: &str) -> String {
         ],
         &format!(" -> {handle_ty} {{"),
     );
-    format!(
+    Ok(format!(
         "/// `subscript-typegpu.h`: takes the {word} once and frees its slot.\n\
          #[no_mangle]\n\
          {sig}\n\
@@ -518,7 +527,7 @@ pub(crate) fn rust_take_export(op: &AsyncOp, anchor: &str) -> String {
         word = object.replace('_', " "),
         instance = naming::camel(anchor),
         kind = op.kind_const,
-    )
+    ))
 }
 
 /// Renders the private slot-kind constant for one async op.

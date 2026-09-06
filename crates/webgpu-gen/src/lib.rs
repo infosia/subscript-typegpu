@@ -2,6 +2,15 @@
 //! `webgpu.yml` with policy. The API stage joins extracted GPUWeb IDL,
 //! the generated facade mirror, and API policy. Both stages enforce
 //! two-way policy validation and regeneration gates.
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::indexing_slicing
+)]
 #![warn(missing_docs)]
 #![forbid(unsafe_code)]
 
@@ -133,11 +142,11 @@ fn filter_header_exports(mut header: String, excluded: &BTreeSet<String>) -> Str
 fn rust_export_range(source: &str, name: &str) -> Option<std::ops::Range<usize>> {
     let marker = format!("pub extern \"C\" fn {name}(");
     let signature = source.find(&marker)?;
-    let start = source[..signature].rfind("\n///").map_or_else(
-        || source[..signature].rfind("#[no_mangle]"),
-        |offset| Some(offset + 1),
-    )?;
-    let open = source[signature..].find('{')? + signature;
+    let prefix = source.get(..signature)?;
+    let start = prefix
+        .rfind("\n///")
+        .map_or_else(|| prefix.rfind("#[no_mangle]"), |offset| Some(offset + 1))?;
+    let open = source.get(signature..)?.find('{')? + signature;
     let bytes = source.as_bytes();
     let mut depth = 0usize;
     let mut index = open;
@@ -145,7 +154,7 @@ fn rust_export_range(source: &str, name: &str) -> Option<std::ops::Range<usize>>
     let mut character = false;
     let mut escaped = false;
     while index < bytes.len() {
-        let byte = bytes[index];
+        let byte = *bytes.get(index)?;
         if escaped {
             escaped = false;
         } else if string {
@@ -169,7 +178,7 @@ fn rust_export_range(source: &str, name: &str) -> Option<std::ops::Range<usize>>
                     depth -= 1;
                     if depth == 0 {
                         let mut end = index + 1;
-                        while end < bytes.len() && bytes[end] == b'\n' {
+                        while bytes.get(end) == Some(&b'\n') {
                             end += 1;
                         }
                         return Some(start..end);
@@ -188,7 +197,9 @@ fn filter_rust_exports(mut rust: String, excluded: &BTreeSet<String>) -> Result<
         let range = rust_export_range(&rust, name).ok_or_else(|| {
             Error::Policy(PolicyError::Invalid {
                 entry: name.clone(),
-                message: "excluded export has no generated Rust function".to_owned(),
+                message:
+                    "internal: filter_rust_exports: excluded export has no generated Rust function"
+                        .to_owned(),
             })
         })?;
         rust.replace_range(range, "");
@@ -239,13 +250,13 @@ pub fn generate(yml_text: &str, policy_text: &str) -> Result<Generated, Error> {
         }
     }
     let rust = filter_rust_exports(
-        emit_rust::render(&plan, &excluded_exports),
+        emit_rust::render(&plan, &excluded_exports)?,
         &excluded_exports,
     )?;
-    let symbols = native_symbols::render(&plan, &rust, &excluded_exports);
+    let symbols = native_symbols::render(&plan, &rust, &excluded_exports)?;
     Ok(Generated {
         header: filter_header_exports(
-            emit_header::render(&plan, &cenum_aliases),
+            emit_header::render(&plan, &cenum_aliases)?,
             &excluded_exports,
         ),
         rust,
@@ -254,4 +265,11 @@ pub fn generate(yml_text: &str, policy_text: &str) -> Result<Generated, Error> {
         export_names: symbols.names,
         cenum_aliases,
     })
+}
+
+pub(crate) fn internal(site: &str, what: impl std::fmt::Display) -> policy::PolicyError {
+    policy::PolicyError::Invalid {
+        entry: site.to_owned(),
+        message: format!("internal: {site}: {what}"),
+    }
 }

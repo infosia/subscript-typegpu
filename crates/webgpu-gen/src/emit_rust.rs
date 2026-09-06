@@ -25,7 +25,9 @@ struct FunctionSignature {
     result: String,
 }
 
-fn function_signatures(declarations: &str) -> Vec<FunctionSignature> {
+fn function_signatures(
+    declarations: &str,
+) -> Result<Vec<FunctionSignature>, crate::policy::PolicyError> {
     let mut signatures = Vec::new();
     let mut seen = std::collections::BTreeSet::new();
     for declaration in declarations.split(';') {
@@ -38,18 +40,50 @@ fn function_signatures(declarations: &str) -> Vec<FunctionSignature> {
         let Some(signature) = normalized.strip_prefix("fn ") else {
             continue;
         };
-        let open = signature
-            .find('(')
-            .expect("generated function has parameters");
-        let close = signature
-            .rfind(')')
-            .expect("generated function closes parameters");
-        let name = signature[..open].to_owned();
+        let open = signature.find('(').ok_or_else(|| {
+            crate::internal(
+                "emit_rust::function_signatures",
+                "generated function lacks an opening parameter delimiter",
+            )
+        })?;
+        let close = signature.rfind(')').ok_or_else(|| {
+            crate::internal(
+                "emit_rust::function_signatures",
+                "generated function lacks a closing parameter delimiter",
+            )
+        })?;
+        let name = signature
+            .get(..open)
+            .ok_or_else(|| {
+                crate::internal(
+                    "emit_rust::function_signatures",
+                    "invalid signature range ..open",
+                )
+            })?
+            .to_owned();
         if !seen.insert(name.clone()) {
             continue;
         }
-        let params = signature[open + 1..close].trim().to_owned();
-        let result = signature[close + 1..].trim().to_owned();
+        let params = signature
+            .get(open + 1..close)
+            .ok_or_else(|| {
+                crate::internal(
+                    "emit_rust::function_signatures",
+                    "invalid signature range open + 1..close",
+                )
+            })?
+            .trim()
+            .to_owned();
+        let result = signature
+            .get(close + 1..)
+            .ok_or_else(|| {
+                crate::internal(
+                    "emit_rust::function_signatures",
+                    "invalid signature range close + 1..",
+                )
+            })?
+            .trim()
+            .to_owned();
         let mut pairs = Vec::new();
         let mut start = 0;
         let mut depth = 0_u32;
@@ -58,7 +92,15 @@ fn function_signatures(declarations: &str) -> Vec<FunctionSignature> {
                 '(' | '[' | '<' => depth += 1,
                 ')' | ']' | '>' => depth = depth.saturating_sub(1),
                 ',' if depth == 0 => {
-                    let pair = params[start..index].trim();
+                    let pair = params
+                        .get(start..index)
+                        .ok_or_else(|| {
+                            crate::internal(
+                                "emit_rust::function_signatures",
+                                "invalid params range start..index",
+                            )
+                        })?
+                        .trim();
                     if !pair.is_empty() {
                         pairs.push(pair);
                     }
@@ -67,32 +109,37 @@ fn function_signatures(declarations: &str) -> Vec<FunctionSignature> {
                 _ => {}
             }
         }
-        let pair = params[start..].trim();
+        let pair = params
+            .get(start..)
+            .ok_or_else(|| {
+                crate::internal(
+                    "emit_rust::function_signatures",
+                    "invalid params range start..",
+                )
+            })?
+            .trim();
         if !pair.is_empty() {
             pairs.push(pair);
         }
-        let param_types = pairs
+        let pairs = pairs
             .iter()
             .map(|pair| {
-                pair.split_once(':')
-                    .unwrap_or_else(|| {
-                        panic!("generated parameter has a type: `{pair}` in `{params}`")
-                    })
-                    .1
-                    .trim()
+                pair.split_once(':').ok_or_else(|| {
+                    crate::internal(
+                        "emit_rust::function_signatures",
+                        format!("malformed parameter `{pair}` in `{params}`"),
+                    )
+                })
             })
+            .collect::<Result<Vec<_>, _>>()?;
+        let param_types = pairs
+            .iter()
+            .map(|(_, ty)| ty.trim())
             .collect::<Vec<_>>()
             .join(", ");
         let args = pairs
             .iter()
-            .map(|pair| {
-                pair.split_once(':')
-                    .unwrap_or_else(|| {
-                        panic!("generated parameter has a name: `{pair}` in `{params}`")
-                    })
-                    .0
-                    .trim()
-            })
+            .map(|(name, _)| name.trim())
             .collect::<Vec<_>>()
             .join(", ");
         signatures.push(FunctionSignature {
@@ -103,11 +150,11 @@ fn function_signatures(declarations: &str) -> Vec<FunctionSignature> {
             result,
         });
     }
-    signatures
+    Ok(signatures)
 }
 
-fn render_webgpu_table(declarations: &str) -> String {
-    let signatures = function_signatures(declarations);
+fn render_webgpu_table(declarations: &str) -> Result<String, crate::policy::PolicyError> {
+    let signatures = function_signatures(declarations)?;
     let mut out = String::from(
         "pub(crate) struct WebgpuTable {\n    pub(crate) library: libloading::Library,\n    pub(crate) is_yawgpu: bool,\n",
     );
@@ -118,7 +165,7 @@ fn render_webgpu_table(declarations: &str) -> String {
             signature.name, signature.param_types, signature.result
         ));
     }
-    out.push_str("}\n\nimpl WebgpuTable {\n    pub(crate) fn load(path: &std::path::Path) -> Result<Self, String> {\n        #[cfg(windows)]\n        // SAFETY: The library stays owned by the returned table.\n        // The Windows flag searches the backend directory for dependent libraries.\n        let library = unsafe {\n            libloading::os::windows::Library::load_with_flags(\n                path,\n                libloading::os::windows::LOAD_WITH_ALTERED_SEARCH_PATH,\n            )\n        }\n        .map(libloading::Library::from);\n        #[cfg(not(windows))]\n        // SAFETY: The library stays owned by the returned table.\n        let library = unsafe { libloading::Library::new(path) };\n        let library = library\n            .map_err(|error| format!(\"load {}: {error}\", path.display()))?;\n        fn symbol<T: Copy>(\n            library: &libloading::Library,\n            path: &std::path::Path,\n            name: &'static [u8],\n        ) -> Result<T, String> {\n            // SAFETY: each call uses the pinned webgpu.h signature for this symbol.\n            unsafe { library.get::<T>(name) }\n                .map(|value| *value)\n                .map_err(|error| {\n                    let name = std::str::from_utf8(&name[..name.len() - 1]).unwrap_or(\"<invalid>\");\n                    format!(\"missing symbol {name} in {}: {error}\", path.display())\n                })\n        }\n        Ok(Self {\n");
+    out.push_str("}\n\nimpl WebgpuTable {\n    pub(crate) fn load(path: &std::path::Path) -> Result<Self, String> {\n        #[cfg(windows)]\n        // SAFETY: The library stays owned by the returned table.\n        // The Windows flag searches the backend directory for dependent libraries.\n        let library = unsafe {\n            libloading::os::windows::Library::load_with_flags(\n                path,\n                libloading::os::windows::LOAD_WITH_ALTERED_SEARCH_PATH,\n            )\n        }\n        .map(libloading::Library::from);\n        #[cfg(not(windows))]\n        // SAFETY: The library stays owned by the returned table.\n        let library = unsafe { libloading::Library::new(path) };\n        let library = library\n            .map_err(|error| format!(\"load {}: {error}\", path.display()))?;\n        fn symbol<T: Copy>(\n            library: &libloading::Library,\n            path: &std::path::Path,\n            name: &'static [u8],\n        ) -> Result<T, String> {\n            // SAFETY: each call uses the pinned webgpu.h signature for this symbol.\n            unsafe { library.get::<T>(name) }\n                .map(|value| *value)\n                .map_err(|error| {\n                    let name = name.get(..name.len().saturating_sub(1))\n                        .and_then(|bytes| std::str::from_utf8(bytes).ok())\n                        .unwrap_or(\"<invalid>\");\n                    format!(\"missing symbol {name} in {}: {error}\", path.display())\n                })\n        }\n        Ok(Self {\n");
     out = out.replace(
         "        fn symbol<T: Copy>(",
         "        // SAFETY: the marker is probed but never called.\n\
@@ -145,12 +192,36 @@ fn render_webgpu_table(declarations: &str) -> String {
             args = signature.args,
         ));
     }
-    out
+    Ok(out)
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::indexing_slicing
+)]
 mod tests {
     use super::render_webgpu_table;
+
+    #[test]
+    fn malformed_declarations_return_internal_errors() {
+        for declaration in [
+            "fn broken;",
+            "fn broken(;",
+            "fn broken)(;",
+            "fn broken(value);",
+        ] {
+            let error = super::function_signatures(declaration).err().unwrap();
+            assert!(error
+                .to_string()
+                .starts_with("internal: emit_rust::function_signatures:"));
+        }
+    }
 
     #[test]
     fn function_table_accepts_docs_and_function_pointer_parameters() {
@@ -163,7 +234,7 @@ mod tests {
             /// A documented scalar declaration.
             fn wgpuDocumented(value: u32) -> u32;
         "#;
-        let table = render_webgpu_table(declarations);
+        let table = render_webgpu_table(declarations).unwrap();
         assert!(table.contains("wgpuWithCallback: unsafe extern \"C\" fn"));
         assert!(table.contains("wgpuDocumented: unsafe extern \"C\" fn"));
         assert!(table.contains("(table.wgpuWithCallback)(callback, userdata)"));
@@ -179,7 +250,10 @@ mod tests {
 /// contributes no webgpu.h declaration for a create, a sync method, a limits fill, or a feature
 /// probe, so the table resolves no symbol only that export needed. The caller removes the
 /// export bodies themselves (F22).
-pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String {
+pub(crate) fn render(
+    plan: &Plan,
+    excluded_exports: &BTreeSet<String>,
+) -> Result<String, crate::policy::PolicyError> {
     let async_ops: Vec<_> = plan
         .chunks
         .iter()
@@ -346,9 +420,9 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
     }
     for shape in &plan.structs {
         out.push('\n');
-        out.push_str(&descriptor::rust_structs(shape));
+        out.push_str(&descriptor::rust_structs(shape)?);
         out.push('\n');
-        out.push_str(&descriptor::rust_conversion(shape));
+        out.push_str(&descriptor::rust_conversion(shape)?);
     }
 
     let mut declarations = String::new();
@@ -376,7 +450,9 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
                     .structs
                     .iter()
                     .find(|shape| shape.source == op.descriptor)
-                    .expect("descriptor shape exists");
+                    .ok_or_else(|| {
+                        crate::internal("emit_rust::render", "missing descriptor shape")
+                    })?;
                 declarations.push_str(&descriptor::rust_extern(op, shape));
             }
             Chunk::DescriptorAsync(op) => {
@@ -384,27 +460,31 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
                     .structs
                     .iter()
                     .find(|shape| shape.source == op.descriptor)
-                    .expect("descriptor shape exists");
+                    .ok_or_else(|| {
+                        crate::internal("emit_rust::render", "missing descriptor shape")
+                    })?;
                 declarations.push_str(&descriptor_async::rust_extern(op, shape));
             }
             Chunk::ShaderWgsl(op) => declarations.push_str(&shader_wgsl::rust_extern(op)),
             Chunk::Label(op) => declarations.push_str(&label::rust_extern(op)),
             Chunk::BytePair(op) => declarations.push_str(&byte_pair::rust_extern(op)),
             Chunk::TypedPair(_) => {}
-            Chunk::Array(op) => declarations.push_str(&handle_array::rust_extern(op)),
+            Chunk::Array(op) => declarations.push_str(&handle_array::rust_extern(op)?),
             Chunk::MapAsync(op) => declarations.push_str(&map_async::rust_extern(op)),
             Chunk::WriteTexture(op) => {
                 let find = |name: &str| {
                     plan.structs
                         .iter()
                         .find(|shape| shape.source == name)
-                        .expect("write-texture shape exists")
+                        .ok_or_else(|| {
+                            crate::internal("emit_rust::render", "missing write-texture shape")
+                        })
                 };
                 declarations.push_str(&write_texture::rust_extern(
                     op,
-                    find(&op.destination),
-                    find(&op.layout),
-                    find(&op.extent),
+                    find(&op.destination)?,
+                    find(&op.layout)?,
+                    find(&op.extent)?,
                 ));
             }
             Chunk::DeviceEvents(op) => declarations.push_str(&device_events::rust_extern(op)),
@@ -414,7 +494,9 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
                         .structs
                         .iter()
                         .find(|shape| shape.source == op.shape)
-                        .expect("limits shape exists");
+                        .ok_or_else(|| {
+                            crate::internal("emit_rust::render", "missing limits shape")
+                        })?;
                     declarations.push_str(&adapter_limits::rust_limits_extern(op, shape));
                 }
             }
@@ -438,7 +520,7 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
         declarations.push_str(&handles::rust_release_extern(object));
     }
     out.push('\n');
-    out.push_str(&render_webgpu_table(&declarations));
+    out.push_str(&render_webgpu_table(&declarations)?);
 
     out.push('\n');
     out.push_str(SUBSCRIPT_TYPEGPU_SEPARATOR);
@@ -493,7 +575,7 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
 
     for create in &plan.creates {
         out.push('\n');
-        out.push_str(&sync::rust_create_export(create));
+        out.push_str(&sync::rust_create_export(create)?);
     }
     for op in &plan.anchor_syncs {
         out.push('\n');
@@ -515,7 +597,9 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
                     .mode_const
                     .as_ref()
                     .map(|(name, _)| name.as_str())
-                    .expect("async ops imply a mode constant");
+                    .ok_or_else(|| {
+                        crate::internal("emit_rust::render", "missing async callback mode constant")
+                    })?;
                 out.push('\n');
                 out.push_str(&future_poll::rust_request_export(
                     op,
@@ -531,7 +615,7 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
                 }
                 if op.take_fn.is_some() {
                     out.push('\n');
-                    out.push_str(&future_poll::rust_take_export(op, &plan.anchor));
+                    out.push_str(&future_poll::rust_take_export(op, &plan.anchor)?);
                 }
             }
             Chunk::Sync(op) => {
@@ -543,7 +627,9 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
                     .structs
                     .iter()
                     .find(|shape| shape.source == op.descriptor)
-                    .expect("descriptor shape exists");
+                    .ok_or_else(|| {
+                        crate::internal("emit_rust::render", "missing descriptor shape")
+                    })?;
                 out.push('\n');
                 out.push_str(&descriptor::rust_export(op, shape));
             }
@@ -552,12 +638,16 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
                     .structs
                     .iter()
                     .find(|shape| shape.source == op.descriptor)
-                    .expect("descriptor shape exists");
+                    .ok_or_else(|| {
+                        crate::internal("emit_rust::render", "missing descriptor shape")
+                    })?;
                 let mode = plan
                     .mode_const
                     .as_ref()
                     .map(|(name, _)| name.as_str())
-                    .expect("async ops imply a mode constant");
+                    .ok_or_else(|| {
+                        crate::internal("emit_rust::render", "missing async callback mode constant")
+                    })?;
                 out.push('\n');
                 out.push_str(&descriptor_async::rust_export(
                     op,
@@ -567,7 +657,7 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
                 ));
                 if op.async_op.take_fn.is_some() {
                     out.push('\n');
-                    out.push_str(&future_poll::rust_take_export(&op.async_op, &plan.anchor));
+                    out.push_str(&future_poll::rust_take_export(&op.async_op, &plan.anchor)?);
                 }
             }
             Chunk::ShaderWgsl(op) => {
@@ -588,14 +678,16 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
             }
             Chunk::Array(op) => {
                 out.push('\n');
-                out.push_str(&handle_array::rust_export(op));
+                out.push_str(&handle_array::rust_export(op)?);
             }
             Chunk::MapAsync(op) => {
                 let mode = plan
                     .mode_const
                     .as_ref()
                     .map(|(name, _)| name.as_str())
-                    .expect("async ops imply a mode constant");
+                    .ok_or_else(|| {
+                        crate::internal("emit_rust::render", "missing async callback mode constant")
+                    })?;
                 out.push('\n');
                 out.push_str(&map_async::rust_exports(op, mode));
             }
@@ -604,14 +696,16 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
                     plan.structs
                         .iter()
                         .find(|shape| shape.source == name)
-                        .expect("write-texture shape exists")
+                        .ok_or_else(|| {
+                            crate::internal("emit_rust::render", "missing write-texture shape")
+                        })
                 };
                 out.push('\n');
                 out.push_str(&write_texture::rust_export(
                     op,
-                    find(&op.destination),
-                    find(&op.layout),
-                    find(&op.extent),
+                    find(&op.destination)?,
+                    find(&op.layout)?,
+                    find(&op.extent)?,
                 ));
             }
             Chunk::DeviceEvents(op) => {
@@ -619,7 +713,12 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
                     .mode_const
                     .as_ref()
                     .map(|(name, _)| name.as_str())
-                    .expect("device events imply a mode constant");
+                    .ok_or_else(|| {
+                        crate::internal(
+                            "emit_rust::render",
+                            "missing device-event callback mode constant",
+                        )
+                    })?;
                 out.push('\n');
                 out.push_str(&device_events::rust_exports(op, &plan.anchor, mode));
             }
@@ -628,7 +727,7 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
                     .structs
                     .iter()
                     .find(|shape| shape.source == op.shape)
-                    .expect("limits shape exists");
+                    .ok_or_else(|| crate::internal("emit_rust::render", "missing limits shape"))?;
                 out.push('\n');
                 out.push_str(&adapter_limits::rust_limits_export(op, shape));
             }
@@ -651,5 +750,5 @@ pub(crate) fn render(plan: &Plan, excluded_exports: &BTreeSet<String>) -> String
         out.push('\n');
         out.push_str(&handles::rust_release_export(object, plan.device_events));
     }
-    out
+    Ok(out)
 }

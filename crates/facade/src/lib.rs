@@ -11,8 +11,6 @@
 )]
 #![warn(missing_docs)]
 
-// subscript-typegpu-webgpu-gen emits the symbol-name slice.
-#[allow(clippy::indexing_slicing)]
 #[rustfmt::skip]
 pub mod generated;
 mod runtime;

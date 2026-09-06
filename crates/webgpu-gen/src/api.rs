@@ -105,6 +105,9 @@ impl fmt::Display for ApiPolicyError {
                 f,
                 "api policy error (unpoliced): `{construct}` is reachable from the selected IDL subset but is neither generated, deviation-rowed, nor excluded"
             ),
+            ApiPolicyError::Invalid { message, .. } if message.starts_with("internal:") => {
+                write!(f, "{message}")
+            }
             ApiPolicyError::Invalid { entry, message } => {
                 write!(f, "api policy error (invalid): `{entry}`: {message}")
             }
@@ -1966,7 +1969,12 @@ fn build_descriptors(
             let field_pattern = match &classified_member.classification {
                 Classification::Generate(pattern) => pattern.as_str(),
                 Classification::Deviation(row) => row.pattern.as_str(),
-                Classification::Exclude => unreachable!("excluded fields returned above"),
+                Classification::Exclude => {
+                    return Err(internal(
+                        "api::build_descriptors",
+                        "excluded fields returned above",
+                    ))
+                }
             };
             let (api_type, conversion) = descriptor_field_shape(
                 mirror,
@@ -3321,8 +3329,9 @@ fn validate_flattened_interfaces(
             .get(&row.interface)
             .ok_or_else(|| unknown(&row.interface))?;
         if members.len() != 1
-            || members[0].name != "@constructor"
-            || !matches!(members[0].kind, IdlMemberKind::Special)
+            || members.first().is_none_or(|member| {
+                member.name != "@constructor" || !matches!(member.kind, IdlMemberKind::Special)
+            })
         {
             return Err(ApiPolicyError::Invalid {
                 entry: row.interface.clone(),
@@ -3330,13 +3339,19 @@ fn validate_flattened_interfaces(
                     .to_owned(),
             });
         }
+        let member = members.first().ok_or_else(|| {
+            internal(
+                "api::validate_flattened_interfaces",
+                "missing validated constructor",
+            )
+        })?;
         if !policy
             .exclude
             .iter()
-            .any(|exclude| exclude.member == members[0].key())
+            .any(|exclude| exclude.member == member.key())
         {
             return Err(ApiPolicyError::Invalid {
-                entry: members[0].key(),
+                entry: member.key(),
                 message: "a flattened error-subclass constructor must be excluded".to_owned(),
             });
         }
@@ -4427,7 +4442,15 @@ fn build_async_method(
                 format!("this.{}", lower_first(receiver)),
             ]
         };
-        (&begin_fn.params[receiver_types.len()..], args)
+        (
+            begin_fn.params.get(receiver_types.len()..).ok_or_else(|| {
+                internal(
+                    "api::build_async_method",
+                    "missing validated receiver prefix",
+                )
+            })?,
+            args,
+        )
     } else if receiver != "Instance"
         && begin_fn
             .params
@@ -4437,7 +4460,12 @@ fn build_async_method(
             .eq(receiver_only_types.iter().map(String::as_str))
     {
         (
-            &begin_fn.params[1..],
+            begin_fn.params.get(1..).ok_or_else(|| {
+                internal(
+                    "api::build_async_method",
+                    "missing validated receiver prefix",
+                )
+            })?,
             vec![format!("this.{}", lower_first(receiver))],
         )
     } else {
@@ -4711,7 +4739,12 @@ fn build_operation_method(
         .iter()
         .filter(|argument| !dropped.contains(&argument.name))
         .collect::<Vec<_>>();
-    let mirror_params = &function.params[1..];
+    let mirror_params = function.params.get(1..).ok_or_else(|| {
+        internal(
+            "api::build_operation_method",
+            "missing validated receiver prefix",
+        )
+    })?;
     if mirror_params.len() != kept.len() {
         return Err(ApiPolicyError::Invalid {
             entry: member.key(),
@@ -6644,9 +6677,19 @@ fn render_operation_nullable_descriptor_branches(
                 ),
             });
         }
-        let argument_index = matching[0];
+        let argument_index = *matching.first().ok_or_else(|| {
+            internal(
+                "api::render_operation_nullable_descriptor_branches",
+                "missing matched argument",
+            )
+        })?;
         out.push_str(&format!("{indent}if ({name} === null) {{\n"));
-        boundary_args[argument_index] = "null".to_owned();
+        *boundary_args.get_mut(argument_index).ok_or_else(|| {
+            internal(
+                "api::render_operation_nullable_descriptor_branches",
+                "missing boundary argument",
+            )
+        })? = "null".to_owned();
         render_operation_nullable_descriptor_branches(
             out,
             interface,
@@ -6660,7 +6703,12 @@ fn render_operation_nullable_descriptor_branches(
             &format!("{indent}  "),
         )?;
         out.push_str(&format!("{indent}}}\n"));
-        boundary_args[argument_index] = expression.clone();
+        *boundary_args.get_mut(argument_index).ok_or_else(|| {
+            internal(
+                "api::render_operation_nullable_descriptor_branches",
+                "missing boundary argument",
+            )
+        })? = expression.clone();
         return render_operation_nullable_descriptor_branches(
             out,
             interface,
@@ -6726,5 +6774,12 @@ fn lower_first(value: &str) -> String {
     match chars.next() {
         None => String::new(),
         Some(first) => first.to_ascii_lowercase().to_string() + chars.as_str(),
+    }
+}
+
+fn internal(site: &str, what: impl std::fmt::Display) -> ApiPolicyError {
+    ApiPolicyError::Invalid {
+        entry: site.to_owned(),
+        message: format!("internal: {site}: {what}"),
     }
 }
