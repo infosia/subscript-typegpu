@@ -109,3 +109,19 @@ along the velocity. The header now states the port's behavior.
 
 Evidence: `tools/gate.sh --require-backend` green, 283 passed, 1
 ignored, 221.7 s wall. `tools/hygiene.sh` exit 0.
+
+### The two defects, fixed (2026-09-06)
+
+The commit above this record: the four examples dispose the bind
+group in `shutdown()` before the buffers it references, and
+`fluid-double-buffering` moves density along a per-cell velocity as
+the TypeGPU original does. The velocity is the unit step toward the
+open neighbor with the least cost (density plus 0.5 per row upward),
+and each cell keeps what it does not send and receives the out-flow of
+each neighbor whose velocity points at it. The diffusion is gone, and
+the evaporation and the obstacle passes stay. The header and two step
+comments moved with the code. Evidence: `tools/gate.sh
+--require-backend` green, 283 passed, 1 ignored, 216.4 s wall.
+`tools/window.sh --frames 30` on yawgpu Metal: `fluid-double-buffering`
+and `smoky-triangle` print `window:frames=30` with no `FAIL`. The
+visual result of the flow waits for the owner's run.
