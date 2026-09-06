@@ -125,3 +125,17 @@ comments moved with the code. Evidence: `tools/gate.sh
 `tools/window.sh --frames 30` on yawgpu Metal: `fluid-double-buffering`
 and `smoky-triangle` print `window:frames=30` with no `FAIL`. The
 visual result of the flow waits for the owner's run.
+
+### `fluid-double-buffering`, the owner's run (2026-09-06)
+
+The owner saw the fluid pool at the bottom and no flow. Cause: the
+upstream gravity rule moves density toward lower `y`, and the port's
+source sat in the bottom three rows, so the fluid had nowhere to fall.
+The grid was also 32 cells against upstream's 256, so one cell filled
+a large block of the window. The commit above moves the source to the
+top three rows with a downward unit velocity, sets `GRID_SIZE` to 256,
+and expresses the initial dense block relative to the grid. Five
+comment lines moved with the code. Evidence: `tools/gate.sh
+--require-backend` green, 283 passed, 1 ignored, 220.1 s wall.
+`tools/window.sh --frames 30` prints `window:frames=30` with no `FAIL`.
+The visual result waits for the owner's run.
