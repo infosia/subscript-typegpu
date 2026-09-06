@@ -100,9 +100,10 @@ headers gained the reductions their bodies carry (`dispatch`,
 
 Defects the writers found in the code, recorded for a coding round:
 `smoky-triangle`, `caustics`, `vaporrave`, and `ray-marching` set
-their bind group to `null` in `shutdown()` and in the `init` failure
-path without `dispose()`, where the other windowed examples dispose
-it. `fluid-double-buffering` integrates a velocity field that nothing
+their bind group to `null` in `shutdown()` without `dispose()`, where
+the other windowed examples dispose it. The `init` failure path is
+not affected: the group is created after the validation check, so
+that path has no group to free (read, not the writer's claim). `fluid-double-buffering` integrates a velocity field that nothing
 reads, so its density moves by diffusion only, where upstream advects
 along the velocity. The header now states the port's behavior.
 
