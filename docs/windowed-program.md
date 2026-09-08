@@ -11,6 +11,12 @@ and the script owns the frame. The second is how much work happens before the
 program starts. The WGSL, the vertex layout, and every byte offset exist as
 constants by the time the first line runs.
 
+One point comes before both, because it changes how you read everything else.
+The host in this repository is an example. Your application brings its own
+window, its own input, and its own loop, so you write your own host and call the
+script from it. The chapter after the split below states what such a host must
+keep and what it chooses.
+
 If you know WebGPU in a browser, most of this looks familiar. Where it differs,
 the reason is one of three. subscript has no exceptions. It has no garbage
 collector. This library moves to compile time what a browser library does at run
@@ -86,10 +92,88 @@ The host links no backend. The facade loads the shared library that
 `SUBSCRIPT_TYPEGPU_BACKEND_LIB` names and resolves the `wgpu*` symbols it
 needs. One binary therefore runs against any webgpu.h implementation.
 
+## Write your own host
+
+`crates/window` is one host. It runs the examples of this repository and its
+smoke checks, and it shows the integration end to end. It is a convenience and a
+worked example. It is not a framework, and your application does not have to use
+it.
+
+Your engine owns a window, an input model, and a frame cadence already. The
+contract under this host is small. Most of what the rest of this document shows
+is this host's choice, and the three lists below separate the two.
+
+### subscript fixes these
+
+- A host-callable export is synchronous, returns `void`, and takes boundary
+  scalars and opaque handles.
+- A development session calls an export by name with a list of arguments. The
+  ship tier emits `void subscript_export_<name>(subscript_rt_context* ctx, ...)`
+  for the same export, so a C host calls it directly.
+- `print` writes into a sink that the runtime owns. The host drains it.
+- Async work steps through the session, one step per call.
+
+### This library fixes these
+
+- Every callback the facade registers terminates inside the facade and uses the
+  process-events mode. A host polls a future instead of receiving a callback.
+- A handle belongs to its creator and goes back by name.
+- One instance serves one run, and the backend library comes from an environment
+  variable.
+
+### This host chose these
+
+- The three entry names and their parameter lists. `init`, `frame`, and
+  `shutdown` are this host's vocabulary, not the language's. Yours can be
+  `onStart` and `onTick`.
+- `winit`, a 960 by 640 window, and the Fifo present mode.
+- The format preference, `bgra8unorm` before the first listed format.
+- One key scalar per frame, three button bits, and 30 pixels per wheel line.
+- The four optional input entries, the `--frames` limit, and the
+  `window:frames=<n>` line.
+
+### Six steps for a host of your own
+
+1. Create the facade instance.
+2. Create your window, and create the surface for its native handle.
+3. Request the adapter and the device. Poll each future and pump the instance
+   until it resolves.
+4. Load the script. During development, compile it in process and keep the
+   session. To ship, build the emitted C and call the exported symbols.
+5. Call your entries with handles and scalars. After each call, pump the
+   instance, step the session until no async work remains, and drain the print
+   sink.
+6. Release in dependency order: the script's handles, the device, the surface,
+   the instance, and the window.
+
+### What you gain by writing your own
+
+You choose the vocabulary. A renderer needs `frame`, and a simulation needs
+`step`, and an editor needs both plus a `reloadScene`. The language admits any
+name, and the entry list is yours.
+
+You choose the cadence. This host presents one frame per redraw request. Yours
+can run a fixed simulation step and a variable render step, or drive several
+scripts in one loop.
+
+You gain hot reload. The development session reloads a changed file at a frame
+boundary. The swap is accepted when the module's declaration hash is unchanged,
+so a body edit reloads and a signature change needs a restart. This host does
+not use that feature. A host of your own watches the file and reloads between
+frames.
+
+The one thing you do not change is the boundary. Handles and scalars cross it,
+callbacks do not, and every handle goes back to the side that made it.
+
+The rest of this document walks one host and one script in full. Read the script
+chapters for the shape of your own script, and the host chapter for the steps
+your own host repeats.
+
 ## The three entries
 
-The host calls three exported functions. Their names and signatures are fixed,
-and a harness test checks them against the example's typed representation.
+This host calls three exported functions. The names are its vocabulary, and a
+harness test holds every example to them. The signatures below are therefore
+fixed for this host, and a host of your own picks its own.
 
 ```ts program=examples/window-triangle/main.ts
 export function init(
@@ -515,8 +599,8 @@ the rest. Here each handle goes back by name.
 
 The script is half the program. The other half is `crates/window`, one Rust
 binary of about 870 lines. This chapter walks it, because every rule the script
-follows has its reason here. The chapter after it separates the parts you must
-keep from the parts this host merely chose.
+follows has its reason here. Read it as one worked example of the six steps
+above, not as the shape your own host must take.
 
 The crate depends on `winit` for the window and the events, and on
 `raw-window-handle` for the native handle. Three `objc2` crates serve the macOS
@@ -757,79 +841,6 @@ and the host calls each one before `frame` for every queued event.
 A script that exports none of them behaves as this example does. The host drops
 an event whose entry the script does not export. `examples/ui-demo` exports all
 four and feeds them to an immediate-mode GUI.
-
-## Write your own host
-
-`crates/window` is one host. It runs the examples of this repository and its
-smoke checks, and it shows the integration end to end. It is a convenience and a
-worked example. It is not a framework, and your application does not have to use
-it.
-
-Your engine owns a window, an input model, and a frame cadence already. The
-contract under this host is small, and most of what you read above is this
-host's choice.
-
-### subscript fixes these
-
-- A host-callable export is synchronous, returns `void`, and takes boundary
-  scalars and opaque handles.
-- A development session calls an export by name with a list of arguments. The
-  ship tier emits `void subscript_export_<name>(subscript_rt_context* ctx, ...)`
-  for the same export, so a C host calls it directly.
-- `print` writes into a sink that the runtime owns. The host drains it.
-- Async work steps through the session, one step per call.
-
-### This library fixes these
-
-- Every callback the facade registers terminates inside the facade and uses the
-  process-events mode. A host polls a future instead of receiving a callback.
-- A handle belongs to its creator and goes back by name.
-- One instance serves one run, and the backend library comes from an environment
-  variable.
-
-### This host chose these
-
-- The three entry names and their parameter lists. `init`, `frame`, and
-  `shutdown` are this host's vocabulary, not the language's. Yours can be
-  `onStart` and `onTick`.
-- `winit`, a 960 by 640 window, and the Fifo present mode.
-- The format preference, `bgra8unorm` before the first listed format.
-- One key scalar per frame, three button bits, and 30 pixels per wheel line.
-- The four optional input entries, the `--frames` limit, and the
-  `window:frames=<n>` line.
-
-### Six steps for a host of your own
-
-1. Create the facade instance.
-2. Create your window, and create the surface for its native handle.
-3. Request the adapter and the device. Poll each future and pump the instance
-   until it resolves.
-4. Load the script. During development, compile it in process and keep the
-   session. To ship, build the emitted C and call the exported symbols.
-5. Call your entries with handles and scalars. After each call, pump the
-   instance, step the session until no async work remains, and drain the print
-   sink.
-6. Release in dependency order: the script's handles, the device, the surface,
-   the instance, and the window.
-
-### What you gain by writing your own
-
-You choose the vocabulary. A renderer needs `frame`, and a simulation needs
-`step`, and an editor needs both plus a `reloadScene`. The language admits any
-name, and the entry list is yours.
-
-You choose the cadence. This host presents one frame per redraw request. Yours
-can run a fixed simulation step and a variable render step, or drive several
-scripts in one loop.
-
-You gain hot reload. The development session reloads a changed file at a frame
-boundary. The swap is accepted when the module's declaration hash is unchanged,
-so a body edit reloads and a signature change needs a restart. This host does
-not use that feature. A host of your own watches the file and reloads between
-frames.
-
-The one thing you do not change is the boundary. Handles and scalars cross it,
-callbacks do not, and every handle goes back to the side that made it.
 
 ## Five rules that shape every line
 
