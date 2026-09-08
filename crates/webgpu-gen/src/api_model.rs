@@ -101,6 +101,8 @@ struct InterfaceDef {
 #[derive(Clone, Debug, Default)]
 /// One IDL dictionary as declared, before inheritance resolves.
 struct DictionaryDef {
+    /// A full definition exists. A source with partial definitions only leaves it false.
+    defined: bool,
     /// The declared parent dictionary.
     inheritance: Option<String>,
     /// The members of the definition and of every partial definition, in source order.
@@ -180,9 +182,10 @@ impl IdlModel {
                 Definition::Dictionary(dictionary) => {
                     let name = dictionary.identifier.0;
                     let entry = model.dictionaries.entry(name.to_owned()).or_default();
-                    if entry.inheritance.is_some() {
+                    if entry.defined {
                         return Err(format!("duplicate dictionary definition `{name}`"));
                     }
+                    entry.defined = true;
                     entry.inheritance = dictionary
                         .inheritance
                         .as_ref()
@@ -948,4 +951,51 @@ fn parse_mirror_integer(value: &str) -> Result<i64, String> {
     }
     .map_err(|_| format!("invalid mirror enum integer `{value}`"))?;
     Ok(if negative { -magnitude } else { magnitude })
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use super::IdlModel;
+    use weedle::Parse;
+
+    fn parse_model(source: &str) -> Result<IdlModel, String> {
+        let (remaining, definitions) =
+            weedle::Definitions::parse(source).expect("valid IDL fixture");
+        assert!(remaining.trim().is_empty());
+        IdlModel::from_definitions(&definitions, &[])
+    }
+
+    #[test]
+    fn duplicate_parentless_dictionary_is_rejected() {
+        let error =
+            parse_model("dictionary Options { long first; }; dictionary Options { long second; };")
+                .expect_err("duplicate parentless dictionary must fail");
+        assert_eq!(error, "duplicate dictionary definition `Options`");
+    }
+
+    #[test]
+    fn duplicate_dictionary_with_parent_is_rejected() {
+        let error = parse_model(
+            "dictionary Base {}; dictionary Options : Base { long first; };
+             dictionary Options : Base { long second; };",
+        )
+        .expect_err("duplicate dictionary with a parent must fail");
+        assert_eq!(error, "duplicate dictionary definition `Options`");
+    }
+
+    #[test]
+    fn full_and_partial_dictionary_definitions_merge() {
+        for source in [
+            "dictionary Options { long first; }; partial dictionary Options { long second; };",
+            "partial dictionary Options { long first; }; dictionary Options { long second; };",
+        ] {
+            let model = parse_model(source).expect("full and partial definitions must succeed");
+            let members = model
+                .dictionary_members("Options")
+                .expect("known dictionary");
+            let names: Vec<_> = members.iter().map(|member| member.name.as_str()).collect();
+            assert_eq!(names, ["first", "second"]);
+        }
+    }
 }
