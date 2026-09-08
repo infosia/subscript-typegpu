@@ -96,3 +96,29 @@ root. No `examples/` entry declares `async function frame`, so
 nothing with a frame budget has entered that loop yet. A bounded
 drain needs a contract in `specs/blocks/` first, and this round did
 not change the drain.
+
+## The continuation queue of 2026-09-09
+
+The pin moved to `4dcbd98`. subscript replaced its async drivers with a
+host-driven continuation queue, and every await now suspends. The standard
+runner invokes `main`, then every other exported async function in declaration
+order, then steps to quiescence. `main` therefore returns at its first
+suspension, and the runner invokes the other exports while `main`'s chain is
+mid-flight.
+
+`programs/a06-map-async-cost.ts` failed on that order. Its exported phases
+belong to the `--measure-map-async` host, and its guard flag assumed a kicked
+phase runs only after `main` completes. Nothing in the contract states that
+order. The ship tier printed `FAIL prepare` before the two golden lines, and
+the dev tier did not, because its runner kicks no other export.
+
+The fix is here, not in subscript. The three bodies moved into private
+functions. Each exported phase returns at once when the flag is unset, and
+`main` calls the private functions and never sets the flag. A kicked phase is
+inert under any runner, and the measurement host keeps its four entries. The
+golden did not move.
+
+Evidence at the pin: `tools/gate.sh --require-backend` green, 286 passed, 1
+ignored. `tools/live.sh` green on yawgpu Metal, 112.8 s, and on Dawn, 108.1 s.
+`tools/window.sh --frames 30` green for `window-triangle` and `ui-demo`. The
+measurement mode reports its line and the two golden lines.
