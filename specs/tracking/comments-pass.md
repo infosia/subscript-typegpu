@@ -200,3 +200,15 @@ came from the child process, not from the comparison. Reproduction attempts on
 the same tree and the same backend library: 12 sequential ship runs and 20 runs
 in four-way parallel, all green. The cause is unknown and the record stands for
 the next occurrence.
+
+### The async start-timing pin (2026-09-08)
+
+subscript §92 changed when an async call starts its callee: the body now runs to
+its first suspension at the call, as JavaScript does. A program that holds a
+handle and awaits it later therefore prints in a new order. This tree has no
+such site. Every async call here awaits at the call, so no golden moved.
+
+Evidence at the pin `30318d5`: `tools/gate.sh --require-backend` green, 286
+passed, 1 ignored. `tools/live.sh` green on yawgpu Metal, 113.6 s, and on Dawn,
+108.3 s. `tools/window.sh --frames 30` green for `window-triangle` and
+`ui-demo`.
