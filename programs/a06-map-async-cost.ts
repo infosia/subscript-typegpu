@@ -16,8 +16,8 @@ let activeAdapter: GPUAdapter | null = null;
 let activeDevice: GPUDevice | null = null;
 let activeReadback: GPUBuffer | null = null;
 let mapPassed: boolean = false;
-// The ship tier's subscript_kick_async_exports runs each async phase again after main.
-// This flag makes those second phase calls return without work.
+// The exported phases belong to the measurement host.
+// A standard runner kicks them with this flag unset.
 let measurementEnabled: boolean = false;
 
 export function enableMapAsyncMeasurement(): void {
@@ -26,6 +26,10 @@ export function enableMapAsyncMeasurement(): void {
 
 export async function prepareMapAsync(): Promise<void> {
   if (!measurementEnabled) return;
+  await prepareReadback();
+}
+
+async function prepareReadback(): Promise<void> {
   const adapter = await gpu.requestAdapter();
   if (adapter === null) {
     print("FAIL adapter");
@@ -66,6 +70,10 @@ export async function prepareMapAsync(): Promise<void> {
 
 export async function measureMapAsync(): Promise<void> {
   if (!measurementEnabled) return;
+  await measureReadback();
+}
+
+async function measureReadback(): Promise<void> {
   const readback = activeReadback;
   if (readback === null) {
     print("FAIL prepare");
@@ -96,6 +104,11 @@ export async function measureMapAsync(): Promise<void> {
 
 export function cleanupMapAsync(): void {
   if (!measurementEnabled) return;
+  cleanupReadback();
+  measurementEnabled = false;
+}
+
+function cleanupReadback(): void {
   const readback = activeReadback;
   const device = activeDevice;
   const adapter = activeAdapter;
@@ -107,12 +120,10 @@ export function cleanupMapAsync(): void {
   if (adapter !== null) adapter.dispose();
   gpu.dispose();
   if (mapPassed) print("PASS");
-  measurementEnabled = false;
 }
 
 export async function main(): Promise<void> {
-  enableMapAsyncMeasurement();
-  await prepareMapAsync();
-  await measureMapAsync();
-  cleanupMapAsync();
+  await prepareReadback();
+  await measureReadback();
+  cleanupReadback();
 }
