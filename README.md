@@ -158,6 +158,7 @@ one TypeGPU render pipeline.
 
 - [docs/first-gpu-program.md](docs/first-gpu-program.md) builds the smallest compute program: a GPU counter from buffer creation to readback.
 - [docs/tutorial.md](docs/tutorial.md) walks `programs/b04-particles.ts` from the schema to the dispatch.
+- [docs/windowed-program.md](docs/windowed-program.md) walks the windowed triangle example and the host loop around it: the three entries, the generated WGSL, and the lifetime of every handle.
 - [docs/from-typegpu.md](docs/from-typegpu.md) compares TypeGPU with this library, topic by topic.
 
 ## Development

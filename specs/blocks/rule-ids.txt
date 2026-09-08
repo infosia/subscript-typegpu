@@ -352,3 +352,4 @@ W5 Rev 1
 W9 Rev 2
 PI1 Rev 1
 H2 Rev 1
+EG9 Rev 3

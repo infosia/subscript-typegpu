@@ -97,6 +97,14 @@ question (P2 review M6), and the diagnostic sweep.
   `b04-particles` with the same `program=` fence, and pairs each quote
   with its TypeGPU counterpart in one or two sentences. The quote test
   scans `README.md` with `docs/*.md`.
+  Rev 3, 2026-09-08: a third document, `docs/windowed-program.md`,
+  walks `examples/window-triangle/main.ts` and the host loop around
+  it, for a reader who integrates a script with a native window. The
+  `program=` fence therefore takes an example path
+  (`examples/<name>/main.ts`) beside a `programs/` path, and the quote
+  test reads both. The document also quotes the generator's emitted
+  WGSL and support module, which no fence gates, because an example
+  commits neither artifact. `README.md` links the three documents.
 
 - **EG10 — The pipeline helpers accept a host-owned device.** Rev 0,
   2026-08-24. Rev 1, 2026-09-05: `createBufferHost<T>` joins them

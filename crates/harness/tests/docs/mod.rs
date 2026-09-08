@@ -18,7 +18,13 @@ fn check_program_quotes(root: &Path, document_path: &Path) {
                 line_index + 1
             );
             assert!(
-                relative.starts_with("programs/") && relative.ends_with(".ts"),
+                (relative.starts_with("programs/") && relative.ends_with(".ts"))
+                    || relative
+                        .strip_prefix("examples/")
+                        .and_then(|path| path.strip_suffix("/main.ts"))
+                        .is_some_and(|name| {
+                            !name.is_empty() && name != "." && name != ".." && !name.contains('/')
+                        }),
                 "{}:{} names an invalid program",
                 document_path.display(),
                 line_index + 1,
