@@ -181,3 +181,22 @@ filter over five chunk kinds (`emit_rust::render` states the scope);
 K19's cycle guard in `fold_global_constant` is unreachable by the
 rule and stays as defence; `mapping::ident` mangles the `_g_` prefix
 the emitter owns.
+
+### The two reported items, resolved (2026-09-08)
+
+The duplicate-dictionary check of `IdlModel::from_definitions` reads the parent
+instead of a definition flag, so two full definitions of a parentless dictionary
+merge instead of failing. The pinned IDL holds no such pair, so no output was
+wrong. The fix and its demonstrated red land in the commit that follows this
+record.
+
+One gate run failed at
+`differential::every_program_is_deterministic_across_repeated_runs` with
+`a06-map-async-cost.ts ship failed with exit status: 1`. The same tree passed
+the same test alone, and passed two later full gates. The program asserts no
+time and no cost: it writes eight bytes, copies them, maps the readback, and
+compares. A failed comparison prints `FAIL` and exits 0, so the non-zero exit
+came from the child process, not from the comparison. Reproduction attempts on
+the same tree and the same backend library: 12 sequential ship runs and 20 runs
+in four-way parallel, all green. The cause is unknown and the record stands for
+the next occurrence.
