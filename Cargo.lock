@@ -555,7 +555,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1717,7 +1717,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1933,7 +1933,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1962,7 +1962,7 @@ dependencies = [
 [[package]]
 name = "subscript-bindgen"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=4dcbd98#4dcbd98025dd10ec52e2a459fc2963d9a0ecc3c7"
+source = "git+https://github.com/infosia/subscript.git?rev=ed7a668#ed7a668b3dd4abd17d075a585aef872240f4467c"
 dependencies = [
  "clang-sys",
 ]
@@ -1970,7 +1970,7 @@ dependencies = [
 [[package]]
 name = "subscript-codegen"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=4dcbd98#4dcbd98025dd10ec52e2a459fc2963d9a0ecc3c7"
+source = "git+https://github.com/infosia/subscript.git?rev=ed7a668#ed7a668b3dd4abd17d075a585aef872240f4467c"
 dependencies = [
  "cc",
  "cranelift-codegen",
@@ -1987,7 +1987,7 @@ dependencies = [
 [[package]]
 name = "subscript-compiler"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=4dcbd98#4dcbd98025dd10ec52e2a459fc2963d9a0ecc3c7"
+source = "git+https://github.com/infosia/subscript.git?rev=ed7a668#ed7a668b3dd4abd17d075a585aef872240f4467c"
 dependencies = [
  "regress",
  "serde",
@@ -1999,7 +1999,7 @@ dependencies = [
 [[package]]
 name = "subscript-runtime"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=4dcbd98#4dcbd98025dd10ec52e2a459fc2963d9a0ecc3c7"
+source = "git+https://github.com/infosia/subscript.git?rev=ed7a668#ed7a668b3dd4abd17d075a585aef872240f4467c"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -2130,7 +2130,7 @@ dependencies = [
 [[package]]
 name = "swc_ecma_parser"
 version = "6.0.2"
-source = "git+https://github.com/infosia/swc_ecma_parser?branch=subscript-eof-bump#113e3c470d9a91538aaa723c1ed244fbfde8b300"
+source = "git+https://github.com/infosia/swc_ecma_parser?branch=subscript-eof-bump#c603b41538fc55f2119f71e6164d7811b0a3954e"
 dependencies = [
  "either",
  "new_debug_unreachable",
@@ -2683,7 +2683,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
