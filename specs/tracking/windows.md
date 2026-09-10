@@ -431,3 +431,20 @@ This number is not a reference-machine measurement. Every `.wgsl` and
 `tools/window.sh examples/ui-demo/main.ts` runs on yawgpu Vulkan. The
 30-frame smoke prints `window:frames=30`. An interactive run prints
 `window:frames=3509` and exits 0.
+
+## W8's workaround is withdrawn (2026-09-10)
+
+subscript §89 splits a long string constant into adjacent C literals, and §99
+emits a constant above 65,000 bytes as a `static const unsigned char` array and
+retires the language cap. Measured at the pin `ed7a668` with a CLI built from
+it: a 32,768-byte constant emits as nine adjacent literals whose longest line is
+4,065 characters, and a 70,000-byte constant emits as one static array.
+
+The atlas alpha is 32,768 hex digits, so it now reaches MSVC as nine pieces.
+Each piece is under the 16,380-character limit for one literal, and the
+concatenation is under the 65,535-byte limit. UI2 Rev 2 restores the single
+string, and `UI_ATLAS_ALPHA_CHUNK` is gone.
+
+This host cannot show the difference, because clang accepts either form. The
+macOS gate is green with 286 tests. The windows-msvc re-check confirms the
+change, and this record stands until it runs.
