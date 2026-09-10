@@ -1,32 +1,22 @@
 use crate::support;
 
-fn alpha_hex(module: &str) -> String {
-    assert!(module.contains("export const UI_ATLAS_ALPHA_CHUNK: i32 = 4096;"));
-    let array = module
-        .split_once("UI_ATLAS_ALPHA_HEX: string[] = [")
+fn alpha_hex(module: &str) -> &str {
+    assert!(!module.contains("UI_ATLAS_ALPHA_CHUNK"));
+    assert_eq!(
+        module.matches("export const UI_ATLAS_ALPHA_HEX:").count(),
+        1
+    );
+    let hex = module
+        .split_once("export const UI_ATLAS_ALPHA_HEX: string = \"")
         .expect("alpha constant")
         .1
-        .split_once("];")
-        .expect("alpha array")
+        .split_once("\";")
+        .expect("alpha string literal")
         .0;
-    let chunks = array
-        .split(',')
-        .map(|chunk| {
-            let hex = chunk
-                .trim()
-                .strip_prefix('"')
-                .and_then(|hex| hex.strip_suffix('"'))
-                .expect("alpha chunk literal");
-            assert_eq!(hex.len(), 4096);
-            assert!(hex
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
-            hex
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(chunks.len(), 8);
-    let hex = chunks.concat();
     assert_eq!(hex.len(), 32768);
+    assert!(hex
+        .bytes()
+        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
     hex
 }
 
