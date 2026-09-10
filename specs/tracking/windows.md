@@ -446,8 +446,8 @@ concatenation is under the 65,535-byte limit. UI2 Rev 2 restores the single
 string, and `UI_ATLAS_ALPHA_CHUNK` is gone.
 
 This host cannot show the difference, because clang accepts either form. The
-macOS gate is green with 286 tests. The windows-msvc re-check confirms the
-change, and this record stands until it runs.
+macOS gate is green with 286 tests. The windows-msvc re-check below confirms the
+change.
 
 ## Re-check at 858fec4 (2026-09-10)
 
