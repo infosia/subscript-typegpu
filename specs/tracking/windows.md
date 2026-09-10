@@ -448,3 +448,23 @@ string, and `UI_ATLAS_ALPHA_CHUNK` is gone.
 This host cannot show the difference, because clang accepts either form. The
 macOS gate is green with 286 tests. The windows-msvc re-check confirms the
 change, and this record stands until it runs.
+
+## Re-check at 858fec4 (2026-09-10)
+
+This run closes the W8 withdrawal.
+
+Machine: Windows 11, `x86_64-pc-windows-msvc`, rustc 1.95.0, Git Bash.
+Backend: a yawgpu Windows release build with the default Noop backend.
+
+`tools/gate.sh --require-backend` exits 0 and prints `gate: green` with
+zero pending. The run has 286 passed and 1 ignored in eight executables,
+and takes 297 s. That time includes a cold compile of the pin `ed7a668`.
+This number is not a reference-machine measurement.
+
+`lib/typegpu-ui-atlas.generated.ts` holds one string literal of 32,768
+characters, and `UI_ATLAS_ALPHA_CHUNK` is absent. `programs/b23-ui-core.ts`
+and `programs/b24-ui-render.ts` pass both tiers through
+`differential::every_program_matches_both_tiers_and_golden`. `cl` accepts
+the emitted program, so C2026 does not return.
+
+The port needed no new source change. W1 to W5 hold.
