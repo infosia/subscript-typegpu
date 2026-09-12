@@ -30,7 +30,11 @@ import {
 } from "./x16-live-guarded.typegpu";
 
 class GuardedLayout {
-  output!: MutStorage<u32>;
+  output: MutStorage<u32>;
+
+  constructor(output: MutStorage<u32>) {
+    this.output = output;
+  }
 }
 
 function guardedKernel(res: GuardedLayout, ctx: ComputeInvocation): void {

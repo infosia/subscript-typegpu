@@ -45,8 +45,13 @@ class ReductionCounter {
 }
 
 class ReductionLayout {
-  input!: Storage<ReductionValue>;
-  output!: MutStorage<ReductionCounter>;
+  input: Storage<ReductionValue>;
+  output: MutStorage<ReductionCounter>;
+
+  constructor(input: Storage<ReductionValue>, output: MutStorage<ReductionCounter>) {
+    this.input = input;
+    this.output = output;
+  }
 }
 
 const partials: WorkgroupArray<f32> = workgroupArray<f32>(256);

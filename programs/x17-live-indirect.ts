@@ -69,7 +69,11 @@ class Varyings {
 }
 
 class IndirectLayout {
-  output!: MutStorage<u32>;
+  output: MutStorage<u32>;
+
+  constructor(output: MutStorage<u32>) {
+    this.output = output;
+  }
 }
 
 function computeStep(res: IndirectLayout, ctx: ComputeInvocation): void {
@@ -252,8 +256,7 @@ export async function main(): Promise<void> {
       outputBytes,
       0,
     );
-    const host = new IndirectLayout();
-    host.output = new MutStorage<u32>([0]);
+    const host = new IndirectLayout(new MutStorage<u32>([0]));
     simulateCompute<IndirectLayout>(
       computeStep,
       host,

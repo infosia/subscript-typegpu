@@ -136,8 +136,13 @@ class VectorOutput {
 }
 
 class VectorLayout {
-  input!: Storage<VectorInput>;
-  output!: MutStorage<VectorOutput>;
+  input: Storage<VectorInput>;
+  output: MutStorage<VectorOutput>;
+
+  constructor(input: Storage<VectorInput>, output: MutStorage<VectorOutput>) {
+    this.input = input;
+    this.output = output;
+  }
 }
 
 function coverFloat2(a: Vec2f, b: Vec2f, low: Vec2f, high: Vec2f): Vec2f {
@@ -495,9 +500,10 @@ export async function main(): Promise<void> {
     device.queue.submit([command]);
     const gpuBytes: u8[] = await output.read(device, 0, 1);
     const gpuOutput: VectorOutput = Context.fromBytes<VectorOutput>(gpuBytes, 0);
-    const hostLayout = new VectorLayout();
-    hostLayout.input = new Storage<VectorInput>([source]);
-    hostLayout.output = new MutStorage<VectorOutput>([new VectorOutput()]);
+    const hostLayout = new VectorLayout(
+      new Storage<VectorInput>([source]),
+      new MutStorage<VectorOutput>([new VectorOutput()]),
+    );
     simulateComputeThreads<VectorLayout>(vectorKernel, hostLayout, vectorBuiltins, 1, 1, 1, vectorBuiltins_HOST_RUNNABLE);
     const hostOutput = hostLayout.output[0];
     if (!exactOutput(gpuOutput, hostOutput)) {

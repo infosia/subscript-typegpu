@@ -162,7 +162,7 @@ import { Vec2f, Vec4f } from "./typegpu-types";
 @CStruct class Offset { value: Vec4f; constructor(value: Vec4f) { this.value = value; } }
 @CStruct class Tint { value: Vec4f; constructor(value: Vec4f) { this.value = value; } }
 @CStruct class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
-class Layout { vertexOnly!: Uniform<Offset>; fragmentOnly!: Storage<Tint>; both!: Storage<Tint>; }
+class Layout { vertexOnly: Uniform<Offset>; fragmentOnly: Storage<Tint>; both: Storage<Tint>; constructor(vertexOnly: Uniform<Offset>, fragmentOnly: Storage<Tint>, both: Storage<Tint>) { this.vertexOnly = vertexOnly; this.fragmentOnly = fragmentOnly; this.both = both; } }
 function vert(res: Layout, value: Vertex, ctx: VertexInvocation): Varyings { const offset: Offset = res.vertexOnly.$; const shared: Tint = res.both[0]; return new Varyings(new Vec4f(value.position.x + offset.value.x + shared.value.x * 0.0, value.position.y + offset.value.y, 0.0, 1.0)); }
 function frag(res: Layout, input: Varyings, ctx: FragmentInvocation): Vec4f { const tint: Tint = res.fragmentOnly[0]; const shared: Tint = res.both[0]; return tint.value.add(shared.value.scale(0.0)); }
 export const shifted: RenderPipelineSpec = renderPipelineL<Layout, Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });

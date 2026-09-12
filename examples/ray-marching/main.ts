@@ -86,7 +86,11 @@ class Varyings {
 // A bind group layout is a class here, not a runtime object. Field order fixes the
 // binding numbers, and the generator emits the WGSL declaration and scene_LAYOUT0.
 class SceneLayout {
-  frame!: Uniform<FrameData>;
+  frame: Uniform<FrameData>;
+
+  constructor(frame: Uniform<FrameData>) {
+    this.frame = frame;
+  }
 }
 
 // The whole scene is one signed distance field. The smooth union melts the sphere into

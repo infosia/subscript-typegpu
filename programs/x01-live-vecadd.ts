@@ -45,9 +45,15 @@ class Item {
 }
 
 class VecAddLayout {
-  a!: Storage<Item>;
-  b!: Storage<Item>;
-  out!: MutStorage<Item>;
+  a: Storage<Item>;
+  b: Storage<Item>;
+  out: MutStorage<Item>;
+
+  constructor(a: Storage<Item>, b: Storage<Item>, out: MutStorage<Item>) {
+    this.a = a;
+    this.b = b;
+    this.out = out;
+  }
 }
 
 function vecAddKernel(res: VecAddLayout, ctx: ComputeInvocation): void {
@@ -122,10 +128,11 @@ export async function main(): Promise<void> {
       hostOut.push(new Item(0.0));
       index = index + 1;
     }
-    const hostLayout = new VecAddLayout();
-    hostLayout.a = new Storage<Item>(hostA);
-    hostLayout.b = new Storage<Item>(hostB);
-    hostLayout.out = new MutStorage<Item>(hostOut);
+    const hostLayout = new VecAddLayout(
+      new Storage<Item>(hostA),
+      new Storage<Item>(hostB),
+      new MutStorage<Item>(hostOut),
+    );
     simulateComputeThreads<VecAddLayout>(
       vecAddKernel,
       hostLayout,

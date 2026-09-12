@@ -3,6 +3,6 @@
 import { AtomicU32 } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
-class Layout { output!: MutStorage<Item>; }
+class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { const local: AtomicU32 = new AtomicU32(0); res.output[0] = new Item(local.add(1)); }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

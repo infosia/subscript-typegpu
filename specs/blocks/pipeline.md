@@ -2,7 +2,8 @@
 
 P2 contract. Rev 0, 2026-08-22. Rev 5 (PI15–PI18 guarded dispatch,
 indirect), 2026-08-23. Rev 6 (PI15 Rev 1, PI18 Rev 1), 2026-08-23. Rev 7 (PI15 Rev 2
-wrapper identity), 2026-08-24. Plan §3 D1, D3, D10 and §4 govern
+wrapper identity), 2026-08-24. Rev 8 (PI3 Rev 1, the layout
+constructor), 2026-09-12. Plan §3 D1, D3, D10 and §4 govern
 this block. Kernels are `kernel.md`. The runtime classes live in
 `lib/typegpu.ts`.
 
@@ -30,10 +31,26 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   generator reads the layout classes from the kernel's parameter
   types and checks that each equals the declaration's type argument.
 - **PI3 — A layout class is a plain class of binding fields.** Every
-  field is a binding wrapper (PI5). Binding index is declaration
-  order from 0. No other member is legal. The class is not
-  `@CStruct` and not `@Descriptor`. A layout class is never
-  instantiated by the author.
+  field is a binding wrapper (PI5, TX1). Binding index is
+  declaration order from 0. The class is not `@CStruct` and not
+  `@Descriptor`. Rev 1, 2026-09-12: **the class declares one
+  constructor and no other member.** The constructor takes one
+  parameter per field, in declaration order, each typed as its
+  field, and its body is the assignments `this.<field> =
+  <parameter>` in the same order and nothing else. The generator
+  reads the field list and never reads the constructor. A
+  constructor of any other form, a method, an index signature, or
+  an accessor is a PI3 diagnostic that names the class and the
+  first departure. The GPU lane never constructs a layout class.
+  The CPU lane constructs one with `new L(...)` and passes it to
+  `simulateCompute` (CL1). *(Rev 0 spelled every field `name!:
+  Wrapper<T>` with no constructor, and the CPU lane assigned the
+  fields after `new L()`. subscript §108, measured at `403f8fc`,
+  requires every field to hold a value before the constructor
+  returns, and a `!` assertion does not count. The reply of
+  2026-09-12 in `specs/tracking/language-request.md` declined a
+  language change. The constructor is the spelling the S100
+  diagnostic names.)*
 - **PI4 — `ComputeInvocation` carries the builtins.** A library
   class with `globalId: Vec3u`, `localId: Vec3u`, `workgroupId:
   Vec3u`, `numWorkgroups: Vec3u`, `localIndex: u32`. The generator

@@ -92,7 +92,11 @@ class Varyings {
 // The bind group layout. The three patterns declare the same layout, so one uniform buffer
 // and one bind group serve all three pipelines.
 class DiscoLayout {
-  frame!: Uniform<FrameData>;
+  frame: Uniform<FrameData>;
+
+  constructor(frame: Uniform<FrameData>) {
+    this.frame = frame;
+  }
 }
 
 // The cosine palette maps one scalar to a color. The 6.28318 factor turns the argument into

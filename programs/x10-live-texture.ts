@@ -37,9 +37,15 @@ import {
 } from "./x10-live-texture.typegpu";
 
 class TextureCopyLayout {
-  source!: Texture2d<f32>;
-  nearest!: Sampler;
-  target!: StorageTexture2d<Rgba8unorm>;
+  source: Texture2d<f32>;
+  nearest: Sampler;
+  target: StorageTexture2d<Rgba8unorm>;
+
+  constructor(source: Texture2d<f32>, nearest: Sampler, target: StorageTexture2d<Rgba8unorm>) {
+    this.source = source;
+    this.nearest = nearest;
+    this.target = target;
+  }
 }
 
 function textureCopyKernel(res: TextureCopyLayout, ctx: ComputeInvocation): void {

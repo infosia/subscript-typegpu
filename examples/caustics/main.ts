@@ -83,7 +83,11 @@ class Varyings {
 // A bind group layout is a class here, not a runtime object. Field order fixes the
 // binding numbers, and the generator emits the WGSL declaration and caustic_LAYOUT0.
 class CausticLayout {
-  frame!: Uniform<FrameData>;
+  frame: Uniform<FrameData>;
+
+  constructor(frame: Uniform<FrameData>) {
+    this.frame = frame;
+  }
 }
 
 // Four octaves of absolute noise build a ridged field. One minus that field, cubed,

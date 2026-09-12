@@ -62,9 +62,15 @@ class Matrix {
 // A bind group layout is a class here, not a runtime object. Field order fixes the binding
 // numbers, and both kernels take the same class, so both bind groups share one shape.
 class MatrixLayout {
-  left!: Storage<Matrix>;
-  right!: Storage<Matrix>;
-  product!: MutStorage<Matrix>;
+  left: Storage<Matrix>;
+  right: Storage<Matrix>;
+  product: MutStorage<Matrix>;
+
+  constructor(left: Storage<Matrix>, right: Storage<Matrix>, product: MutStorage<Matrix>) {
+    this.left = left;
+    this.right = right;
+    this.product = product;
+  }
 }
 
 // One invocation computes the whole product with three nested loops.
@@ -295,10 +301,11 @@ export async function main(): Promise<void> {
 
       // The binding wrappers carry real bodies over plain arrays, so the same kernel source runs
       // on the host. TypeGPU keeps a separate function for its host result.
-      const host = new MatrixLayout();
-      host.left = new Storage<Matrix>([leftValue]);
-      host.right = new Storage<Matrix>([rightValue]);
-      host.product = new MutStorage<Matrix>([zeroMatrix()]);
+      const host = new MatrixLayout(
+        new Storage<Matrix>([leftValue]),
+        new Storage<Matrix>([rightValue]),
+        new MutStorage<Matrix>([zeroMatrix()]),
+      );
       // The naive kernel runs on the host and gives the oracle for both GPU results. The
       // tiled kernel reaches a barrier, so it has no host lane.
       simulateComputeThreads<MatrixLayout>(

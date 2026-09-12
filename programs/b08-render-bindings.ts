@@ -73,8 +73,13 @@ class Varyings {
 }
 
 class RenderLayout {
-  params!: Uniform<Offset>;
-  tint!: Storage<Tint>;
+  params: Uniform<Offset>;
+  tint: Storage<Tint>;
+
+  constructor(params: Uniform<Offset>, tint: Storage<Tint>) {
+    this.params = params;
+    this.tint = tint;
+  }
 }
 
 function vert(res: RenderLayout, value: Vertex, ctx: VertexInvocation): Varyings {

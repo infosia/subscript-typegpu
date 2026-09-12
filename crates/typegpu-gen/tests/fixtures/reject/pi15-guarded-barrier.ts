@@ -4,7 +4,7 @@
 
 import { ComputeInvocation, ComputePipelineSpec, computePipeline, MutStorage, workgroupBarrier } from "./typegpu";
 
-class Layout { output!: MutStorage<u32>; }
+class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function guardedKernel(res: Layout, ctx: ComputeInvocation): void {
   workgroupBarrier();
   res.output[ctx.globalId.x] = 1;

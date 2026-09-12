@@ -193,26 +193,52 @@ class SceneHit {
 class CascadeLayout {
   // `upper` reads the layer above and `target` writes this layer. The two always name views
   // of different textures, because one dispatch cannot sample what it stores.
-  upper!: Texture2d<f32>;
-  linear!: Sampler;
-  target!: StorageTexture2d<Rgba16float>;
-  scene!: Uniform<Scene>;
-  params!: Uniform<CascadeParams>;
+  upper: Texture2d<f32>;
+  linear: Sampler;
+  target: StorageTexture2d<Rgba16float>;
+  scene: Uniform<Scene>;
+  params: Uniform<CascadeParams>;
+
+  constructor(
+    upper: Texture2d<f32>,
+    linear: Sampler,
+    target: StorageTexture2d<Rgba16float>,
+    scene: Uniform<Scene>,
+    params: Uniform<CascadeParams>,
+  ) {
+    this.upper = upper;
+    this.linear = linear;
+    this.target = target;
+    this.scene = scene;
+    this.params = params;
+  }
 }
 
 // The gather reads cascade 0 through the sampler and writes the output field.
 class FieldLayout {
-  cascade0!: Texture2d<f32>;
-  linear!: Sampler;
-  target!: StorageTexture2d<Rgba16float>;
+  cascade0: Texture2d<f32>;
+  linear: Sampler;
+  target: StorageTexture2d<Rgba16float>;
+
+  constructor(cascade0: Texture2d<f32>, linear: Sampler, target: StorageTexture2d<Rgba16float>) {
+    this.cascade0 = cascade0;
+    this.linear = linear;
+    this.target = target;
+  }
 }
 
 // One layout class serves both render stages. `renderPipelineL` gives the vertex entry and
 // the fragment entry the same bindings.
 class RenderLayout {
-  field!: Texture2d<f32>;
-  linear!: Sampler;
-  scene!: Uniform<Scene>;
+  field: Texture2d<f32>;
+  linear: Sampler;
+  scene: Uniform<Scene>;
+
+  constructor(field: Texture2d<f32>, linear: Sampler, scene: Uniform<Scene>) {
+    this.field = field;
+    this.linear = linear;
+    this.scene = scene;
+  }
 }
 
 // Returns the nearest body and its color. The kernels and the host call this same function,

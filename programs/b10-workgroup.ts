@@ -38,7 +38,11 @@ class WorkCounter {
 }
 
 class WorkgroupLayout {
-  counters!: MutStorage<WorkCounter>;
+  counters: MutStorage<WorkCounter>;
+
+  constructor(counters: MutStorage<WorkCounter>) {
+    this.counters = counters;
+  }
 }
 
 const privateOffset: PrivateVar<u32> = privateVar<u32>(3);

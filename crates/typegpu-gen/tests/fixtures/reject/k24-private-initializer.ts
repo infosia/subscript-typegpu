@@ -2,7 +2,7 @@
 // expected-message: private variable `state` initializer is not evaluable
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, PrivateVar, privateVar } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
-class Layout { output!: MutStorage<Item>; }
+class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function initial(): u32 { return 1; }
 const state: PrivateVar<u32> = privateVar<u32>(initial());
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = new Item(state.$); }

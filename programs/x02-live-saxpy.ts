@@ -58,9 +58,15 @@ class SaxpyParams {
 }
 
 class SaxpyLayout {
-  params!: Uniform<SaxpyParams>;
-  x!: Storage<Item>;
-  y!: MutStorage<Item>;
+  params: Uniform<SaxpyParams>;
+  x: Storage<Item>;
+  y: MutStorage<Item>;
+
+  constructor(params: Uniform<SaxpyParams>, x: Storage<Item>, y: MutStorage<Item>) {
+    this.params = params;
+    this.x = x;
+    this.y = y;
+  }
 }
 
 function saxpyKernel(res: SaxpyLayout, ctx: ComputeInvocation): void {
@@ -135,10 +141,11 @@ export async function main(): Promise<void> {
       hostY.push(new Item(yValue));
       index = index + 1;
     }
-    const hostLayout = new SaxpyLayout();
-    hostLayout.params = new Uniform<SaxpyParams>(new SaxpyParams(aValue, count));
-    hostLayout.x = new Storage<Item>(hostX);
-    hostLayout.y = new MutStorage<Item>(hostY);
+    const hostLayout = new SaxpyLayout(
+      new Uniform<SaxpyParams>(new SaxpyParams(aValue, count)),
+      new Storage<Item>(hostX),
+      new MutStorage<Item>(hostY),
+    );
     simulateComputeThreads<SaxpyLayout>(
       saxpyKernel,
       hostLayout,

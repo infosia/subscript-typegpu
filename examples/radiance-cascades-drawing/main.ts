@@ -200,59 +200,127 @@ class Varyings {
 // The layout classes replace TypeGPU's run-time bind group layout objects. The field
 // order is the binding order, and the generator emits one `_LAYOUT0` spec per class.
 class SceneEditLayout {
-  scene!: StorageTexture2d<Rgba16float>;
-  brush!: Uniform<BrushParams>;
+  scene: StorageTexture2d<Rgba16float>;
+  brush: Uniform<BrushParams>;
+
+  constructor(scene: StorageTexture2d<Rgba16float>, brush: Uniform<BrushParams>) {
+    this.scene = scene;
+    this.brush = brush;
+  }
 }
 
 // The flood passes bind both payload layers as one 2D-array texture. Layer 0 holds the seed
 // color and layer 1 holds the seed position.
 class FloodSeedLayout {
-  scene!: Texture2d<f32>;
-  target!: WriteStorageTexture2dArray<Rgba16float>;
+  scene: Texture2d<f32>;
+  target: WriteStorageTexture2dArray<Rgba16float>;
+
+  constructor(scene: Texture2d<f32>, target: WriteStorageTexture2dArray<Rgba16float>) {
+    this.scene = scene;
+    this.target = target;
+  }
 }
 
 // A step reads one payload texture and writes the other, because one dispatch cannot read
 // and write the same texture.
 class FloodStepLayout {
-  source!: ReadStorageTexture2dArray<Rgba16float>;
-  target!: WriteStorageTexture2dArray<Rgba16float>;
-  params!: Uniform<StepParams>;
+  source: ReadStorageTexture2dArray<Rgba16float>;
+  target: WriteStorageTexture2dArray<Rgba16float>;
+  params: Uniform<StepParams>;
+
+  constructor(
+    source: ReadStorageTexture2dArray<Rgba16float>,
+    target: WriteStorageTexture2dArray<Rgba16float>,
+    params: Uniform<StepParams>,
+  ) {
+    this.source = source;
+    this.target = target;
+    this.params = params;
+  }
 }
 
 // The derive pass turns the flood payload into the two textures the light passes read: a
 // signed distance and an emissive color.
 class FloodDeriveLayout {
-  payload!: ReadStorageTexture2dArray<Rgba16float>;
-  scene!: Texture2d<f32>;
-  sdf!: StorageTexture2d<Rgba16float>;
-  colors!: StorageTexture2d<Rgba16float>;
+  payload: ReadStorageTexture2dArray<Rgba16float>;
+  scene: Texture2d<f32>;
+  sdf: StorageTexture2d<Rgba16float>;
+  colors: StorageTexture2d<Rgba16float>;
+
+  constructor(
+    payload: ReadStorageTexture2dArray<Rgba16float>,
+    scene: Texture2d<f32>,
+    sdf: StorageTexture2d<Rgba16float>,
+    colors: StorageTexture2d<Rgba16float>,
+  ) {
+    this.payload = payload;
+    this.scene = scene;
+    this.sdf = sdf;
+    this.colors = colors;
+  }
 }
 
 // `upper` reads the layer above and `target` writes this layer. `sdf` and `colors` replace
 // the analytic scene function of the first cascade example.
 class CascadeLayout {
-  upper!: Texture2d<f32>;
-  sdf!: Texture2d<f32>;
-  colors!: Texture2d<f32>;
-  linear!: Sampler;
-  target!: StorageTexture2d<Rgba16float>;
-  params!: Uniform<CascadeParams>;
+  upper: Texture2d<f32>;
+  sdf: Texture2d<f32>;
+  colors: Texture2d<f32>;
+  linear: Sampler;
+  target: StorageTexture2d<Rgba16float>;
+  params: Uniform<CascadeParams>;
+
+  constructor(
+    upper: Texture2d<f32>,
+    sdf: Texture2d<f32>,
+    colors: Texture2d<f32>,
+    linear: Sampler,
+    target: StorageTexture2d<Rgba16float>,
+    params: Uniform<CascadeParams>,
+  ) {
+    this.upper = upper;
+    this.sdf = sdf;
+    this.colors = colors;
+    this.linear = linear;
+    this.target = target;
+    this.params = params;
+  }
 }
 
 // The gather reads cascade 0 through the sampler and writes the light field.
 class FieldLayout {
-  cascade0!: Texture2d<f32>;
-  linear!: Sampler;
-  target!: StorageTexture2d<Rgba16float>;
+  cascade0: Texture2d<f32>;
+  linear: Sampler;
+  target: StorageTexture2d<Rgba16float>;
+
+  constructor(cascade0: Texture2d<f32>, linear: Sampler, target: StorageTexture2d<Rgba16float>) {
+    this.cascade0 = cascade0;
+    this.linear = linear;
+    this.target = target;
+  }
 }
 
 // One layout class serves both render stages, and the mode uniform selects the view.
 class RenderLayout {
-  field!: Texture2d<f32>;
-  sdf!: Texture2d<f32>;
-  colors!: Texture2d<f32>;
-  linear!: Sampler;
-  params!: Uniform<RenderParams>;
+  field: Texture2d<f32>;
+  sdf: Texture2d<f32>;
+  colors: Texture2d<f32>;
+  linear: Sampler;
+  params: Uniform<RenderParams>;
+
+  constructor(
+    field: Texture2d<f32>,
+    sdf: Texture2d<f32>,
+    colors: Texture2d<f32>,
+    linear: Sampler,
+    params: Uniform<RenderParams>,
+  ) {
+    this.field = field;
+    this.sdf = sdf;
+    this.colors = colors;
+    this.linear = linear;
+    this.params = params;
+  }
 }
 
 // The edit pass only writes touched cells, so a stroke accumulates in one scene texture.

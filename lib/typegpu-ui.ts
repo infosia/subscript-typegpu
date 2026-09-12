@@ -1064,9 +1064,15 @@ export class UiViewport {
 // The bind group of the UI pipeline: the viewport uniform, the atlas texture, and
 // the nearest-filter sampler.
 export class UiRenderLayout {
-  viewport!: Uniform<UiViewport>;
-  atlas!: Texture2d<f32>;
-  nearest!: Sampler;
+  viewport: Uniform<UiViewport>;
+  atlas: Texture2d<f32>;
+  nearest: Sampler;
+
+  constructor(viewport: Uniform<UiViewport>, atlas: Texture2d<f32>, nearest: Sampler) {
+    this.viewport = viewport;
+    this.atlas = atlas;
+    this.nearest = nearest;
+  }
 }
 
 // The vertex kernel's output and the fragment kernel's input. `color` carries the

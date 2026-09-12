@@ -87,7 +87,11 @@ class Varyings {
 // A bind group layout is a class here, not a runtime object. Field order fixes the
 // binding numbers, and the generator emits the WGSL declaration and oklab_LAYOUT0.
 class OklabLayout {
-  uniforms!: Uniform<OklabUniforms>;
+  uniforms: Uniform<OklabUniforms>;
+
+  constructor(uniforms: Uniform<OklabUniforms>) {
+    this.uniforms = uniforms;
+  }
 }
 
 // A small alpha keeps the adaptive clip near the original lightness. TypeGPU offers the

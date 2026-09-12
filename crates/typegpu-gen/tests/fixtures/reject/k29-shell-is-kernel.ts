@@ -4,7 +4,7 @@
 
 import { ComputeInvocation, ComputePipelineSpec, computePipeline, MutStorage, WgslShellSpec, wgslShell } from "./typegpu";
 
-class EmptyLayout { output!: MutStorage<u32>; }
+class EmptyLayout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 
 function both(res: EmptyLayout, ctx: ComputeInvocation): void {}
 

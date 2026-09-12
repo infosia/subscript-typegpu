@@ -7,4 +7,8 @@ class Item {}
 @CStruct
 class BadReference {
   value: Item;
+
+  constructor(value: Item) {
+    this.value = value;
+  }
 }

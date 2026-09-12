@@ -37,11 +37,17 @@ class SimParams {
 ## Define the resources
 
 The layout class gives the uniform and storage bindings their script types.
+Its constructor takes one binding per field, in declaration order.
 
 ```ts program=programs/b04-particles.ts
 class ParticleLayout {
-  params!: Uniform<SimParams>;
-  particles!: MutStorage<Particle>;
+  params: Uniform<SimParams>;
+  particles: MutStorage<Particle>;
+
+  constructor(params: Uniform<SimParams>, particles: MutStorage<Particle>) {
+    this.params = params;
+    this.particles = particles;
+  }
 }
 ```
 

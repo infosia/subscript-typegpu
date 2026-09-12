@@ -48,7 +48,11 @@ const addBiasShell: WgslShellSpec = wgslShell<(value: u32) => u32>(
 );
 
 class ShellLayout {
-  output!: MutStorage<u32>;
+  output: MutStorage<u32>;
+
+  constructor(output: MutStorage<u32>) {
+    this.output = output;
+  }
 }
 
 function shellKernel(res: ShellLayout, ctx: ComputeInvocation): void {
@@ -119,8 +123,7 @@ export async function main(): Promise<void> {
     const bytes: u8[] = await output.read(device, 0, 1);
     const gpuValues: FixedArray<u32, 1> = Context.fromBytes<FixedArray<u32, 1>>(bytes, 0);
     const gpuValue: u32 = gpuValues[0];
-    const host = new ShellLayout();
-    host.output = new MutStorage<u32>([0]);
+    const host = new ShellLayout(new MutStorage<u32>([0]));
     simulateCompute<ShellLayout>(
       shellKernel,
       host,

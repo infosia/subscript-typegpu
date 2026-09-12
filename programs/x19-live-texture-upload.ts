@@ -48,9 +48,15 @@ const HEIGHT: u32 = 2;
 const PIXEL_COUNT: u32 = WIDTH * HEIGHT;
 
 class UploadLiveLayout {
-  source!: Texture2d<f32>;
-  nearest!: Sampler;
-  output!: MutStorage<Vec4f>;
+  source: Texture2d<f32>;
+  nearest: Sampler;
+  output: MutStorage<Vec4f>;
+
+  constructor(source: Texture2d<f32>, nearest: Sampler, output: MutStorage<Vec4f>) {
+    this.source = source;
+    this.nearest = nearest;
+    this.output = output;
+  }
 }
 
 function uploadLiveKernel(res: UploadLiveLayout, ctx: ComputeInvocation): void {
@@ -175,11 +181,12 @@ export async function main(): Promise<void> {
     }
     print("dispatch:submitted");
 
-    const host = new UploadLiveLayout();
-    host.source = new Texture2d<f32>(pixels, WIDTH, HEIGHT);
-    host.nearest = samplerFromDescriptor(nearestDescriptor);
     const hostOutput: Vec4f[] = zeroPixels();
-    host.output = new MutStorage<Vec4f>(hostOutput);
+    const host = new UploadLiveLayout(
+      new Texture2d<f32>(pixels, WIDTH, HEIGHT),
+      samplerFromDescriptor(nearestDescriptor),
+      new MutStorage<Vec4f>(hostOutput),
+    );
     simulateComputeThreads<UploadLiveLayout>(
       uploadLiveKernel,
       host,

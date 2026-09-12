@@ -228,75 +228,167 @@ class Varyings {
 // The layout classes replace TypeGPU's run-time bind group layout objects. The field
 // order is the binding order, and the generator emits one `_LAYOUT0` spec per class.
 class BrushLayout {
-  force!: StorageTexture2d<Rgba16float>;
-  addedInk!: StorageTexture2d<Rgba16float>;
-  params!: Uniform<BrushParams>;
+  force: StorageTexture2d<Rgba16float>;
+  addedInk: StorageTexture2d<Rgba16float>;
+  params: Uniform<BrushParams>;
+
+  constructor(
+    force: StorageTexture2d<Rgba16float>,
+    addedInk: StorageTexture2d<Rgba16float>,
+    params: Uniform<BrushParams>,
+  ) {
+    this.force = force;
+    this.addedInk = addedInk;
+    this.params = params;
+  }
 }
 
 // The ink pass and the force pass share one layout. Each reads a field and an addition and
 // writes the sum to a third texture.
 class AddLayout {
-  source!: Texture2d<f32>;
-  addition!: Texture2d<f32>;
-  target!: StorageTexture2d<Rgba16float>;
+  source: Texture2d<f32>;
+  addition: Texture2d<f32>;
+  target: StorageTexture2d<Rgba16float>;
+
+  constructor(
+    source: Texture2d<f32>,
+    addition: Texture2d<f32>,
+    target: StorageTexture2d<Rgba16float>,
+  ) {
+    this.source = source;
+    this.addition = addition;
+    this.target = target;
+  }
 }
 
 // The velocity advection writes its result twice: to the next velocity, and to the fixed
 // right-hand side of the viscosity solve.
 class VelocityAdvectionLayout {
-  quantity!: Texture2d<f32>;
-  velocity!: Texture2d<f32>;
-  linear!: Sampler;
-  target!: StorageTexture2d<Rgba16float>;
-  viscosityRhs!: StorageTexture2d<Rgba16float>;
+  quantity: Texture2d<f32>;
+  velocity: Texture2d<f32>;
+  linear: Sampler;
+  target: StorageTexture2d<Rgba16float>;
+  viscosityRhs: StorageTexture2d<Rgba16float>;
+
+  constructor(
+    quantity: Texture2d<f32>,
+    velocity: Texture2d<f32>,
+    linear: Sampler,
+    target: StorageTexture2d<Rgba16float>,
+    viscosityRhs: StorageTexture2d<Rgba16float>,
+  ) {
+    this.quantity = quantity;
+    this.velocity = velocity;
+    this.linear = linear;
+    this.target = target;
+    this.viscosityRhs = viscosityRhs;
+  }
 }
 
 class AdvectionLayout {
-  quantity!: Texture2d<f32>;
-  velocity!: Texture2d<f32>;
-  linear!: Sampler;
-  target!: StorageTexture2d<Rgba16float>;
+  quantity: Texture2d<f32>;
+  velocity: Texture2d<f32>;
+  linear: Sampler;
+  target: StorageTexture2d<Rgba16float>;
+
+  constructor(
+    quantity: Texture2d<f32>,
+    velocity: Texture2d<f32>,
+    linear: Sampler,
+    target: StorageTexture2d<Rgba16float>,
+  ) {
+    this.quantity = quantity;
+    this.velocity = velocity;
+    this.linear = linear;
+    this.target = target;
+  }
 }
 
 // `rhs` holds the advected velocity and stays fixed through the ten Jacobi steps.
 class ViscosityLayout {
-  rhs!: Texture2d<f32>;
-  source!: Texture2d<f32>;
-  target!: StorageTexture2d<Rgba16float>;
+  rhs: Texture2d<f32>;
+  source: Texture2d<f32>;
+  target: StorageTexture2d<Rgba16float>;
+
+  constructor(rhs: Texture2d<f32>, source: Texture2d<f32>, target: StorageTexture2d<Rgba16float>) {
+    this.rhs = rhs;
+    this.source = source;
+    this.target = target;
+  }
 }
 
 class DivergenceLayout {
-  velocity!: Texture2d<f32>;
-  target!: StorageTexture2d<Rgba16float>;
+  velocity: Texture2d<f32>;
+  target: StorageTexture2d<Rgba16float>;
+
+  constructor(velocity: Texture2d<f32>, target: StorageTexture2d<Rgba16float>) {
+    this.velocity = velocity;
+    this.target = target;
+  }
 }
 
 class ClearLayout {
-  target!: StorageTexture2d<Rgba16float>;
+  target: StorageTexture2d<Rgba16float>;
+
+  constructor(target: StorageTexture2d<Rgba16float>) {
+    this.target = target;
+  }
 }
 
 class PressureLayout {
-  pressure!: Texture2d<f32>;
-  divergence!: Texture2d<f32>;
-  target!: StorageTexture2d<Rgba16float>;
+  pressure: Texture2d<f32>;
+  divergence: Texture2d<f32>;
+  target: StorageTexture2d<Rgba16float>;
+
+  constructor(
+    pressure: Texture2d<f32>,
+    divergence: Texture2d<f32>,
+    target: StorageTexture2d<Rgba16float>,
+  ) {
+    this.pressure = pressure;
+    this.divergence = divergence;
+    this.target = target;
+  }
 }
 
 class GradientLayout {
-  velocity!: Texture2d<f32>;
-  pressure!: Texture2d<f32>;
-  target!: StorageTexture2d<Rgba16float>;
+  velocity: Texture2d<f32>;
+  pressure: Texture2d<f32>;
+  target: StorageTexture2d<Rgba16float>;
+
+  constructor(
+    velocity: Texture2d<f32>,
+    pressure: Texture2d<f32>,
+    target: StorageTexture2d<Rgba16float>,
+  ) {
+    this.velocity = velocity;
+    this.pressure = pressure;
+    this.target = target;
+  }
 }
 
 // The ink view and the velocity view read one texture each, so one layout class serves both
 // render pipelines.
 class FieldRenderLayout {
-  field!: Texture2d<f32>;
-  linear!: Sampler;
+  field: Texture2d<f32>;
+  linear: Sampler;
+
+  constructor(field: Texture2d<f32>, linear: Sampler) {
+    this.field = field;
+    this.linear = linear;
+  }
 }
 
 class ImageRenderLayout {
-  ink!: Texture2d<f32>;
-  background!: Texture2d<f32>;
-  linear!: Sampler;
+  ink: Texture2d<f32>;
+  background: Texture2d<f32>;
+  linear: Sampler;
+
+  constructor(ink: Texture2d<f32>, background: Texture2d<f32>, linear: Sampler) {
+    this.ink = ink;
+    this.background = background;
+    this.linear = linear;
+  }
 }
 
 // A neighbor read clamps at the border. That clamp is the boundary condition of this solver.

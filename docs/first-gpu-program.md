@@ -62,7 +62,11 @@ class State {
 
 ```ts program=programs/b22-first-program.ts
 class CounterLayout {
-  state!: MutStorage<State>;
+  state: MutStorage<State>;
+
+  constructor(state: MutStorage<State>) {
+    this.state = state;
+  }
 }
 ```
 
@@ -202,8 +206,7 @@ host-side bindings, one invocation at a time, so the arithmetic is
 proven without a device.
 
 ```ts program=programs/b22-first-program.ts
-    const hostLayout = new CounterLayout();
-    hostLayout.state = new MutStorage<State>([new State(0, 10)]);
+    const hostLayout = new CounterLayout(new MutStorage<State>([new State(0, 10)]));
     simulateCompute<CounterLayout>(
       incrementCounter,
       hostLayout,

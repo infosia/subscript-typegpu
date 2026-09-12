@@ -49,8 +49,13 @@ class ShadowResult {
 }
 
 class ShadowLayout {
-  params!: Uniform<Params>;
-  output!: MutStorage<ShadowResult>;
+  params: Uniform<Params>;
+  output: MutStorage<ShadowResult>;
+
+  constructor(params: Uniform<Params>, output: MutStorage<ShadowResult>) {
+    this.params = params;
+    this.output = output;
+  }
 }
 
 function shadowKernel(res: ShadowLayout, ctx: ComputeInvocation): void {

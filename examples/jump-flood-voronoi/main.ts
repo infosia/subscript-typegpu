@@ -124,23 +124,43 @@ class Varyings {
 // The seed layout writes both layers of one texture. Layer 0 carries the color, and layer 1
 // carries the seed coordinate as a 0 to 1 pair.
 class SeedLayout {
-  target!: WriteStorageTexture2dArray<Rgba16float>;
-  params!: Uniform<SeedParams>;
+  target: WriteStorageTexture2dArray<Rgba16float>;
+  params: Uniform<SeedParams>;
+
+  constructor(target: WriteStorageTexture2dArray<Rgba16float>, params: Uniform<SeedParams>) {
+    this.target = target;
+    this.params = params;
+  }
 }
 
 // The step layout reads one texture and writes the other, so no invocation reads a cell that
 // another invocation already changed.
 class StepLayout {
-  source!: ReadStorageTexture2dArray<Rgba16float>;
-  target!: WriteStorageTexture2dArray<Rgba16float>;
-  params!: Uniform<StepParams>;
+  source: ReadStorageTexture2dArray<Rgba16float>;
+  target: WriteStorageTexture2dArray<Rgba16float>;
+  params: Uniform<StepParams>;
+
+  constructor(
+    source: ReadStorageTexture2dArray<Rgba16float>,
+    target: WriteStorageTexture2dArray<Rgba16float>,
+    params: Uniform<StepParams>,
+  ) {
+    this.source = source;
+    this.target = target;
+    this.params = params;
+  }
 }
 
 // The render layout takes a sampled view of layer 0 and a linear sampler. A storage binding
 // takes no sampler, so the display path needs a second view of the same texture.
 class VoronoiRenderLayout {
-  colors!: Texture2d<f32>;
-  linear!: Sampler;
+  colors: Texture2d<f32>;
+  linear: Sampler;
+
+  constructor(colors: Texture2d<f32>, linear: Sampler) {
+    this.colors = colors;
+    this.linear = linear;
+  }
 }
 
 // These are the four committed upstream palette literals. The random variation below

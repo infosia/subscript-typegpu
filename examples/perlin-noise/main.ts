@@ -81,7 +81,11 @@ class Varyings {
 // The bind group of the pipeline: one uniform buffer. TypeGPU declares the same binding
 // with `root.createUniform`, and the generator emits `noise_LAYOUT0` from this class.
 class NoiseLayout {
-  frame!: Uniform<FrameData>;
+  frame: Uniform<FrameData>;
+
+  constructor(frame: Uniform<FrameData>) {
+    this.frame = frame;
+  }
 }
 
 // GRID is the noise cells across the surface, DEPTH is the loop period in seconds, and

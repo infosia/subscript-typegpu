@@ -36,7 +36,7 @@ fn non_uniform_barrier_names_statement_value_and_author() {
             r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
-class Layout { output!: MutStorage<Item>; }
+class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function nonUniform(res: Layout, ctx: ComputeInvocation): void {
   if (ctx.localIndex === 0) { workgroupBarrier(); }
   res.output[ctx.globalId.x] = new Item(ctx.localIndex);

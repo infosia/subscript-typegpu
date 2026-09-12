@@ -4,8 +4,8 @@
 
 import { ComputeInvocation, ComputePipelineSpec, computePipeline2, MutStorage } from "./typegpu";
 
-class LeftLayout { left!: MutStorage<u32>; }
-class RightLayout { right!: MutStorage<u32>; }
+class LeftLayout { left: MutStorage<u32>; constructor(left: MutStorage<u32>) { this.left = left; } }
+class RightLayout { right: MutStorage<u32>; constructor(right: MutStorage<u32>) { this.right = right; } }
 function guardedKernel(left: LeftLayout, right: RightLayout, ctx: ComputeInvocation): void {
   left.left[ctx.globalId.x] = right.right[ctx.globalId.x];
 }

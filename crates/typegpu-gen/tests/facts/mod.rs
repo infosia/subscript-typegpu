@@ -30,16 +30,28 @@ import {
 @CStruct
 class Inner {
   value: u32;
+
+  constructor(value: u32) {
+    this.value = value;
+  }
 }
 
 @CStruct
 class Outer {
   inner: Inner;
+
+  constructor(inner: Inner) {
+    this.inner = inner;
+  }
 }
 
 @CStruct
 class ArrayRoot {
   items: FixedArray<Inner, 2>;
+
+  constructor(items: FixedArray<Inner, 2>) {
+    this.items = items;
+  }
 }
 "#;
     let generated = subscript_typegpu_gen::generate(&[SourceFile::new("facts.ts", source)])
@@ -60,6 +72,10 @@ import { Host_SIZE } from "./not-schema.typegpu";
 
 class Host {
   value: u32;
+
+  constructor(value: u32) {
+    this.value = value;
+  }
 }
 "#;
     let diagnostics = subscript_typegpu_gen::generate(&[SourceFile::new("not-schema.ts", source)])
@@ -91,6 +107,10 @@ import { Bad_SIZE } from "./illegal.typegpu";
 @CStruct
 class Bad {
   value: string;
+
+  constructor(value: string) {
+    this.value = value;
+  }
 }
 "#,
             "illegal.ts",
@@ -131,7 +151,7 @@ import { lower_SIZE } from "./lowercase.typegpu";
         r#"
 import { UPPER_WGSL } from "./uppercase.typegpu";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
-class Layout { output!: MutStorage<u32>; }
+class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = 1; }
 export const UPPER: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "UPPER", workgroupSize: [1, 1, 1] });
 "#,

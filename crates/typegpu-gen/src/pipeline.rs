@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use subscript_compiler::hir::{Callee, Expr, ExprKind, Function, Module, Stmt};
+use subscript_compiler::hir::{Callee, ClassDef, Expr, ExprKind, Function, Module, Stmt};
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 /// The address space and the resource kind of one layout binding (PI5, TX1).
@@ -458,14 +458,137 @@ fn allowed_binding_item(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, D
     })
 }
 
+/// Reports whether `statement` is the assignment `this.<field> = <parameter>` (PI3).
+fn assigns_field(statement: &Stmt, field: &str, parameter: &str) -> bool {
+    let Stmt::Expr(expr) = statement else {
+        return false;
+    };
+    let ExprKind::Assign {
+        op: None,
+        target,
+        value,
+        ..
+    } = &expr.kind
+    else {
+        return false;
+    };
+    let ExprKind::Field { obj, name, .. } = &target.kind else {
+        return false;
+    };
+    if !matches!(obj.kind, ExprKind::This) || name != field {
+        return false;
+    }
+    matches!(&value.kind, ExprKind::Local(local) if local == parameter)
+}
+
+/// Returns the position of `statement` when the statement carries one.
+fn statement_pos(statement: &Stmt) -> Option<Pos> {
+    match statement {
+        Stmt::Expr(expr) => Some(expr.pos.clone()),
+        Stmt::Let { pos, .. }
+        | Stmt::Return { pos, .. }
+        | Stmt::If { pos, .. }
+        | Stmt::While { pos, .. }
+        | Stmt::For { pos, .. }
+        | Stmt::ForOf { pos, .. }
+        | Stmt::Switch { pos, .. } => Some(pos.clone()),
+        Stmt::Break(pos) | Stmt::Continue(pos) => Some(pos.clone()),
+        _ => None,
+    }
+}
+
+/// Checks the constructor of a layout class against PI3.
+///
+/// The constructor takes one parameter per field, in declaration order, each typed as its field.
+/// The body is the assignments `this.<field> = <parameter>` in the same order and nothing else.
+/// The generator reads the field list, so one spelling serves every layout class.
+///
+/// # Errors
+///
+/// A class with no constructor, and a constructor of any other form, give a PI3 diagnostic that
+/// names the class and the first departure.
+fn layout_constructor(class: &ClassDef) -> Result<(), Diagnostic> {
+    let Some(ctor) = &class.ctor else {
+        return Err(diagnostic(
+            "PI3",
+            format!("layout class `{}` declares no constructor", class.name),
+            class.pos.clone(),
+        ));
+    };
+    for (index, field) in class.fields.iter().enumerate() {
+        let Some(parameter) = ctor.params.get(index) else {
+            return Err(diagnostic(
+                "PI3",
+                format!(
+                    "layout constructor of `{}` declares no parameter for field `{}`",
+                    class.name, field.name
+                ),
+                ctor.pos.clone(),
+            ));
+        };
+        if parameter.ty != field.ty {
+            return Err(diagnostic(
+                "PI3",
+                format!(
+                    "layout constructor parameter `{}` of `{}` is not the type of field `{}`",
+                    parameter.name, class.name, field.name
+                ),
+                parameter.pos.clone(),
+            ));
+        }
+        let Some(statement) = ctor.body.get(index) else {
+            return Err(diagnostic(
+                "PI3",
+                format!(
+                    "layout constructor of `{}` omits the assignment `this.{} = {}`",
+                    class.name, field.name, parameter.name
+                ),
+                ctor.pos.clone(),
+            ));
+        };
+        if !assigns_field(statement, &field.name, &parameter.name) {
+            return Err(diagnostic(
+                "PI3",
+                format!(
+                    "layout constructor of `{}` holds a statement that is not `this.{} = {}`",
+                    class.name, field.name, parameter.name
+                ),
+                statement_pos(statement).unwrap_or_else(|| ctor.pos.clone()),
+            ));
+        }
+    }
+    if let Some(parameter) = ctor.params.get(class.fields.len()) {
+        return Err(diagnostic(
+            "PI3",
+            format!(
+                "layout constructor of `{}` declares the parameter `{}` that names no field",
+                class.name, parameter.name
+            ),
+            parameter.pos.clone(),
+        ));
+    }
+    if let Some(statement) = ctor.body.get(class.fields.len()) {
+        return Err(diagnostic(
+            "PI3",
+            format!(
+                "layout constructor of `{}` holds a statement after the field assignments",
+                class.name
+            ),
+            statement_pos(statement).unwrap_or_else(|| ctor.pos.clone()),
+        ));
+    }
+    Ok(())
+}
+
 /// Reads one layout class into its bindings (PI3).
 ///
 /// `group` becomes the bind group index. Binding indices follow field declaration order from 0.
 ///
 /// # Errors
 ///
-/// A class that is not a plain class of binding wrappers gives a PI3 diagnostic. A class with no
-/// field gives a TX2 diagnostic. A buffer item type outside PI5 gives a PI5 diagnostic.
+/// A class that is not a plain class of binding wrappers gives a PI3 diagnostic, and so does a
+/// constructor outside the PI3 form. A class with no field gives a TX2 diagnostic. A buffer item
+/// type outside PI5 gives a PI5 diagnostic.
 pub(crate) fn layout(
     module: &Module,
     ty: &Type,
@@ -489,7 +612,7 @@ pub(crate) fn layout(
             class.pos.clone(),
         ));
     }
-    if class.ctor.is_some() || !class.methods.is_empty() || class.index_signature.is_some() {
+    if !class.methods.is_empty() || class.index_signature.is_some() {
         return Err(diagnostic(
             "PI3",
             format!("layout class `{}` contains a non-field member", class.name),
@@ -503,6 +626,7 @@ pub(crate) fn layout(
             class.pos.clone(),
         ));
     }
+    layout_constructor(class)?;
     // The binding index is the field's declaration position from 0 (PI3). A guarded declaration
     // appends its hidden binding after this loop.
     let mut bindings = Vec::new();

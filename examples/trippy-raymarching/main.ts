@@ -82,7 +82,11 @@ class Varyings {
 // The bind group layout. TypeGPU splits time, aspect, mouse, and the slider parameters into
 // four uniforms. One record replaces them here, because the parameters are constants.
 class TrippyLayout {
-  frame!: Uniform<FrameData>;
+  frame: Uniform<FrameData>;
+
+  constructor(frame: Uniform<FrameData>) {
+    this.frame = frame;
+  }
 }
 
 // These constants hold the upstream slider defaults. MAX_STEPS bounds the march per pixel,

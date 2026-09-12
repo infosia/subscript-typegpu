@@ -46,7 +46,11 @@ class State {
 }
 
 class CounterLayout {
-  state!: MutStorage<State>;
+  state: MutStorage<State>;
+
+  constructor(state: MutStorage<State>) {
+    this.state = state;
+  }
 }
 
 function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
@@ -144,8 +148,7 @@ export async function main(): Promise<void> {
     const readback: State = Context.fromBytes<State>(readbackBytes, 0);
     print(`readback:counter=${readback.counter} incrementBy=${readback.incrementBy}`);
 
-    const hostLayout = new CounterLayout();
-    hostLayout.state = new MutStorage<State>([new State(0, 10)]);
+    const hostLayout = new CounterLayout(new MutStorage<State>([new State(0, 10)]));
     simulateCompute<CounterLayout>(
       incrementCounter,
       hostLayout,

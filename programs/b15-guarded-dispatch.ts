@@ -30,7 +30,11 @@ import {
 } from "./b15-guarded-dispatch.typegpu";
 
 class GuardedLayout {
-  output!: MutStorage<u32>;
+  output: MutStorage<u32>;
+
+  constructor(output: MutStorage<u32>) {
+    this.output = output;
+  }
 }
 
 function guardedKernel(res: GuardedLayout, ctx: ComputeInvocation): void {
@@ -96,8 +100,7 @@ export async function main(): Promise<void> {
     pipeline.dispatchThreads(encoder, [bindGroup], 6, 1, 1);
     using command = encoder.finishDefault();
     device.queue.submit([command]);
-    const host = new GuardedLayout();
-    host.output = new MutStorage<u32>([999, 999, 999, 999, 999, 999, 999, 999]);
+    const host = new GuardedLayout(new MutStorage<u32>([999, 999, 999, 999, 999, 999, 999, 999]));
     simulateComputeThreads<GuardedLayout>(
       guardedKernel,
       host,

@@ -110,20 +110,34 @@ class Varyings {
 // The step bind group. `ReadStorageTexture2d` is read-only and `StorageTexture2d` is
 // write-only, so the types state that one dispatch never writes the texture it reads.
 class LifeStepLayout {
-  generation!: ReadStorageTexture2d<R32float>;
-  next!: StorageTexture2d<R32float>;
+  generation: ReadStorageTexture2d<R32float>;
+  next: StorageTexture2d<R32float>;
+
+  constructor(generation: ReadStorageTexture2d<R32float>, next: StorageTexture2d<R32float>) {
+    this.generation = generation;
+    this.next = next;
+  }
 }
 
 // The edit bind group. `ReadWriteStorageTexture2d` reads and writes one texture, because the
 // brush changes cells in place.
 class LifeEditLayout {
-  generation!: ReadWriteStorageTexture2d<R32float>;
-  edit!: Uniform<EditParams>;
+  generation: ReadWriteStorageTexture2d<R32float>;
+  edit: Uniform<EditParams>;
+
+  constructor(generation: ReadWriteStorageTexture2d<R32float>, edit: Uniform<EditParams>) {
+    this.generation = generation;
+    this.edit = edit;
+  }
 }
 
 // The render bind group. The fragment loads a texel directly, so the pass needs no sampler.
 class LifeRenderLayout {
-  generation!: ReadStorageTexture2d<R32float>;
+  generation: ReadStorageTexture2d<R32float>;
+
+  constructor(generation: ReadStorageTexture2d<R32float>) {
+    this.generation = generation;
+  }
 }
 
 // One invocation counts the eight neighbors and writes the next state of one cell.

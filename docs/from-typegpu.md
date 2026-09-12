@@ -256,14 +256,21 @@ const saxpyLayout = tgpu.bindGroupLayout({
 ```
 
 subscript-typegpu declares a layout as a class. Each field is a binding
-wrapper. The binding index follows the field order. A kernel receives
-the layout as its first parameter.
+wrapper. The binding index follows the field order. The constructor takes
+one value per field, in the same order. A kernel receives the layout as
+its first parameter.
 
 ```ts program=programs/b03-saxpy-uniform.ts
 class SaxpyLayout {
-  params!: Uniform<SaxpyParams>;
-  x!: Storage<Item>;
-  y!: MutStorage<Item>;
+  params: Uniform<SaxpyParams>;
+  x: Storage<Item>;
+  y: MutStorage<Item>;
+
+  constructor(params: Uniform<SaxpyParams>, x: Storage<Item>, y: MutStorage<Item>) {
+    this.params = params;
+    this.x = x;
+    this.y = y;
+  }
 }
 ```
 
@@ -564,9 +571,15 @@ stores are methods on the field.
 
 ```ts program=programs/b11-texture.ts
 class TextureLayout {
-  source!: Texture2d<f32>;
-  nearest!: Sampler;
-  target!: StorageTexture2d<Rgba8unorm>;
+  source: Texture2d<f32>;
+  nearest: Sampler;
+  target: StorageTexture2d<Rgba8unorm>;
+
+  constructor(source: Texture2d<f32>, nearest: Sampler, target: StorageTexture2d<Rgba8unorm>) {
+    this.source = source;
+    this.nearest = nearest;
+    this.target = target;
+  }
 }
 ```
 
@@ -690,10 +703,11 @@ A subscript-typegpu kernel is also a subscript function.
 instance and a `ComputeInvocation`.
 
 ```ts program=programs/b02-vecadd.ts
-    const hostLayout = new VecAddLayout();
-    hostLayout.a = new Storage<Item>([new Item(1.0), new Item(2.0), new Item(3.0)]);
-    hostLayout.b = new Storage<Item>([new Item(4.0), new Item(5.0), new Item(6.0)]);
-    hostLayout.out = new MutStorage<Item>([new Item(0.0), new Item(0.0), new Item(0.0)]);
+    const hostLayout = new VecAddLayout(
+      new Storage<Item>([new Item(1.0), new Item(2.0), new Item(3.0)]),
+      new Storage<Item>([new Item(4.0), new Item(5.0), new Item(6.0)]),
+      new MutStorage<Item>([new Item(0.0), new Item(0.0), new Item(0.0)]),
+    );
     simulateCompute<VecAddLayout>(
       vecAddKernel,
       hostLayout,

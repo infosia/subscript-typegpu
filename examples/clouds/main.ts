@@ -102,9 +102,15 @@ class Varyings {
 // The bind group layout. TypeGPU builds a layout object at run time. Here the layout is a
 // class, and the field order fixes binding 0, 1, and 2 of group 0.
 class CloudLayout {
-  noise!: Texture2d<f32>;
-  linear!: Sampler;
-  frame!: Uniform<CloudFrame>;
+  noise: Texture2d<f32>;
+  linear: Sampler;
+  frame: Uniform<CloudFrame>;
+
+  constructor(noise: Texture2d<f32>, linear: Sampler, frame: Uniform<CloudFrame>) {
+    this.noise = noise;
+    this.linear = linear;
+    this.frame = frame;
+  }
 }
 
 // TypeGPU draws one full-screen triangle and picks its three corners from the vertex index.

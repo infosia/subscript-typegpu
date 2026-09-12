@@ -7,4 +7,8 @@ class Item {}
 @CStruct
 class BadNullable {
   value: Item | null;
+
+  constructor(value: Item | null) {
+    this.value = value;
+  }
 }

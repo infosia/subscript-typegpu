@@ -110,15 +110,29 @@ class Varyings {
 // The compute layout. All three passes share it, so one class names the source cells, the target
 // cells, and the obstacle uniform. TypeGPU binds the same two roles through slots per pipeline.
 class FluidLayout {
-  source!: Storage<FluidCell>;
-  target!: MutStorage<FluidCell>;
-  params!: Uniform<FluidParams>;
+  source: Storage<FluidCell>;
+  target: MutStorage<FluidCell>;
+  params: Uniform<FluidParams>;
+
+  constructor(
+    source: Storage<FluidCell>,
+    target: MutStorage<FluidCell>,
+    params: Uniform<FluidParams>,
+  ) {
+    this.source = source;
+    this.target = target;
+    this.params = params;
+  }
 }
 
 // The render pass reads one grid, so its layout carries a single read-only binding. Two bind
 // groups on this layout then select cells A or cells B without a second pipeline.
 class FluidRenderLayout {
-  cells!: Storage<FluidCell>;
+  cells: Storage<FluidCell>;
+
+  constructor(cells: Storage<FluidCell>) {
+    this.cells = cells;
+  }
 }
 
 function isValidFlowOut(x: i32, y: i32, params: FluidParams): boolean {

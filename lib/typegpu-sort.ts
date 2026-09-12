@@ -37,8 +37,13 @@ export class BitonicSortPass {
 // The layout `bitonicSortStep` reads. `values` holds a power-of-two count of `u32` keys, and
 // `pass` carries the parameters of the current step.
 export class BitonicSortResources {
-  values!: MutStorage<u32>;
-  pass!: Uniform<BitonicSortPass>;
+  values: MutStorage<u32>;
+  pass: Uniform<BitonicSortPass>;
+
+  constructor(values: MutStorage<u32>, pass: Uniform<BitonicSortPass>) {
+    this.values = values;
+    this.pass = pass;
+  }
 }
 
 function bitonicSortStride(jShift: u32): u32 {
@@ -122,15 +127,25 @@ export function bitonicSortStep(
 // The layout `prefixScanBlockF32` reads. `values` holds the padded input, and `sums` receives
 // one block total for each workgroup.
 export class PrefixScanBlockResources {
-  values!: MutStorage<f32>;
-  sums!: MutStorage<f32>;
+  values: MutStorage<f32>;
+  sums: MutStorage<f32>;
+
+  constructor(values: MutStorage<f32>, sums: MutStorage<f32>) {
+    this.values = values;
+    this.sums = sums;
+  }
 }
 
 // The layout `prefixScanApplyF32` reads. `offsets` holds the scanned block sums, one for each
 // workgroup.
 export class PrefixScanApplyResources {
-  values!: MutStorage<f32>;
-  offsets!: Storage<f32>;
+  values: MutStorage<f32>;
+  offsets: Storage<f32>;
+
+  constructor(values: MutStorage<f32>, offsets: Storage<f32>) {
+    this.values = values;
+    this.offsets = offsets;
+  }
 }
 
 const prefixScanShared: WorkgroupArray<f32> = workgroupArray<f32>(256);

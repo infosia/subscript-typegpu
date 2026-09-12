@@ -60,8 +60,13 @@ class SimParams {
 }
 
 class ParticleLayout {
-  params!: Uniform<SimParams>;
-  particles!: MutStorage<Particle>;
+  params: Uniform<SimParams>;
+  particles: MutStorage<Particle>;
+
+  constructor(params: Uniform<SimParams>, particles: MutStorage<Particle>) {
+    this.params = params;
+    this.particles = particles;
+  }
 }
 
 function integrate(particle: Particle, dt: f32): Particle {
@@ -144,9 +149,10 @@ export async function main(): Promise<void> {
       hostParticles.push(particle);
       index = index + 1;
     }
-    const hostLayout = new ParticleLayout();
-    hostLayout.params = new Uniform<SimParams>(new SimParams(dt, count));
-    hostLayout.particles = new MutStorage<Particle>(hostParticles);
+    const hostLayout = new ParticleLayout(
+      new Uniform<SimParams>(new SimParams(dt, count)),
+      new MutStorage<Particle>(hostParticles),
+    );
     let step: u32 = 0;
     while (step < steps) {
       simulateComputeThreads<ParticleLayout>(

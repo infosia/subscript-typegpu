@@ -33,7 +33,11 @@ class DepthItem {
 }
 
 class DepthLayout {
-  output!: MutStorage<DepthItem>;
+  output: MutStorage<DepthItem>;
+
+  constructor(output: MutStorage<DepthItem>) {
+    this.output = output;
+  }
 }
 
 const ITERATIONS: u32 = 4;
@@ -100,8 +104,7 @@ export async function main(): Promise<void> {
       hostValues.push(new DepthItem(0));
       hostIndex += 1;
     }
-    const hostLayout = new DepthLayout();
-    hostLayout.output = new MutStorage<DepthItem>(hostValues);
+    const hostLayout = new DepthLayout(new MutStorage<DepthItem>(hostValues));
     simulateCompute<DepthLayout>(
       depthKernel,
       hostLayout,

@@ -47,7 +47,7 @@ fn validate(wgsl: &str) {
 fn binding_methods_and_indices_emit_identical_wgsl() {
     let method_source = r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, Storage, WorkgroupArray, computePipeline, workgroupArray } from "./typegpu";
-class Layout { input!: Storage<u32>; output!: MutStorage<u32>; }
+class Layout { input: Storage<u32>; output: MutStorage<u32>; constructor(input: Storage<u32>, output: MutStorage<u32>) { this.input = input; this.output = output; } }
 const shared: WorkgroupArray<u32> = workgroupArray<u32>(1);
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.localIndex;
@@ -61,7 +61,7 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { n
 "#;
     let index_source = r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, Storage, WorkgroupArray, computePipeline, workgroupArray } from "./typegpu";
-class Layout { input!: Storage<u32>; output!: MutStorage<u32>; }
+class Layout { input: Storage<u32>; output: MutStorage<u32>; constructor(input: Storage<u32>, output: MutStorage<u32>) { this.input = input; this.output = output; } }
 const shared: WorkgroupArray<u32> = workgroupArray<u32>(1);
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   const index: u32 = ctx.localIndex;
@@ -114,7 +114,7 @@ fn cl6_storage_barrier_alone_is_not_host_runnable() {
     assert_host_runnable(
         r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline, storageBarrier } from "./typegpu";
-class Layout { output!: MutStorage<u32>; }
+class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { storageBarrier(); }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
@@ -129,7 +129,7 @@ fn cl6_storage_atomic_alone_is_not_host_runnable() {
 import { AtomicU32 } from "./typegpu-types";
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
 @CStruct class Counter { value: AtomicU32; constructor(value: AtomicU32) { this.value = value; } }
-class Layout { counters!: MutStorage<Counter>; }
+class Layout { counters: MutStorage<Counter>; constructor(counters: MutStorage<Counter>) { this.counters = counters; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.counters[0].value.add(1); }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
@@ -142,7 +142,7 @@ fn cl6_written_private_variable_alone_is_not_host_runnable() {
     assert_host_runnable(
         r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, PrivateVar, computePipeline, privateVar } from "./typegpu";
-class Layout { output!: MutStorage<u32>; }
+class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 const state: PrivateVar<u32> = privateVar<u32>(1);
 function kernel(res: Layout, ctx: ComputeInvocation): void { state.$ = state.$ + 1; }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
@@ -156,7 +156,7 @@ fn cl6_workgroup_variable_alone_is_not_host_runnable() {
     assert_host_runnable(
         r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, WorkgroupVar, computePipeline, workgroupVar } from "./typegpu";
-class Layout { output!: MutStorage<u32>; }
+class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 const shared: WorkgroupVar<u32> = workgroupVar<u32>();
 function kernel(res: Layout, ctx: ComputeInvocation): void { shared.$ = 1; }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
@@ -170,7 +170,7 @@ fn cl6_read_private_variable_alone_is_host_runnable() {
     assert_host_runnable(
         r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, PrivateVar, computePipeline, privateVar } from "./typegpu";
-class Layout { output!: MutStorage<u32>; }
+class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 const state: PrivateVar<u32> = privateVar<u32>(1);
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = state.$; }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
@@ -185,7 +185,7 @@ fn pipeline_name_must_match_its_declaration() {
         (
             r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
-class Layout { output!: MutStorage<u32>; }
+class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = 1; }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
 "#,
@@ -194,7 +194,7 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { w
         (
             r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
-class Layout { output!: MutStorage<u32>; }
+class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = 1; }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "other", workgroupSize: [1, 1, 1] });
 "#,
@@ -214,7 +214,7 @@ fn local_shadow_of_a_binding_is_renamed_for_every_reference() {
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, Uniform, computePipeline } from "./typegpu";
 @CStruct class Params { value: u32; constructor(value: u32) { this.value = value; } }
 @CStruct class Result { local: u32; reread: u32; constructor(local: u32, reread: u32) { this.local = local; this.reread = reread; } }
-class Layout { params!: Uniform<Params>; output!: MutStorage<Result>; }
+class Layout { params: Uniform<Params>; output: MutStorage<Result>; constructor(params: Uniform<Params>, output: MutStorage<Result>) { this.params = params; this.output = output; } }
 function shadow(res: Layout, ctx: ComputeInvocation): void {
   let params: Params = res.params.$;
   params.value = params.value + 1;
@@ -245,7 +245,7 @@ fn uniform_stride_loop_with_conditional_binding_load_emits() {
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage, WorkgroupArray, workgroupArray, workgroupBarrier } from "./typegpu";
 @CStruct class Item { value: f32; constructor(value: f32) { this.value = value; } }
-class Layout { input!: Storage<Item>; }
+class Layout { input: Storage<Item>; constructor(input: Storage<Item>) { this.input = input; } }
 const partials: WorkgroupArray<f32> = workgroupArray<f32>(4);
 function reduction(res: Layout, ctx: ComputeInvocation): void {
   const global: u32 = ctx.globalId.x;
@@ -274,7 +274,7 @@ fn k22_rejects_non_uniform_continue_from_a_barrier_loop() {
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
-class Layout { output!: MutStorage<Item>; }
+class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   let running: boolean = true;
   while (running) {
@@ -297,7 +297,7 @@ fn k22_taints_loop_writes_after_non_uniform_exits_and_steps() {
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
-class Layout { output!: MutStorage<Item>; }
+class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   let count: u32 = 0;
   for (let index: u32 = 0; index < 4; index += 1) {
@@ -317,7 +317,7 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { n
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
-class Layout { output!: MutStorage<Item>; }
+class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   let count: u32 = 0;
   for (let index: u32 = 0; index < 4; index += 1) {
@@ -337,7 +337,7 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { n
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
-class Layout { output!: MutStorage<Item>; }
+class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   let index: u32 = 0;
   for (index = 0; index < ctx.localIndex; index += 1) {}
@@ -360,7 +360,7 @@ fn switch_grouping_module_constants_and_nested_control_flow_emit() {
 import { Mat2x2f, Vec2u, vec2f, vec2u } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
-class Layout { output!: MutStorage<Item>; }
+class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 const LIMIT: u32 = 4;
 const OFFSET: Vec2u = vec2u(1, 2);
 const BASIS: Mat2x2f = new Mat2x2f(vec2f(1.0, 0.0), vec2f(0.0, 1.0));
@@ -414,7 +414,7 @@ fn private_workgroup_variables_barriers_and_builtins_emit() {
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, PrivateVar, privateVar, WorkgroupArray, workgroupArray, workgroupBarrier, WorkgroupVar, workgroupVar } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
 @CStruct class Initial { value: u32; constructor(value: u32) { this.value = value; } }
-class Layout { output!: MutStorage<Item>; }
+class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 const BASE: u32 = 3;
 const privateState: PrivateVar<Initial> = privateVar<Initial>(new Initial(BASE));
 const sharedValue: WorkgroupVar<u32> = workgroupVar<u32>();
@@ -452,7 +452,7 @@ fn uniform_reads_binding_lengths_and_workgroup_indices_follow_k22() {
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, Storage, Uniform, WorkgroupArray, workgroupArray, workgroupBarrier } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
-class Layout { params!: Uniform<Item>; input!: Storage<Item>; output!: MutStorage<Item>; }
+class Layout { params: Uniform<Item>; input: Storage<Item>; output: MutStorage<Item>; constructor(params: Uniform<Item>, input: Storage<Item>, output: MutStorage<Item>) { this.params = params; this.input = input; this.output = output; } }
 const hist: WorkgroupArray<u32> = workgroupArray<u32>(4);
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   if (res.params.$.value > 0 && res.input.length() > 0) { workgroupBarrier(); }
@@ -475,7 +475,7 @@ fn k19_folds_checked_scalar_constant_expressions() {
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
-class Layout { output!: MutStorage<Item>; }
+class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 const SUM: u32 = 4 + 5 * 2;
 const NEXT: u32 = SUM + 1;
 const SCALE: f32 = 1.5 + 2.25;
@@ -496,7 +496,7 @@ fn k14_suffixes_a_folded_u32_above_i32_max() {
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
 @CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
-class Layout { output!: MutStorage<Item>; }
+class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 const LARGE: u32 = 2147483647 + 1;
 const MINIMUM: i32 = -2147483648;
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[ctx.globalId.x] = new Item(LARGE + (MINIMUM as u32)); }
@@ -516,7 +516,7 @@ fn atomic_storage_and_workgroup_places_emit_every_operation() {
 import { AtomicI32, AtomicU32 } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, storageBarrier, WorkgroupVar, workgroupVar } from "./typegpu";
 @CStruct class Counters { unsigned: AtomicU32; signed: AtomicI32; constructor(unsigned: AtomicU32, signed: AtomicI32) { this.unsigned = unsigned; this.signed = signed; } }
-class Layout { counters!: MutStorage<Counters>; }
+class Layout { counters: MutStorage<Counters>; constructor(counters: MutStorage<Counters>) { this.counters = counters; } }
 const localCounter: WorkgroupVar<AtomicU32> = workgroupVar<AtomicU32>();
 function atomics(res: Layout, ctx: ComputeInvocation): void {
   const a: u32 = res.counters[0].unsigned.load();
@@ -565,7 +565,7 @@ fn atomic_receiver_emits_a_conditional_index_prelude() {
 import { AtomicU32 } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
 @CStruct class Counter { value: AtomicU32; constructor(value: AtomicU32) { this.value = value; } }
-class Layout { counters!: MutStorage<Counter>; }
+class Layout { counters: MutStorage<Counter>; constructor(counters: MutStorage<Counter>) { this.counters = counters; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   res.counters[ctx.localIndex === 0 ? 1 : 2].value.add(1);
 }
@@ -592,7 +592,7 @@ fn conditional_uses_control_flow_and_all_identifiers_use_one_mangler() {
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
 @CStruct class Word { let: f32; constructor(value: f32) { this.let = value; } }
-class Layout { new!: Storage<Word>; }
+class Layout { new: Storage<Word>; constructor(values: Storage<Word>) { this.new = values; } }
 function loop(res: Layout, ctx: ComputeInvocation): void {
   const item: Word = res.new[0];
   const value: f32 = ctx.globalId.x > 0 ? item.let : 1.0;
@@ -616,7 +616,7 @@ fn half_vectors_enable_the_capability_and_binding_sizes_use_wgsl_layout() {
         r#"
 import { Vec2h } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
-class HalfLayout { values!: Storage<Vec2h>; }
+class HalfLayout { values: Storage<Vec2h>; constructor(values: Storage<Vec2h>) { this.values = values; } }
 function half(res: HalfLayout, ctx: ComputeInvocation): void { const value: Vec2h = res.values[0]; }
 export const halfPipeline: ComputePipelineSpec = computePipeline<HalfLayout>(half, { name: "halfPipeline", workgroupSize: [2, 3, 4] });
 "#,
@@ -633,8 +633,8 @@ fn uniform_and_two_layout_bindings_keep_group_order() {
         r#"
 import { Vec4f } from "./typegpu-types";
 import { ComputeInvocation, computePipeline2, ComputePipelineSpec, Storage, Uniform } from "./typegpu";
-class First { params!: Uniform<Vec4f>; }
-class Second { values!: Storage<Vec4f>; }
+class First { params: Uniform<Vec4f>; constructor(params: Uniform<Vec4f>) { this.params = params; } }
+class Second { values: Storage<Vec4f>; constructor(values: Storage<Vec4f>) { this.values = values; } }
 function groups(a: First, b: Second, ctx: ComputeInvocation): void {
   const params: Vec4f = a.params.$;
   const value: Vec4f = b.values[0];
@@ -662,7 +662,7 @@ fn control_flow_operators_casts_helpers_and_builtins_emit_as_wgsl() {
 import { clamp, fract, sign, Vec4f } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, Storage } from "./typegpu";
 @CStruct class Pack { values: FixedArray<Vec4f, 2>; constructor(values: FixedArray<Vec4f, 2>) { this.values = values; } }
-class Layout { input!: Storage<Pack>; output!: MutStorage<Pack>; }
+class Layout { input: Storage<Pack>; output: MutStorage<Pack>; constructor(input: Storage<Pack>, output: MutStorage<Pack>) { this.input = input; this.output = output; } }
 function helper(value: f32): f32 { return clamp(value, 0.0, 1.0); }
 function operations(res: Layout, ctx: ComputeInvocation): void {
   let total: f32 = 0.0;
@@ -706,7 +706,7 @@ fn lowered_operators_preserve_emitted_wgsl_precedence() {
         r#"
 import { Vec3f } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
-class Layout { values!: Storage<Vec3f>; }
+class Layout { values: Storage<Vec3f>; constructor(values: Storage<Vec3f>) { this.values = values; } }
 function precedence(res: Layout, ctx: ComputeInvocation): void {
   const a: Vec3f = res.values[0];
   const b: Vec3f = res.values[1];
@@ -738,7 +738,7 @@ fn mixed_logical_chains_parenthesize_each_operator_group() {
     let generated = generate(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
-class Layout { values!: MutStorage<u32>; }
+class Layout { values: MutStorage<u32>; constructor(values: MutStorage<u32>) { this.values = values; } }
 function logical(res: Layout, ctx: ComputeInvocation): void {
   const a: boolean = ctx.localId.x < 1;
   const b: boolean = ctx.localId.x < 2;
@@ -762,7 +762,7 @@ fn mixed_bitwise_chains_parenthesize_arithmetic_operands() {
     let generated = generate(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
-class Layout { values!: MutStorage<u32>; }
+class Layout { values: MutStorage<u32>; constructor(values: MutStorage<u32>) { this.values = values; } }
 function bitwise(res: Layout, ctx: ComputeInvocation): void {
   const a: u32 = ctx.globalId.x;
   const b: u32 = res.values[0];
@@ -793,11 +793,25 @@ fn every_k10_and_k11_mapping_reaches_the_emitter() {
 import { clamp, fract, mix, sign, smoothstep, step, Mat4x4f, Vec3f, Vec3i, Vec3u, Vec4f } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
 class MappingLayout {
-  floats!: Storage<Vec3f>;
-  ints!: Storage<Vec3i>;
-  uints!: Storage<Vec3u>;
-  matrices!: Storage<Mat4x4f>;
-  vectors4!: Storage<Vec4f>;
+  floats: Storage<Vec3f>;
+  ints: Storage<Vec3i>;
+  uints: Storage<Vec3u>;
+  matrices: Storage<Mat4x4f>;
+  vectors4: Storage<Vec4f>;
+
+  constructor(
+    floats: Storage<Vec3f>,
+    ints: Storage<Vec3i>,
+    uints: Storage<Vec3u>,
+    matrices: Storage<Mat4x4f>,
+    vectors4: Storage<Vec4f>,
+  ) {
+    this.floats = floats;
+    this.ints = ints;
+    this.uints = uints;
+    this.matrices = matrices;
+    this.vectors4 = vectors4;
+  }
 }
 function mappings(res: MappingLayout, ctx: ComputeInvocation): void {
   const a: Vec3f = res.floats[0]; const b: Vec3f = res.floats[1];
@@ -872,7 +886,7 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from
   constructor(left: FixedArray<f32, 2>, right: FixedArray<f32, 2>) { this.left = left; this.right = right; }
 }
 
-class Layout { packs!: Storage<Pack>; }
+class Layout { packs: Storage<Pack>; constructor(packs: Storage<Pack>) { this.packs = packs; } }
 function control(res: Layout, ctx: ComputeInvocation): void {
   let i: u32 = 0;
   const flag: boolean = ctx.globalId.x === (0 as u32);
@@ -923,7 +937,7 @@ fn wgsl_shell_uses_the_typed_signature_and_literal_body() {
     let generated = generate(
         r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, WgslShellSpec, computePipeline, wgslDeclarations, wgslShell } from "./typegpu";
-class Layout { output!: MutStorage<u32>; }
+class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 wgslDeclarations("const SHELL_BIAS: u32 = 7u;");
 function addBias(input: u32): u32 { print(`host=${input}`); return input + 100; }
 export const shell: WgslShellSpec = wgslShell<(input: u32) => u32>(addBias, { body: "return input + SHELL_BIAS;" });
@@ -957,7 +971,7 @@ fn wgsl_shell_preserves_relative_indentation_and_empty_lines() {
     let generated = generate(
         r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, WgslShellSpec, computePipeline, wgslShell } from "./typegpu";
-class Layout { output!: MutStorage<u32>; }
+class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function choose(input: u32): u32 { return input; }
 const shell: WgslShellSpec = wgslShell<(input: u32) => u32>(choose, {
   body: "    if (input > 0u) {\n      return input;\n\n    }\n    return 0u;",
@@ -982,7 +996,7 @@ fn guarded_pipeline_emits_the_hidden_last_binding_and_three_axis_fence() {
     let generated = generate(
         r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
-class Layout { output!: MutStorage<u32>; }
+class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[ctx.globalId.x] = 9; }
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 2, 1], guarded: true });
 "#,

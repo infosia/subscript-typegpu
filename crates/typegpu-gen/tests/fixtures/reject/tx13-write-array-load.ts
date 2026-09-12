@@ -2,7 +2,7 @@
 // expected-message: write-only array storage texture
 import { ComputeInvocation, ComputePipelineSpec, Rgba16float, WriteStorageTexture2dArray, computePipeline } from "./typegpu";
 import { Vec2i } from "./typegpu-types";
-class Layout { target!: WriteStorageTexture2dArray<Rgba16float>; }
+class Layout { target: WriteStorageTexture2dArray<Rgba16float>; constructor(target: WriteStorageTexture2dArray<Rgba16float>) { this.target = target; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   res.target.load(new Vec2i(0, 0), 0);
 }

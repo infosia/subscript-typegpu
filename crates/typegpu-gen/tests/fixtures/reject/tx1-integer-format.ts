@@ -2,6 +2,6 @@
 // expected-message: float-channel library marker
 import { ComputeInvocation, ComputePipelineSpec, StorageTexture2d, computePipeline } from "./typegpu";
 class Rgba8uint {}
-class Layout { target!: StorageTexture2d<Rgba8uint>; }
+class Layout { target: StorageTexture2d<Rgba8uint>; constructor(target: StorageTexture2d<Rgba8uint>) { this.target = target; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {}
 export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

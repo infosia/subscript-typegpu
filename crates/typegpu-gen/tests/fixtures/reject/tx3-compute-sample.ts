@@ -2,7 +2,7 @@
 // expected-message: fragment kernel
 import { ComputeInvocation, ComputePipelineSpec, Sampler, Texture2d, computePipeline } from "./typegpu";
 import { Vec2f, Vec4f } from "./typegpu-types";
-class Layout { source!: Texture2d<f32>; nearest!: Sampler; }
+class Layout { source: Texture2d<f32>; nearest: Sampler; constructor(source: Texture2d<f32>, nearest: Sampler) { this.source = source; this.nearest = nearest; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   const color: Vec4f = res.source.sample(res.nearest, new Vec2f(0.5, 0.5));
 }

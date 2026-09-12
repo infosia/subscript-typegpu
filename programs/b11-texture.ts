@@ -53,13 +53,23 @@ class SampleParams {
 }
 
 class TextureLayout {
-  source!: Texture2d<f32>;
-  nearest!: Sampler;
-  target!: StorageTexture2d<Rgba8unorm>;
+  source: Texture2d<f32>;
+  nearest: Sampler;
+  target: StorageTexture2d<Rgba8unorm>;
+
+  constructor(source: Texture2d<f32>, nearest: Sampler, target: StorageTexture2d<Rgba8unorm>) {
+    this.source = source;
+    this.nearest = nearest;
+    this.target = target;
+  }
 }
 
 class ParamsLayout {
-  params!: Uniform<SampleParams>;
+  params: Uniform<SampleParams>;
+
+  constructor(params: Uniform<SampleParams>) {
+    this.params = params;
+  }
 }
 
 function textureKernel(
@@ -144,12 +154,12 @@ export async function main(): Promise<void> {
     device.queue.submit([command]);
     const hostSourcePixels: Vec4f[] = [new Vec4f(1.0, 0.0, 0.0, 1.0)];
     const hostTargetPixels: Vec4f[] = [new Vec4f(0.0, 0.0, 0.0, 0.0)];
-    const hostTextures = new TextureLayout();
-    hostTextures.source = new Texture2d<f32>(hostSourcePixels, 1, 1);
-    hostTextures.nearest = samplerFromDescriptor(nearestDescriptor);
-    hostTextures.target = new StorageTexture2d<Rgba8unorm>(hostTargetPixels, 1, 1);
-    const hostParams = new ParamsLayout();
-    hostParams.params = new Uniform<SampleParams>(new SampleParams(1, 1));
+    const hostTextures = new TextureLayout(
+      new Texture2d<f32>(hostSourcePixels, 1, 1),
+      samplerFromDescriptor(nearestDescriptor),
+      new StorageTexture2d<Rgba8unorm>(hostTargetPixels, 1, 1),
+    );
+    const hostParams = new ParamsLayout(new Uniform<SampleParams>(new SampleParams(1, 1)));
     simulateCompute2<TextureLayout, ParamsLayout>(
       textureKernel,
       hostTextures,

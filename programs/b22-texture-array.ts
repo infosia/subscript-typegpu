@@ -38,9 +38,19 @@ const HEIGHT: u32 = 1;
 const LAYERS: u32 = 2;
 
 class TextureArrayLayout {
-  sampled!: Texture2dArray<f32>;
-  source!: ReadStorageTexture2dArray<Rgba16float>;
-  target!: WriteStorageTexture2dArray<Rgba16float>;
+  sampled: Texture2dArray<f32>;
+  source: ReadStorageTexture2dArray<Rgba16float>;
+  target: WriteStorageTexture2dArray<Rgba16float>;
+
+  constructor(
+    sampled: Texture2dArray<f32>,
+    source: ReadStorageTexture2dArray<Rgba16float>,
+    target: WriteStorageTexture2dArray<Rgba16float>,
+  ) {
+    this.sampled = sampled;
+    this.source = source;
+    this.target = target;
+  }
 }
 
 function textureArrayKernel(res: TextureArrayLayout, ctx: ComputeInvocation): void {
@@ -161,10 +171,11 @@ export async function main(): Promise<void> {
     const hostSampled: Vec4f[] = sampledPixels();
     const hostSource: Vec4f[] = storagePixels();
     const hostTarget: Vec4f[] = zeroPixels();
-    const host = new TextureArrayLayout();
-    host.sampled = new Texture2dArray<f32>(hostSampled, WIDTH, HEIGHT, LAYERS);
-    host.source = new ReadStorageTexture2dArray<Rgba16float>(hostSource, WIDTH, HEIGHT, LAYERS);
-    host.target = new WriteStorageTexture2dArray<Rgba16float>(hostTarget, WIDTH, HEIGHT, LAYERS);
+    const host = new TextureArrayLayout(
+      new Texture2dArray<f32>(hostSampled, WIDTH, HEIGHT, LAYERS),
+      new ReadStorageTexture2dArray<Rgba16float>(hostSource, WIDTH, HEIGHT, LAYERS),
+      new WriteStorageTexture2dArray<Rgba16float>(hostTarget, WIDTH, HEIGHT, LAYERS),
+    );
     simulateComputeThreads<TextureArrayLayout>(
       textureArrayKernel,
       host,

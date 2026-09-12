@@ -96,8 +96,13 @@ class Varyings {
 // The compute bind group. `Storage` is read-only and `MutStorage` is read-write, so the
 // types state that one dispatch never writes the buffer it reads.
 class BoidLayout {
-  previous!: Storage<Boid>;
-  next!: MutStorage<Boid>;
+  previous: Storage<Boid>;
+  next: MutStorage<Boid>;
+
+  constructor(previous: Storage<Boid>, next: MutStorage<Boid>) {
+    this.previous = previous;
+    this.next = next;
+  }
 }
 
 // Each invocation reads the complete previous flock and writes one next-state record.

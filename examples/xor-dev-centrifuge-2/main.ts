@@ -79,7 +79,11 @@ class Varyings {
 // This port sends time and the aspect ratio only. A bind group layout is a class here,
 // and field order fixes the binding numbers.
 class TunnelLayout {
-  frame!: Uniform<FrameData>;
+  frame: Uniform<FrameData>;
+
+  constructor(frame: Uniform<FrameData>) {
+    this.frame = frame;
+  }
 }
 
 // A shell function has two bodies. This subscript body is the host implementation,

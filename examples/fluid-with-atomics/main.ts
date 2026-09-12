@@ -149,27 +149,46 @@ class Varyings {
 // The flow layout reads the current levels and accumulates signed changes into the next buffer.
 // No pass writes the source, so a plain read never sees a partial update.
 class AtomicFluidLayout {
-  current!: Storage<WaterLevel>;
-  next!: MutStorage<WaterDelta>;
+  current: Storage<WaterLevel>;
+  next: MutStorage<WaterDelta>;
+
+  constructor(current: Storage<WaterLevel>, next: MutStorage<WaterDelta>) {
+    this.current = current;
+    this.next = next;
+  }
 }
 
 // The finalize layout binds the same pair. Its pass turns the accumulated changes into levels.
 class AtomicFinalizeLayout {
-  current!: Storage<WaterLevel>;
-  next!: MutStorage<WaterDelta>;
+  current: Storage<WaterLevel>;
+  next: MutStorage<WaterDelta>;
+
+  constructor(current: Storage<WaterLevel>, next: MutStorage<WaterDelta>) {
+    this.current = current;
+    this.next = next;
+  }
 }
 
 // The brush layout writes the new state directly, so a stroke lands on the buffer the frame
 // displays.
 class AtomicBrushLayout {
-  cells!: MutStorage<WaterCell>;
-  brush!: Uniform<BrushParams>;
+  cells: MutStorage<WaterCell>;
+  brush: Uniform<BrushParams>;
+
+  constructor(cells: MutStorage<WaterCell>, brush: Uniform<BrushParams>) {
+    this.cells = cells;
+    this.brush = brush;
+  }
 }
 
 // The render layout binds the cells as mutable storage, because an atomic load needs that
 // access.
 class AtomicFluidRenderLayout {
-  cells!: MutStorage<WaterCell>;
+  cells: MutStorage<WaterCell>;
+
+  constructor(cells: MutStorage<WaterCell>) {
+    this.cells = cells;
+  }
 }
 
 function minU32(left: u32, right: u32): u32 {

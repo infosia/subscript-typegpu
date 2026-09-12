@@ -52,8 +52,13 @@ class SimParams {
 }
 
 class ParticleLayout {
-  params!: Uniform<SimParams>;
-  particles!: MutStorage<Particle>;
+  params: Uniform<SimParams>;
+  particles: MutStorage<Particle>;
+
+  constructor(params: Uniform<SimParams>, particles: MutStorage<Particle>) {
+    this.params = params;
+    this.particles = particles;
+  }
 }
 
 function integrate(particle: Particle, dt: f32): Particle {
@@ -129,11 +134,12 @@ export async function main(): Promise<void> {
     pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
     using command = encoder.finishDefault();
     device.queue.submit([command]);
-    const hostLayout = new ParticleLayout();
-    hostLayout.params = new Uniform<SimParams>(new SimParams(2.0, 1));
-    hostLayout.particles = new MutStorage<Particle>([
-      new Particle(new Vec3f(1.0, 2.0, 3.0), new Vec3f(0.5, 0.0, 0.0)),
-    ]);
+    const hostLayout = new ParticleLayout(
+      new Uniform<SimParams>(new SimParams(2.0, 1)),
+      new MutStorage<Particle>([
+        new Particle(new Vec3f(1.0, 2.0, 3.0), new Vec3f(0.5, 0.0, 0.0)),
+      ]),
+    );
     simulateCompute<ParticleLayout>(
       particleKernel,
       hostLayout,

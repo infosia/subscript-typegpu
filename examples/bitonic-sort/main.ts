@@ -89,7 +89,11 @@ class DisplayVaryings {
 // The display binds the same buffer as read-only storage. The sort kernel binds it as
 // mutable storage through its own layout, so the two passes never share a bind group.
 class BitonicDisplayResources {
-  values!: Storage<u32>;
+  values: Storage<u32>;
+
+  constructor(values: Storage<u32>) {
+    this.values = values;
+  }
 }
 
 // The vertex stage widens the corner to clip space and maps it from the -1 to 1 range

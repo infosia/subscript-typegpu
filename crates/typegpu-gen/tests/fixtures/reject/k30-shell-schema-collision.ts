@@ -14,7 +14,7 @@ function textureSample_(value: u32): u32 { return value; }
 const shell: WgslShellSpec = wgslShell<(value: u32) => u32>(textureSample_, {
   body: "return value;",
 });
-class Layout { input!: Storage<textureSample>; output!: MutStorage<u32>; }
+class Layout { input: Storage<textureSample>; output: MutStorage<u32>; constructor(input: Storage<textureSample>, output: MutStorage<u32>) { this.input = input; this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   res.output[0] = textureSample_(res.input[0].value);
 }

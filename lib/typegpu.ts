@@ -774,8 +774,13 @@ export class ComputeInvocation {
  * the kernel reads.
  */
 export class VertexInvocation {
-  vertexIndex!: u32;
-  instanceIndex!: u32;
+  vertexIndex: u32;
+  instanceIndex: u32;
+
+  constructor(vertexIndex: u32, instanceIndex: u32) {
+    this.vertexIndex = vertexIndex;
+    this.instanceIndex = instanceIndex;
+  }
 }
 
 /**
@@ -784,7 +789,11 @@ export class VertexInvocation {
  * The fragment position arrives as the varyings' `position` field, never through this class.
  */
 export class FragmentInvocation {
-  frontFacing!: boolean;
+  frontFacing: boolean;
+
+  constructor(frontFacing: boolean) {
+    this.frontFacing = frontFacing;
+  }
 }
 
 /**

@@ -85,36 +85,45 @@ import { gpu, GPUAdapter, GPUDevice } from "./webgpu";
 
 @CStruct
 class Params {
-  dt: f32;
-  count: u32;
+  dt: f32 = 0.0;
+  count: u32 = 0;
 }
 
 @CStruct
 class Particle {
-  pos: Vec3f;
-  vel: Vec3f;
+  pos: Vec3f = new Vec3f(0.0, 0.0, 0.0);
+  vel: Vec3f = new Vec3f(0.0, 0.0, 0.0);
 }
 
 @CStruct
 class Mixed {
-  a: f32;
-  p: Vec3f;
+  a: f32 = 0.0;
+  p: Vec3f = new Vec3f(0.0, 0.0, 0.0);
 }
 
 @CStruct
 class Grid {
   cells: FixedArray<Particle, 4>;
   extent: Vec4u;
+
+  constructor(cells: FixedArray<Particle, 4>, extent: Vec4u) {
+    this.cells = cells;
+    this.extent = extent;
+  }
 }
 
 @CStruct
 class MatrixHolder {
   value: Mat3x3f;
+
+  constructor(value: Mat3x3f) {
+    this.value = value;
+  }
 }
 
 @CStruct
 class Half {
-  v: Vec2h;
+  v: Vec2h = new Vec2h(0.0, 0.0);
 }
 
 @CStruct
@@ -123,20 +132,27 @@ class FloatVectors {
   v3: Vec3f;
   v4: Vec4f;
   triples: FixedArray<Vec3f, 4>;
+
+  constructor(v2: Vec2f, v3: Vec3f, v4: Vec4f, triples: FixedArray<Vec3f, 4>) {
+    this.v2 = v2;
+    this.v3 = v3;
+    this.v4 = v4;
+    this.triples = triples;
+  }
 }
 
 @CStruct
 class SignedVectors {
-  v2: Vec2i;
-  v3: Vec3i;
-  v4: Vec4i;
+  v2: Vec2i = new Vec2i(0, 0);
+  v3: Vec3i = new Vec3i(0, 0, 0);
+  v4: Vec4i = new Vec4i(0, 0, 0, 0);
 }
 
 @CStruct
 class UnsignedVectors {
-  v2: Vec2u;
-  v3: Vec3u;
-  v4: Vec4u;
+  v2: Vec2u = new Vec2u(0, 0);
+  v3: Vec3u = new Vec3u(0, 0, 0);
+  v4: Vec4u = new Vec4u(0, 0, 0, 0);
 }
 
 @CStruct
@@ -147,6 +163,15 @@ class HalfMatrices {
   m2: Mat2x2f;
   m3: Mat3x3f;
   m4: Mat4x4f;
+
+  constructor(h2: Vec2h, h3: Vec3h, h4: Vec4h, m2: Mat2x2f, m3: Mat3x3f, m4: Mat4x4f) {
+    this.h2 = h2;
+    this.h3 = h3;
+    this.h4 = h4;
+    this.m2 = m2;
+    this.m3 = m3;
+    this.m4 = m4;
+  }
 }
 
 function retainSchemaTypes(

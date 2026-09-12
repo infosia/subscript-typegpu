@@ -59,7 +59,11 @@ class Counter {
 // TypeGPU's `createGuardedComputePipeline` allocates the mutable and the layout on
 // its own. This port declares the binding, and the generator emits `count1d_LAYOUT0`.
 class CounterLayout {
-  counter!: MutStorage<Counter>;
+  counter: MutStorage<Counter>;
+
+  constructor(counter: MutStorage<Counter>) {
+    this.counter = counter;
+  }
 }
 
 // The kernel body of all three pipelines. The body reads no global id, so the generated

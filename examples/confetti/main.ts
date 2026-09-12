@@ -94,7 +94,11 @@ class Varyings {
 // A bind group layout is a class here, not a runtime object. Only the update kernel binds
 // the particles. The draw reaches the same buffer through a vertex slot instead.
 class ParticleLayout {
-  particles!: MutStorage<Particle>;
+  particles: MutStorage<Particle>;
+
+  constructor(particles: MutStorage<Particle>) {
+    this.particles = particles;
+  }
 }
 
 // One storage buffer becomes the instance stream after this pass completes.

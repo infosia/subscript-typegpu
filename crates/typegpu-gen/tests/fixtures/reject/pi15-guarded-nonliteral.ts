@@ -4,7 +4,7 @@
 
 import { ComputeInvocation, ComputePipelineSpec, computePipeline, MutStorage } from "./typegpu";
 
-class EmptyLayout { output!: MutStorage<u32>; }
+class EmptyLayout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function guardedKernel(res: EmptyLayout, ctx: ComputeInvocation): void {}
 const guardedValue: boolean = true;
 

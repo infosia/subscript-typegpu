@@ -3,7 +3,11 @@ import { Vec3b } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
 
 class Layout {
-  values!: Storage<Vec3b>;
+  values: Storage<Vec3b>;
+
+  constructor(values: Storage<Vec3b>) {
+    this.values = values;
+  }
 }
 
 function kernel(res: Layout, ctx: ComputeInvocation): void {}

@@ -124,21 +124,40 @@ class Varyings {
 // reads and then writes the same cell, so the target binding is read-write.
 // The two textures swap roles every frame, so one layout serves both directions.
 class SlimeMoveLayout {
-  agents!: MutStorage<Agent>;
-  sense!: ReadStorageTexture2d<R32float>;
-  trail!: ReadWriteStorageTexture2d<R32float>;
+  agents: MutStorage<Agent>;
+  sense: ReadStorageTexture2d<R32float>;
+  trail: ReadWriteStorageTexture2d<R32float>;
+
+  constructor(
+    agents: MutStorage<Agent>,
+    sense: ReadStorageTexture2d<R32float>,
+    trail: ReadWriteStorageTexture2d<R32float>,
+  ) {
+    this.agents = agents;
+    this.sense = sense;
+    this.trail = trail;
+  }
 }
 
 // The diffuse layout reads one trail and writes the other, so no invocation reads a cell that
 // another invocation already changed.
 class SlimeDiffuseLayout {
-  source!: ReadStorageTexture2d<R32float>;
-  target!: StorageTexture2d<R32float>;
+  source: ReadStorageTexture2d<R32float>;
+  target: StorageTexture2d<R32float>;
+
+  constructor(source: ReadStorageTexture2d<R32float>, target: StorageTexture2d<R32float>) {
+    this.source = source;
+    this.target = target;
+  }
 }
 
 // The render layout reads one trail. Two bind groups on it select the texture the frame shows.
 class SlimeRenderLayout {
-  trail!: ReadStorageTexture2d<R32float>;
+  trail: ReadStorageTexture2d<R32float>;
+
+  constructor(trail: ReadStorageTexture2d<R32float>) {
+    this.trail = trail;
+  }
 }
 
 // The trail is a torus. A coordinate one step outside the grid returns on the opposite edge.

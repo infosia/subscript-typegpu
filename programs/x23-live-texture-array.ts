@@ -51,8 +51,16 @@ const LAYERS: u32 = 2;
 const PIXEL_COUNT: u32 = WIDTH * HEIGHT;
 
 class ArrayPingPongLayout {
-  source!: ReadStorageTexture2dArray<Rgba16float>;
-  target!: WriteStorageTexture2dArray<Rgba16float>;
+  source: ReadStorageTexture2dArray<Rgba16float>;
+  target: WriteStorageTexture2dArray<Rgba16float>;
+
+  constructor(
+    source: ReadStorageTexture2dArray<Rgba16float>,
+    target: WriteStorageTexture2dArray<Rgba16float>,
+  ) {
+    this.source = source;
+    this.target = target;
+  }
 }
 
 function arrayPingPongKernel(res: ArrayPingPongLayout, ctx: ComputeInvocation): void {
@@ -75,8 +83,13 @@ export const arrayPingPong: ComputePipelineSpec = computePipeline<ArrayPingPongL
 );
 
 class LayerReadbackLayout {
-  source!: Texture2d<f32>;
-  output!: MutStorage<Vec4f>;
+  source: Texture2d<f32>;
+  output: MutStorage<Vec4f>;
+
+  constructor(source: Texture2d<f32>, output: MutStorage<Vec4f>) {
+    this.source = source;
+    this.output = output;
+  }
 }
 
 function layerReadbackKernel(res: LayerReadbackLayout, ctx: ComputeInvocation): void {
@@ -293,9 +306,10 @@ export async function main(): Promise<void> {
 
     const hostA: Vec4f[] = payloadPixels();
     const hostB: Vec4f[] = zeroPayload();
-    const hostAB = new ArrayPingPongLayout();
-    hostAB.source = new ReadStorageTexture2dArray<Rgba16float>(hostA, WIDTH, HEIGHT, LAYERS);
-    hostAB.target = new WriteStorageTexture2dArray<Rgba16float>(hostB, WIDTH, HEIGHT, LAYERS);
+    const hostAB = new ArrayPingPongLayout(
+      new ReadStorageTexture2dArray<Rgba16float>(hostA, WIDTH, HEIGHT, LAYERS),
+      new WriteStorageTexture2dArray<Rgba16float>(hostB, WIDTH, HEIGHT, LAYERS),
+    );
     simulateComputeThreads<ArrayPingPongLayout>(
       arrayPingPongKernel,
       hostAB,
@@ -305,9 +319,10 @@ export async function main(): Promise<void> {
       LAYERS,
       arrayPingPong_HOST_RUNNABLE,
     );
-    const hostBA = new ArrayPingPongLayout();
-    hostBA.source = new ReadStorageTexture2dArray<Rgba16float>(hostB, WIDTH, HEIGHT, LAYERS);
-    hostBA.target = new WriteStorageTexture2dArray<Rgba16float>(hostA, WIDTH, HEIGHT, LAYERS);
+    const hostBA = new ArrayPingPongLayout(
+      new ReadStorageTexture2dArray<Rgba16float>(hostB, WIDTH, HEIGHT, LAYERS),
+      new WriteStorageTexture2dArray<Rgba16float>(hostA, WIDTH, HEIGHT, LAYERS),
+    );
     simulateComputeThreads<ArrayPingPongLayout>(
       arrayPingPongKernel,
       hostBA,

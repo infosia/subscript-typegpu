@@ -73,7 +73,11 @@ class State {
 
 ```ts program=programs/b22-first-program.ts
 class CounterLayout {
-  state!: MutStorage<State>;
+  state: MutStorage<State>;
+
+  constructor(state: MutStorage<State>) {
+    this.state = state;
+  }
 }
 ```
 

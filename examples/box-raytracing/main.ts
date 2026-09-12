@@ -137,8 +137,13 @@ class Intersection {
 
 // The bind group layout. `Storage` is read-only, which matches a grid that no pass writes.
 class BoxLayout {
-  cells!: Storage<BoxCell>;
-  camera!: Uniform<Camera>;
+  cells: Storage<BoxCell>;
+  camera: Uniform<Camera>;
+
+  constructor(cells: Storage<BoxCell>, camera: Uniform<Camera>) {
+    this.cells = cells;
+    this.camera = camera;
+  }
 }
 
 function scalarMin(a: f32, b: f32): f32 {

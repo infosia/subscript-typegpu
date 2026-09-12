@@ -61,8 +61,13 @@ class FragmentVarying {
 }
 
 class FragmentTextureLayout {
-  source!: Texture2d<f32>;
-  nearest!: Sampler;
+  source: Texture2d<f32>;
+  nearest: Sampler;
+
+  constructor(source: Texture2d<f32>, nearest: Sampler) {
+    this.source = source;
+    this.nearest = nearest;
+  }
 }
 
 function fragmentVertex(

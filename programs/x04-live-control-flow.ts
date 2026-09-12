@@ -36,8 +36,13 @@ class Item {
 }
 
 class ControlLayout {
-  input!: Storage<Item>;
-  output!: MutStorage<Item>;
+  input: Storage<Item>;
+  output: MutStorage<Item>;
+
+  constructor(input: Storage<Item>, output: MutStorage<Item>) {
+    this.input = input;
+    this.output = output;
+  }
 }
 
 function controlFlowKernel(res: ControlLayout, ctx: ComputeInvocation): void {
@@ -66,11 +71,12 @@ export async function main(): Promise<void> {
     using adapter = adapterResult;
     using device = deviceResult;
     const inputValues: FixedArray<Item, 4> = [new Item(-1.0), new Item(1.0), new Item(3.0), new Item(4.0)];
-    const hostLayout = new ControlLayout();
-    hostLayout.input = new Storage<Item>([
-      new Item(-1.0), new Item(1.0), new Item(3.0), new Item(4.0),
-    ]);
-    hostLayout.output = new MutStorage<Item>([new Item(0.0)]);
+    const hostLayout = new ControlLayout(
+      new Storage<Item>([
+        new Item(-1.0), new Item(1.0), new Item(3.0), new Item(4.0),
+      ]),
+      new MutStorage<Item>([new Item(0.0)]),
+    );
     simulateComputeThreads<ControlLayout>(
       controlFlowKernel,
       hostLayout,

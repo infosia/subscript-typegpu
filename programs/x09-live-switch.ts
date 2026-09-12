@@ -35,7 +35,11 @@ class SwitchValue {
 }
 
 class SwitchLayout {
-  output!: MutStorage<SwitchValue>;
+  output: MutStorage<SwitchValue>;
+
+  constructor(output: MutStorage<SwitchValue>) {
+    this.output = output;
+  }
 }
 
 function liveSwitchKernel(res: SwitchLayout, ctx: ComputeInvocation): void {
@@ -77,8 +81,7 @@ export async function main(): Promise<void> {
       hostValues.push(new SwitchValue(0));
       index += 1;
     }
-    const hostLayout = new SwitchLayout();
-    hostLayout.output = new MutStorage<SwitchValue>(hostValues);
+    const hostLayout = new SwitchLayout(new MutStorage<SwitchValue>(hostValues));
     simulateComputeThreads<SwitchLayout>(
       liveSwitchKernel,
       hostLayout,

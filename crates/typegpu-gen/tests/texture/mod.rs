@@ -35,8 +35,8 @@ fn texture_bindings_calls_groups_and_layout_entries_emit() {
 import { ComputeInvocation, ComputePipelineSpec, Rgba8unorm, Sampler, StorageTexture2d, Texture2d, Uniform, computePipeline2 } from "./typegpu";
 import { Vec2f, Vec2i, Vec4f } from "./typegpu-types";
 @CStruct class Params { width: u32; constructor(width: u32) { this.width = width; } }
-class Textures { source!: Texture2d<f32>; nearest!: Sampler; target!: StorageTexture2d<Rgba8unorm>; }
-class Settings { params!: Uniform<Params>; }
+class Textures { source: Texture2d<f32>; nearest: Sampler; target: StorageTexture2d<Rgba8unorm>; constructor(source: Texture2d<f32>, nearest: Sampler, target: StorageTexture2d<Rgba8unorm>) { this.source = source; this.nearest = nearest; this.target = target; } }
+class Settings { params: Uniform<Params>; constructor(params: Uniform<Params>) { this.params = params; } }
 function kernel(textures: Textures, settings: Settings, ctx: ComputeInvocation): void {
   const size = textures.source.dimensions();
   const loaded = textures.source.load(new Vec2i(0, 0), 0);
@@ -96,12 +96,28 @@ fn float_texture_wrappers_and_storage_formats_are_declared_by_library_identity()
 import { ComputeInvocation, ComputePipelineSpec, R32float, Rgba16float, Rgba32float, Rgba8unorm, Sampler, StorageTexture2d, Texture2d, computePipeline } from "./typegpu";
 import { Vec2f, Vec2i, Vec4f } from "./typegpu-types";
 class Layout {
-  floats!: Texture2d<f32>;
-  filtering!: Sampler;
-  rgba8unorm!: StorageTexture2d<Rgba8unorm>;
-  rgba16float!: StorageTexture2d<Rgba16float>;
-  r32float!: StorageTexture2d<R32float>;
-  rgba32float!: StorageTexture2d<Rgba32float>;
+  floats: Texture2d<f32>;
+  filtering: Sampler;
+  rgba8unorm: StorageTexture2d<Rgba8unorm>;
+  rgba16float: StorageTexture2d<Rgba16float>;
+  r32float: StorageTexture2d<R32float>;
+  rgba32float: StorageTexture2d<Rgba32float>;
+
+  constructor(
+    floats: Texture2d<f32>,
+    filtering: Sampler,
+    rgba8unorm: StorageTexture2d<Rgba8unorm>,
+    rgba16float: StorageTexture2d<Rgba16float>,
+    r32float: StorageTexture2d<R32float>,
+    rgba32float: StorageTexture2d<Rgba32float>,
+  ) {
+    this.floats = floats;
+    this.filtering = filtering;
+    this.rgba8unorm = rgba8unorm;
+    this.rgba16float = rgba16float;
+    this.r32float = r32float;
+    this.rgba32float = rgba32float;
+  }
 }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   const dimensions = res.floats.dimensions();
@@ -136,8 +152,13 @@ fn read_access_storage_textures_emit_methods_layout_access_and_resources() {
 import { ComputeInvocation, ComputePipelineSpec, R32float, ReadStorageTexture2d, ReadWriteStorageTexture2d, computePipeline } from "./typegpu";
 import { Vec2i } from "./typegpu-types";
 class Layout {
-  source!: ReadStorageTexture2d<R32float>;
-  target!: ReadWriteStorageTexture2d<R32float>;
+  source: ReadStorageTexture2d<R32float>;
+  target: ReadWriteStorageTexture2d<R32float>;
+
+  constructor(source: ReadStorageTexture2d<R32float>, target: ReadWriteStorageTexture2d<R32float>) {
+    this.source = source;
+    this.target = target;
+  }
 }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   const coords = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);
@@ -187,9 +208,19 @@ fn array_textures_emit_layered_calls_dimensions_and_layout_access() {
 import { ComputeInvocation, ComputePipelineSpec, ReadStorageTexture2dArray, Rgba16float, Texture2dArray, WriteStorageTexture2dArray, computePipeline } from "./typegpu";
 import { Vec2i } from "./typegpu-types";
 class Layout {
-  sampled!: Texture2dArray<f32>;
-  source!: ReadStorageTexture2dArray<Rgba16float>;
-  target!: WriteStorageTexture2dArray<Rgba16float>;
+  sampled: Texture2dArray<f32>;
+  source: ReadStorageTexture2dArray<Rgba16float>;
+  target: WriteStorageTexture2dArray<Rgba16float>;
+
+  constructor(
+    sampled: Texture2dArray<f32>,
+    source: ReadStorageTexture2dArray<Rgba16float>,
+    target: WriteStorageTexture2dArray<Rgba16float>,
+  ) {
+    this.sampled = sampled;
+    this.source = source;
+    this.target = target;
+  }
 }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   const coords = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);

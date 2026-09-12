@@ -125,3 +125,82 @@ The workspace moved from `d45c0c1` to `db3449d`, then to `587d6da`.
 Both re-pins carry subscript changes that this project did not ask
 for. No fixture and no golden moved. `specs/tracking/windows.md`
 records the gate evidence at `ada9e24`.
+
+## R40 — §108 and the layout class (2026-09-12)
+
+The workspace pin moves from `ed7a668` to `403f8fc`. subscript §108
+(`specs/blocks/compiler.md` at `403f8fc`) requires every class field
+to hold a value before the constructor returns: an initializer, or a
+top-level constructor assignment. A `!` assertion does not count.
+Ambient declarations and `@Descriptor` members are exempt.
+
+Measured at `403f8fc` before any change: `subscript-typegpu-gen`
+9 passed, 59 failed, 2.91 s. `subscript-typegpu-harness` 20 passed,
+24 failed, 8.05 s. The harness stops at the first diagnostic of
+`lib/typegpu.ts` (`VertexInvocation.vertexIndex!`). With the three
+`!` fields of the builtin carriers given initializers, the next
+diagnostics were `UiRenderLayout`, `SaxpyLayout`, and the ten schema
+classes of `programs/b01-layout.ts`: 28 passed, 16 failed, 15.14 s.
+
+Two shapes fail. **A**: the PI3 layout class, `name!: Wrapper<T>`
+fields and no constructor. 33 program classes, 4 library classes,
+54 example classes, and the two builtin carriers. Stock `tsc`
+accepts the shape. **B**: a `@CStruct` schema with bare fields and no
+constructor. The ten classes of `programs/b01-layout.ts` and the
+schema fixtures inside the generator tests. Stock `tsc` answers
+TS2564, so subscript's invariant 5 forbids a language-side exemption
+for B. The 93 schema classes with an assigning constructor, and the
+72 `!` members inside `@Descriptor` classes, pass.
+
+The request to subscript (2026-09-12) asked for A1: a construction-site
+form of rule 2, where `const x = new C()` followed by a top-level
+assignment of every `!` field counts as assigned. It named A2 (exempt a
+class whose every field carries `!`) as weaker, and A3 (a layout class
+becomes a `@Descriptor`) as the downstream-only alternative.
+
+**Reply (2026-09-12): A1 and A2 declined. No subscript change.** The
+language has one form for members the use site supplies, the
+`@Descriptor` literal with R17 `!` members, and A1 adds a second
+spelling that is legal at one syntactic position only. The barrier is
+PI3, which says "never instantiated by the author" while the CPU lane
+instantiates the class in 24 programs. The reply recommends A4: a
+constructor that assigns every field from its parameters, the spelling
+the S100 diagnostic names. Probed by the subscript side at `403f8fc`:
+the A4 form is `tsc`-clean, passes `subscript check`, and runs on the
+dev tier. The reply carries no subscript commit. Cite
+`specs/blocks/compiler.md` §108.1 rule 1 at `403f8fc`.
+
+**Decision (owner, 2026-09-12): A4.** `specs/blocks/pipeline.md` PI3
+Rev 1: a layout class declares one constructor that takes one
+parameter per field in declaration order and assigns each. The
+generator reads the field list and never reads the constructor. Shape
+B takes initializers or constructors in the program and the fixtures.
+
+### The round (2026-09-12)
+
+The generator's `layout()` accepts one constructor of the PI3 Rev 1
+form and reports the first departure of seven kinds: no constructor,
+no parameter for a field, a parameter type that differs, a missing
+assignment, a statement that is not `this.<field> = <parameter>` in
+order, an extra parameter, an extra statement. Three reject fixtures
+demonstrate the red: `pi3-constructor-order`, `pi3-constructor-extra`,
+`pi3-constructor-missing`, each with one diagnostic that names the
+departure. `pi3-non-field` keeps its method and stays red.
+
+Changed: 34 program layout classes, 54 example layout classes, 4
+library layout classes, the two builtin carriers, 31 CPU-lane
+construction sites, the ten schema classes of `b01-layout` (six by
+initializer, four by constructor), 78 fixture classes, 59 inline test
+classes, 7 document quotes. Measured: a `@CStruct` schema class accepts
+a field initializer, and a `FixedArray<T, N>` constructor parameter is
+legal at `403f8fc`.
+
+Every `.expected` and `.wgsl` golden is byte-identical across the
+re-pin.
+
+Evidence at `403f8fc`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
+224.15 s wall. The gate needs `SUBSCRIPT_TYPEGPU_BACKEND_LIB` as an
+absolute path: the harness tests run with `crates/harness` as the
+working directory, and a relative path fails every backend test at
+`dlopen`.

@@ -291,7 +291,7 @@ fn sdf_library_helpers_emit_and_validate() {
 import { Vec2f, Vec3f } from "./typegpu-types";
 import { sdDisk, sdBox2d, sdSphere, sdBox, sdBoxFrame, sdPlane, sdLine, opUnion, opSmoothUnion } from "./typegpu-sdf";
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
-class Layout { output!: MutStorage<f32>; }
+class Layout { output: MutStorage<f32>; constructor(output: MutStorage<f32>) { this.output = output; } }
 function sdfKernel(res: Layout, ctx: ComputeInvocation): void {
   let value: f32 = sdDisk(new Vec2f(1.0, 2.0), new Vec2f(0.5, 0.5), 0.25);
   value += sdBox2d(new Vec2f(1.0, 2.0), new Vec2f(0.5, 0.5), new Vec2f(0.25, 0.75));
@@ -337,7 +337,7 @@ fn radiance_cascade_library_helpers_emit_and_validate() {
 import { Vec2f, Vec2u, Vec4f } from "./typegpu-types";
 import { cascadeRaysStored, cascadeProbesAt, cascadeIntervalStart, cascadeIntervalEnd, cascadeRayAngle, cascadeMergeUv, radianceGatherUv } from "./typegpu-radiance-cascades";
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
-class Layout { output!: MutStorage<Vec4f>; }
+class Layout { output: MutStorage<Vec4f>; constructor(output: MutStorage<Vec4f>) { this.output = output; } }
 function cascadeKernel(res: Layout, ctx: ComputeInvocation): void {
   const layer: u32 = ctx.globalId.x;
   const stored: u32 = cascadeRaysStored(layer);
@@ -411,7 +411,7 @@ fn noise_library_helpers_emit_and_validate() {
 import { Vec3f } from "./typegpu-types";
 import { RandomF32, perlin3d, randF32, randSeed } from "./typegpu-noise";
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
-class Layout { output!: MutStorage<f32>; }
+class Layout { output: MutStorage<f32>; constructor(output: MutStorage<f32>) { this.output = output; } }
 function noiseKernel(res: Layout, ctx: ComputeInvocation): void {
   const seed: u32 = randSeed(ctx.globalId.x + 1);
   const sample: RandomF32 = randF32(seed);
@@ -447,7 +447,7 @@ fn color_library_helpers_emit_and_validate() {
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
 import { Vec3f } from "./typegpu-types";
 import { hsvToRgb, linearRgbToOklab, linearToSrgb, oklabGamutClipAdaptiveL05, oklabToLinearRgb, oklabToRgb, rgbToHsv, rgbToOklab, srgbToLinear } from "./typegpu-color";
-class Layout { output!: MutStorage<Vec3f>; }
+class Layout { output: MutStorage<Vec3f>; constructor(output: MutStorage<Vec3f>) { this.output = output; } }
 function colorKernel(res: Layout, ctx: ComputeInvocation): void {
   const input = new Vec3f(0.25, 0.5, 0.75);
   res.output[0] = linearToSrgb(input);

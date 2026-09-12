@@ -8,6 +8,12 @@ export class Vec3f {
   x: f32;
   y: f32;
   z: f32;
+
+  constructor(x: f32, y: f32, z: f32) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
 }
 "#;
     let program = r#"
@@ -18,6 +24,11 @@ import { Mixed_OFFSET_p } from "./identity.typegpu";
 class Mixed {
   a: f32;
   p: Vec3f;
+
+  constructor(a: f32, p: Vec3f) {
+    this.a = a;
+    this.p = p;
+  }
 }
 "#;
     let diagnostics = subscript_typegpu_gen::generate(&[
@@ -43,6 +54,10 @@ import { Mat3x3f_OFFSET_value } from "./ordinary-name.typegpu";
 @CStruct
 class Mat3x3f {
   value: f32;
+
+  constructor(value: f32) {
+    this.value = value;
+  }
 }
 "#;
     let generated = subscript_typegpu_gen::generate(&[SourceFile::new("ordinary-name.ts", source)])
@@ -61,6 +76,13 @@ export class Vec4f {
   y: f32;
   z: f32;
   w: f32;
+
+  constructor(x: f32, y: f32, z: f32, w: f32) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.w = w;
+  }
 }
 "#;
     let program = r#"
@@ -70,12 +92,21 @@ import { Root_SIZE } from "./size-mismatch.typegpu";
 @CStruct({ align: 16 })
 class Padded {
   value: f32;
+
+  constructor(value: f32) {
+    this.value = value;
+  }
 }
 
 @CStruct
 class Root {
   head: Vec4f;
   items: FixedArray<Padded, 2>;
+
+  constructor(head: Vec4f, items: FixedArray<Padded, 2>) {
+    this.head = head;
+    this.items = items;
+  }
 }
 "#;
     let diagnostics = subscript_typegpu_gen::generate(&[

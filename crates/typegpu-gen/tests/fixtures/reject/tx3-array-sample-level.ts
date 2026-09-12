@@ -2,7 +2,7 @@
 // expected-message: array sampled texture
 import { ComputeInvocation, ComputePipelineSpec, Sampler, Texture2dArray, computePipeline } from "./typegpu";
 import { Vec2f, Vec4f } from "./typegpu-types";
-class Layout { source!: Texture2dArray<f32>; nearest!: Sampler; }
+class Layout { source: Texture2dArray<f32>; nearest: Sampler; constructor(source: Texture2dArray<f32>, nearest: Sampler) { this.source = source; this.nearest = nearest; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   const color: Vec4f = res.source.sampleLevel(res.nearest, new Vec2f(0.5, 0.5), 0.0);
 }

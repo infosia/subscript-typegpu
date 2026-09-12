@@ -59,7 +59,11 @@ class RandomValue {
 // The single mutable storage binding. TypeGPU allocates the same buffer with
 // `root.createMutable`, and the generator emits `randomFill_LAYOUT0` from this class.
 class RandomLayout {
-  output!: MutStorage<RandomValue>;
+  output: MutStorage<RandomValue>;
+
+  constructor(output: MutStorage<RandomValue>) {
+    this.output = output;
+  }
 }
 
 // One thread per sample. Each thread seeds from its own index and advances the
@@ -91,8 +95,7 @@ function makeHostLayout(): RandomLayout {
   for (let index: u32 = 0; index < SAMPLE_COUNT; index += 1) {
     values.push(new RandomValue(0, 0.0));
   }
-  const layout = new RandomLayout();
-  layout.output = new MutStorage<RandomValue>(values);
+  const layout = new RandomLayout(new MutStorage<RandomValue>(values));
   return layout;
 }
 

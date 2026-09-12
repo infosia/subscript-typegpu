@@ -127,7 +127,7 @@ fn live_typegpu_programs_receive_generated_support() {
     let program = directory.join("x99-layout.ts");
     std::fs::write(
         &program,
-        "import { Demo_SIZE } from \"./x99-layout.typegpu\";\n\n@CStruct\nclass Demo {\n  value: u32;\n}\n",
+        "import { Demo_SIZE } from \"./x99-layout.typegpu\";\n\n@CStruct\nclass Demo {\n  value: u32;\n\n  constructor(value: u32) {\n    this.value = value;\n  }\n}\n",
     )
     .expect("write live program");
     let files =
