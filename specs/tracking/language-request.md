@@ -204,3 +204,16 @@ yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
 absolute path: the harness tests run with `crates/harness` as the
 working directory, and a relative path fails every backend test at
 `dlopen`.
+
+### Re-pin to `b8b9739` (2026-09-12)
+
+The workspace pin moves from `403f8fc` to `b8b9739`. The five subscript
+commits between them split `cemit.rs`, `lower/func.rs`, `lir.rs`, and
+`check/expr.rs` into child modules under 2,000 lines and split the
+compiler contract into one file per section. No language rule changed.
+No fixture and no golden moved.
+
+Evidence at `b8b9739`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
+245.8 s wall. The wall time includes a cold compile of the four
+subscript crates.
