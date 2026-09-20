@@ -272,7 +272,6 @@ fn inspect_statements(
                 inspect_statements(module, source, body, source_name, display_name, failures);
             }
             Stmt::Break(_) | Stmt::Continue(_) => {}
-            _ => {}
         }
     }
 }

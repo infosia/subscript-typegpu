@@ -303,7 +303,6 @@ fn inspect_statements(
                 inspect_statements(module, body, program_name, inspection);
             }
             Stmt::Break(_) | Stmt::Continue(_) => {}
-            _ => {}
         }
     }
 }

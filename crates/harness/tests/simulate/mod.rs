@@ -64,7 +64,6 @@ fn statement_pos(statement: &Stmt) -> Option<&subscript_compiler::Pos> {
         | Stmt::Continue(pos) => Some(pos),
         Stmt::Expr(expression) => Some(&expression.pos),
         Stmt::Block(body) => body.first().and_then(statement_pos),
-        _ => None,
     }
 }
 
@@ -420,7 +419,6 @@ fn visit_statements(
                 simulation_calls,
             ),
             Stmt::Break(_) | Stmt::Continue(_) => {}
-            _ => {}
         }
     }
 }

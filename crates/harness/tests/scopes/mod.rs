@@ -284,7 +284,6 @@ fn visit_statements(
             }
             Stmt::Block(body) => visit_statements(module, body, program_name, calls),
             Stmt::Break(_) | Stmt::Continue(_) => {}
-            _ => {}
         }
     }
 }
