@@ -217,3 +217,23 @@ Evidence at `b8b9739`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
 245.8 s wall. The wall time includes a cold compile of the four
 subscript crates.
+
+### Re-pin to `082657b` (2026-09-20)
+
+The workspace pin moves from `b8b9739` to `082657b`. The subscript
+range holds 125 commits. It adds the sandbox compile profile (§109),
+one reservation for each dev-JIT module (§110), a callback
+registration with an explicit end (§111), and the reserved position
+id 0 (§112). `082657b` is the last commit in the range that changes a
+crate. The `swc_ecma_parser` fork moves from `c603b41` to `affcb6e`,
+the revision in subscript's `Cargo.lock`.
+
+One API change reaches this repository.
+`subscript_compiler::parse_import_specifiers` takes a `Profile` as
+its second argument. `crates/typegpu-gen/src/library.rs` passes
+`Profile::Default`, because library sources are trusted first-party
+code. No fixture and no golden moved.
+
+Evidence at `082657b`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
+236 s wall on a warm build.
