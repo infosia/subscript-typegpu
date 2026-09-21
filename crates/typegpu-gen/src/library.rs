@@ -2,9 +2,7 @@
 
 use std::path::Path;
 
-use subscript_compiler::{
-    parse_import_specifiers, render_diagnostics, Diagnostic, Profile, SourceFile,
-};
+use subscript_compiler::{parse_import_specifiers, render_diagnostics, Diagnostic, SourceFile};
 
 /// The registered library modules (LB1), in the order the compiler loads them.
 ///
@@ -95,12 +93,11 @@ pub fn load_library_files(
         *slot = Some(file);
     }
     while let Some(file) = pending.pop() {
-        let imports = parse_import_specifiers(&file, Profile::Default).map_err(|diagnostics| {
-            LibraryLoadError::Parse {
+        let imports =
+            parse_import_specifiers(&file).map_err(|diagnostics| LibraryLoadError::Parse {
                 file: file.clone(),
                 diagnostics,
-            }
-        })?;
+            })?;
         for specifier in imports {
             let Some(module) = specifier.strip_prefix("./") else {
                 continue;

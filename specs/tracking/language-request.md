@@ -237,3 +237,22 @@ code. No fixture and no golden moved.
 Evidence at `082657b`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
 236 s wall on a warm build.
+
+### Re-pin to `93a4041` (2026-09-21)
+
+The workspace pin moves from `082657b` to `93a4041`. The subscript
+range holds 13 commits. It removes the sandbox compile profile (§113,
+which supersedes §109) and the compile thread (§114). A compile runs
+on the thread of the caller. `93a4041` is the last commit in the range
+that changes a crate. The `swc_ecma_parser` fork stays at `affcb6e`.
+
+One API change reaches this repository.
+`subscript_compiler::parse_import_specifiers` takes the source file
+only, because `Profile` does not exist at this pin.
+`crates/typegpu-gen/src/library.rs` returns to the one-argument call.
+No fixture and no golden moved.
+
+Evidence at `93a4041`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
+242.8 s wall. The wall time includes a cold compile of the four
+subscript crates.
