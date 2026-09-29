@@ -23,7 +23,7 @@ function sortTrap(method: string, values: string): void {
 
 // The two parameters of one bitonic step. `k` is the span whose bit picks the sort direction,
 // and `jShift` is the base-2 logarithm of the compare stride.
-@CStruct
+@ValueType
 export class BitonicSortPass {
   k: u32;
   jShift: u32;
@@ -212,7 +212,7 @@ function requirePrefixScanLength(length: u32): void {
 
 // The host sizing of one scan. `paddedLength` rounds the input up to whole 256-value blocks,
 // and `blockCount` counts them.
-@CStruct
+@ValueType
 export class PrefixScanPlanF32 {
   paddedLength: u32;
   blockCount: u32;

@@ -19,7 +19,7 @@ is illustrative. This repository does not run it.
 | Topic | TypeGPU | subscript-typegpu |
 |---|---|---|
 | Language | JavaScript or TypeScript | [subscript](https://github.com/infosia/subscript) |
-| Schema | `d.struct({ ... })`, a run-time object | `@CStruct class`, a compile-time declaration |
+| Schema | `d.struct({ ... })`, a run-time object | `@ValueType class`, a compile-time declaration |
 | Layout | computed at run time, `d.sizeOf(T)` | computed by the generator, `T_SIZE` and `T_STRIDE` constants |
 | Kernel | a function with `'use gpu'` | a plain function named by `computePipeline<L>(fn, spec)` |
 | WGSL | generated at run time from a compacted AST | generated before the program runs — one readable `.wgsl` file per pipeline |
@@ -83,12 +83,12 @@ const Particle = d.struct({
 });
 ```
 
-subscript-typegpu declares a schema as a class with the `@CStruct`
+subscript-typegpu declares a schema as a class with the `@ValueType`
 decorator. The fields carry subscript types. The constructor is
 ordinary code.
 
 ```ts program=programs/b04-particles.ts
-@CStruct
+@ValueType
 class Particle {
   pos: Vec3f;
   vel: Vec3f;
@@ -105,11 +105,11 @@ Differences:
 - `f32`, `u32`, and `i32` are distinct subscript types. TypeGPU uses
   the JavaScript `number` and the schema decides the WGSL type.
 - `Vec3f` is a class from `lib/typegpu-types.ts`, declared
-  `@CStruct({ align: 16 })`, so its C alignment equals the WGSL
+  `@ValueType({ align: 16 })`, so its C alignment equals the WGSL
   alignment. Its C size is 16 and its WGSL size is 12. `d.vec3f` is a
   schema object.
 - There is no `d.Infer`. The class is the type.
-- `@CStruct({ align: N })` raises the alignment of a class, the way
+- `@ValueType({ align: N })` raises the alignment of a class, the way
   `d.align` does for one field. `lib/typegpu-types.ts` declares `Vec3f`
   with `align: 16`. There is no `d.size`.
 
@@ -189,7 +189,7 @@ supplies the bytes.
     );
 ```
 
-`Context.bytesOf<T>(value)` returns the bytes of a `@CStruct` value,
+`Context.bytesOf<T>(value)` returns the bytes of a `@ValueType` value,
 padding included. `Context.bytesInto<T>` writes them into an existing
 `u8[]` at an offset.
 
@@ -346,7 +346,7 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
   }
 }
 
-export const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
+const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
   name: "particles",
   workgroupSize: [64, 1, 1],
 });
@@ -655,7 +655,7 @@ function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(input.color.x, input.color.y, input.color.z, FRAGMENT_ALPHA);
 }
 
-export const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, {
+const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, {
   format: "rgba8unorm",
 });
 ```
@@ -671,10 +671,10 @@ follows the WebGPU JavaScript API.
 
 Differences:
 
-- The vertex input is a `@CStruct` class, and the generator derives
+- The vertex input is a `@ValueType` class, and the generator derives
   `<name>_VERTEX_LAYOUT0` with the stride, the formats, and the
   locations. TypeGPU derives the same from `tgpu.vertexLayout`.
-- The varyings are a `@CStruct` class. The `Vec4f` field named
+- The varyings are a `@ValueType` class. The `Vec4f` field named
   `position` is the clip position.
 - `renderPipelineL` adds a layout class for bindings in both stages.
   `renderPipelineInstanced` adds an instance class.

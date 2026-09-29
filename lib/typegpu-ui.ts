@@ -27,7 +27,7 @@ export class UiState<T> {
 }
 
 // An axis-aligned rectangle in pixels. `x` and `y` are the top-left corner.
-@CStruct
+@ValueType
 export class UiRect {
   x: i32;
   y: i32;
@@ -1042,7 +1042,7 @@ export class UiContext {
 
 // One vertex of the UI quad stream. `position` is in pixels, `uv` is normalized to
 // the atlas, and `color` packs `0xAABBGGRR`.
-@CStruct
+@ValueType
 export class UiVertex {
   position: Vec2f;
   uv: Vec2f;
@@ -1054,7 +1054,7 @@ export class UiVertex {
 
 // The uniform that the vertex kernel divides by to reach clip space. Both fields
 // hold the render target size in pixels.
-@CStruct
+@ValueType
 export class UiViewport {
   width: f32;
   height: f32;
@@ -1077,7 +1077,7 @@ export class UiRenderLayout {
 
 // The vertex kernel's output and the fragment kernel's input. `color` carries the
 // unpacked RGBA in the 0 to 1 range.
-@CStruct
+@ValueType
 export class UiVarying {
   position: Vec4f;
   uv: Vec2f;

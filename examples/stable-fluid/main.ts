@@ -188,7 +188,7 @@ const RENDER_GROUP_IMAGE_B: i32 = 5;
 
 // One clip-space corner of the full-screen triangle. The generator derives the vertex
 // attribute layout and the `Vertex_STRIDE` byte stride from this class.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -199,7 +199,7 @@ class Vertex {
 
 // The brush state of one frame: the pointer cell, the movement since the last frame in
 // cells, and 1.0 while a button is down.
-@CStruct
+@ValueType
 class BrushParams {
   point: Vec2f;
   delta: Vec2f;
@@ -214,7 +214,7 @@ class BrushParams {
 
 // The vertex output. The `Vec4f` field named `position` becomes the WGSL builtin position,
 // and every other field becomes an interpolated location.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -681,71 +681,71 @@ function imageFragment(
 // The thirteen declarations are the generator's input. It walks the typed program before the
 // run and emits `main.typegpu.ts`: the WGSL text, the entry names, and the layout specs.
 // TypeGPU resolves the same shaders from the kernel functions at run time.
-export const brushSplat: ComputePipelineSpec = computePipeline<BrushLayout>(
+const brushSplat: ComputePipelineSpec = computePipeline<BrushLayout>(
   brushSplatKernel,
   { name: "brushSplat", workgroupSize: [16, 16, 1] },
 );
 
-export const inkAdd: ComputePipelineSpec = computePipeline<AddLayout>(
+const inkAdd: ComputePipelineSpec = computePipeline<AddLayout>(
   inkAddKernel,
   { name: "inkAdd", workgroupSize: [16, 16, 1] },
 );
 
-export const forceAdd: ComputePipelineSpec = computePipeline<AddLayout>(
+const forceAdd: ComputePipelineSpec = computePipeline<AddLayout>(
   forceAddKernel,
   { name: "forceAdd", workgroupSize: [16, 16, 1] },
 );
 
-export const advectVelocity: ComputePipelineSpec = computePipeline<VelocityAdvectionLayout>(
+const advectVelocity: ComputePipelineSpec = computePipeline<VelocityAdvectionLayout>(
   advectVelocityKernel,
   { name: "advectVelocity", workgroupSize: [16, 16, 1] },
 );
 
-export const viscosityJacobi: ComputePipelineSpec = computePipeline<ViscosityLayout>(
+const viscosityJacobi: ComputePipelineSpec = computePipeline<ViscosityLayout>(
   viscosityJacobiKernel,
   { name: "viscosityJacobi", workgroupSize: [16, 16, 1] },
 );
 
-export const divergence: ComputePipelineSpec = computePipeline<DivergenceLayout>(
+const divergence: ComputePipelineSpec = computePipeline<DivergenceLayout>(
   divergenceKernel,
   { name: "divergence", workgroupSize: [16, 16, 1] },
 );
 
-export const clearPressure: ComputePipelineSpec = computePipeline<ClearLayout>(
+const clearPressure: ComputePipelineSpec = computePipeline<ClearLayout>(
   clearPressureKernel,
   { name: "clearPressure", workgroupSize: [16, 16, 1] },
 );
 
-export const pressureJacobi: ComputePipelineSpec = computePipeline<PressureLayout>(
+const pressureJacobi: ComputePipelineSpec = computePipeline<PressureLayout>(
   pressureJacobiKernel,
   { name: "pressureJacobi", workgroupSize: [16, 16, 1] },
 );
 
-export const gradientSubtract: ComputePipelineSpec = computePipeline<GradientLayout>(
+const gradientSubtract: ComputePipelineSpec = computePipeline<GradientLayout>(
   gradientSubtractKernel,
   { name: "gradientSubtract", workgroupSize: [16, 16, 1] },
 );
 
-export const advectInk: ComputePipelineSpec = computePipeline<AdvectionLayout>(
+const advectInk: ComputePipelineSpec = computePipeline<AdvectionLayout>(
   advectInkKernel,
   { name: "advectInk", workgroupSize: [16, 16, 1] },
 );
 
 // The three render pipelines share the vertex entry and differ in the fragment entry.
 // `renderPipelineL` adds the layout class, so both stages read the same bindings.
-export const inkRender: RenderPipelineSpec = renderPipelineL<
+const inkRender: RenderPipelineSpec = renderPipelineL<
   FieldRenderLayout,
   Vertex,
   Varyings
 >(fieldVertex, inkFragment, { format: "bgra8unorm" });
 
-export const velocityRender: RenderPipelineSpec = renderPipelineL<
+const velocityRender: RenderPipelineSpec = renderPipelineL<
   FieldRenderLayout,
   Vertex,
   Varyings
 >(fieldVertex, velocityFragment, { format: "bgra8unorm" });
 
-export const imageRender: RenderPipelineSpec = renderPipelineL<
+const imageRender: RenderPipelineSpec = renderPipelineL<
   ImageRenderLayout,
   Vertex,
   Varyings

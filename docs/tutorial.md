@@ -7,7 +7,7 @@ This tutorial follows `programs/b04-particles.ts`. The program defines host data
 `Particle` uses two `Vec3f` fields. The layout generator gives each value the required C and WGSL layout.
 
 ```ts program=programs/b04-particles.ts
-@CStruct
+@ValueType
 class Particle {
   pos: Vec3f;
   vel: Vec3f;
@@ -22,7 +22,7 @@ class Particle {
 `SimParams` stores the time step and the active particle count.
 
 ```ts program=programs/b04-particles.ts
-@CStruct
+@ValueType
 class SimParams {
   dt: f32;
   count: u32;
@@ -85,7 +85,7 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
 The declaration connects the layout type, the kernel function, and the workgroup size.
 
 ```ts program=programs/b04-particles.ts
-export const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
+const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
   name: "particles",
   workgroupSize: [64, 1, 1],
 });

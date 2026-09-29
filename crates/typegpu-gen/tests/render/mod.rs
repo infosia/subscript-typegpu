@@ -6,7 +6,7 @@ use crate::support;
 fn generate(source: &str) -> subscript_typegpu_gen::Generated {
     let mut files = support::b01_files();
     files.pop();
-    files.push(SourceFile::new("render-test.ts", source));
+    files.push(SourceFile::entry("render-test.ts", source));
     subscript_typegpu_gen::generate(&files).unwrap_or_else(|diagnostics| {
         panic!(
             "render test generation failed: {}",
@@ -38,11 +38,11 @@ fn render_entries_interfaces_and_layout_constants_use_typed_hir() {
         r#"
 import { FragmentInvocation, renderPipeline, RenderPipelineSpec, VertexInvocation } from "./typegpu";
 import { Vec2f, Vec3f, Vec4f } from "./typegpu-types";
-@CStruct class Vertex { position: Vec2f; color: Vec3f; constructor(position: Vec2f, color: Vec3f) { this.position = position; this.color = color; } }
-@CStruct class Varyings { position: Vec4f; color: Vec3f; constructor(position: Vec4f, color: Vec3f) { this.position = position; this.color = color; } }
+@ValueType class Vertex { position: Vec2f; color: Vec3f; constructor(position: Vec2f, color: Vec3f) { this.position = position; this.color = color; } }
+@ValueType class Varyings { position: Vec4f; color: Vec3f; constructor(position: Vec4f, color: Vec3f) { this.position = position; this.color = color; } }
 function vert(value: Vertex, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(value.position.x, value.position.y, 0.0, 1.0), value.color); }
 function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { return new Vec4f(input.color.x, input.color.y, input.color.z, 1.0); }
-export const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
+const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -78,12 +78,12 @@ fn instance_locations_builtins_flat_varyings_and_stage_visibility_emit() {
         r#"
 import { FragmentInvocation, renderPipelineInstanced, RenderPipelineSpec, VertexInvocation } from "./typegpu";
 import { Vec2f, Vec2u, Vec4f } from "./typegpu-types";
-@CStruct class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
-@CStruct class Instance { offset: Vec2f; constructor(offset: Vec2f) { this.offset = offset; } }
-@CStruct class Varyings { position: Vec4f; id: Vec2u; constructor(position: Vec4f, id: Vec2u) { this.position = position; this.id = id; } }
+@ValueType class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
+@ValueType class Instance { offset: Vec2f; constructor(offset: Vec2f) { this.offset = offset; } }
+@ValueType class Varyings { position: Vec4f; id: Vec2u; constructor(position: Vec4f, id: Vec2u) { this.position = position; this.id = id; } }
 function vert(value: Vertex, instance: Instance, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(value.position.x + instance.offset.x, value.position.y + instance.offset.y, 0.0, 1.0), new Vec2u(ctx.vertexIndex, ctx.instanceIndex)); }
 function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { return new Vec4f(input.id.x as f32, input.position.y, 0.0, ctx.frontFacing ? 1.0 : 0.0); }
-export const instanced: RenderPipelineSpec = renderPipelineInstanced<Vertex, Instance, Varyings>(vert, frag, { format: "rgba8unorm" });
+const instanced: RenderPipelineSpec = renderPipelineInstanced<Vertex, Instance, Varyings>(vert, frag, { format: "rgba8unorm" });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -124,13 +124,13 @@ fn render_kernels_emit_reached_module_constants_and_private_variables() {
         r#"
 import { FragmentInvocation, privateVar, PrivateVar, renderPipeline, RenderPipelineSpec, VertexInvocation } from "./typegpu";
 import { Vec2f, Vec4f } from "./typegpu-types";
-@CStruct class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
-@CStruct class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
+@ValueType class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
+@ValueType class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
 const vertexShift: f32 = 0.25;
 const fragmentAlpha: PrivateVar<f32> = privateVar<f32>(0.75);
 function vert(value: Vertex, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(value.position.x + vertexShift, value.position.y, 0.0, 1.0)); }
 function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { return new Vec4f(1.0, 0.0, 0.0, fragmentAlpha.$); }
-export const pipeline: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
+const pipeline: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -158,14 +158,14 @@ fn render_binding_visibility_follows_each_kernel_reach() {
         r#"
 import { FragmentInvocation, renderPipelineL, RenderPipelineSpec, Storage, Uniform, VertexInvocation } from "./typegpu";
 import { Vec2f, Vec4f } from "./typegpu-types";
-@CStruct class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
-@CStruct class Offset { value: Vec4f; constructor(value: Vec4f) { this.value = value; } }
-@CStruct class Tint { value: Vec4f; constructor(value: Vec4f) { this.value = value; } }
-@CStruct class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
+@ValueType class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
+@ValueType class Offset { value: Vec4f; constructor(value: Vec4f) { this.value = value; } }
+@ValueType class Tint { value: Vec4f; constructor(value: Vec4f) { this.value = value; } }
+@ValueType class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
 class Layout { vertexOnly: Uniform<Offset>; fragmentOnly: Storage<Tint>; both: Storage<Tint>; constructor(vertexOnly: Uniform<Offset>, fragmentOnly: Storage<Tint>, both: Storage<Tint>) { this.vertexOnly = vertexOnly; this.fragmentOnly = fragmentOnly; this.both = both; } }
 function vert(res: Layout, value: Vertex, ctx: VertexInvocation): Varyings { const offset: Offset = res.vertexOnly.$; const shared: Tint = res.both[0]; return new Varyings(new Vec4f(value.position.x + offset.value.x + shared.value.x * 0.0, value.position.y + offset.value.y, 0.0, 1.0)); }
 function frag(res: Layout, input: Varyings, ctx: FragmentInvocation): Vec4f { const tint: Tint = res.fragmentOnly[0]; const shared: Tint = res.both[0]; return tint.value.add(shared.value.scale(0.0)); }
-export const shifted: RenderPipelineSpec = renderPipelineL<Layout, Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
+const shifted: RenderPipelineSpec = renderPipelineL<Layout, Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
 "#,
     );
     for expected in [
@@ -188,11 +188,11 @@ fn render_f16_capability_depends_on_referenced_module_types() {
         r#"
 import { FragmentInvocation, renderPipeline, RenderPipelineSpec, VertexInvocation } from "./typegpu";
 import { Vec2f, Vec2h, Vec4f } from "./typegpu-types";
-@CStruct class Vertex { position: Vec2f; half: Vec2h; constructor(position: Vec2f, half: Vec2h) { this.position = position; this.half = half; } }
-@CStruct class Varyings { position: Vec4f; half: Vec2h; constructor(position: Vec4f, half: Vec2h) { this.position = position; this.half = half; } }
+@ValueType class Vertex { position: Vec2f; half: Vec2h; constructor(position: Vec2f, half: Vec2h) { this.position = position; this.half = half; } }
+@ValueType class Varyings { position: Vec4f; half: Vec2h; constructor(position: Vec4f, half: Vec2h) { this.position = position; this.half = half; } }
 function vert(value: Vertex, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(value.position.x, value.position.y, 0.0, 1.0), value.half); }
 function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { return input.position; }
-export const pipeline: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
+const pipeline: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
 "#,
     );
     assert!(varying_half.pipelines[0].1.starts_with("enable f16;"));
@@ -203,12 +203,12 @@ export const pipeline: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(ver
 import { FragmentInvocation, renderPipeline, RenderPipelineSpec, VertexInvocation } from "./typegpu";
 import { Vec2f, Vec4f } from "./typegpu-types";
 import { UnusedHalf_SIZE } from "./render-test.typegpu";
-@CStruct class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
-@CStruct class UnusedHalf { value: f16; constructor(value: f16) { this.value = value; } }
-@CStruct class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
+@ValueType class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
+@ValueType class UnusedHalf { value: f16; constructor(value: f16) { this.value = value; } }
+@ValueType class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
 function vert(value: Vertex, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(value.position.x, value.position.y, 0.0, 1.0)); }
 function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { return input.position; }
-export const pipeline: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
+const pipeline: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
 "#,
     );
     assert!(!unrelated_half.pipelines[0].1.starts_with("enable f16;"));
@@ -221,16 +221,16 @@ fn program_owned_pipeline_lookalikes_are_not_declarations() {
         r#"
 import { ComputeInvocation, ComputePipelineSpec, FragmentInvocation, RenderPipelineSpec, VertexInvocation } from "./typegpu";
 import { Vec2f, Vec4f } from "./typegpu-types";
-@CStruct class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
-@CStruct class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
+@ValueType class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
+@ValueType class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
 class Layout {}
 function computePipeline<L>(kernel: (res: L, ctx: ComputeInvocation) => void, spec: ComputePipelineSpec): ComputePipelineSpec { return spec; }
 function renderPipeline<V, O>(vertex: (value: V, ctx: VertexInvocation) => O, fragment: (input: O, ctx: FragmentInvocation) => Vec4f, spec: RenderPipelineSpec): RenderPipelineSpec { return spec; }
 function kernel(res: Layout, ctx: ComputeInvocation): void {}
 function vert(value: Vertex, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(value.position.x, value.position.y, 0.0, 1.0)); }
 function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { return input.position; }
-export const compute: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "compute", workgroupSize: [1, 1, 1] });
-export const render: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
+const compute: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "compute", workgroupSize: [1, 1, 1] });
+const render: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
 "#,
     );
     assert!(generated.pipelines.is_empty());

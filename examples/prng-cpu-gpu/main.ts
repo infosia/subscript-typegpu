@@ -45,7 +45,7 @@ const ROUND_COUNT: u32 = 5;
 
 // The output record: the generator state after the last draw, and that draw's value. The
 // comparison covers both, so a state divergence cannot hide behind an equal value.
-@CStruct
+@ValueType
 class RandomValue {
   state: u32;
   value: f32;
@@ -83,7 +83,7 @@ function randomKernel(res: RandomLayout, ctx: ComputeInvocation): void {
 
 // The declaration names the pipeline and fixes the workgroup size at 32 threads. The
 // generator reads it and emits the WGSL and the constants of `main.typegpu`.
-export const randomFill: ComputePipelineSpec = computePipeline<RandomLayout>(randomKernel, {
+const randomFill: ComputePipelineSpec = computePipeline<RandomLayout>(randomKernel, {
   name: "randomFill",
   workgroupSize: [32, 1, 1],
 });

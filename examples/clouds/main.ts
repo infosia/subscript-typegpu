@@ -64,7 +64,7 @@ const CLOUD_TIME_PERIOD: u32 = 4096;
 
 // The vertex record. The generator emits Vertex_STRIDE from this class, so the host code
 // never counts bytes.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -75,7 +75,7 @@ class Vertex {
 
 // The per-frame uniform. `time` carries the wrapped frame count, not seconds. `aspect`
 // carries the surface width divided by the surface height.
-@CStruct
+@ValueType
 class CloudFrame {
   time: f32;
   aspect: f32;
@@ -88,7 +88,7 @@ class CloudFrame {
 
 // The inter-stage record. The field named `position` becomes the clip-space builtin, and
 // `uv` becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -169,7 +169,7 @@ function cloudFragment(
 
 // The pipeline declaration joins the layout class, the vertex schema, and the varyings.
 // `subscript-typegpu-gen` reads it and emits the WGSL before the run, so no shader text is built here.
-export const clouds: RenderPipelineSpec = renderPipelineL<
+const clouds: RenderPipelineSpec = renderPipelineL<
   CloudLayout,
   Vertex,
   Varyings

@@ -31,7 +31,7 @@ import {
   Vertex_STRIDE,
 } from "./b17-index-cull.typegpu";
 
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -40,7 +40,7 @@ class Vertex {
   }
 }
 
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
 
@@ -59,7 +59,7 @@ function fragmentStep(value: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(1.0, 1.0, 1.0, 1.0);
 }
 
-export const culled: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const culled: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
   vertexStep,
   fragmentStep,
   {

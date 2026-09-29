@@ -51,9 +51,24 @@ pub(crate) fn wgsl_i32_literal(value: i64) -> String {
     }
 }
 
-/// Returns a type or function name without its generic arguments.
+/// Returns a type or function name without its declaration identity and its generic arguments.
+///
+/// A callee, a function reference, and a global reference carry the checker's declaration symbol,
+/// `[[identity:<kind>:<hex>]]name<args>`. The result is the source spelling `name`.
 pub(crate) fn base_name(name: &str) -> &str {
-    name.split('<').next().unwrap_or(name)
+    let name = name.split('<').next().unwrap_or(name);
+    // The identity precedes the source spelling, so the source spelling is a suffix of the symbol.
+    let source = source_name(name);
+    if name.ends_with(source.as_str()) {
+        &name[name.len() - source.len()..]
+    } else {
+        name
+    }
+}
+
+/// Returns the source spelling of a declaration symbol, generic arguments included.
+pub(crate) fn source_name(symbol: &str) -> String {
+    subscript_compiler::hir::source_name(symbol)
 }
 
 /// Reads one field of a descriptor literal by name.
@@ -95,7 +110,7 @@ pub struct GeneratedLayout {
 pub struct GeneratedComputePipeline {
     /// The module-level pipeline declaration.
     pub declaration: String,
-    /// The named kernel function.
+    /// The declaration symbol of the kernel function, as a function reference carries it.
     pub kernel: String,
     /// Whether sequential host simulation preserves the kernel's behavior.
     pub host_runnable: bool,
@@ -183,6 +198,37 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
         format!("{rule}: {} (author)", message.into()),
         pos,
     )
+}
+
+/// Rejects two program classes that share one source name when one of them is a value class (K14).
+///
+/// The generator finds a schema, a layout, and a varyings class by its source name, and the
+/// emitted WGSL names a struct by it. Two modules can each declare a class of one name. A value
+/// class then has no single WGSL struct and no single set of layout constants.
+///
+/// # Errors
+///
+/// Returns a K14 diagnostic at the second class that names the shared source name.
+fn validate_unique_classes(module: &Module) -> Result<(), Diagnostic> {
+    let mut owners =
+        std::collections::BTreeMap::<String, &subscript_compiler::hir::ClassDef>::new();
+    for class in &module.classes {
+        let name = source_name(&class.name);
+        match owners.get(&name) {
+            Some(owner) if owner.is_value || class.is_value => {
+                return Err(diagnostic(
+                    "K14",
+                    format!("two program classes share the source name `{name}`"),
+                    class.pos.clone(),
+                ));
+            }
+            Some(_) => {}
+            None => {
+                owners.insert(name, class);
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Reports whether `name` is a registered library module (LB1).
@@ -319,6 +365,8 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     // poisoned import carries the imported names, and nothing here lowers this HIR (SC1a).
     let options = discovery_options(files)?;
     let module = subscript_compiler::check_program_with(files, &options)?;
+    // Every class lookup below resolves a source name, so the check runs before the first one.
+    validate_unique_classes(&module).map_err(|item| vec![item])?;
     let support = support_import(&module)?;
     let shell_program = shell::discover(&module)?;
     let pipeline_definitions = pipeline::discover(&module, &shell_program)?;
@@ -395,12 +443,12 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     generated_names.extend(
         pipeline_definitions
             .iter()
-            .map(|pipeline| pipeline.entry.clone()),
+            .map(|pipeline| base_name(&pipeline.entry).to_owned()),
     );
     generated_names.extend(render_definitions.iter().flat_map(|pipeline| {
         [
-            pipeline.vertex_entry.clone(),
-            pipeline.fragment_entry.clone(),
+            base_name(&pipeline.vertex_entry).to_owned(),
+            base_name(&pipeline.fragment_entry).to_owned(),
         ]
     }));
     generated_names.extend(

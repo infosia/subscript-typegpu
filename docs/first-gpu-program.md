@@ -25,7 +25,7 @@ function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
   res.state[0] = state;
 }
 
-export const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
+const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
   incrementCounter,
   {
     name: "firstProgram",
@@ -48,7 +48,7 @@ variable. A schema class gives the state its layout, and a layout
 class names the bindings of one bind group.
 
 ```ts program=programs/b22-first-program.ts
-@CStruct
+@ValueType
 class State {
   counter: u32;
   incrementBy: u32;
@@ -187,7 +187,7 @@ function badKernel(res: CounterLayout, ctx: ComputeInvocation): void {
   res.state[0] = new State(counter, 1);
 }
 
-export const badProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
+const badProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
   badKernel,
   { name: "badProgram", workgroupSize: [1, 1, 1] },
 );

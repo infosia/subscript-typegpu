@@ -475,7 +475,7 @@ fn prepare_program(program: &Path) -> Result<Vec<SourceFile>, ProgramLoadError> 
     let program_source = std::fs::read_to_string(program).map_err(|error| {
         ProgramLoadError::message(format!("read {}: {error}", program.display()))
     })?;
-    let program_file = SourceFile::new(format!("{stem}.ts"), program_source);
+    let program_file = SourceFile::entry(format!("{stem}.ts"), program_source);
     let mut files = library_files(&program_file)?;
     files.push(program_file);
     let support_module = format!("./{stem}.typegpu");
@@ -512,11 +512,10 @@ fn load_program_with_library(
     load_program_with_exports_and_library(program, library).map(|(session, _)| session)
 }
 
-/// Compiles one program and returns the session with the exported function names of the program
-/// file.
+/// Compiles one program and returns the session with the host entry names of the program.
 ///
-/// The names come from the checked module, so no text scan guesses them. A library export never
-/// appears, because the filter keeps the entry file alone.
+/// The names come from the checked module's host entry table, which the program file, as the
+/// entry module, declares. A library export never appears.
 fn load_program_with_exports_and_library(
     program: &Path,
     library: NativeLibrary,
@@ -524,20 +523,10 @@ fn load_program_with_exports_and_library(
     let files = prepare_program(program)?;
     let module = subscript_compiler::check_program(&files)
         .map_err(|diagnostics| ProgramLoadError::rejected(&files, diagnostics))?;
-    let entry_file = program.file_name().unwrap_or_default().to_string_lossy();
-    let entry_count = files.iter().filter(|file| file.name == entry_file).count();
-    // The export filter below needs exactly one file under the entry name.
-    if entry_count != 1 {
-        return Err(ProgramLoadError::message(format!(
-            "exactly one loaded file must match program {entry_file}, found {entry_count}"
-        )));
-    }
-    let exports = module
-        .functions
-        .iter()
-        .filter(|function| function.exported && function.pos.file == entry_file)
-        .map(|function| function.name.clone())
-        .collect();
+    // The result lists the entries in export order, which is their source order.
+    let mut entries = module.host_entries.iter().collect::<Vec<_>>();
+    entries.sort_by_key(|entry| (entry.pos.line, entry.pos.col));
+    let exports = entries.iter().map(|entry| entry.name.clone()).collect();
     match ReloadSession::new_with_native_libraries(&files, &[library]) {
         Ok(session) => Ok((session, exports)),
         Err(RunError::Rejected(diagnostics)) => {

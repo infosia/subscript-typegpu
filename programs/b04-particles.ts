@@ -29,7 +29,7 @@ import {
   particles_WORKGROUP_Z,
 } from "./b04-particles.typegpu";
 
-@CStruct
+@ValueType
 class Particle {
   pos: Vec3f;
   vel: Vec3f;
@@ -40,7 +40,7 @@ class Particle {
   }
 }
 
-@CStruct
+@ValueType
 class SimParams {
   dt: f32;
   count: u32;
@@ -78,7 +78,7 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
   }
 }
 
-export const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
+const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
   name: "particles",
   workgroupSize: [64, 1, 1],
 });

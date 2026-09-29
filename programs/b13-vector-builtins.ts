@@ -56,7 +56,7 @@ import {
   vectorBuiltins_WORKGROUP_Z,
 } from "./b13-vector-builtins.typegpu";
 
-@CStruct
+@ValueType
 class VectorInput {
   floatA: Vec4f;
   floatB: Vec4f;
@@ -75,7 +75,7 @@ class VectorInput {
   }
 }
 
-@CStruct
+@ValueType
 class VectorOutput {
   exactFloat: Vec4f;
   transFloat: Vec4f;
@@ -403,7 +403,7 @@ function vectorKernel(res: VectorLayout, ctx: ComputeInvocation): void {
   res.output[0] = output;
 }
 
-export const vectorBuiltins: ComputePipelineSpec = computePipeline<VectorLayout>(
+const vectorBuiltins: ComputePipelineSpec = computePipeline<VectorLayout>(
   vectorKernel,
   { name: "vectorBuiltins", workgroupSize: [1, 1, 1] },
 );

@@ -62,7 +62,7 @@ function textureArrayKernel(res: TextureArrayLayout, ctx: ComputeInvocation): vo
   res.target.store(coords, layer, sampled.add(stored));
 }
 
-export const textureArray: ComputePipelineSpec = computePipeline<TextureArrayLayout>(
+const textureArray: ComputePipelineSpec = computePipeline<TextureArrayLayout>(
   textureArrayKernel,
   { name: "textureArray", workgroupSize: [2, 1, 1] },
 );

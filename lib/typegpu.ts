@@ -1579,7 +1579,8 @@ export class ComputePipeline {
         return;
       }
     }
-    if (this.guardQueue === null) {
+    const queue: GPUQueue | null = this.guardQueue;
+    if (queue === null) {
       authorTrap("PI15", "ComputePipeline.guard", "queue=missing");
       return;
     }
@@ -1587,7 +1588,7 @@ export class ComputePipeline {
     const bytes: u8[] = Context.bytesOf<FixedArray<u32, 4>>([x, y, z, 0]);
     let index: i32 = 0;
     while (index < this.guardBuffers.length) {
-      this.guardQueue.writeBuffer(this.guardBuffers[index], 0, bytes);
+      queue.writeBuffer(this.guardBuffers[index], 0, bytes);
       index = index + 1;
     }
   }

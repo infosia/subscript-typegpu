@@ -40,7 +40,7 @@ import {
 
 // One corner of the full-surface triangle in normalized device coordinates.
 // TypeGPU reads the same three corners from a constant array inside its vertex stage.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -51,7 +51,7 @@ class Vertex {
 
 // The only uniform. time is in seconds and aspect is the window width over its height.
 // The other six values of the upstream struct are constants in the shell body below.
-@CStruct
+@ValueType
 class FrameData {
   time: f32;
   aspect: f32;
@@ -64,7 +64,7 @@ class FrameData {
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and uv becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -154,7 +154,7 @@ function tunnelFragment(
 
 // The declaration ties the layout class, the two kernels, and the target format together.
 // The generator reads it at compile time and emits tunnel_WGSL into ./main.typegpu.
-export const tunnel: RenderPipelineSpec = renderPipelineL<TunnelLayout, Vertex, Varyings>(
+const tunnel: RenderPipelineSpec = renderPipelineL<TunnelLayout, Vertex, Varyings>(
   tunnelVertex,
   tunnelFragment,
   { format: "bgra8unorm" },

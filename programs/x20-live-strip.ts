@@ -35,7 +35,7 @@ import {
 
 const SIZE: i32 = 16;
 
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -44,7 +44,7 @@ class Vertex {
   }
 }
 
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
 
@@ -61,7 +61,7 @@ function fragmentStep(value: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(0.25, 0.6, 0.75, 1.0);
 }
 
-export const stripLive: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const stripLive: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
   vertexStep,
   fragmentStep,
   {

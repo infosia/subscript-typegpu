@@ -246,7 +246,7 @@ to completion and returns.
 Look at the declaration that ties the two kernels together.
 
 ```ts program=examples/window-triangle/main.ts
-export const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, {
+const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, {
   format: "bgra8unorm",
 });
 ```
@@ -260,7 +260,7 @@ the typed representation of the file, finds this call, follows the call graph of
 The schema and the two kernels are ordinary subscript.
 
 ```ts program=examples/window-triangle/main.ts
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 

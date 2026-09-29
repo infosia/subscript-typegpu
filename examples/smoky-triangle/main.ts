@@ -45,7 +45,7 @@ import {
 // One triangle corner in normalized device coordinates plus its texture coordinate.
 // TypeGPU reads the same values from two constant arrays by vertex index.
 // This port sends them through a vertex buffer, so the generator fixes the stride.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
   uv: Vec2f;
@@ -56,7 +56,7 @@ class Vertex {
   }
 }
 
-@CStruct
+@ValueType
 class FrameData {
   // One vec2f carries time and density. TypeGPU holds a full parameter struct that
   // its sliders patch on every frame.
@@ -69,7 +69,7 @@ class FrameData {
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and uv becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -139,7 +139,7 @@ function smokeFragment(
 // The declaration ties the layout class, the two kernels, and the target format together.
 // The generator reads it at compile time and emits smoke_WGSL into ./main.typegpu.
 // TypeGPU builds the equivalent shader at run time from the same functions.
-export const smoke: RenderPipelineSpec = renderPipelineL<SmokeLayout, Vertex, Varyings>(
+const smoke: RenderPipelineSpec = renderPipelineL<SmokeLayout, Vertex, Varyings>(
   smokeVertex,
   smokeFragment,
   { format: "bgra8unorm" },

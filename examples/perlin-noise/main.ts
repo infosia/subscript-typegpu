@@ -45,7 +45,7 @@ import {
 
 // The vertex schema. The generator lays it out for the vertex buffer and emits
 // `Vertex_STRIDE`, the byte distance between two vertices.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -56,7 +56,7 @@ class Vertex {
 
 // The uniform record. `time` counts seconds, and the generator emits `FrameData_SIZE`
 // for the buffer.
-@CStruct
+@ValueType
 class FrameData {
   time: f32;
 
@@ -67,7 +67,7 @@ class FrameData {
 
 // The record that travels from the vertex stage to the fragment stage. The `position`
 // field carries the clip-space position builtin, and `uv` takes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -131,7 +131,7 @@ function noiseFragment(
 
 // The declaration pairs the two kernels with the layout class, so both stages reach the
 // uniform. The generator reads it and emits the WGSL, the layout, and the vertex layout.
-export const noise: RenderPipelineSpec = renderPipelineL<NoiseLayout, Vertex, Varyings>(
+const noise: RenderPipelineSpec = renderPipelineL<NoiseLayout, Vertex, Varyings>(
   noiseVertex,
   noiseFragment,
   { format: "bgra8unorm" },

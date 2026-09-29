@@ -91,12 +91,10 @@ fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
-/// Returns the module-level function of this name, and `None` when the module declares none.
-fn function<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
-    module
-        .functions
-        .iter()
-        .find(|function| function.name == name)
+/// Returns the module-level function of this declaration symbol, and `None` when the module
+/// declares none.
+fn function<'a>(module: &'a Module, symbol: &str) -> Option<&'a Function> {
+    crate::pipeline::function(module, symbol)
 }
 
 /// Returns the class name of a class type, and `None` for every other type.
@@ -115,6 +113,9 @@ fn statement_pos(statement: &Stmt) -> Option<&Pos> {
         | Stmt::For { pos, .. }
         | Stmt::ForOf { pos, .. }
         | Stmt::Switch { pos, .. }
+        | Stmt::Throw { pos, .. }
+        | Stmt::Try { pos, .. }
+        | Stmt::Using { pos, .. }
         | Stmt::Break(pos)
         | Stmt::Continue(pos) => Some(pos),
         Stmt::Expr(expr) => Some(&expr.pos),
@@ -218,6 +219,8 @@ enum KernelGlobalKind {
 /// One module-level declaration that a kernel's call graph reads.
 #[derive(Debug, Clone)]
 struct KernelGlobal {
+    /// The checker's declaration symbol, which a global reference carries.
+    symbol: String,
     /// The author's declaration name, which the emitter mangles (K14).
     name: String,
     /// The value type. A wrapper gives the `T` it carries, never the wrapper class.
@@ -228,7 +231,7 @@ struct KernelGlobal {
     pos: Pos,
 }
 
-/// Collects the module-level declaration names that `expr` reads.
+/// Collects the declaration symbols of the module-level declarations that `expr` reads.
 fn global_names_expr(expr: &Expr, out: &mut BTreeSet<String>) {
     if let ExprKind::Global(name) = &expr.kind {
         out.insert(name.clone());
@@ -238,8 +241,7 @@ fn global_names_expr(expr: &Expr, out: &mut BTreeSet<String>) {
         | ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
-        | ExprKind::Field { obj: operand, .. }
-        | ExprKind::JsonResultValue(operand) => global_names_expr(operand, out),
+        | ExprKind::Field { obj: operand, .. } => global_names_expr(operand, out),
         ExprKind::Binary { left, right, .. }
         | ExprKind::Assign {
             target: left,
@@ -347,11 +349,17 @@ fn global_names_stmt(statement: &Stmt, out: &mut BTreeSet<String>) {
                 }
             }
         }
-        Stmt::Block(body) => {
+        Stmt::Block(body) | Stmt::Using { body, .. } => {
             for statement in body {
                 global_names_stmt(statement, out);
             }
         }
+        Stmt::Try { body, handler, .. } => {
+            for statement in body.iter().chain(handler) {
+                global_names_stmt(statement, out);
+            }
+        }
+        Stmt::Throw { value, .. } => global_names_expr(value, out),
         Stmt::Break(_) | Stmt::Continue(_) => {}
     }
 }
@@ -413,7 +421,7 @@ fn kernel_globals(
     loop {
         let before = reached.len();
         for global in &module.globals {
-            if reached.contains(&global.name) {
+            if reached.contains(&global.symbol) {
                 global_names_expr(&global.init, &mut reached);
             }
         }
@@ -426,7 +434,7 @@ fn kernel_globals(
     for global in module
         .globals
         .iter()
-        .filter(|global| reached.contains(&global.name))
+        .filter(|global| reached.contains(&global.symbol))
     {
         if global.mutable {
             return Err(diagnostic(
@@ -501,6 +509,7 @@ fn kernel_globals(
             ),
         };
         globals.push(KernelGlobal {
+            symbol: global.symbol.clone(),
             name: global.name.clone(),
             ty,
             kind,
@@ -526,13 +535,13 @@ fn render_kernel_globals(
     let mut reached = BTreeMap::new();
     for kernel in kernels {
         for global in kernel_globals(module, kernel, shells)? {
-            reached.insert(global.name.clone(), global);
+            reached.insert(global.symbol.clone(), global);
         }
     }
     Ok(module
         .globals
         .iter()
-        .filter_map(|global| reached.remove(&global.name))
+        .filter_map(|global| reached.remove(&global.symbol))
         .collect())
 }
 
@@ -592,8 +601,7 @@ fn expression_blocks_host(module: &Module, expression: &Expr) -> Result<bool, Di
         | ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
-        | ExprKind::Field { obj: operand, .. }
-        | ExprKind::JsonResultValue(operand) => expression_blocks_host(module, operand)?,
+        | ExprKind::Field { obj: operand, .. } => expression_blocks_host(module, operand)?,
         ExprKind::Binary { left, right, .. }
         | ExprKind::Assign {
             target: left,
@@ -702,7 +710,11 @@ fn statements_block_host(module: &Module, statements: &[Stmt]) -> Result<bool, D
                         })
                     })?
             }
-            Stmt::Block(body) => statements_block_host(module, body)?,
+            Stmt::Block(body) | Stmt::Using { body, .. } => statements_block_host(module, body)?,
+            Stmt::Try { body, handler, .. } => {
+                statements_block_host(module, body)? || statements_block_host(module, handler)?
+            }
+            Stmt::Throw { value, .. } => expression_blocks_host(module, value)?,
             Stmt::Break(_) | Stmt::Continue(_) => false,
         })
     })
@@ -1318,14 +1330,20 @@ fn fold_constant_expr(
             let constructor = mapping::free_function(name).ok_or_else(|| {
                 diagnostic(
                     "K19",
-                    format!("module constant calls unsupported function `{name}`"),
+                    format!(
+                        "module constant calls unsupported function `{}`",
+                        crate::source_name(name)
+                    ),
                     expr.pos.clone(),
                 )
             })?;
             if !constructor.starts_with("vec") {
                 return Err(diagnostic(
                     "K19",
-                    format!("module constant calls non-vector factory `{name}`"),
+                    format!(
+                        "module constant calls non-vector factory `{}`",
+                        crate::source_name(name)
+                    ),
                     expr.pos.clone(),
                 ));
             }
@@ -1372,7 +1390,7 @@ fn fold_constant_expr(
     }
 }
 
-/// Folds one named module constant, through the cache (K19).
+/// Folds one module constant, named by its declaration symbol, through the cache (K19).
 ///
 /// # Errors
 ///
@@ -1384,17 +1402,21 @@ fn fold_global_constant(
     globals: &BTreeMap<String, KernelGlobal>,
     cache: &mut BTreeMap<String, FoldedConstant>,
     visiting: &mut BTreeSet<String>,
-    name: &str,
+    symbol: &str,
 ) -> Result<FoldedConstant, Diagnostic> {
-    if let Some(value) = cache.get(name) {
+    if let Some(value) = cache.get(symbol) {
         return Ok(value.clone());
     }
-    let global = globals.get(name).ok_or_else(|| {
+    let global = globals.get(symbol).ok_or_else(|| {
         generator_diagnostic(
-            format!("global `{name}` disappeared from typed HIR"),
+            format!(
+                "global `{}` disappeared from typed HIR",
+                crate::source_name(symbol)
+            ),
             Pos::new("", 1, 1),
         )
     })?;
+    let name = &global.name;
     let KernelGlobalKind::Constant(init) = &global.kind else {
         return Err(diagnostic(
             "K19",
@@ -1412,16 +1434,16 @@ fn fold_global_constant(
             global.pos.clone(),
         ));
     }
-    if !visiting.insert(name.to_owned()) {
+    if !visiting.insert(symbol.to_owned()) {
         return Err(generator_diagnostic(
             format!("module constant cycle includes `{name}`"),
             global.pos.clone(),
         ));
     }
     let value = fold_constant_expr(module, globals, cache, visiting, init);
-    visiting.remove(name);
+    visiting.remove(symbol);
     let value = value?;
-    cache.insert(name.to_owned(), value.clone());
+    cache.insert(symbol.to_owned(), value.clone());
     Ok(value)
 }
 
@@ -1443,21 +1465,27 @@ fn constant_snippet(
         ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) => {
             Ok(Snippet::atom(literal(expr)?))
         }
-        ExprKind::Global(name) => {
-            let global = globals.get(name).ok_or_else(|| {
+        ExprKind::Global(symbol) => {
+            let global = globals.get(symbol).ok_or_else(|| {
                 generator_diagnostic(
-                    format!("global `{name}` disappeared from typed HIR"),
+                    format!(
+                        "global `{}` disappeared from typed HIR",
+                        crate::source_name(symbol)
+                    ),
                     expr.pos.clone(),
                 )
             })?;
             if !matches!(global.kind, KernelGlobalKind::Constant(_)) {
                 return Err(diagnostic(
                     "K19",
-                    format!("module constant initializer reads variable `{name}`"),
+                    format!(
+                        "module constant initializer reads variable `{}`",
+                        global.name
+                    ),
                     expr.pos.clone(),
                 ));
             }
-            Ok(Snippet::atom(mapping::ident(name)))
+            Ok(Snippet::atom(mapping::ident(&global.name)))
         }
         ExprKind::Unary { op, operand } => {
             let operand = constant_snippet(module, globals, operand)?;
@@ -1509,14 +1537,20 @@ fn constant_snippet(
             let Some(factory) = mapping::free_function(name) else {
                 return Err(diagnostic(
                     "K19",
-                    format!("module constant calls unsupported function `{name}`"),
+                    format!(
+                        "module constant calls unsupported function `{}`",
+                        crate::source_name(name)
+                    ),
                     expr.pos.clone(),
                 ));
             };
             if !factory.starts_with("vec") {
                 return Err(diagnostic(
                     "K19",
-                    format!("module constant calls non-vector factory `{name}`"),
+                    format!(
+                        "module constant calls non-vector factory `{}`",
+                        crate::source_name(name)
+                    ),
                     expr.pos.clone(),
                 ));
             }
@@ -1563,9 +1597,9 @@ fn constant_snippet(
 /// initializer that does not evaluate gives a K20 diagnostic, as does a zero-length workgroup
 /// array. An atomic in the private address space gives a K21 diagnostic.
 fn emit_kernel_globals(module: &Module, globals: &[KernelGlobal]) -> Result<String, Diagnostic> {
-    let by_name = globals
+    let by_symbol = globals
         .iter()
-        .map(|global| (global.name.clone(), global.clone()))
+        .map(|global| (global.symbol.clone(), global.clone()))
         .collect::<BTreeMap<_, _>>();
     let mut folded = BTreeMap::new();
     let mut visiting = BTreeSet::new();
@@ -1588,10 +1622,10 @@ fn emit_kernel_globals(module: &Module, globals: &[KernelGlobal]) -> Result<Stri
                 let ty = wgsl_type(module, &global.ty, &global.pos)?;
                 let value = fold_global_constant(
                     module,
-                    &by_name,
+                    &by_symbol,
                     &mut folded,
                     &mut visiting,
-                    &global.name,
+                    &global.symbol,
                 )?
                 .snippet();
                 out.push_str(&format!("const {name}: {ty} = {};\n", value.text));
@@ -1607,7 +1641,7 @@ fn emit_kernel_globals(module: &Module, globals: &[KernelGlobal]) -> Result<Stri
                 let ty = wgsl_type(module, &global.ty, &global.pos)?;
                 // A private variable's initializer keeps its expression form, so a K19 failure
                 // here belongs to the K20 declaration the author wrote.
-                let value = constant_snippet(module, &by_name, init).map_err(|_| {
+                let value = constant_snippet(module, &by_symbol, init).map_err(|_| {
                     diagnostic(
                         "K20",
                         format!(
@@ -1669,7 +1703,7 @@ fn barrier_call<'a>(module: &Module, expr: &'a Expr) -> Option<&'a str> {
 fn case_terminates(body: &[Stmt]) -> bool {
     match body.last() {
         Some(Stmt::Break(_) | Stmt::Continue(_) | Stmt::Return { .. }) => true,
-        Some(Stmt::Block(body)) => case_terminates(body),
+        Some(Stmt::Block(body) | Stmt::Using { body, .. }) => case_terminates(body),
         _ => false,
     }
 }
@@ -1704,7 +1738,13 @@ fn validate_statement_subset(statements: &[Stmt]) -> Result<(), Diagnostic> {
                     validate_statement_subset(&case.body)?;
                 }
             }
-            Stmt::Block(body) => validate_statement_subset(body)?,
+            Stmt::Block(body) | Stmt::Using { body, .. } => validate_statement_subset(body)?,
+            Stmt::Throw { pos, .. } => {
+                return Err(diagnostic("K7", "`throw` statement in kernel", pos.clone()));
+            }
+            Stmt::Try { pos, .. } => {
+                return Err(diagnostic("K7", "`try` statement in kernel", pos.clone()));
+            }
             _ => {}
         }
     }
@@ -1756,7 +1796,19 @@ fn local_declarations(statements: &[Stmt], out: &mut Vec<String>) {
                     local_declarations(&case.body, out);
                 }
             }
-            Stmt::Block(body) => local_declarations(body, out),
+            Stmt::Block(body) | Stmt::Using { body, .. } => local_declarations(body, out),
+            Stmt::Try {
+                body,
+                binding,
+                handler,
+                ..
+            } => {
+                local_declarations(body, out);
+                if let Some((name, _)) = binding {
+                    out.push(name.clone());
+                }
+                local_declarations(handler, out);
+            }
             _ => {}
         }
     }
@@ -1901,7 +1953,7 @@ impl<'a> Emitter<'a> {
             bindings,
             globals: globals
                 .iter()
-                .map(|global| (global.name.clone(), global.clone()))
+                .map(|global| (global.symbol.clone(), global.clone()))
                 .collect(),
             local_names,
             used_builtins: BTreeSet::new(),
@@ -1931,7 +1983,7 @@ impl<'a> Emitter<'a> {
             bindings: BTreeMap::new(),
             globals: globals
                 .iter()
-                .map(|global| (global.name.clone(), global.clone()))
+                .map(|global| (global.symbol.clone(), global.clone()))
                 .collect(),
             local_names: local_names(helper, module_names),
             used_builtins: BTreeSet::new(),
@@ -1957,7 +2009,7 @@ impl<'a> Emitter<'a> {
         let ExprKind::Field { obj, name } = &expr.kind else {
             return None;
         };
-        let ExprKind::Local(param) = &obj.kind else {
+        let ExprKind::Local(param, _) = &obj.kind else {
             return None;
         };
         let group = *self.layout_params.get(param)?;
@@ -2168,15 +2220,18 @@ impl<'a> Emitter<'a> {
                 "string local or expression in kernel",
                 expr.pos.clone(),
             )),
-            ExprKind::Local(name) => Ok(Snippet::atom(self.local_name(name))),
-            ExprKind::Global(name) => {
-                if !self.globals.contains_key(name) {
+            ExprKind::Local(name, _) => Ok(Snippet::atom(self.local_name(name))),
+            ExprKind::Global(symbol) => {
+                let Some(global) = self.globals.get(symbol) else {
                     return Err(generator_diagnostic(
-                        format!("global `{name}` has no kernel declaration"),
+                        format!(
+                            "global `{}` has no kernel declaration",
+                            crate::source_name(symbol)
+                        ),
                         expr.pos.clone(),
                     ));
-                }
-                Ok(Snippet::atom(mapping::ident(name)))
+                };
+                Ok(Snippet::atom(mapping::ident(&global.name)))
             }
             ExprKind::Unary { op, operand } => {
                 let value = self.snippet(operand)?;
@@ -2281,7 +2336,7 @@ impl<'a> Emitter<'a> {
                 if let Some(binding) = self.binding_ref(expr) {
                     return Ok(Snippet::atom(binding.name));
                 }
-                if matches!(&obj.kind, ExprKind::Local(name) if name == &self.invocation_param) {
+                if matches!(&obj.kind, ExprKind::Local(name, _) if name == &self.invocation_param) {
                     let builtin = match (self.invocation_kind, name.as_str()) {
                         (InvocationKind::Compute, "globalId") => "globalId",
                         (InvocationKind::Compute, "localId") => "localId",
@@ -3266,6 +3321,19 @@ impl<'a> Emitter<'a> {
                     pos.clone(),
                 ));
             }
+            Stmt::Using { pos, .. } => {
+                return Err(diagnostic(
+                    "K5",
+                    "`using` declaration in kernel",
+                    pos.clone(),
+                ));
+            }
+            Stmt::Throw { pos, .. } => {
+                return Err(diagnostic("K7", "`throw` statement in kernel", pos.clone()));
+            }
+            Stmt::Try { pos, .. } => {
+                return Err(diagnostic("K7", "`try` statement in kernel", pos.clone()));
+            }
             Stmt::Break(pos) => {
                 if self.loop_depth == 0 && self.switch_depth == 0 {
                     return Err(diagnostic(
@@ -3375,7 +3443,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
     fn expression(&self, expr: &Expr) -> UniformityTaint {
         match &expr.kind {
             ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) => UniformityTaint::Uniform,
-            ExprKind::Local(name) => self.locals.get(name).cloned().unwrap_or_else(|| {
+            ExprKind::Local(name, _) => self.locals.get(name).cloned().unwrap_or_else(|| {
                 UniformityTaint::NonUniform(format!("local or parameter `{name}`"))
             }),
             ExprKind::Global(name) => match self.emitter.globals.get(name) {
@@ -3383,9 +3451,12 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                     kind: KernelGlobalKind::Constant(_),
                     ..
                 }) => UniformityTaint::Uniform,
-                _ => UniformityTaint::NonUniform(format!("global variable `{name}`")),
+                _ => UniformityTaint::NonUniform(format!(
+                    "global variable `{}`",
+                    crate::source_name(name)
+                )),
             },
-            ExprKind::Field { obj, name } if matches!(&obj.kind, ExprKind::Local(param) if param == &self.emitter.invocation_param) => {
+            ExprKind::Field { obj, name } if matches!(&obj.kind, ExprKind::Local(param, _) if param == &self.emitter.invocation_param) => {
                 UniformityTaint::NonUniform(format!(
                     "builtin `{}.{name}`",
                     self.emitter.invocation_param
@@ -3393,8 +3464,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
             }
             ExprKind::AbsenceTest { value: operand, .. }
             | ExprKind::Unary { operand, .. }
-            | ExprKind::Cast(operand)
-            | ExprKind::JsonResultValue(operand) => self.expression(operand),
+            | ExprKind::Cast(operand) => self.expression(operand),
             ExprKind::Length(operand) => {
                 if self.emitter.binding_root(operand).is_some() {
                     UniformityTaint::Uniform
@@ -3582,9 +3652,12 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                         ))
                     })
                 }
-                Stmt::Block(body) => {
+                Stmt::Block(body) | Stmt::Using { body, .. } => {
                     self.loop_exit_taint(body, control.clone(), nested_loops, switches)
                 }
+                Stmt::Try { body, handler, .. } => self
+                    .loop_exit_taint(body, control.clone(), nested_loops, switches)
+                    .merge(self.loop_exit_taint(handler, control.clone(), nested_loops, switches)),
                 Stmt::Break(_) if nested_loops == 0 && switches == 0 => control.clone(),
                 Stmt::Continue(_) if nested_loops == 0 => control.clone(),
                 _ => UniformityTaint::Uniform,
@@ -3696,8 +3769,14 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                         self.collect_statements(&case.body, branch.clone());
                     }
                 }
-                Stmt::Block(body) => self.collect_statements(body, control.clone()),
-                Stmt::Return { .. } | Stmt::Break(_) | Stmt::Continue(_) => {}
+                Stmt::Block(body) | Stmt::Using { body, .. } => {
+                    self.collect_statements(body, control.clone());
+                }
+                Stmt::Try { body, handler, .. } => {
+                    self.collect_statements(body, control.clone());
+                    self.collect_statements(handler, control.clone());
+                }
+                Stmt::Return { .. } | Stmt::Throw { .. } | Stmt::Break(_) | Stmt::Continue(_) => {}
             }
         }
     }
@@ -3829,13 +3908,23 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                     }
                     targets.pop();
                 }
-                Stmt::Block(body) => {
+                Stmt::Block(body) | Stmt::Using { body, .. } => {
                     self.validate_statements(
                         body,
                         control.clone(),
                         barrier_scope_allowed,
                         targets,
                     )?;
+                }
+                Stmt::Try { body, handler, .. } => {
+                    for statements in [body, handler] {
+                        self.validate_statements(
+                            statements,
+                            control.clone(),
+                            barrier_scope_allowed,
+                            targets,
+                        )?;
+                    }
                 }
                 Stmt::Break(pos) => {
                     if matches!(
@@ -3870,7 +3959,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                         }
                     }
                 }
-                Stmt::Let { .. } => {}
+                Stmt::Let { .. } | Stmt::Throw { .. } => {}
             }
         }
         Ok(())
@@ -3880,7 +3969,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
 /// Returns the local name at the root of an assignment target, and `None` for every other target.
 fn assigned_local(expr: &Expr) -> Option<&str> {
     match &expr.kind {
-        ExprKind::Local(name) => Some(name),
+        ExprKind::Local(name, _) => Some(name),
         ExprKind::Field { obj, .. } | ExprKind::Index { obj, .. } => assigned_local(obj),
         _ => None,
     }
@@ -3920,7 +4009,11 @@ fn written_locals(statements: &[Stmt], out: &mut BTreeSet<String>) {
                     written_locals(&case.body, out);
                 }
             }
-            Stmt::Block(body) => written_locals(body, out),
+            Stmt::Block(body) | Stmt::Using { body, .. } => written_locals(body, out),
+            Stmt::Try { body, handler, .. } => {
+                written_locals(body, out);
+                written_locals(handler, out);
+            }
             _ => {}
         }
     }
@@ -3933,7 +4026,7 @@ fn written_locals(statements: &[Stmt], out: &mut BTreeSet<String>) {
 /// reaches.
 fn assignment_target_taint(validator: &BarrierValidator<'_, '_>, target: &Expr) -> UniformityTaint {
     match &target.kind {
-        ExprKind::Local(_) => UniformityTaint::Uniform,
+        ExprKind::Local(_, _) => UniformityTaint::Uniform,
         ExprKind::Field { obj, .. } => assignment_target_taint(validator, obj),
         ExprKind::Index { obj, index, .. } => {
             assignment_target_taint(validator, obj).merge(validator.expression(index))
@@ -3958,7 +4051,10 @@ fn contains_barrier(module: &Module, statements: &[Stmt]) -> bool {
         Stmt::Switch { cases, .. } => cases
             .iter()
             .any(|case| contains_barrier(module, &case.body)),
-        Stmt::Block(body) => contains_barrier(module, body),
+        Stmt::Block(body) | Stmt::Using { body, .. } => contains_barrier(module, body),
+        Stmt::Try { body, handler, .. } => {
+            contains_barrier(module, body) || contains_barrier(module, handler)
+        }
         _ => false,
     })
 }
@@ -3988,7 +4084,11 @@ fn last_barrier_position(module: &Module, statements: &[Stmt]) -> Option<(u32, u
                 .iter()
                 .filter_map(|case| last_barrier_position(module, &case.body))
                 .max(),
-            Stmt::Block(body) => last_barrier_position(module, body),
+            Stmt::Block(body) | Stmt::Using { body, .. } => last_barrier_position(module, body),
+            Stmt::Try { body, handler, .. } => last_barrier_position(module, body)
+                .into_iter()
+                .chain(last_barrier_position(module, handler))
+                .max(),
             _ => None,
         };
         last = last.into_iter().chain(candidate).max();
@@ -4017,8 +4117,7 @@ fn called_functions_expr(expr: &Expr, out: &mut BTreeSet<String>) {
         | ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
-        | ExprKind::Field { obj: operand, .. }
-        | ExprKind::JsonResultValue(operand) => called_functions_expr(operand, out),
+        | ExprKind::Field { obj: operand, .. } => called_functions_expr(operand, out),
         ExprKind::Binary { left, right, .. } => {
             called_functions_expr(left, out);
             called_functions_expr(right, out);
@@ -4109,11 +4208,17 @@ fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<String>) {
                 called_functions_stmt(stmt, out);
             }
         }
-        Stmt::Block(body) => {
+        Stmt::Block(body) | Stmt::Using { body, .. } => {
             for stmt in body {
                 called_functions_stmt(stmt, out);
             }
         }
+        Stmt::Try { body, handler, .. } => {
+            for stmt in body.iter().chain(handler) {
+                called_functions_stmt(stmt, out);
+            }
+        }
+        Stmt::Throw { value, .. } => called_functions_expr(value, out),
         Stmt::Break(_) | Stmt::Continue(_) => {}
     }
 }
@@ -4170,8 +4275,7 @@ fn collect_schema_expr(
         | ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
-        | ExprKind::Field { obj: operand, .. }
-        | ExprKind::JsonResultValue(operand) => {
+        | ExprKind::Field { obj: operand, .. } => {
             collect_schema_expr(module, operand, seen, out)?;
         }
         ExprKind::Binary { left, right, .. } => {
@@ -4305,11 +4409,17 @@ fn collect_schema_stmt(
                 collect_schema_stmt(module, stmt, seen, out)?;
             }
         }
-        Stmt::Block(body) => {
+        Stmt::Block(body) | Stmt::Using { body, .. } => {
             for stmt in body {
                 collect_schema_stmt(module, stmt, seen, out)?;
             }
         }
+        Stmt::Try { body, handler, .. } => {
+            for stmt in body.iter().chain(handler) {
+                collect_schema_stmt(module, stmt, seen, out)?;
+            }
+        }
+        Stmt::Throw { value, .. } => collect_schema_expr(module, value, seen, out)?,
         Stmt::Break(_) | Stmt::Continue(_) => {}
     }
 
@@ -4366,6 +4476,62 @@ pub(crate) fn referenced_schema_names(
     Ok(out)
 }
 
+/// Orders callee symbols by source name, then by symbol.
+///
+/// The emitted helper order then follows the author's names and not the checker's module
+/// identities (K14).
+fn source_order(symbols: BTreeSet<String>) -> Vec<String> {
+    let mut ordered = symbols
+        .into_iter()
+        .map(|symbol| (crate::source_name(&symbol), symbol))
+        .collect::<Vec<_>>();
+    ordered.sort();
+    ordered.into_iter().map(|(_, symbol)| symbol).collect()
+}
+
+/// Rejects two program declarations that one WGSL module would declare under one name (K14).
+///
+/// The emitted WGSL names a function or a module-level declaration by its source name. A
+/// program of several files can declare one source name in two modules, and the WGSL module then
+/// has no name for the second declaration.
+///
+/// # Errors
+///
+/// Returns a K14 diagnostic that names the shared source name.
+fn validate_unique_sources(
+    entries: &[&str],
+    dependencies: &[String],
+    globals: &[KernelGlobal],
+    pos: &Pos,
+) -> Result<(), Diagnostic> {
+    let mut owners = BTreeMap::<String, &str>::new();
+    let functions = entries
+        .iter()
+        .copied()
+        .chain(dependencies.iter().map(String::as_str))
+        .map(|symbol| (crate::base_name(symbol), symbol));
+    let declarations = globals
+        .iter()
+        .map(|global| (global.name.as_str(), global.symbol.as_str()));
+    for (name, symbol) in functions.chain(declarations) {
+        let emitted = mapping::ident(name);
+        match owners.get(&emitted) {
+            Some(owner) if *owner != symbol => {
+                return Err(diagnostic(
+                    "K14",
+                    format!("two program declarations share the source name `{name}` in one WGSL module"),
+                    pos.clone(),
+                ));
+            }
+            Some(_) => {}
+            None => {
+                owners.insert(emitted, symbol);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Returns the functions that one kernel's call graph reaches, in dependency order (K2).
 ///
 /// A callee precedes its caller, so the emitter writes each helper after the helpers it calls. A
@@ -4400,8 +4566,12 @@ fn dependencies(
             return Ok(());
         }
         if let Some(start) = stack.iter().position(|item| item == name) {
-            let mut cycle = stack.iter().skip(start).cloned().collect::<Vec<_>>();
-            cycle.push(name.to_owned());
+            let mut cycle = stack
+                .iter()
+                .skip(start)
+                .map(|item| crate::source_name(item))
+                .collect::<Vec<_>>();
+            cycle.push(crate::source_name(name));
             return Err(diagnostic(
                 "K2",
                 format!("recursive helper cycle: {}", cycle.join(" -> ")),
@@ -4422,7 +4592,7 @@ fn dependencies(
         for stmt in &function.body {
             called_functions_stmt(stmt, &mut calls);
         }
-        for called in calls {
+        for called in source_order(calls) {
             visit(module, &called, shells, stack, done, order, &function.pos)?;
         }
         stack.pop();
@@ -4436,7 +4606,7 @@ fn dependencies(
     }
     let mut order = Vec::new();
     let mut done = BTreeSet::new();
-    for called in calls {
+    for called in source_order(calls) {
         visit(
             module,
             &called,
@@ -4649,7 +4819,7 @@ pub(crate) fn emit(
         &pipeline.layouts,
         &globals,
         &helpers,
-        &[&pipeline.entry],
+        &[crate::base_name(&pipeline.entry)],
         shells.declarations.as_ref().map(|item| &item.names),
     );
     validate_statement_subset(&kernel.body)?;
@@ -4681,14 +4851,20 @@ pub(crate) fn emit(
     for name in &helpers {
         let helper = function(module, name).ok_or_else(|| {
             generator_diagnostic(
-                format!("helper `{name}` disappeared from typed HIR"),
+                format!(
+                    "helper `{}` disappeared from typed HIR",
+                    crate::source_name(name)
+                ),
                 pipeline.pos.clone(),
             )
         })?;
         if helper.is_async || helper.is_generator {
             return Err(diagnostic(
                 "K2",
-                format!("helper `{name}` is async or a generator"),
+                format!(
+                    "helper `{}` is async or a generator",
+                    crate::source_name(name)
+                ),
                 helper.pos.clone(),
             ));
         }
@@ -4699,7 +4875,10 @@ pub(crate) fn emit(
             if takes_layout || class_name(module, &param.ty) == Some("ComputeInvocation") {
                 return Err(diagnostic(
                     "K2",
-                    format!("helper `{name}` takes a layout class or ComputeInvocation"),
+                    format!(
+                        "helper `{}` takes a layout class or ComputeInvocation",
+                        crate::source_name(name)
+                    ),
                     param.pos.clone(),
                 ));
             }
@@ -4763,6 +4942,7 @@ pub(crate) fn emit(
     // The check resolves bindings and globals through the emitter, so it reads the same maps the
     // emitted text did (K22).
     BarrierValidator::new(&emitter, kernel).validate(kernel)?;
+    validate_unique_sources(&[&pipeline.entry], &dependencies, &globals, &pipeline.pos)?;
 
     // The order below is K14's, the same for every module. It runs from the `enable` directives
     // to the raw declarations, the schema structs, the shells, the bindings, the module variables,
@@ -4826,7 +5006,7 @@ pub(crate) fn emit(
     ));
     out.push_str(&format!(
         "fn {}({}) {{\n",
-        mapping::ident(&pipeline.entry),
+        mapping::ident(crate::base_name(&pipeline.entry)),
         parameters.join(", ")
     ));
     out.push_str(&entry_body);
@@ -5017,14 +5197,20 @@ fn render_helpers(
     for name in names {
         let helper = function(module, &name).ok_or_else(|| {
             generator_diagnostic(
-                format!("helper `{name}` disappeared from typed HIR"),
+                format!(
+                    "helper `{}` disappeared from typed HIR",
+                    crate::source_name(&name)
+                ),
                 pipeline.pos.clone(),
             )
         })?;
         if helper.is_async || helper.is_generator {
             return Err(diagnostic(
                 "K2",
-                format!("helper `{name}` is async or a generator"),
+                format!(
+                    "helper `{}` is async or a generator",
+                    crate::source_name(&name)
+                ),
                 helper.pos.clone(),
             ));
         }
@@ -5039,7 +5225,10 @@ fn render_helpers(
             {
                 return Err(diagnostic(
                     "K2",
-                    format!("helper `{name}` takes a layout class or invocation class"),
+                    format!(
+                        "helper `{}` takes a layout class or invocation class",
+                        crate::source_name(&name)
+                    ),
                     param.pos.clone(),
                 ));
             }
@@ -5111,7 +5300,10 @@ pub(crate) fn emit_render(
         &pipeline.layouts,
         &globals,
         &helper_names,
-        &[&pipeline.vertex_entry, &pipeline.fragment_entry],
+        &[
+            crate::base_name(&pipeline.vertex_entry),
+            crate::base_name(&pipeline.fragment_entry),
+        ],
         shells.declarations.as_ref().map(|item| &item.names),
     );
     module_names.insert(mapping::ident(&pipeline.varyings_name));
@@ -5209,6 +5401,12 @@ pub(crate) fn emit_render(
         &module_names,
         shells,
     )?);
+    validate_unique_sources(
+        &[&pipeline.vertex_entry, &pipeline.fragment_entry],
+        &helper_names,
+        &globals,
+        &pipeline.pos,
+    )?;
 
     let mut vertex_parameters = vertex
         .params
@@ -5240,7 +5438,7 @@ pub(crate) fn emit_render(
     out.push_str("@vertex\n");
     out.push_str(&format!(
         "fn {}({}) -> {} {{\n",
-        mapping::ident(&pipeline.vertex_entry),
+        mapping::ident(crate::base_name(&pipeline.vertex_entry)),
         vertex_parameters.join(", "),
         mapping::ident(&pipeline.varyings_name)
     ));
@@ -5270,7 +5468,7 @@ pub(crate) fn emit_render(
     let fragment_result = "@location(0u) vec4<f32>";
     out.push_str(&format!(
         "fn {}({}) -> {fragment_result} {{\n",
-        mapping::ident(&pipeline.fragment_entry),
+        mapping::ident(crate::base_name(&pipeline.fragment_entry)),
         fragment_parameters.join(", ")
     ));
     out.push_str(&fragment_body);

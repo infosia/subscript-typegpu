@@ -200,3 +200,13 @@ new `.o` file, the first gate 300.2 s with every test binary rebuilt,
 the second gate 225.1 s warm, both green with 276 passed and 1
 ignored. The stale `.o` files were deleted by hand, and the next
 `cargo build` was a no-op. `debug = "line-tables-only"` stays.
+
+## Re-pin to `2fa77ec` (2026-09-29)
+
+The warm `--require-backend` gate: 397.2 s, and 406.8 s on a second
+run after the K14 class check, both 286 passed and 1 ignored. The
+harness `tests/main.rs` took 348.9 s and 350.8 s. The previous warm
+rows are 225.1 s to 242.8 s, so the growth is about 1.65x, below the
+2x red line. The cause is not measured. The Rust diff of this
+repository adds no test and no program, so the subscript range is
+the suspect.

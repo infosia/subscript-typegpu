@@ -83,25 +83,25 @@ import {
 } from "./b01-layout.typegpu";
 import { gpu, GPUAdapter, GPUDevice } from "./webgpu";
 
-@CStruct
+@ValueType
 class Params {
   dt: f32 = 0.0;
   count: u32 = 0;
 }
 
-@CStruct
+@ValueType
 class Particle {
   pos: Vec3f = new Vec3f(0.0, 0.0, 0.0);
   vel: Vec3f = new Vec3f(0.0, 0.0, 0.0);
 }
 
-@CStruct
+@ValueType
 class Mixed {
   a: f32 = 0.0;
   p: Vec3f = new Vec3f(0.0, 0.0, 0.0);
 }
 
-@CStruct
+@ValueType
 class Grid {
   cells: FixedArray<Particle, 4>;
   extent: Vec4u;
@@ -112,7 +112,7 @@ class Grid {
   }
 }
 
-@CStruct
+@ValueType
 class MatrixHolder {
   value: Mat3x3f;
 
@@ -121,12 +121,12 @@ class MatrixHolder {
   }
 }
 
-@CStruct
+@ValueType
 class Half {
   v: Vec2h = new Vec2h(0.0, 0.0);
 }
 
-@CStruct
+@ValueType
 class FloatVectors {
   v2: Vec2f;
   v3: Vec3f;
@@ -141,21 +141,21 @@ class FloatVectors {
   }
 }
 
-@CStruct
+@ValueType
 class SignedVectors {
   v2: Vec2i = new Vec2i(0, 0);
   v3: Vec3i = new Vec3i(0, 0, 0);
   v4: Vec4i = new Vec4i(0, 0, 0, 0);
 }
 
-@CStruct
+@ValueType
 class UnsignedVectors {
   v2: Vec2u = new Vec2u(0, 0);
   v3: Vec3u = new Vec3u(0, 0, 0);
   v4: Vec4u = new Vec4u(0, 0, 0, 0);
 }
 
-@CStruct
+@ValueType
 class HalfMatrices {
   h2: Vec2h;
   h3: Vec3h;

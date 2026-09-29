@@ -50,7 +50,7 @@ import {
   Vertex_STRIDE,
 } from "./x17-live-indirect.typegpu";
 
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -59,7 +59,7 @@ class Vertex {
   }
 }
 
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
 
@@ -92,7 +92,7 @@ function fragmentStep(value: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(0.25, 0.6, 0.75, 1.0);
 }
 
-export const indirectCompute: ComputePipelineSpec = computePipeline<IndirectLayout>(
+const indirectCompute: ComputePipelineSpec = computePipeline<IndirectLayout>(
   computeStep,
   {
     name: "indirectCompute",
@@ -100,7 +100,7 @@ export const indirectCompute: ComputePipelineSpec = computePipeline<IndirectLayo
   },
 );
 
-export const indirectRender: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const indirectRender: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
   vertexStep,
   fragmentStep,
   { format: "rgba8unorm" },

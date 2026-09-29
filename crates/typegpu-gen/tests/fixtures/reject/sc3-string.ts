@@ -2,7 +2,7 @@
 // expected-owner: checker
 import { BadString_OFFSET_value } from "./sc3-string.typegpu";
 
-@CStruct
+@ValueType
 class BadString {
   value: string;
 

@@ -38,7 +38,7 @@ import {
   fragmentSample_WGSL,
 } from "./x11-live-fragment-sample.typegpu";
 
-@CStruct
+@ValueType
 class FragmentVertex {
   position: Vec2f;
   uv: Vec2f;
@@ -49,7 +49,7 @@ class FragmentVertex {
   }
 }
 
-@CStruct
+@ValueType
 class FragmentVarying {
   position: Vec4f;
   uv: Vec2f;
@@ -86,7 +86,7 @@ function fragmentColor(
   return res.source.sample(res.nearest, input.uv);
 }
 
-export const fragmentSample: RenderPipelineSpec = renderPipelineL<
+const fragmentSample: RenderPipelineSpec = renderPipelineL<
   FragmentTextureLayout,
   FragmentVertex,
   FragmentVarying

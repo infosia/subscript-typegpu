@@ -68,8 +68,8 @@ fn is_validation_filter(module: &Module, expression: &Expr) -> bool {
         == Some(*value)
 }
 
-fn is_library_creation(module: &Module, name: &str) -> bool {
-    let file = match name {
+fn is_library_creation(module: &Module, symbol: &str) -> bool {
+    let file = match subscript_compiler::hir::source_name(symbol).as_str() {
         "createComputePipeline" | "createRenderPipeline" => "typegpu.ts",
         "UiRenderer.create" | "UiRenderer.createHost" => "typegpu-ui.ts",
         _ => return false,
@@ -77,7 +77,7 @@ fn is_library_creation(module: &Module, name: &str) -> bool {
     module
         .functions
         .iter()
-        .any(|function| function.name == name && function.pos.file == file)
+        .any(|function| function.symbol == symbol && function.pos.file == file)
 }
 
 fn is_device_creation(module: &Module, receiver: &Expr, name: &str) -> bool {
@@ -147,8 +147,7 @@ fn visit_expr(
         ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
-        | ExprKind::Field { obj: operand, .. }
-        | ExprKind::JsonResultValue(operand) => visit!(operand),
+        | ExprKind::Field { obj: operand, .. } => visit!(operand),
         ExprKind::Binary { left, right, .. }
         | ExprKind::Assign {
             target: left,
@@ -195,11 +194,7 @@ fn visit_expr(
             }
         }
         ExprKind::Lambda { body, .. } => visit_statements(module, body, program_name, calls),
-        ExprKind::Yield(value) => {
-            if let Some(value) = value {
-                visit!(value);
-            }
-        }
+        ExprKind::Yield(Some(value)) => visit!(value),
         ExprKind::AsyncCall { callee, args } => {
             if let AsyncCallee::Method { receiver, .. } = callee {
                 visit!(receiver);
@@ -282,7 +277,14 @@ fn visit_statements(
                     visit_statements(module, &case.body, program_name, calls);
                 }
             }
-            Stmt::Block(body) => visit_statements(module, body, program_name, calls),
+            Stmt::Block(body) | Stmt::Using { body, .. } => {
+                visit_statements(module, body, program_name, calls)
+            }
+            Stmt::Try { body, handler, .. } => {
+                visit_statements(module, body, program_name, calls);
+                visit_statements(module, handler, program_name, calls);
+            }
+            Stmt::Throw { value, .. } => visit_expr(module, value, program_name, calls),
             Stmt::Break(_) | Stmt::Continue(_) => {}
         }
     }

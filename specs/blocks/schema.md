@@ -5,7 +5,7 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
 
 ## What a schema is
 
-- **SC1 — A schema is a `@CStruct` class in the program.** No
+- **SC1 — A schema is a `@ValueType` class in the program.** No
   marker, no manifest, no sidecar file. The generator treats a value
   class as a schema when every field type is schema-legal (SC3) and
   the class is reachable from a schema use: a buffer creation
@@ -43,7 +43,7 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
 
 ## The type library
 
-- **SC5 — Vectors and matrices are `@CStruct` classes in
+- **SC5 — Vectors and matrices are `@ValueType` classes in
   `lib/typegpu-types.ts`**, hand-written, with the R33 alignment.
   (The file also holds the `Vec*b` classes of K26, the atomic classes
   of K21, and the indirect blocks of PI17, so this list is the vector
@@ -88,7 +88,7 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
 - **SC10 — A uniform schema needs uniform-safe fields.** When a
   schema reaches a uniform binding (P2) or a uniform buffer, LY11
   applies. A violation is a diagnostic that names the member and
-  the fix (`@CStruct({ align: 16 })` on the member's class, or a
+  the fix (`@ValueType({ align: 16 })` on the member's class, or a
   struct wrapper around the array element).
 
 ## Generated facts

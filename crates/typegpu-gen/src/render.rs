@@ -49,9 +49,9 @@ pub(crate) struct Varying {
 pub(crate) struct RenderPipeline {
     /// The module-level `const` name that carries the declaration.
     pub(crate) declaration: String,
-    /// The vertex kernel name, which becomes the `@vertex` entry point.
+    /// The vertex kernel's declaration symbol. Its source name is the `@vertex` entry point.
     pub(crate) vertex_entry: String,
-    /// The fragment kernel name, which becomes the `@fragment` entry point.
+    /// The fragment kernel's declaration symbol. Its source name is the `@fragment` entry point.
     pub(crate) fragment_entry: String,
     /// The layout classes, in group order from 0.
     pub(crate) layouts: Vec<Layout>,
@@ -122,7 +122,7 @@ fn library_named(module: &Module, ty: &Type, name: &str, pos: &Pos) -> Result<bo
     )
 }
 
-/// Returns the program's `@CStruct` class that `ty` names.
+/// Returns the program's `@ValueType` class that `ty` names.
 ///
 /// A library vector or matrix class gives `None`, so a vertex schema and a varyings class are
 /// always the author's own (RN4, RN7).
@@ -198,7 +198,7 @@ fn vertex_format(
 ///
 /// # Errors
 ///
-/// Returns an RN4 diagnostic when the type is not a program `@CStruct` class, and an RN5
+/// Returns an RN4 diagnostic when the type is not a program `@ValueType` class, and an RN5
 /// diagnostic when a field type is not a vertex attribute.
 fn vertex_buffer(
     module: &Module,
@@ -211,7 +211,7 @@ fn vertex_buffer(
     let class = value_class(module, ty, pos)?.ok_or_else(|| {
         diagnostic(
             "RN4",
-            "vertex input is not a program @CStruct class",
+            "vertex input is not a program @ValueType class",
             pos.clone(),
         )
     })?;
@@ -250,13 +250,13 @@ fn vertex_buffer(
 ///
 /// # Errors
 ///
-/// Returns an RN7 diagnostic when the type is not a program `@CStruct` class, when it has no
+/// Returns an RN7 diagnostic when the type is not a program `@ValueType` class, when it has no
 /// `position: Vec4f` field, or when a field type is outside RN7.
 fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varying>), Diagnostic> {
     let class = value_class(module, ty, pos)?.ok_or_else(|| {
         diagnostic(
             "RN7",
-            "varyings is not a program @CStruct class",
+            "varyings is not a program @ValueType class",
             pos.clone(),
         )
     })?;
@@ -528,9 +528,7 @@ fn contains_render_call_expr(module: &Module, expr: &Expr) -> bool {
             .iter()
             .flatten()
             .any(|value| contains_render_call_expr(module, value)),
-        ExprKind::Field { obj, .. } | ExprKind::JsonResultValue(obj) => {
-            contains_render_call_expr(module, obj)
-        }
+        ExprKind::Field { obj, .. } => contains_render_call_expr(module, obj),
         ExprKind::Index { obj, index, .. } => {
             contains_render_call_expr(module, obj) || contains_render_call_expr(module, index)
         }
@@ -600,10 +598,15 @@ fn contains_render_call_stmt(module: &Module, stmt: &Stmt) -> bool {
                     .flat_map(|case| &case.body)
                     .any(|stmt| contains_render_call_stmt(module, stmt))
         }
-        Stmt::Block(body) => body
+        Stmt::Block(body) | Stmt::Using { body, .. } => body
             .iter()
             .any(|stmt| contains_render_call_stmt(module, stmt)),
-        _ => false,
+        Stmt::Try { body, handler, .. } => body
+            .iter()
+            .chain(handler)
+            .any(|stmt| contains_render_call_stmt(module, stmt)),
+        Stmt::Throw { value, .. } => contains_render_call_expr(module, value),
+        Stmt::Break(_) | Stmt::Continue(_) => false,
     }
 }
 
@@ -851,7 +854,7 @@ fn binding_reads_expr(
     out: &mut BTreeSet<(usize, String)>,
 ) {
     if let ExprKind::Field { obj, name } = &expr.kind {
-        if let ExprKind::Local(param) = &obj.kind {
+        if let ExprKind::Local(param, _) = &obj.kind {
             if let Some(group) = layout_params.get(param) {
                 out.insert((*group, name.clone()));
             }
@@ -889,9 +892,7 @@ fn binding_reads_expr(
                 binding_reads_expr(value, layout_params, out);
             }
         }
-        ExprKind::Field { obj, .. } | ExprKind::JsonResultValue(obj) => {
-            binding_reads_expr(obj, layout_params, out)
-        }
+        ExprKind::Field { obj, .. } => binding_reads_expr(obj, layout_params, out),
         ExprKind::Index { obj, index, .. } => {
             binding_reads_expr(obj, layout_params, out);
             binding_reads_expr(index, layout_params, out);
@@ -968,12 +969,18 @@ fn binding_reads_stmt(
                 binding_reads_stmt(item, layout_params, out);
             }
         }
-        Stmt::Block(body) => {
+        Stmt::Block(body) | Stmt::Using { body, .. } => {
             for item in body {
                 binding_reads_stmt(item, layout_params, out);
             }
         }
-        _ => {}
+        Stmt::Try { body, handler, .. } => {
+            for item in body.iter().chain(handler) {
+                binding_reads_stmt(item, layout_params, out);
+            }
+        }
+        Stmt::Throw { value, .. } => binding_reads_expr(value, layout_params, out),
+        Stmt::Break(_) | Stmt::Continue(_) => {}
     }
 }
 
@@ -1081,7 +1088,7 @@ fn unreached_binding(
 fn binding_key(expr: &Expr, layout_params: &BTreeMap<String, usize>) -> Option<(usize, String)> {
     match &expr.kind {
         ExprKind::Field { obj, name } => {
-            let ExprKind::Local(param) = &obj.kind else {
+            let ExprKind::Local(param, _) = &obj.kind else {
                 return None;
             };
             Some((*layout_params.get(param)?, name.clone()))
@@ -1147,7 +1154,7 @@ fn written_binding_expr(
                 written_binding_expr(value, layout_params, out);
             }
         }
-        ExprKind::Field { obj, .. } | ExprKind::JsonResultValue(obj) => {
+        ExprKind::Field { obj, .. } => {
             written_binding_expr(obj, layout_params, out);
         }
         ExprKind::Index { obj, index, .. } => {
@@ -1227,12 +1234,18 @@ fn written_binding_stmt(
                 written_binding_stmt(item, layout_params, out);
             }
         }
-        Stmt::Block(body) => {
+        Stmt::Block(body) | Stmt::Using { body, .. } => {
             for item in body {
                 written_binding_stmt(item, layout_params, out);
             }
         }
-        _ => {}
+        Stmt::Try { body, handler, .. } => {
+            for item in body.iter().chain(handler) {
+                written_binding_stmt(item, layout_params, out);
+            }
+        }
+        Stmt::Throw { value, .. } => written_binding_expr(value, layout_params, out),
+        Stmt::Return { value: None, .. } | Stmt::Break(_) | Stmt::Continue(_) => {}
     }
 }
 

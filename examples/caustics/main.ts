@@ -45,7 +45,7 @@ import {
 
 // One triangle corner in normalized device coordinates. TypeGPU reads the same three
 // corners from a constant array. This port sends them through a vertex buffer.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -56,7 +56,7 @@ class Vertex {
 
 // The only uniform. time is in seconds and aspect is the window width over its height.
 // TypeGPU keeps one uniform per value and adds a tile density slider this port drops.
-@CStruct
+@ValueType
 class FrameData {
   time: f32;
   aspect: f32;
@@ -69,7 +69,7 @@ class FrameData {
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and uv becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -151,7 +151,7 @@ function causticFragment(
 // The declaration ties the layout class, the two kernels, and the target format together.
 // The generator reads it at compile time and emits caustic_WGSL into ./main.typegpu.
 // TypeGPU builds the equivalent shader at run time from the same functions.
-export const caustic: RenderPipelineSpec = renderPipelineL<CausticLayout, Vertex, Varyings>(
+const caustic: RenderPipelineSpec = renderPipelineL<CausticLayout, Vertex, Varyings>(
   causticVertex,
   causticFragment,
   { format: "bgra8unorm" },

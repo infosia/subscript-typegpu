@@ -28,7 +28,7 @@ import {
   uniformReread_WORKGROUP_Z,
 } from "./x12-live-uniform-reread.typegpu";
 
-@CStruct
+@ValueType
 class Params {
   value: u32;
 
@@ -37,7 +37,7 @@ class Params {
   }
 }
 
-@CStruct
+@ValueType
 class ShadowResult {
   local: u32;
   reread: u32;
@@ -65,7 +65,7 @@ function shadowKernel(res: ShadowLayout, ctx: ComputeInvocation): void {
   res.output[0] = new ShadowResult(params.value, reread.value);
 }
 
-export const uniformReread: ComputePipelineSpec = computePipeline<ShadowLayout>(shadowKernel, {
+const uniformReread: ComputePipelineSpec = computePipeline<ShadowLayout>(shadowKernel, {
   name: "uniformReread",
   workgroupSize: [1, 1, 1],
 });

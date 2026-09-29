@@ -4,7 +4,7 @@
 
 import { ComputeInvocation, ComputePipelineSpec, computePipeline, Storage, wgslDeclarations } from "./typegpu";
 
-@CStruct
+@ValueType
 class Collision {
   value: u32;
   constructor(value: u32) { this.value = value; }
@@ -16,7 +16,7 @@ class CollisionLayout { input: Storage<Collision>; constructor(input: Storage<Co
 function collisionKernel(res: CollisionLayout, ctx: ComputeInvocation): void {
   const value: Collision = res.input[ctx.globalId.x];
 }
-export const rejected: ComputePipelineSpec = computePipeline<CollisionLayout>(collisionKernel, {
+const rejected: ComputePipelineSpec = computePipeline<CollisionLayout>(collisionKernel, {
   name: "rejected",
   workgroupSize: [1, 1, 1],
 });

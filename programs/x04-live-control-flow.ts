@@ -29,7 +29,7 @@ import {
   controlFlow_WORKGROUP_Z,
 } from "./x04-live-control-flow.typegpu";
 
-@CStruct
+@ValueType
 class Item {
   value: f32;
   constructor(value: f32) { this.value = value; }
@@ -57,7 +57,7 @@ function controlFlowKernel(res: ControlLayout, ctx: ComputeInvocation): void {
   res.output[0] = new Item(total);
 }
 
-export const controlFlow: ComputePipelineSpec = computePipeline<ControlLayout>(controlFlowKernel, {
+const controlFlow: ComputePipelineSpec = computePipeline<ControlLayout>(controlFlowKernel, {
   name: "controlFlow",
   workgroupSize: [1, 1, 1],
 });

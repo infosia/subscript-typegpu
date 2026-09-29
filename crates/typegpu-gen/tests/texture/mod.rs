@@ -5,7 +5,7 @@ use crate::support;
 fn generate(source: &str) -> subscript_typegpu_gen::Generated {
     let mut files = support::b01_files();
     files.pop();
-    files.push(SourceFile::new("texture-test.ts", source));
+    files.push(SourceFile::entry("texture-test.ts", source));
     subscript_typegpu_gen::generate(&files).unwrap_or_else(|diagnostics| {
         panic!(
             "texture test generation failed: {}",
@@ -34,7 +34,7 @@ fn texture_bindings_calls_groups_and_layout_entries_emit() {
         r#"
 import { ComputeInvocation, ComputePipelineSpec, Rgba8unorm, Sampler, StorageTexture2d, Texture2d, Uniform, computePipeline2 } from "./typegpu";
 import { Vec2f, Vec2i, Vec4f } from "./typegpu-types";
-@CStruct class Params { width: u32; constructor(width: u32) { this.width = width; } }
+@ValueType class Params { width: u32; constructor(width: u32) { this.width = width; } }
 class Textures { source: Texture2d<f32>; nearest: Sampler; target: StorageTexture2d<Rgba8unorm>; constructor(source: Texture2d<f32>, nearest: Sampler, target: StorageTexture2d<Rgba8unorm>) { this.source = source; this.nearest = nearest; this.target = target; } }
 class Settings { params: Uniform<Params>; constructor(params: Uniform<Params>) { this.params = params; } }
 function kernel(textures: Textures, settings: Settings, ctx: ComputeInvocation): void {
@@ -43,7 +43,7 @@ function kernel(textures: Textures, settings: Settings, ctx: ComputeInvocation):
   const sampled = textures.source.sampleLevel(textures.nearest, new Vec2f(0.5, 0.5), 0.0);
   textures.target.store(new Vec2i(size.x as i32, 0), loaded.add(sampled));
 }
-export const pipeline: ComputePipelineSpec = computePipeline2<Textures, Settings>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline2<Textures, Settings>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -128,7 +128,7 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
   res.r32float.store(new Vec2i(0, 0), sampled);
   res.rgba32float.store(new Vec2i(dimensions.x as i32, 0), new Vec4f(0.0, 0.0, 0.0, 1.0));
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -169,7 +169,7 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
     res.target.store(coords, source.add(target));
   }
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -232,7 +232,7 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
     res.target.store(coords, layer, sampled.add(source));
   }
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;

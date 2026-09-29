@@ -220,9 +220,9 @@ tiers with no GPU. The renderer is the only GPU code.
 
 ## The renderer
 
-- **UI14 — One pipeline.** Rev 2. `UiVertex` is `@CStruct {
+- **UI14 — One pipeline.** Rev 2. `UiVertex` is `@ValueType {
   position: Vec2f; uv: Vec2f; color: u32 }`. `UiViewport` is
-  `@CStruct { width: f32; height: f32 }`. `UiVarying` is `@CStruct {
+  `@ValueType { width: f32; height: f32 }`. `UiVarying` is `@ValueType {
   position: Vec4f; uv: Vec2f; color: Vec4f }`. `UiRenderLayout` has
   `viewport: Uniform<UiViewport>`, `atlas: Texture2d<f32>`, and
   `nearest: Sampler`. The module exports the kernels `uiVertex` and

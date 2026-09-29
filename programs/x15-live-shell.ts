@@ -61,7 +61,7 @@ function shellKernel(res: ShellLayout, ctx: ComputeInvocation): void {
   }
 }
 
-export const shellPipeline: ComputePipelineSpec = computePipeline<ShellLayout>(
+const shellPipeline: ComputePipelineSpec = computePipeline<ShellLayout>(
   shellKernel,
   {
     name: "shellPipeline",

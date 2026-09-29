@@ -10,7 +10,7 @@ this block. Kernels are `kernel.md`. The runtime classes live in
 ## The declaration
 
 - **PI1 — A pipeline is a module-level `const`.**
-  `export const stepPipeline = computePipeline<StepLayout>(step,
+  `const stepPipeline = computePipeline<StepLayout>(step,
   { workgroupSize: [64, 1, 1] });`. `computePipeline` is a library
   generic function in `lib/typegpu.ts`, with a real body that returns
   a `ComputePipelineSpec` (the kernel name and the workgroup size).
@@ -32,7 +32,7 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   types and checks that each equals the declaration's type argument.
 - **PI3 — A layout class is a plain class of binding fields.** Every
   field is a binding wrapper (PI5, TX1). Binding index is
-  declaration order from 0. The class is not `@CStruct` and not
+  declaration order from 0. The class is not `@ValueType` and not
   `@Descriptor`. Rev 1, 2026-09-12: **the class declares one
   constructor and no other member.** The constructor takes one
   parameter per field, in declaration order, each typed as its
@@ -192,7 +192,7 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   the API layer (RN11): `pass.drawIndirect` and
   `pass.drawIndexedIndirect` exist in `lib/webgpu.ts`.
 - **PI17 — The indirect argument schemas.** `lib/typegpu-types.ts`
-  exports `@CStruct class DispatchIndirectArgs { x: u32; y: u32; z:
+  exports `@ValueType class DispatchIndirectArgs { x: u32; y: u32; z:
   u32 }`, `DrawIndirectArgs { vertexCount; instanceCount;
   firstVertex; firstInstance: u32 }`, and `DrawIndexedIndirectArgs {
   indexCount; instanceCount; firstIndex: u32; baseVertex: i32;

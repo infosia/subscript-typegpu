@@ -6,4 +6,4 @@ class Layout { target: WriteStorageTexture2dArray<Rgba16float>; constructor(targ
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   res.target.load(new Vec2i(0, 0), 0);
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

@@ -60,7 +60,7 @@ const MATERIAL_DENSITY: f32 = 2.0;
 
 // The vertex record. The generator emits Vertex_STRIDE from this class, so the host code
 // never counts bytes.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -71,7 +71,7 @@ class Vertex {
 
 // One cell of the flattened grid. A schema holds no `boolean`, because WGSL `bool` is not
 // host-shareable, so `isActive` is a `u32`.
-@CStruct
+@ValueType
 class BoxCell {
   isActive: u32;
   albedo: Vec3f;
@@ -84,7 +84,7 @@ class BoxCell {
 
 // The camera uniform. The host computes the basis vectors, so the fragment needs no matrix.
 // Upstream sends an inverse view matrix from `mat4.aim` instead.
-@CStruct
+@ValueType
 class Camera {
   canvasDims: Vec2f;
   origin: Vec3f;
@@ -109,7 +109,7 @@ class Camera {
 
 // The inter-stage record. The field named `position` becomes the clip-space builtin, and
 // `uv` becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -122,7 +122,7 @@ class Varyings {
 
 // The slab test returns three values at once. `hit` is a `u32` for the same reason as
 // `isActive`.
-@CStruct
+@ValueType
 class Intersection {
   hit: u32;
   tMin: f32;
@@ -289,7 +289,7 @@ function boxFragment(
 
 // The declaration carries the blend state. `one` and `one-minus-src-alpha` compose the
 // premultiplied color the fragment returns over the cleared background.
-export const boxes: RenderPipelineSpec = renderPipelineL<BoxLayout, Vertex, Varyings>(
+const boxes: RenderPipelineSpec = renderPipelineL<BoxLayout, Vertex, Varyings>(
   boxVertex,
   boxFragment,
   {

@@ -41,7 +41,7 @@ import {
   texturePass_WORKGROUP_Z,
 } from "./b11-texture.typegpu";
 
-@CStruct
+@ValueType
 class SampleParams {
   width: u32;
   height: u32;
@@ -89,7 +89,7 @@ function textureKernel(
   textures.target.store(coords, loaded.add(sampled).scale(0.5));
 }
 
-export const texturePass: ComputePipelineSpec = computePipeline2<TextureLayout, ParamsLayout>(
+const texturePass: ComputePipelineSpec = computePipeline2<TextureLayout, ParamsLayout>(
   textureKernel,
   { name: "texturePass", workgroupSize: [4, 4, 1] },
 );

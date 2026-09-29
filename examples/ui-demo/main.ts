@@ -17,7 +17,7 @@ import {
 
 // The program declares the pipeline that draws the UI. The generator emits its
 // WGSL and layout facts beside this file, and the renderer receives them.
-export const uiPipeline: RenderPipelineSpec = renderPipelineL<UiRenderLayout, UiVertex, UiVarying>(
+const uiPipeline: RenderPipelineSpec = renderPipelineL<UiRenderLayout, UiVertex, UiVarying>(
   uiVertex, uiFragment, { format: "bgra8unorm", indexFormat: "uint16", blend: UI_BLEND },
 );
 

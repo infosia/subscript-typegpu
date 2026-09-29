@@ -32,7 +32,7 @@ import {
   Vertex_STRIDE,
 } from "./b21-blend.typegpu";
 
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -41,7 +41,7 @@ class Vertex {
   }
 }
 
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
 
@@ -58,7 +58,7 @@ function fragmentStep(value: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(0.8, 0.2, 0.1, 0.4);
 }
 
-export const blended: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const blended: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
   vertexStep,
   fragmentStep,
   {

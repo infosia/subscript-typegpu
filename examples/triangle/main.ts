@@ -33,7 +33,7 @@ import {
 
 // The vertex schema. The generator lays it out for the vertex buffer and emits
 // `Vertex_STRIDE`, the byte distance between two vertices.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -44,7 +44,7 @@ class Vertex {
 
 // The record that travels from the vertex stage to the fragment stage. The `position`
 // field carries the clip-space position builtin, and `color` takes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   color: Vec3f;
@@ -78,7 +78,7 @@ function triangleFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
 
 // The declaration pairs the two entry points and fixes the target format. The
 // generator walks it and emits the WGSL and the constants of `main.typegpu`.
-export const triangle: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const triangle: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
   triangleVertex,
   triangleFragment,
   { format: "bgra8unorm" },

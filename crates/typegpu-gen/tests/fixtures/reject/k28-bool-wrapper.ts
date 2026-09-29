@@ -12,7 +12,7 @@ class Layout {
 
 function kernel(res: Layout, ctx: ComputeInvocation): void {}
 
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(
   kernel,
   { name: "pipeline", workgroupSize: [1, 1, 1] },
 );

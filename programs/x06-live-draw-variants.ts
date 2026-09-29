@@ -32,7 +32,7 @@ import {
   Vertex_STRIDE,
 } from "./x06-live-draw-variants.typegpu";
 
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -41,7 +41,7 @@ class Vertex {
   }
 }
 
-@CStruct
+@ValueType
 class Instance {
   offset: Vec2f;
   color: Vec3f;
@@ -52,7 +52,7 @@ class Instance {
   }
 }
 
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   color: Vec3f;
@@ -79,7 +79,7 @@ function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(input.color.x, input.color.y, input.color.z, 1.0);
 }
 
-export const quad: RenderPipelineSpec = renderPipelineInstanced<Vertex, Instance, Varyings>(
+const quad: RenderPipelineSpec = renderPipelineInstanced<Vertex, Instance, Varyings>(
   quadVert,
   frag,
   { format: "rgba8unorm" },

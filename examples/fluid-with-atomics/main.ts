@@ -78,7 +78,7 @@ const BRUSH_WATER_MODE: u32 = 1;
 const BRUSH_WALL: u32 = 2;
 
 // One corner of the render strip. The generator derives `Vertex_STRIDE` from this class.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -90,7 +90,7 @@ class Vertex {
 // The same cell buffer carries three declarations. `WaterCell` is the atomic `u32` the brush
 // edits, `WaterLevel` is the plain read the flow pass takes, and `WaterDelta` is the change.
 // Each layout picks the declaration its pass needs, and the bytes never change shape.
-@CStruct
+@ValueType
 class WaterCell {
   level: AtomicU32;
 
@@ -99,7 +99,7 @@ class WaterCell {
   }
 }
 
-@CStruct
+@ValueType
 class WaterLevel {
   level: u32;
 
@@ -108,7 +108,7 @@ class WaterLevel {
   }
 }
 
-@CStruct
+@ValueType
 class WaterDelta {
   level: AtomicI32;
 
@@ -119,7 +119,7 @@ class WaterDelta {
 
 // The brush segment in cell coordinates, with the mode and an active flag. One frame writes it
 // once. TypeGPU passes a radius and a cell kind and erases from the right mouse button.
-@CStruct
+@ValueType
 class BrushParams {
   previous: Vec2f;
   current: Vec2f;
@@ -135,7 +135,7 @@ class BrushParams {
 }
 
 // The vertex output. `position` is clip space and `uv` runs 0 to 1 across the surface.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -334,22 +334,22 @@ function atomicFluidFragment(
 // The four declarations name the kernel, the layout type, and the workgroup size. The generator
 // reads them ahead of the run and emits the WGSL, the entry names, and the layout facts.
 // TypeGPU builds the same WGSL at run time from the kernel function.
-export const atomicFlow: ComputePipelineSpec = computePipeline<AtomicFluidLayout>(
+const atomicFlow: ComputePipelineSpec = computePipeline<AtomicFluidLayout>(
   atomicFlowKernel,
   { name: "atomicFlow", workgroupSize: [8, 8, 1] },
 );
 
-export const atomicFinalize: ComputePipelineSpec = computePipeline<AtomicFinalizeLayout>(
+const atomicFinalize: ComputePipelineSpec = computePipeline<AtomicFinalizeLayout>(
   atomicFinalizeKernel,
   { name: "atomicFinalize", workgroupSize: [8, 8, 1] },
 );
 
-export const atomicBrush: ComputePipelineSpec = computePipeline<AtomicBrushLayout>(
+const atomicBrush: ComputePipelineSpec = computePipeline<AtomicBrushLayout>(
   atomicBrushKernel,
   { name: "atomicBrush", workgroupSize: [8, 8, 1] },
 );
 
-export const atomicFluidRender: RenderPipelineSpec = renderPipelineL<
+const atomicFluidRender: RenderPipelineSpec = renderPipelineL<
   AtomicFluidRenderLayout,
   Vertex,
   Varyings

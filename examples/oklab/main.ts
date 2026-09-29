@@ -47,7 +47,7 @@ import {
 
 // One corner of the full-surface triangle in normalized device coordinates.
 // TypeGPU takes the same triangle from a shared vertex helper.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -58,7 +58,7 @@ class Vertex {
 
 // hue is an angle in radians. alpha is the gamut clip strength. pointer is the probe
 // position in the 0 to 1 surface range. TypeGPU drives all three from HTML controls.
-@CStruct
+@ValueType
 class OklabUniforms {
   hue: f32;
   alpha: f32;
@@ -73,7 +73,7 @@ class OklabUniforms {
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and uv becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -155,7 +155,7 @@ function oklabFragment(
 // The declaration ties the layout class, the two kernels, and the target format together.
 // The generator reads it at compile time and emits oklab_WGSL into ./main.typegpu.
 // TypeGPU rebuilds its pipeline whenever a control picks another clip or pattern.
-export const oklab: RenderPipelineSpec = renderPipelineL<OklabLayout, Vertex, Varyings>(
+const oklab: RenderPipelineSpec = renderPipelineL<OklabLayout, Vertex, Varyings>(
   oklabVertex,
   oklabFragment,
   { format: "bgra8unorm" },

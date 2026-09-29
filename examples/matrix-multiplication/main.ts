@@ -38,7 +38,7 @@ import {
 
 // The matrix record: the live size and a fixed 16-value body. TypeGPU sizes its body for a
 // six-by-six maximum and drives the live size from sliders.
-@CStruct
+@ValueType
 class Matrix {
   size: Vec2u;
   body: FixedArray<f32, 16>;
@@ -80,7 +80,7 @@ function multiplyKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
   }
 }
 
-export const multiply: ComputePipelineSpec = computePipeline<MatrixLayout>(
+const multiply: ComputePipelineSpec = computePipeline<MatrixLayout>(
   multiplyKernel,
   {
     name: "multiply",

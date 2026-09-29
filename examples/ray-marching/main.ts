@@ -48,7 +48,7 @@ import {
 
 // One corner of the full-surface triangle in normalized device coordinates.
 // TypeGPU reads the same three corners from a constant array inside its vertex stage.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -59,7 +59,7 @@ class Vertex {
 
 // The only uniform. time is in seconds and aspect is the window width over its height.
 // TypeGPU keeps time and the canvas resolution in two separate uniforms.
-@CStruct
+@ValueType
 class FrameData {
   time: f32;
   aspect: f32;
@@ -72,7 +72,7 @@ class FrameData {
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and uv becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -200,7 +200,7 @@ function sceneFragment(
 // The declaration ties the layout class, the two kernels, and the target format together.
 // The generator reads it at compile time and emits scene_WGSL into ./main.typegpu.
 // TypeGPU builds the equivalent shader at run time from the same functions.
-export const scene: RenderPipelineSpec = renderPipelineL<SceneLayout, Vertex, Varyings>(
+const scene: RenderPipelineSpec = renderPipelineL<SceneLayout, Vertex, Varyings>(
   sceneVertex,
   sceneFragment,
   { format: "bgra8unorm" },

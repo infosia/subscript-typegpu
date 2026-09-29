@@ -33,7 +33,7 @@ import {
 
 // The vertex schema. The generator lays it out for the vertex buffer and emits
 // `Vertex_STRIDE`, the byte distance between two vertices.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -44,7 +44,7 @@ class Vertex {
 
 // The record that travels from the vertex stage to the fragment stage. The `position`
 // field carries the clip-space position builtin, and `uv` takes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -79,7 +79,7 @@ function tilesFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
 
 // The declaration pairs the two kernels and fixes the target format. The generator reads
 // it and emits the WGSL and the constants of `main.typegpu` before the program runs.
-export const tiles: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const tiles: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
   tilesVertex,
   tilesFragment,
   { format: "bgra8unorm" },

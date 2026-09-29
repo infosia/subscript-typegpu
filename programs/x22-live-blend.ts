@@ -37,7 +37,7 @@ import {
 const SIZE: i32 = 64;
 const EDGE_MARGIN: f32 = 0.0025;
 
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
   color: Vec4f;
@@ -48,7 +48,7 @@ class Vertex {
   }
 }
 
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   color: Vec4f;
@@ -70,7 +70,7 @@ function fragmentStep(value: Varyings, ctx: FragmentInvocation): Vec4f {
   return value.color;
 }
 
-export const blendLive: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const blendLive: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
   vertexStep,
   fragmentStep,
   {

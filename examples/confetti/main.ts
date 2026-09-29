@@ -52,7 +52,7 @@ const PARTICLE_COUNT: u32 = 64;
 
 // One corner of the card, in normalized device coordinates around the particle center.
 // The four corners form a triangle strip, and every instance reuses the same four.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -63,7 +63,7 @@ class Vertex {
 
 // One instance record. One buffer holds them all. The update kernel binds it as mutable
 // storage, and the draw reads it as the instance stream, so no copy moves between passes.
-@CStruct
+@ValueType
 class Particle {
   position: Vec2f;
   velocity: Vec2f;
@@ -80,7 +80,7 @@ class Particle {
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and color becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   color: Vec4f;
@@ -157,7 +157,7 @@ function confettiFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
 // TypeGPU uses a guarded pipeline. This port keeps the guard and dispatches the exact
 // particle thread count through `dispatchThreads`. The generator wraps the body in a
 // bounds test against a hidden uniform, which `dispatchThreads` writes before the pass.
-export const confettiUpdate: ComputePipelineSpec = computePipeline<ParticleLayout>(
+const confettiUpdate: ComputePipelineSpec = computePipeline<ParticleLayout>(
   updateParticles,
   { name: "confettiUpdate", workgroupSize: [64, 1, 1], guarded: true },
 );
@@ -165,7 +165,7 @@ export const confettiUpdate: ComputePipelineSpec = computePipeline<ParticleLayou
 // The instanced declaration takes the vertex schema first and the instance schema second.
 // Slot 0 steps per vertex and slot 1 steps per instance. The strip draws one card in four
 // vertices, so the draw below needs no index buffer.
-export const confettiRender: RenderPipelineSpec = renderPipelineInstanced<
+const confettiRender: RenderPipelineSpec = renderPipelineInstanced<
   Vertex,
   Particle,
   Varyings

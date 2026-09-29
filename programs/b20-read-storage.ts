@@ -57,7 +57,7 @@ function readStorageKernel(res: ReadStorageLayout, ctx: ComputeInvocation): void
   res.target.store(coords, source.add(target));
 }
 
-export const readStorage: ComputePipelineSpec = computePipeline<ReadStorageLayout>(
+const readStorage: ComputePipelineSpec = computePipeline<ReadStorageLayout>(
   readStorageKernel,
   { name: "readStorage", workgroupSize: [2, 2, 1] },
 );

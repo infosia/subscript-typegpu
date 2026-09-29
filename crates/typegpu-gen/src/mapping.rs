@@ -786,9 +786,12 @@ mod tests {
         let path = root.join("lib/typegpu-types.ts");
         let source = std::fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-        let module =
-            subscript_compiler::check_program(&[SourceFile::new("typegpu-types.ts", source)])
-                .expect("check typegpu-types.ts");
+        // The library exports classes, so an empty module is the entry module.
+        let module = subscript_compiler::check_program(&[
+            SourceFile::new("typegpu-types.ts", source),
+            SourceFile::entry("entry.ts", ""),
+        ])
+        .expect("check typegpu-types.ts");
         let hir = module
             .classes
             .iter()

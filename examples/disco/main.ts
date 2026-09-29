@@ -54,7 +54,7 @@ import {
 
 // The vertex record. The generator emits Vertex_STRIDE from this class, so the host code
 // never counts bytes.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -65,7 +65,7 @@ class Vertex {
 
 // The per-frame uniform. `time` carries seconds derived from the frame count, and
 // `resolution` carries the surface size in pixels.
-@CStruct
+@ValueType
 class FrameData {
   time: f32;
   resolution: Vec2f;
@@ -78,7 +78,7 @@ class FrameData {
 
 // The inter-stage record. The field named `position` becomes the clip-space builtin, and
 // `uv` becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -233,19 +233,19 @@ function kaleidoscopeFragment(
 
 // Three declarations share one vertex stage and one layout class. The generator emits one
 // WGSL module per declaration, each with its own entry names and constants.
-export const rings: RenderPipelineSpec = renderPipelineL<DiscoLayout, Vertex, Varyings>(
+const rings: RenderPipelineSpec = renderPipelineL<DiscoLayout, Vertex, Varyings>(
   discoVertex,
   ringsFragment,
   { format: "bgra8unorm" },
 );
 
-export const swirl: RenderPipelineSpec = renderPipelineL<DiscoLayout, Vertex, Varyings>(
+const swirl: RenderPipelineSpec = renderPipelineL<DiscoLayout, Vertex, Varyings>(
   discoVertex,
   swirlFragment,
   { format: "bgra8unorm" },
 );
 
-export const kaleidoscope: RenderPipelineSpec = renderPipelineL<DiscoLayout, Vertex, Varyings>(
+const kaleidoscope: RenderPipelineSpec = renderPipelineL<DiscoLayout, Vertex, Varyings>(
   discoVertex,
   kaleidoscopeFragment,
   { format: "bgra8unorm" },

@@ -32,7 +32,7 @@ import {
   vecAdd_WORKGROUP_Z,
 } from "./b02-vecadd.typegpu";
 
-@CStruct
+@ValueType
 class Item {
   value: f32;
 
@@ -63,7 +63,7 @@ function vecAddKernel(res: VecAddLayout, ctx: ComputeInvocation): void {
   }
 }
 
-export const vecAdd: ComputePipelineSpec = computePipeline<VecAddLayout>(vecAddKernel, {
+const vecAdd: ComputePipelineSpec = computePipeline<VecAddLayout>(vecAddKernel, {
   name: "vecAdd",
   workgroupSize: [64, 1, 1],
 });

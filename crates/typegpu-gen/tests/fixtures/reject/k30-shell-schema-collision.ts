@@ -4,7 +4,7 @@
 
 import { ComputeInvocation, ComputePipelineSpec, computePipeline, MutStorage, Storage, WgslShellSpec, wgslShell } from "./typegpu";
 
-@CStruct
+@ValueType
 class textureSample {
   value: u32;
   constructor(value: u32) { this.value = value; }
@@ -18,7 +18,7 @@ class Layout { input: Storage<textureSample>; output: MutStorage<u32>; construct
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   res.output[0] = textureSample_(res.input[0].value);
 }
-export const rejected: ComputePipelineSpec = computePipeline<Layout>(kernel, {
+const rejected: ComputePipelineSpec = computePipeline<Layout>(kernel, {
   name: "rejected",
   workgroupSize: [1, 1, 1],
 });

@@ -154,7 +154,7 @@ question (P2 review M6), and the diagnostic sweep.
 
   subscript R37 rejects `x.$ += 1`, so a read-modify-write reads and
   writes in one statement: `x.$ = x.$ + 1`. subscript R37 also
-  forbids a write accessor on a `@CStruct` value class, so a swizzle
+  forbids a write accessor on a `@ValueType` value class, so a swizzle
   is a read accessor and never an assignment target.
 
   A spelling that subscript forbids stays as it is. `scale` stays

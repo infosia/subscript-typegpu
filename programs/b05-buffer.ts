@@ -14,7 +14,7 @@ import {
 } from "./webgpu";
 import { Particle_OFFSET_vel, Particle_STRIDE } from "./b05-buffer.typegpu";
 
-@CStruct
+@ValueType
 class Particle {
   pos: Vec3f;
   vel: Vec3f;

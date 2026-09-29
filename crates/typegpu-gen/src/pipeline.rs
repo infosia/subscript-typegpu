@@ -202,7 +202,7 @@ pub(crate) struct Layout {
 pub(crate) struct Pipeline {
     /// The module-level `const` name that carries the declaration.
     pub(crate) declaration: String,
-    /// The kernel function name, which becomes the WGSL entry point.
+    /// The kernel function's declaration symbol. Its source name is the WGSL entry point.
     pub(crate) entry: String,
     /// The workgroup size, from the descriptor literal.
     pub(crate) workgroup: [u32; 3],
@@ -478,7 +478,7 @@ fn assigns_field(statement: &Stmt, field: &str, parameter: &str) -> bool {
     if !matches!(obj.kind, ExprKind::This) || name != field {
         return false;
     }
-    matches!(&value.kind, ExprKind::Local(local) if local == parameter)
+    matches!(&value.kind, ExprKind::Local(local, _) if local == parameter)
 }
 
 /// Returns the position of `statement` when the statement carries one.
@@ -491,9 +491,12 @@ fn statement_pos(statement: &Stmt) -> Option<Pos> {
         | Stmt::While { pos, .. }
         | Stmt::For { pos, .. }
         | Stmt::ForOf { pos, .. }
-        | Stmt::Switch { pos, .. } => Some(pos.clone()),
+        | Stmt::Switch { pos, .. }
+        | Stmt::Throw { pos, .. }
+        | Stmt::Try { pos, .. }
+        | Stmt::Using { pos, .. } => Some(pos.clone()),
         Stmt::Break(pos) | Stmt::Continue(pos) => Some(pos.clone()),
-        _ => None,
+        Stmt::Block(body) => body.first().and_then(statement_pos),
     }
 }
 
@@ -603,7 +606,7 @@ pub(crate) fn layout(
         ));
     };
     let class = crate::class(module, id.0, "pipeline::layout", pos)?;
-    // A layout class is a plain class: not `@CStruct`, not `@Descriptor`, and not a library class
+    // A layout class is a plain class: not `@ValueType`, not `@Descriptor`, and not a library class
     // (PI3). The author never instantiates it.
     if class.is_value || class.is_descriptor || class.pos.file == "typegpu.ts" {
         return Err(diagnostic(
@@ -837,12 +840,16 @@ fn guarded_option(module: &Module, expr: &Expr) -> Result<bool, Diagnostic> {
     }
 }
 
-/// Returns the module-level function of this name, and `None` when the module declares none.
-pub(crate) fn function<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
+/// Returns the module-level function of this declaration symbol, and `None` when the module
+/// declares none.
+///
+/// A callee and a function reference carry the checker's declaration symbol, so the symbol and
+/// never the source name identifies the function.
+pub(crate) fn function<'a>(module: &'a Module, symbol: &str) -> Option<&'a Function> {
     module
         .functions
         .iter()
-        .find(|function| function.name == name)
+        .find(|function| function.symbol == symbol)
 }
 
 /// Returns the layout count of a `computePipeline` declaration function, and `None` for every
@@ -881,7 +888,7 @@ fn call_in_expr(module: &Module, expr: &Expr) -> bool {
         }
         ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => args.iter().any(|arg| call_in_expr(module, arg)),
         ExprKind::DescriptorLit { fields, .. } => fields.iter().flatten().any(|value| call_in_expr(module, value)),
-        ExprKind::Field { obj, .. } | ExprKind::JsonResultValue(obj) => call_in_expr(module, obj),
+        ExprKind::Field { obj, .. } => call_in_expr(module, obj),
         ExprKind::Index { obj, index, .. } => call_in_expr(module, obj) || call_in_expr(module, index),
         ExprKind::Template(parts) => parts.iter().any(|part| matches!(part, subscript_compiler::hir::TplPart::Expr(value) if call_in_expr(module, value))),
         ExprKind::Lambda { body, .. } => body.iter().any(|stmt| stmt_has_compute(module, stmt)),
@@ -937,7 +944,14 @@ fn stmt_has_compute(module: &Module, stmt: &Stmt) -> bool {
                     .flat_map(|case| &case.body)
                     .any(|stmt| stmt_has_compute(module, stmt))
         }
-        Stmt::Block(body) => body.iter().any(|stmt| stmt_has_compute(module, stmt)),
+        Stmt::Block(body) | Stmt::Using { body, .. } => {
+            body.iter().any(|stmt| stmt_has_compute(module, stmt))
+        }
+        Stmt::Try { body, handler, .. } => body
+            .iter()
+            .chain(handler)
+            .any(|stmt| stmt_has_compute(module, stmt)),
+        Stmt::Throw { value, .. } => call_in_expr(module, value),
         Stmt::Break(_) | Stmt::Continue(_) => false,
     }
 }
@@ -1009,14 +1023,17 @@ pub(crate) fn discover(
         // parameter count matches the form. Either failure here is a generator defect.
         let Some(kernel) = function(module, entry) else {
             diagnostics.push(generator_diagnostic(
-                format!("kernel `{entry}` disappeared from typed HIR"),
+                format!(
+                    "kernel `{}` disappeared from typed HIR",
+                    crate::source_name(entry)
+                ),
                 global.init.pos.clone(),
             ));
             continue;
         };
         if kernel.params.len() != arity + 1 {
             diagnostics.push(generator_diagnostic(
-                format!("kernel `{entry}` has an impossible parameter count"),
+                format!("kernel `{}` has an impossible parameter count", kernel.name),
                 kernel.pos.clone(),
             ));
             continue;
@@ -1041,7 +1058,10 @@ pub(crate) fn discover(
             && library_class(module, &invocation.ty).is_some();
         if !invocation_ok {
             diagnostics.push(generator_diagnostic(
-                format!("kernel `{entry}` lost its ComputeInvocation parameter"),
+                format!(
+                    "kernel `{}` lost its ComputeInvocation parameter",
+                    kernel.name
+                ),
                 invocation.pos.clone(),
             ));
             continue;

@@ -1,7 +1,7 @@
 // expected-rule: SC11
 import { BadName_OFFSET_bad_name } from "./sc11-underscore.typegpu";
 
-@CStruct
+@ValueType
 class BadName {
   bad_name: u32;
 

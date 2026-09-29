@@ -8,7 +8,7 @@ import { Vec3f } from "./typegpu-types";
 import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
 import { Particle_STRIDE } from "./b12-readback.typegpu";
 
-@CStruct
+@ValueType
 class Particle {
   mass: f32;
   pos: Vec3f;

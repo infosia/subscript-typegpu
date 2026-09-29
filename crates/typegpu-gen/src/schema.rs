@@ -89,7 +89,7 @@ fn matrix_shape(name: &str) -> Option<(u8, u8)> {
     })
 }
 
-/// Returns the class alignment override that `@CStruct({ align: n })` declares, for the C layout.
+/// Returns the class alignment override that `@ValueType({ align: n })` declares, for the C layout.
 fn class_alignment(class: &ClassDef) -> Option<u32> {
     class.alignment_override.as_ref().map(|value| value.value)
 }
@@ -503,7 +503,7 @@ pub(crate) fn discover(
                         diagnostics.push(diagnostic(
                             "SC10",
                             format!(
-                                "uniform schema `{}` {message}. Add `@CStruct({{ align: 16 }})` to the member class or wrap the array element",
+                                "uniform schema `{}` {message}. Add `@ValueType({{ align: 16 }})` to the member class or wrap the array element",
                                 schema.name
                             ),
                             schema.pos.clone(),

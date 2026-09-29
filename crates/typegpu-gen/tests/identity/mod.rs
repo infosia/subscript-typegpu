@@ -3,7 +3,7 @@ use subscript_compiler::SourceFile;
 #[test]
 fn missing_vec3_alignment_reports_both_offsets() {
     let library = r#"
-@CStruct
+@ValueType
 export class Vec3f {
   x: f32;
   y: f32;
@@ -20,7 +20,7 @@ export class Vec3f {
 import { Vec3f } from "./typegpu-types";
 import { Mixed_OFFSET_p } from "./identity.typegpu";
 
-@CStruct
+@ValueType
 class Mixed {
   a: f32;
   p: Vec3f;
@@ -33,7 +33,7 @@ class Mixed {
 "#;
     let diagnostics = subscript_typegpu_gen::generate(&[
         SourceFile::new("typegpu-types.ts", library),
-        SourceFile::new("identity.ts", program),
+        SourceFile::entry("identity.ts", program),
     ])
     .expect_err("missing Vec3f alignment must fail");
     let message = diagnostics
@@ -51,7 +51,7 @@ fn a_library_shaped_name_in_a_program_is_an_ordinary_schema() {
     let source = r#"
 import { Mat3x3f_OFFSET_value } from "./ordinary-name.typegpu";
 
-@CStruct
+@ValueType
 class Mat3x3f {
   value: f32;
 
@@ -70,7 +70,7 @@ class Mat3x3f {
 #[test]
 fn size_mismatch_names_sizes_without_a_pseudo_field() {
     let library = r#"
-@CStruct({ align: 16 })
+@ValueType({ align: 16 })
 export class Vec4f {
   x: f32;
   y: f32;
@@ -89,7 +89,7 @@ export class Vec4f {
 import { Vec4f } from "./typegpu-types";
 import { Root_SIZE } from "./size-mismatch.typegpu";
 
-@CStruct({ align: 16 })
+@ValueType({ align: 16 })
 class Padded {
   value: f32;
 
@@ -98,7 +98,7 @@ class Padded {
   }
 }
 
-@CStruct
+@ValueType
 class Root {
   head: Vec4f;
   items: FixedArray<Padded, 2>;
@@ -111,7 +111,7 @@ class Root {
 "#;
     let diagnostics = subscript_typegpu_gen::generate(&[
         SourceFile::new("typegpu-types.ts", library),
-        SourceFile::new("size-mismatch.ts", program),
+        SourceFile::entry("size-mismatch.ts", program),
     ])
     .expect_err("different total sizes must fail");
     let message = diagnostics

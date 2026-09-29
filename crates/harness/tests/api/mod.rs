@@ -107,9 +107,8 @@ fn invalid_program_imports_preserve_compiler_diagnostics() {
     std::fs::create_dir_all(&directory).expect("create invalid-program directory");
     let program = directory.join("invalid-import.ts");
     std::fs::write(&program, "import { UiContext } from ;").expect("write invalid import");
-    let error = subscript_typegpu_harness::load_program(&program)
-        .err()
-        .expect("invalid import must fail");
+    let error =
+        subscript_typegpu_harness::load_program(&program).expect_err("invalid import must fail");
     let diagnostics = error.diagnostics().expect("retain parser diagnostics");
     assert!(diagnostics.contains("invalid-import.ts"), "{diagnostics}");
     assert!(diagnostics.contains("S100"), "{diagnostics}");
@@ -127,7 +126,7 @@ fn live_typegpu_programs_receive_generated_support() {
     let program = directory.join("x99-layout.ts");
     std::fs::write(
         &program,
-        "import { Demo_SIZE } from \"./x99-layout.typegpu\";\n\n@CStruct\nclass Demo {\n  value: u32;\n\n  constructor(value: u32) {\n    this.value = value;\n  }\n}\n",
+        "import { Demo_SIZE } from \"./x99-layout.typegpu\";\n\n@ValueType\nclass Demo {\n  value: u32;\n\n  constructor(value: u32) {\n    this.value = value;\n  }\n}\n",
     )
     .expect("write live program");
     let files =

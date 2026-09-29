@@ -68,7 +68,7 @@ function uploadKernel(res: UploadLayout, ctx: ComputeInvocation): void {
   res.output[index] = res.source.sampleLevel(res.nearest, uv, 0.0);
 }
 
-export const uploadPass: ComputePipelineSpec = computePipeline<UploadLayout>(
+const uploadPass: ComputePipelineSpec = computePipeline<UploadLayout>(
   uploadKernel,
   { name: "uploadPass", workgroupSize: [8, 1, 1] },
 );

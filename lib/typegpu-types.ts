@@ -1,7 +1,7 @@
 // A two-component `f32` vector, WGSL `vec2<f32>`. A value class copies on assignment, on an
 // argument pass, and on a return. A kernel never runs the host bodies below: the generator
 // maps each method to a WGSL operator or builtin.
-@CStruct({ align: 8 })
+@ValueType({ align: 8 })
 export class Vec2f {
   x: f32;
   y: f32;
@@ -97,7 +97,7 @@ export class Vec2f {
 
 // A three-component `f32` vector, WGSL `vec3<f32>`. The C size is 16 and the WGSL size is 12.
 // A schema that puts a scalar field after a `Vec3f` field fails the layout check.
-@CStruct({ align: 16 })
+@ValueType({ align: 16 })
 export class Vec3f {
   x: f32;
   y: f32;
@@ -194,7 +194,7 @@ export class Vec3f {
 
 // A four-component `f32` vector, WGSL `vec4<f32>`. The C size and the WGSL size are both 16, so
 // a `Vec4f` field never moves the field after it.
-@CStruct({ align: 16 })
+@ValueType({ align: 16 })
 export class Vec4f {
   x: f32;
   y: f32;
@@ -288,7 +288,7 @@ export class Vec4f {
 
 // A two-component `i32` vector, WGSL `vec2<i32>`. The integer vectors carry no `length`,
 // `normalize`, or transcendental method, because WGSL defines those for float types only.
-@CStruct({ align: 8 })
+@ValueType({ align: 8 })
 export class Vec2i {
   x: i32;
   y: i32;
@@ -320,7 +320,7 @@ export class Vec2i {
 
 // A three-component `i32` vector, WGSL `vec3<i32>`. The C size is 16 and the WGSL size is 12, as
 // with `Vec3f`.
-@CStruct({ align: 16 })
+@ValueType({ align: 16 })
 export class Vec3i {
   x: i32;
   y: i32;
@@ -354,7 +354,7 @@ export class Vec3i {
 }
 
 // A four-component `i32` vector, WGSL `vec4<i32>`.
-@CStruct({ align: 16 })
+@ValueType({ align: 16 })
 export class Vec4i {
   x: i32;
   y: i32;
@@ -397,7 +397,7 @@ export class Vec4i {
 }
 
 // A two-component `u32` vector, WGSL `vec2<u32>`.
-@CStruct({ align: 8 })
+@ValueType({ align: 8 })
 export class Vec2u {
   x: u32;
   y: u32;
@@ -426,7 +426,7 @@ export class Vec2u {
 
 // A three-component `u32` vector, WGSL `vec3<u32>`. The C size is 16 and the WGSL size is 12, as
 // with `Vec3f`.
-@CStruct({ align: 16 })
+@ValueType({ align: 16 })
 export class Vec3u {
   x: u32;
   y: u32;
@@ -459,7 +459,7 @@ export class Vec3u {
 }
 
 // A four-component `u32` vector, WGSL `vec4<u32>`.
-@CStruct({ align: 16 })
+@ValueType({ align: 16 })
 export class Vec4u {
   x: u32;
   y: u32;
@@ -503,7 +503,7 @@ export class Vec4u {
 // A two-component boolean mask, WGSL `vec2<bool>`. A comparison method builds one, and `select`
 // reads it. A `Vec2b` field in a schema is a diagnostic, because WGSL `bool` has no
 // host-shareable layout.
-@CStruct
+@ValueType
 export class Vec2b {
   x: boolean;
   y: boolean;
@@ -519,7 +519,7 @@ export class Vec2b {
 }
 
 // A three-component boolean mask, WGSL `vec3<bool>`.
-@CStruct
+@ValueType
 export class Vec3b {
   x: boolean;
   y: boolean;
@@ -537,7 +537,7 @@ export class Vec3b {
 }
 
 // A four-component boolean mask, WGSL `vec4<bool>`.
-@CStruct
+@ValueType
 export class Vec4b {
   x: boolean;
   y: boolean;
@@ -559,7 +559,7 @@ export class Vec4b {
 // A two-component `f16` vector, WGSL `vec2<f16>`. The `f16` vectors declare no arithmetic,
 // because subscript treats `f16` as storage only. A module that names an `f16` type opens with
 // `enable f16;`.
-@CStruct({ align: 4 })
+@ValueType({ align: 4 })
 export class Vec2h {
   x: f16;
   y: f16;
@@ -571,7 +571,7 @@ export class Vec2h {
 }
 
 // A three-component `f16` vector, WGSL `vec3<f16>`. The C size is 8 and the WGSL size is 6.
-@CStruct({ align: 8 })
+@ValueType({ align: 8 })
 export class Vec3h {
   x: f16;
   y: f16;
@@ -585,7 +585,7 @@ export class Vec3h {
 }
 
 // A four-component `f16` vector, WGSL `vec4<f16>`.
-@CStruct({ align: 8 })
+@ValueType({ align: 8 })
 export class Vec4h {
   x: f16;
   y: f16;
@@ -603,7 +603,7 @@ export class Vec4h {
 // A `u32` cell for atomic access, WGSL `atomic<u32>`. `add`, `sub`, `min`, `max`, and `exchange`
 // return the value from before the update. The receiver must be a place in a storage binding or
 // a workgroup variable.
-@CStruct({ align: 4 })
+@ValueType({ align: 4 })
 export class AtomicU32 {
   value: u32;
 
@@ -656,7 +656,7 @@ export class AtomicU32 {
 
 // An `i32` cell for atomic access, WGSL `atomic<i32>`. A kernel cannot copy a schema that holds
 // an atomic into a local, and cannot write one as a whole value.
-@CStruct({ align: 4 })
+@ValueType({ align: 4 })
 export class AtomicI32 {
   value: i32;
 
@@ -709,7 +709,7 @@ export class AtomicI32 {
 
 // A 2x2 `f32` matrix, WGSL `mat2x2<f32>`. Each field is one column, because WGSL matrices are
 // column-major.
-@CStruct({ align: 8 })
+@ValueType({ align: 8 })
 export class Mat2x2f {
   c0: Vec2f;
   c1: Vec2f;
@@ -742,7 +742,7 @@ export class Mat2x2f {
 
 // A 3x3 `f32` matrix, WGSL `mat3x3<f32>`. Each column is a `Vec3f` with a 4-byte tail, so the
 // size is 48 bytes, not 36.
-@CStruct({ align: 16 })
+@ValueType({ align: 16 })
 export class Mat3x3f {
   c0: Vec3f;
   c1: Vec3f;
@@ -780,7 +780,7 @@ export class Mat3x3f {
 }
 
 // A 4x4 `f32` matrix, WGSL `mat4x4<f32>`. The size is 64 bytes.
-@CStruct({ align: 16 })
+@ValueType({ align: 16 })
 export class Mat4x4f {
   c0: Vec4f;
   c1: Vec4f;
@@ -936,7 +936,7 @@ export function mat4x4fIdentity(): Mat4x4f {
 
 // The argument block of an indirect dispatch, 12 bytes in the order WebGPU fixes. A program
 // writes it with `Context.bytesOf` into a buffer that carries `GPUBufferUsage.INDIRECT`.
-@CStruct
+@ValueType
 export class DispatchIndirectArgs {
   x: u32;
   y: u32;
@@ -950,7 +950,7 @@ export class DispatchIndirectArgs {
 }
 
 // The argument block of an indirect draw, 16 bytes in the order WebGPU fixes.
-@CStruct
+@ValueType
 export class DrawIndirectArgs {
   vertexCount: u32;
   instanceCount: u32;
@@ -967,7 +967,7 @@ export class DrawIndirectArgs {
 
 // The argument block of an indirect indexed draw, 20 bytes. `baseVertex` is signed, and it
 // shifts every index the draw reads.
-@CStruct
+@ValueType
 export class DrawIndexedIndirectArgs {
   indexCount: u32;
   instanceCount: u32;

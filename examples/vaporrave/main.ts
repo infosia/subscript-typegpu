@@ -50,7 +50,7 @@ import {
 
 // One corner of the full-surface triangle in normalized device coordinates.
 // TypeGPU reads the same three corners from a constant array inside its vertex stage.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -61,7 +61,7 @@ class Vertex {
 
 // The only uniform. time is in seconds and aspect is the window width over its height.
 // TypeGPU keeps five uniforms, because its controls change the scene while it runs.
-@CStruct
+@ValueType
 class FrameData {
   time: f32;
   aspect: f32;
@@ -74,7 +74,7 @@ class FrameData {
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and uv becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -197,7 +197,7 @@ function vaporFragment(
 // The declaration ties the layout class, the two kernels, and the target format together.
 // The generator reads it at compile time and emits vapor_WGSL into ./main.typegpu.
 // TypeGPU rebuilds its pipeline whenever the floor pattern control changes.
-export const vapor: RenderPipelineSpec = renderPipelineL<VaporLayout, Vertex, Varyings>(
+const vapor: RenderPipelineSpec = renderPipelineL<VaporLayout, Vertex, Varyings>(
   vaporVertex,
   vaporFragment,
   { format: "bgra8unorm" },

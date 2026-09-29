@@ -228,54 +228,6 @@ fn render_webgpu_table(declarations: &str) -> Result<String, crate::policy::Poli
     Ok(out)
 }
 
-#[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::unreachable,
-    clippy::todo,
-    clippy::unimplemented,
-    clippy::indexing_slicing
-)]
-mod tests {
-    use super::render_webgpu_table;
-
-    #[test]
-    fn malformed_declarations_return_internal_errors() {
-        for declaration in [
-            "fn broken;",
-            "fn broken(;",
-            "fn broken)(;",
-            "fn broken(value);",
-        ] {
-            let error = super::function_signatures(declaration).err().unwrap();
-            assert!(error
-                .to_string()
-                .starts_with("internal: emit_rust::function_signatures:"));
-        }
-    }
-
-    #[test]
-    fn function_table_accepts_docs_and_function_pointer_parameters() {
-        let declarations = r#"
-            /// A declaration with a function-pointer parameter.
-            fn wgpuWithCallback(
-                callback: Option<unsafe extern "C" fn(i32, *mut std::ffi::c_void)>,
-                userdata: *mut std::ffi::c_void,
-            );
-            /// A documented scalar declaration.
-            fn wgpuDocumented(value: u32) -> u32;
-        "#;
-        let table = render_webgpu_table(declarations).unwrap();
-        assert!(table.contains("wgpuWithCallback: unsafe extern \"C\" fn"));
-        assert!(table.contains("wgpuDocumented: unsafe extern \"C\" fn"));
-        assert!(table.contains("(table.wgpuWithCallback)(callback, userdata)"));
-        assert!(table.contains("pub(crate) is_yawgpu: bool"));
-        assert!(table.contains("yawgpuDeviceCreateExternalTexture"));
-    }
-}
-
 /// Renders the whole `crates/facade/src/generated.rs` text from the resolved plan.
 ///
 /// The output holds the private webgpu.h types, the function table and its shims, the public
@@ -793,4 +745,52 @@ pub(crate) fn render(
         out.push_str(&handles::rust_release_export(object, plan.device_events));
     }
     Ok(out)
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::indexing_slicing
+)]
+mod tests {
+    use super::render_webgpu_table;
+
+    #[test]
+    fn malformed_declarations_return_internal_errors() {
+        for declaration in [
+            "fn broken;",
+            "fn broken(;",
+            "fn broken)(;",
+            "fn broken(value);",
+        ] {
+            let error = super::function_signatures(declaration).err().unwrap();
+            assert!(error
+                .to_string()
+                .starts_with("internal: emit_rust::function_signatures:"));
+        }
+    }
+
+    #[test]
+    fn function_table_accepts_docs_and_function_pointer_parameters() {
+        let declarations = r#"
+            /// A declaration with a function-pointer parameter.
+            fn wgpuWithCallback(
+                callback: Option<unsafe extern "C" fn(i32, *mut std::ffi::c_void)>,
+                userdata: *mut std::ffi::c_void,
+            );
+            /// A documented scalar declaration.
+            fn wgpuDocumented(value: u32) -> u32;
+        "#;
+        let table = render_webgpu_table(declarations).unwrap();
+        assert!(table.contains("wgpuWithCallback: unsafe extern \"C\" fn"));
+        assert!(table.contains("wgpuDocumented: unsafe extern \"C\" fn"));
+        assert!(table.contains("(table.wgpuWithCallback)(callback, userdata)"));
+        assert!(table.contains("pub(crate) is_yawgpu: bool"));
+        assert!(table.contains("yawgpuDeviceCreateExternalTexture"));
+    }
 }

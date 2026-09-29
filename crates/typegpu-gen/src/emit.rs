@@ -490,7 +490,7 @@ pub(crate) fn support_module(
              export const {name}_HOST_RUNNABLE: boolean = {host_runnable};\n",
             name = pipeline.declaration,
             wgsl = escape_string(text),
-            entry = crate::mapping::ident(&pipeline.entry),
+            entry = crate::mapping::ident(crate::base_name(&pipeline.entry)),
             x = pipeline.workgroup[0],
             y = pipeline.workgroup[1],
             z = pipeline.workgroup[2],
@@ -521,8 +521,8 @@ pub(crate) fn support_module(
              export const {name}_TARGET_FORMAT: GPUTextureFormat = \"{format}\";\n",
             name = pipeline.declaration,
             wgsl = escape_string(text),
-            vertex = crate::mapping::ident(&pipeline.vertex_entry),
-            fragment = crate::mapping::ident(&pipeline.fragment_entry),
+            vertex = crate::mapping::ident(crate::base_name(&pipeline.vertex_entry)),
+            fragment = crate::mapping::ident(crate::base_name(&pipeline.fragment_entry)),
             format = pipeline.target_format,
         ));
         if let Some(index_format) = &pipeline.index_format {

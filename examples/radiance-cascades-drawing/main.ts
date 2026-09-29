@@ -121,7 +121,7 @@ const DISPLAY_SDF: u32 = 2;
 
 // One clip-space corner of the full-screen triangle. The generator derives the vertex
 // attribute layout and the `Vertex_STRIDE` byte stride from this class.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -132,7 +132,7 @@ class Vertex {
 
 // One stroke segment per frame: the previous point, the current point, and the edit mode.
 // Both points are in scene units of [0, 1].
-@CStruct
+@ValueType
 class BrushParams {
   previous: Vec2f;
   current: Vec2f;
@@ -147,7 +147,7 @@ class BrushParams {
 
 // The jump-flood offset in pixels. Each step owns a buffer with a constant value, so the
 // nine dispatches differ only by their bind group.
-@CStruct
+@ValueType
 class StepParams {
   offset: i32;
 
@@ -158,7 +158,7 @@ class StepParams {
 
 // The per-layer uniform. `init` writes one buffer per layer once, so the five cascade
 // dispatches of a frame differ only by their bind group.
-@CStruct
+@ValueType
 class CascadeParams {
   layer: u32;
   probes: u32;
@@ -175,7 +175,7 @@ class CascadeParams {
 
 // The display mode. Two buffers hold the two values, so a key press selects a bind group
 // and writes no uniform.
-@CStruct
+@ValueType
 class RenderParams {
   mode: u32;
 
@@ -186,7 +186,7 @@ class RenderParams {
 
 // The vertex output. The `Vec4f` field named `position` becomes the WGSL builtin position,
 // and every other field becomes an interpolated location.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -703,39 +703,39 @@ function drawingFragment(
 // The seven declarations are the generator's input. It walks the typed program before the
 // run and emits `main.typegpu.ts`: the WGSL text, the entry names, and the layout specs.
 // TypeGPU resolves the same shaders from the kernel functions at run time.
-export const sceneEdit: ComputePipelineSpec = computePipeline<SceneEditLayout>(
+const sceneEdit: ComputePipelineSpec = computePipeline<SceneEditLayout>(
   sceneEditKernel,
   { name: "sceneEdit", workgroupSize: [8, 8, 1] },
 );
 
-export const floodSeed: ComputePipelineSpec = computePipeline<FloodSeedLayout>(
+const floodSeed: ComputePipelineSpec = computePipeline<FloodSeedLayout>(
   floodSeedKernel,
   { name: "floodSeed", workgroupSize: [8, 8, 1] },
 );
 
-export const floodStep: ComputePipelineSpec = computePipeline<FloodStepLayout>(
+const floodStep: ComputePipelineSpec = computePipeline<FloodStepLayout>(
   floodStepKernel,
   { name: "floodStep", workgroupSize: [8, 8, 1] },
 );
 
-export const floodDerive: ComputePipelineSpec = computePipeline<FloodDeriveLayout>(
+const floodDerive: ComputePipelineSpec = computePipeline<FloodDeriveLayout>(
   floodDeriveKernel,
   { name: "floodDerive", workgroupSize: [8, 8, 1] },
 );
 
-export const cascadePass: ComputePipelineSpec = computePipeline<CascadeLayout>(
+const cascadePass: ComputePipelineSpec = computePipeline<CascadeLayout>(
   cascadeKernel,
   { name: "cascadePass", workgroupSize: [16, 16, 1] },
 );
 
-export const fieldBuild: ComputePipelineSpec = computePipeline<FieldLayout>(fieldKernel, {
+const fieldBuild: ComputePipelineSpec = computePipeline<FieldLayout>(fieldKernel, {
   name: "fieldBuild",
   workgroupSize: [16, 16, 1],
 });
 
 // `renderPipelineL` adds the layout class, so both stages read `RenderLayout`. The target
 // format belongs to the declaration, and `init` checks the surface format against it.
-export const radianceDrawingRender: RenderPipelineSpec = renderPipelineL<
+const radianceDrawingRender: RenderPipelineSpec = renderPipelineL<
   RenderLayout,
   Vertex,
   Varyings

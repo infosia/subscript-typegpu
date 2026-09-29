@@ -64,7 +64,7 @@ const COMPARATOR_COUNT: u32 = VALUE_COUNT / 2;
 
 // One corner of the full-surface triangle in normalized device coordinates.
 // TypeGPU takes the same triangle from a shared vertex helper.
-@CStruct
+@ValueType
 class FullscreenVertex {
   position: Vec2f;
 
@@ -75,7 +75,7 @@ class FullscreenVertex {
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and uv becomes location 0.
-@CStruct
+@ValueType
 class DisplayVaryings {
   position: Vec4f;
   uv: Vec2f;
@@ -127,7 +127,7 @@ function displayFragment(
 
 // The kernel and its layout come from the sort library, so this example declares only the
 // pipeline. 2048 comparators divide by 256 exactly, so the dispatch needs no guard.
-export const bitonicStepPipeline: ComputePipelineSpec = computePipeline<
+const bitonicStepPipeline: ComputePipelineSpec = computePipeline<
   BitonicSortResources
 >(bitonicSortStep, {
   name: "bitonicStepPipeline",
@@ -136,7 +136,7 @@ export const bitonicStepPipeline: ComputePipelineSpec = computePipeline<
 
 // The declaration ties the layout class, the two kernels, and the target format together.
 // The generator reads it at compile time and emits bitonicDisplay_WGSL into ./main.typegpu.
-export const bitonicDisplay: RenderPipelineSpec = renderPipelineL<
+const bitonicDisplay: RenderPipelineSpec = renderPipelineL<
   BitonicDisplayResources,
   FullscreenVertex,
   DisplayVaryings

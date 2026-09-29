@@ -2,4 +2,4 @@
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
 class Layout { bad: Storage<string>; constructor(bad: Storage<string>) { this.bad = bad; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {}
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });

@@ -60,11 +60,11 @@ is revised in §10, never patched silently.
   Kill evidence: a program the generator cannot partition into host
   and GPU parts without a marker the language lacks.
 - **D4 — The schema class is the host type.** The author writes one
-  `@CStruct` class. Host code constructs it, fills `FixedArray<T, N>`
+  `@ValueType` class. Host code constructs it, fills `FixedArray<T, N>`
   of it, and passes it to a buffer. The generator checks that the C
   layout equals the WGSL layout and emits a named diagnostic when it
   does not. Layout identity for vector members needs an alignment
-  override on `@CStruct`. The owner decided on 2026-08-22 that
+  override on `@ValueType`. The owner decided on 2026-08-22 that
   subscript gains it (request R33). Kill evidence: a WGSL layout that
   no aligned C struct can reproduce. None is known for the planned
   schema set.
@@ -76,7 +76,7 @@ is revised in §10, never patched silently.
 - **D6 — Three independent layout checks.** Golden vectors computed
   by upstream TypeGPU, naga's reported offsets for the emitted WGSL,
   and subscript's ship-tier `offsetof` verification of the
-  `@CStruct` class. Kill evidence: two checks that cannot disagree by
+  `@ValueType` class. Kill evidence: two checks that cannot disagree by
   construction.
 - **D7 — The kernel library is ordinary subscript with real bodies.**
   `Vec3f.add`, `dot`, `normalize`, and the rest have CPU bodies and
@@ -117,8 +117,8 @@ P0 and P1 can start. Names are provisional until `schema.md` and
 import { Vec3f, vec3f, Uniform, Storage, MutStorage, GlobalInvocationId,
          computePipeline } from "./typegpu";
 
-@CStruct class Params { dt: f32; count: u32; }
-@CStruct class Particle { pos: Vec3f; vel: Vec3f; }
+@ValueType class Params { dt: f32; count: u32; }
+@ValueType class Particle { pos: Vec3f; vel: Vec3f; }
 
 class StepLayout {                       // one class per bind group
   params: Uniform<Params>;               // binding 0
@@ -308,7 +308,7 @@ facade staticlib carries `libloading` and nothing else, so the
 |---|---|
 | No Proxy, Reflect, Symbol, eval (subscript, permanent) | All TypeGPU run-time machinery becomes generator output (D1) |
 | Generics: explicit type arguments, no inference, constraints not enforced (subscript) | Every generic use is spelled `Buffer<Particle>`. Library functions that need a type per instantiation are methods on the type |
-| `@CStruct` fields: sized numerics, bool, value classes, `FixedArray`, enums (subscript) | Vectors and matrices are `@CStruct` value classes. Layout identity needs alignment control — risk RC-1 |
+| `@ValueType` fields: sized numerics, bool, value classes, `FixedArray`, enums (subscript) | Vectors and matrices are `@ValueType` value classes. Layout identity needs alignment control — risk RC-1 |
 | No typed arrays, no `ArrayBuffer` (subscript) | The host-to-GPU path is a `FixedArray<T, N>` or `T[]` of schema values. The facade copies from the value's bytes |
 | No operator overloading (subscript) | `a.add(b)`, `a.scale(s)`, `a.dot(b)` (D7). Scalars use native operators |
 | Imports: `./sibling` only, one global class namespace (subscript) | The runtime library is two files beside the program. Library class names carry no prefix. The harness injects them as `SourceFile`s |
@@ -558,7 +558,7 @@ inside a shell is attributed by name through recorded line spans;
 the guard covers three axes and rides the layout spec as a `guard`
 entry, so the runtime owns the hidden buffer without a generated
 class; render indirect draws stay in the API layer; the indirect
-argument blocks are `@CStruct` schemas.
+argument blocks are `@ValueType` schemas.
 
 Programs: `b14-wgsl-shell`, `b15-guarded-dispatch`, `b16-indirect`,
 `b17-index-cull`, `x15-live-shell` (GPU shell result against the
@@ -910,7 +910,7 @@ The record is `specs/tracking/imgui.md`.
 
 | Id | Risk | Mitigation / trigger |
 |---|---|---|
-| RC-1 | ~~`@CStruct` has no alignment control~~ **Closed 2026-08-22.** R33 landed in subscript at `ba6aa2e` (compiler.md §62): `@CStruct({ align: N })`, `N` in `{2, 4, 8, 16}`, both tiers, `offsetof` proof for `Vec3f` 16/16, `Mixed` 32/16, `Mat3x3f` 48/16, `Vec2f` 8/8, measured on clang and MSVC | P0 slice 2 re-pins subscript to `ba6aa2e`. P1's layout gate is the end-to-end check, because `a141` pins values, not alignment numbers |
+| RC-1 | ~~`@ValueType` has no alignment control~~ **Closed 2026-08-22.** R33 landed in subscript at `ba6aa2e` (compiler.md §62): `@ValueType({ align: N })`, `N` in `{2, 4, 8, 16}`, both tiers, `offsetof` proof for `Vec3f` 16/16, `Mixed` 32/16, `Mat3x3f` 48/16, `Vec2f` 8/8, measured on clang and MSVC | P0 slice 2 re-pins subscript to `ba6aa2e`. P1's layout gate is the end-to-end check, because `a141` pins values, not alignment numbers |
 | RC-2 | ~~`computePipeline(fn, desc)` needs a function value of a named function and a descriptor literal in one expression~~ **Closed 2026-08-22.** The checker accepts `computePipeline<L>(step, { workgroupSize: [64, 1, 1] })` with a function-typed generic parameter | — |
 | RC-3 | A generic runtime class (`Buffer<T>`) needs per-`T` size and layout facts with no inference | The generator emits one `Layout` const per schema and the class takes it as a constructor argument |
 | RC-4 | `hir` is `#[non_exhaustive]`. A subscript re-pin adds a construct the emitter does not know | Wildcard arms emit a named diagnostic. The re-pin procedure runs the full gate |
@@ -971,7 +971,7 @@ here with the evidence, the date, and the corrected claim.
 
 ## 11. Open questions for the owner
 
-1. ~~**Alignment control in `@CStruct`** (RC-1).~~ Landed
+1. ~~**Alignment control in `@ValueType`** (RC-1).~~ Landed
    2026-08-22 as R33 at subscript `ba6aa2e`.
 2. **The kernel marker** (RC-2). The plan uses a pipeline declaration
    as the marker. A `'use gpu'` directive is valid TypeScript and

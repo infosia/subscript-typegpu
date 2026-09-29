@@ -58,7 +58,7 @@ function textureCopyKernel(res: TextureCopyLayout, ctx: ComputeInvocation): void
   res.target.store(new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32), color);
 }
 
-export const textureCopy: ComputePipelineSpec = computePipeline<TextureCopyLayout>(
+const textureCopy: ComputePipelineSpec = computePipeline<TextureCopyLayout>(
   textureCopyKernel,
   { name: "textureCopy", workgroupSize: [4, 4, 1] },
 );

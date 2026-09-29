@@ -36,7 +36,7 @@ import {
   Vertex_STRIDE,
 } from "./b08-render-bindings.typegpu";
 
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -45,7 +45,7 @@ class Vertex {
   }
 }
 
-@CStruct
+@ValueType
 class Offset {
   value: Vec4f;
 
@@ -54,7 +54,7 @@ class Offset {
   }
 }
 
-@CStruct
+@ValueType
 class Tint {
   value: Vec4f;
 
@@ -63,7 +63,7 @@ class Tint {
   }
 }
 
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
 
@@ -99,7 +99,7 @@ function frag(res: RenderLayout, input: Varyings, ctx: FragmentInvocation): Vec4
   return color.value;
 }
 
-export const shifted: RenderPipelineSpec = renderPipelineL<RenderLayout, Vertex, Varyings>(
+const shifted: RenderPipelineSpec = renderPipelineL<RenderLayout, Vertex, Varyings>(
   vert,
   frag,
   { format: "rgba8unorm" },

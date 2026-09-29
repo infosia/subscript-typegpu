@@ -159,7 +159,7 @@ fn wgsl_vector_layout(vector: &Vector) -> Layout {
 
 /// Returns the C layout of one vector (LY10).
 ///
-/// The natural alignment is the component size. An `@CStruct` alignment override raises it, and it
+/// The natural alignment is the component size. A `@ValueType` alignment override raises it, and it
 /// never lowers it. The size rounds up to the result.
 fn c_vector_layout(vector: &Vector) -> Layout {
     let component = vector.scalar.size();
@@ -179,7 +179,7 @@ fn c_vector_layout(vector: &Vector) -> Layout {
 /// Walks the members in declaration order and returns the struct layout (LY6, LY10).
 ///
 /// `member_layout` computes one member, so the same walk serves the WGSL side and the C side.
-/// `honor_override` raises the struct alignment by the `@CStruct` override, which the C side does
+/// `honor_override` raises the struct alignment by the `@ValueType` override, which the C side does
 /// and the WGSL side does not. Declaration order is layout order (SC2).
 fn struct_layout(
     structure: &Struct,

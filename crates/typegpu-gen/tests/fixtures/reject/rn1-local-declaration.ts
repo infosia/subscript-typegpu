@@ -1,11 +1,11 @@
 // expected-rule: RN1
 import { FragmentInvocation, RenderPipelineSpec, VertexInvocation, renderPipeline } from "./typegpu";
 import { Vec4f } from "./typegpu-types";
-@CStruct class Vertex {
+@ValueType class Vertex {
   position: Vec4f;
   constructor(position: Vec4f) { this.position = position; }
 }
-@CStruct class Varyings {
+@ValueType class Varyings {
   position: Vec4f;
   constructor(position: Vec4f) { this.position = position; }
 }

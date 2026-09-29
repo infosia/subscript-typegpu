@@ -256,3 +256,47 @@ Evidence at `93a4041`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
 242.8 s wall. The wall time includes a cold compile of the four
 subscript crates.
+
+### Re-pin to `2fa77ec` (2026-09-29)
+
+The workspace pin moves from `93a4041` to `2fa77ec`. The subscript
+range holds 75 commits, §115 through §130 and stdlib batches 1 to 5b.
+The `swc_ecma_parser` fork stays at `affcb6e`.
+
+Changes that reach this repository:
+
+- §130: the value class decorator is `@ValueType`. `@CStruct` is S100.
+  Every tracked file outside `specs/tracking/` uses the new spelling.
+  The mirror and `lib/webgpu.ts` do not contain the decorator.
+- §129: a program with several source files names its entry module.
+  The harness and `subscript-typegpu-gen` mark the entry. The entry
+  module exports functions only, so pipeline, render pipeline, and
+  shell declarations are module-level `const` without `export`
+  (PI1, RN1, K29 examples updated). The harness reads the host
+  entries from `module.host_entries`.
+- §125: callees and references carry a module symbol. The generator
+  matches `Function.symbol` and `Global.symbol`, and WGSL and
+  diagnostics use the source name. K14 Rev 9 rejects two program
+  declarations or two value classes that share one source name.
+  Fixtures: `k14-shared-source-name.ts`, `k14-shared-class-name.ts`.
+  Red for the class case: before the check, the generator used the
+  library `RandomF32` layout for a program `RandomF32` and emitted a
+  three-argument call to a two-field constructor, with no diagnostic.
+- §115: `Stmt::Using`, `Stmt::Try`, and `Stmt::Throw` exist. Every
+  walker descends into them. A kernel rejects `throw` and `try` under
+  K7 (fixtures `k17-throw.ts`, `k17-try.ts`).
+- HIR: `ExprKind::JsonResultValue` is removed, and `ExprKind::Local`
+  carries its type.
+- §124: `ComputePipeline.guard` in `lib/typegpu.ts` copies
+  `guardQueue` into a local before the null check and the loop.
+
+No WGSL golden and no `.expected` golden moved.
+
+Open: the shell scan in `crates/typegpu-gen/src/shell.rs` does not
+visit lambda bodies, async call arguments, or template parts, so a
+`wgslShell` call inside a lambda gets no K29 diagnostic. This
+predates the re-pin.
+
+Evidence at `2fa77ec`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
+397.2 s wall on a warm build (harness `tests/main.rs` 348.9 s).

@@ -28,7 +28,7 @@ import {
   liveSwitch_WORKGROUP_Z,
 } from "./x09-live-switch.typegpu";
 
-@CStruct
+@ValueType
 class SwitchValue {
   value: u32;
   constructor(value: u32) { this.value = value; }
@@ -59,7 +59,7 @@ function liveSwitchKernel(res: SwitchLayout, ctx: ComputeInvocation): void {
   res.output[ctx.globalId.x] = new SwitchValue(value);
 }
 
-export const liveSwitch: ComputePipelineSpec = computePipeline<SwitchLayout>(liveSwitchKernel, {
+const liveSwitch: ComputePipelineSpec = computePipeline<SwitchLayout>(liveSwitchKernel, {
   name: "liveSwitch",
   workgroupSize: [16, 1, 1],
 });

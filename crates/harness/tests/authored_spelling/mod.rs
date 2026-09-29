@@ -76,7 +76,7 @@ fn is_authored_method(source: &str, expression: &Expr, name: &str) -> bool {
     let Some(method) = suffix.find(&needle) else {
         return false;
     };
-    suffix.find('[').map_or(true, |index| method < index)
+    suffix.find('[').is_none_or(|index| method < index)
 }
 
 fn inspect_expr(
@@ -120,8 +120,7 @@ fn inspect_expr(
         ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
-        | ExprKind::Field { obj: operand, .. }
-        | ExprKind::JsonResultValue(operand) => visit!(operand),
+        | ExprKind::Field { obj: operand, .. } => visit!(operand),
         ExprKind::Binary { left, right, .. }
         | ExprKind::Assign {
             target: left,
@@ -170,11 +169,7 @@ fn inspect_expr(
         ExprKind::Lambda { body, .. } => {
             inspect_statements(module, source, body, source_name, display_name, failures);
         }
-        ExprKind::Yield(value) => {
-            if let Some(value) = value {
-                visit!(value);
-            }
-        }
+        ExprKind::Yield(Some(value)) => visit!(value),
         ExprKind::AsyncCall { callee, args } => {
             if let AsyncCallee::Method { receiver, .. } = callee {
                 visit!(receiver);
@@ -268,8 +263,15 @@ fn inspect_statements(
                     );
                 }
             }
-            Stmt::Block(body) => {
+            Stmt::Block(body) | Stmt::Using { body, .. } => {
                 inspect_statements(module, source, body, source_name, display_name, failures);
+            }
+            Stmt::Try { body, handler, .. } => {
+                inspect_statements(module, source, body, source_name, display_name, failures);
+                inspect_statements(module, source, handler, source_name, display_name, failures);
+            }
+            Stmt::Throw { value, .. } => {
+                inspect_expr(module, source, value, source_name, display_name, failures);
             }
             Stmt::Break(_) | Stmt::Continue(_) => {}
         }

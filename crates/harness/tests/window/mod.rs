@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use subscript_compiler::{hir, CheckOptions, Type};
 
@@ -23,8 +23,8 @@ fn example_programs() -> Vec<PathBuf> {
     programs
 }
 
-fn checked_example(program: &PathBuf) -> hir::Module {
-    let files = subscript_typegpu_harness::program_files(&program)
+fn checked_example(program: &Path) -> hir::Module {
+    let files = subscript_typegpu_harness::program_files(program)
         .unwrap_or_else(|error| panic!("load {}: {error}", program.display()));
     subscript_compiler::check_program_with(&files, &CheckOptions::default())
         .unwrap_or_else(|diagnostics| panic!("check {}: {diagnostics:?}", program.display()))
@@ -103,11 +103,11 @@ fn check_host_signatures(module: &hir::Module) {
         if *name != "init" {
             assert!(!function.is_async, "{name} must be synchronous");
         }
-        assert_eq!(type_name(&module, &function.ret), "void", "{name} return");
+        assert_eq!(type_name(module, &function.ret), "void", "{name} return");
         let actual = function
             .params
             .iter()
-            .map(|parameter| (parameter.name.as_str(), type_name(&module, &parameter.ty)))
+            .map(|parameter| (parameter.name.as_str(), type_name(module, &parameter.ty)))
             .collect::<Vec<_>>();
         let wanted = params
             .iter()

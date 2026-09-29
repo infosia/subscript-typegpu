@@ -44,7 +44,7 @@ function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
   res.state[0] = state;
 }
 
-export const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
+const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
   incrementCounter,
   {
     name: "firstProgram",
@@ -53,13 +53,13 @@ export const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
 );
 ```
 
-The kernel's state lives in a buffer. A `@CStruct` class shapes the
+The kernel's state lives in a buffer. A `@ValueType` class shapes the
 bytes, and a layout class names the bindings of one bind group.
 TypeGPU writes `d.struct({ ... })` and `root.createMutable(...)`
 for the same two roles.
 
 ```ts program=programs/b22-first-program.ts
-@CStruct
+@ValueType
 class State {
   counter: u32;
   incrementBy: u32;
@@ -103,7 +103,7 @@ with identical results.
 
 | | TypeGPU | subscript-typegpu |
 |---|---|---|
-| Schema | `d.struct({ ... })`, a run-time value | `@CStruct class`, a declaration |
+| Schema | `d.struct({ ... })`, a run-time value | `@ValueType class`, a declaration |
 | Memory layout | computed at run time | computed ahead of time, importable as constants |
 | WGSL | generated at run time from a compacted AST | generated ahead of time — the emitted WGSL sits next to your program as a readable file |
 | Kernel marker | `'use gpu'` directive and a build plugin | `computePipeline<L>(fn, spec)` declaration |

@@ -9,7 +9,7 @@ class RightLayout { right: MutStorage<u32>; constructor(right: MutStorage<u32>) 
 function guardedKernel(left: LeftLayout, right: RightLayout, ctx: ComputeInvocation): void {
   left.left[ctx.globalId.x] = right.right[ctx.globalId.x];
 }
-export const rejected: ComputePipelineSpec = computePipeline2<LeftLayout, RightLayout>(guardedKernel, {
+const rejected: ComputePipelineSpec = computePipeline2<LeftLayout, RightLayout>(guardedKernel, {
   name: "rejected",
   workgroupSize: [1, 1, 1],
   guarded: true,

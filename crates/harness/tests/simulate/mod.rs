@@ -2,7 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use subscript_compiler::hir::{AsyncCallee, Callee, Expr, ExprKind, Module, Stmt, TplPart};
+use subscript_compiler::hir::{
+    source_name, AsyncCallee, Callee, Expr, ExprKind, Module, Stmt, TplPart,
+};
 use subscript_compiler::CheckOptions;
 use subscript_typegpu_gen::Generated;
 
@@ -41,8 +43,9 @@ fn programs() -> Vec<PathBuf> {
     programs
 }
 
-fn simulation_spec_index(name: &str) -> Option<usize> {
-    Some(match name.split('<').next().unwrap_or(name) {
+fn simulation_spec_index(symbol: &str) -> Option<usize> {
+    let name = source_name(symbol);
+    Some(match name.split('<').next().unwrap_or(&name) {
         "simulateCompute" | "simulateComputeThreads" => 2,
         "simulateCompute2" => 3,
         "simulateCompute3" => 4,
@@ -60,6 +63,9 @@ fn statement_pos(statement: &Stmt) -> Option<&subscript_compiler::Pos> {
         | Stmt::For { pos, .. }
         | Stmt::ForOf { pos, .. }
         | Stmt::Switch { pos, .. }
+        | Stmt::Throw { pos, .. }
+        | Stmt::Try { pos, .. }
+        | Stmt::Using { pos, .. }
         | Stmt::Break(pos)
         | Stmt::Continue(pos) => Some(pos),
         Stmt::Expr(expression) => Some(&expression.pos),
@@ -67,10 +73,10 @@ fn statement_pos(statement: &Stmt) -> Option<&subscript_compiler::Pos> {
     }
 }
 
-fn is_library_simulation(module: &Module, name: &str) -> bool {
-    simulation_spec_index(name).is_some()
+fn is_library_simulation(module: &Module, symbol: &str) -> bool {
+    simulation_spec_index(symbol).is_some()
         && module.functions.iter().any(|function| {
-            function.name == name
+            function.symbol == symbol
                 && (function.pos.file == "typegpu.ts"
                     || function
                         .params
@@ -96,7 +102,8 @@ fn assert_pair(
     if !is_library_simulation(module, callee) {
         return;
     }
-    let method = callee.split('<').next().unwrap_or(callee);
+    let callee_name = source_name(callee);
+    let method = callee_name.split('<').next().unwrap_or(&callee_name);
     let Some(spec_index) = simulation_spec_index(callee) else {
         return;
     };
@@ -117,10 +124,13 @@ fn assert_pair(
         failures.push(format!("{call} does not pass a Global pipeline spec"));
         return;
     };
+    let declaration = source_name(declaration);
+    let kernel_symbol = kernel;
+    let kernel = source_name(kernel_symbol);
     let Some(pipeline) = generated
         .compute_pipelines
         .iter()
-        .find(|pipeline| pipeline.declaration == *declaration && pipeline.kernel == *kernel)
+        .find(|pipeline| pipeline.declaration == declaration && pipeline.kernel == *kernel_symbol)
     else {
         failures.push(format!(
             "{call} pairs kernel `{kernel}` with pipeline `{declaration}`"
@@ -136,9 +146,10 @@ fn assert_pair(
         failures.push(format!("{call} does not pass Global `{expected}`"));
         return;
     };
-    if constant != &expected {
+    if source_name(constant) != expected {
         failures.push(format!(
-            "{call} passes `{constant}`, expected `{expected}` for kernel `{kernel}`"
+            "{call} passes `{}`, expected `{expected}` for kernel `{kernel}`",
+            source_name(constant)
         ));
         return;
     }
@@ -149,7 +160,11 @@ fn assert_pair(
             .and_then(|stem| stem.to_str())
             .expect("UTF-8 program stem"),
     );
-    let Some(global) = module.globals.iter().find(|global| global.name == expected) else {
+    let Some(global) = module
+        .globals
+        .iter()
+        .find(|global| global.symbol == *constant)
+    else {
         failures.push(format!("{call} cannot resolve Global `{expected}`"));
         return;
     };
@@ -201,8 +216,7 @@ fn visit_expr(
         ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
-        | ExprKind::Field { obj: operand, .. }
-        | ExprKind::JsonResultValue(operand) => visit!(operand),
+        | ExprKind::Field { obj: operand, .. } => visit!(operand),
         ExprKind::Binary { left, right, .. }
         | ExprKind::Assign {
             target: left,
@@ -257,11 +271,7 @@ fn visit_expr(
             failures,
             simulation_calls,
         ),
-        ExprKind::Yield(value) => {
-            if let Some(value) = value {
-                visit!(value);
-            }
-        }
+        ExprKind::Yield(Some(value)) => visit!(value),
         ExprKind::AsyncCall { callee, args } => {
             if let AsyncCallee::Method { receiver, .. } = callee {
                 visit!(receiver);
@@ -409,7 +419,7 @@ fn visit_statements(
                     );
                 }
             }
-            Stmt::Block(body) => visit_statements(
+            Stmt::Block(body) | Stmt::Using { body, .. } => visit_statements(
                 program,
                 program_name,
                 module,
@@ -418,6 +428,20 @@ fn visit_statements(
                 failures,
                 simulation_calls,
             ),
+            Stmt::Try { body, handler, .. } => {
+                for statements in [body, handler] {
+                    visit_statements(
+                        program,
+                        program_name,
+                        module,
+                        generated,
+                        statements,
+                        failures,
+                        simulation_calls,
+                    );
+                }
+            }
+            Stmt::Throw { value, .. } => visit!(value),
             Stmt::Break(_) | Stmt::Continue(_) => {}
         }
     }

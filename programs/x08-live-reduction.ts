@@ -32,13 +32,13 @@ import {
   reduction_WORKGROUP_Z,
 } from "./x08-live-reduction.typegpu";
 
-@CStruct
+@ValueType
 class ReductionValue {
   value: f32;
   constructor(value: f32) { this.value = value; }
 }
 
-@CStruct
+@ValueType
 class ReductionCounter {
   total: AtomicU32;
   constructor(total: AtomicU32) { this.total = total; }
@@ -74,7 +74,7 @@ function reductionKernel(res: ReductionLayout, ctx: ComputeInvocation): void {
   }
 }
 
-export const reduction: ComputePipelineSpec = computePipeline<ReductionLayout>(reductionKernel, {
+const reduction: ComputePipelineSpec = computePipeline<ReductionLayout>(reductionKernel, {
   name: "reduction",
   workgroupSize: [256, 1, 1],
 });

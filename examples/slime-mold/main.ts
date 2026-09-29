@@ -84,7 +84,7 @@ const TRAIL_DECAY: f32 = 0.96;
 const TAU: f32 = 6.2831855;
 
 // One corner of the render strip. The generator derives `Vertex_STRIDE` from this class.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -95,7 +95,7 @@ class Vertex {
 
 // One agent. The position counts trail cells, the heading counts radians, and `randomState`
 // carries the PRNG state forward. TypeGPU stores position and angle and reseeds from the index.
-@CStruct
+@ValueType
 class Agent {
   position: Vec2f;
   heading: f32;
@@ -109,7 +109,7 @@ class Agent {
 }
 
 // The vertex output. `position` is clip space and `uv` runs 0 to 1 across the surface.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -297,17 +297,17 @@ function slimeFragment(
 // The three declarations name the kernel, the layout type, and the workgroup size. The generator
 // reads them ahead of the run and emits the WGSL, the entry names, and the layout facts.
 // TypeGPU builds the same WGSL at run time from the kernel function.
-export const slimeMove: ComputePipelineSpec = computePipeline<SlimeMoveLayout>(
+const slimeMove: ComputePipelineSpec = computePipeline<SlimeMoveLayout>(
   moveAgents,
   { name: "slimeMove", workgroupSize: [64, 1, 1] },
 );
 
-export const slimeDiffuse: ComputePipelineSpec = computePipeline<SlimeDiffuseLayout>(
+const slimeDiffuse: ComputePipelineSpec = computePipeline<SlimeDiffuseLayout>(
   diffuseTrail,
   { name: "slimeDiffuse", workgroupSize: [8, 8, 1] },
 );
 
-export const slimeRender: RenderPipelineSpec = renderPipelineL<
+const slimeRender: RenderPipelineSpec = renderPipelineL<
   SlimeRenderLayout,
   Vertex,
   Varyings

@@ -79,7 +79,7 @@ const START_OFFSET: u32 = 256;
 
 // One corner of the oversized triangle that covers the surface. TypeGPU picks the same three
 // corners from the vertex index and binds no vertex buffer.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -90,7 +90,7 @@ class Vertex {
 
 // The reseed counter. A new value changes the seed of every cell, so one key press draws a new
 // pattern. TypeGPU reseeds from the clock instead.
-@CStruct
+@ValueType
 class SeedParams {
   reseed: u32;
 
@@ -100,7 +100,7 @@ class SeedParams {
 }
 
 // The jump distance of the current step, in cells. The frame writes it before each dispatch.
-@CStruct
+@ValueType
 class StepParams {
   offset: i32;
 
@@ -110,7 +110,7 @@ class StepParams {
 }
 
 // The vertex output. `position` is clip space and `uv` runs 0 to 1 across the surface.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -353,17 +353,17 @@ function voronoiFragment(
 // The three declarations name the kernel, the layout type, and the workgroup size. The generator
 // reads them ahead of the run and emits the WGSL, the entry names, and the layout facts.
 // TypeGPU builds the same WGSL at run time from the kernel function.
-export const seedVoronoi: ComputePipelineSpec = computePipeline<SeedLayout>(seedKernel, {
+const seedVoronoi: ComputePipelineSpec = computePipeline<SeedLayout>(seedKernel, {
   name: "seedVoronoi",
   workgroupSize: [8, 8, 1],
 });
 
-export const jumpFloodStep: ComputePipelineSpec = computePipeline<StepLayout>(stepKernel, {
+const jumpFloodStep: ComputePipelineSpec = computePipeline<StepLayout>(stepKernel, {
   name: "jumpFloodStep",
   workgroupSize: [8, 8, 1],
 });
 
-export const voronoiRender: RenderPipelineSpec = renderPipelineL<
+const voronoiRender: RenderPipelineSpec = renderPipelineL<
   VoronoiRenderLayout,
   Vertex,
   Varyings

@@ -77,7 +77,7 @@ function arrayPingPongKernel(res: ArrayPingPongLayout, ctx: ComputeInvocation): 
   res.target.store(coords, layer, current.add(paired.scale(pairScale)).add(coordinateStep));
 }
 
-export const arrayPingPong: ComputePipelineSpec = computePipeline<ArrayPingPongLayout>(
+const arrayPingPong: ComputePipelineSpec = computePipeline<ArrayPingPongLayout>(
   arrayPingPongKernel,
   { name: "arrayPingPong", workgroupSize: [2, 2, 1] },
 );
@@ -99,7 +99,7 @@ function layerReadbackKernel(res: LayerReadbackLayout, ctx: ComputeInvocation): 
   res.output[index] = res.source.load(coords, 0);
 }
 
-export const layerReadback: ComputePipelineSpec = computePipeline<LayerReadbackLayout>(
+const layerReadback: ComputePipelineSpec = computePipeline<LayerReadbackLayout>(
   layerReadbackKernel,
   { name: "layerReadback", workgroupSize: [2, 2, 1] },
 );

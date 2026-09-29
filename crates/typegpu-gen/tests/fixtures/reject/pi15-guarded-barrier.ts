@@ -9,7 +9,7 @@ function guardedKernel(res: Layout, ctx: ComputeInvocation): void {
   workgroupBarrier();
   res.output[ctx.globalId.x] = 1;
 }
-export const rejected: ComputePipelineSpec = computePipeline<Layout>(guardedKernel, {
+const rejected: ComputePipelineSpec = computePipeline<Layout>(guardedKernel, {
   name: "rejected",
   workgroupSize: [1, 1, 1],
   guarded: true,

@@ -31,7 +31,7 @@ import {
   workgroup_WORKGROUP_Z,
 } from "./b10-workgroup.typegpu";
 
-@CStruct
+@ValueType
 class WorkCounter {
   total: AtomicU32;
   constructor(total: AtomicU32) { this.total = total; }
@@ -63,7 +63,7 @@ function workgroupKernel(res: WorkgroupLayout, ctx: ComputeInvocation): void {
   }
 }
 
-export const workgroup: ComputePipelineSpec = computePipeline<WorkgroupLayout>(workgroupKernel, {
+const workgroup: ComputePipelineSpec = computePipeline<WorkgroupLayout>(workgroupKernel, {
   name: "workgroup",
   workgroupSize: [4, 1, 1],
 });

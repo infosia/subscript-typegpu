@@ -2,7 +2,7 @@
 import { Vec2b } from "./typegpu-types";
 import { BoolPack_OFFSET_mask } from "./k28-bool-schema.typegpu";
 
-@CStruct
+@ValueType
 class BoolPack {
   mask: Vec2b;
 

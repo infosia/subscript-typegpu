@@ -28,7 +28,7 @@ import {
   saxpy_WORKGROUP_Z,
 } from "./b03-saxpy-uniform.typegpu";
 
-@CStruct
+@ValueType
 class Item {
   value: f32;
 
@@ -37,7 +37,7 @@ class Item {
   }
 }
 
-@CStruct
+@ValueType
 class SaxpyParams {
   a: f32;
   count: u32;
@@ -70,7 +70,7 @@ function saxpyKernel(res: SaxpyLayout, ctx: ComputeInvocation): void {
   }
 }
 
-export const saxpy: ComputePipelineSpec = computePipeline<SaxpyLayout>(saxpyKernel, {
+const saxpy: ComputePipelineSpec = computePipeline<SaxpyLayout>(saxpyKernel, {
   name: "saxpy",
   workgroupSize: [64, 1, 1],
 });

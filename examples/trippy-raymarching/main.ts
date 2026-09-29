@@ -42,7 +42,7 @@ import {
 
 // The vertex record. The generator emits Vertex_STRIDE from this class, so the host code
 // never counts bytes.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -53,7 +53,7 @@ class Vertex {
 
 // The per-frame uniform. `time` carries seconds derived from the frame count, and `pointer`
 // carries the surface position in [-1, 1] per axis.
-@CStruct
+@ValueType
 class FrameData {
   time: f32;
   aspect: f32;
@@ -68,7 +68,7 @@ class FrameData {
 
 // The inter-stage record. The field named `position` becomes the clip-space builtin, and
 // `uv` becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -226,7 +226,7 @@ function trippyFragment(
 
 // The pipeline declaration joins the layout class, the vertex schema, and the varyings.
 // `subscript-typegpu-gen` emits the WGSL for both stages before the run.
-export const trippy: RenderPipelineSpec = renderPipelineL<TrippyLayout, Vertex, Varyings>(
+const trippy: RenderPipelineSpec = renderPipelineL<TrippyLayout, Vertex, Varyings>(
   trippyVertex,
   trippyFragment,
   { format: "bgra8unorm" },

@@ -31,17 +31,17 @@ fn non_uniform_barrier_names_statement_value_and_author() {
         SourceFile::new("webgpu.ts", read("webgpu.ts")),
         SourceFile::new("typegpu-types.ts", read("typegpu-types.ts")),
         SourceFile::new("typegpu.ts", read("typegpu.ts")),
-        SourceFile::new(
+        SourceFile::entry(
             "uniformity-test.ts",
             r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
-@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function nonUniform(res: Layout, ctx: ComputeInvocation): void {
   if (ctx.localIndex === 0) { workgroupBarrier(); }
   res.output[ctx.globalId.x] = new Item(ctx.localIndex);
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(nonUniform, { name: "pipeline", workgroupSize: [4, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(nonUniform, { name: "pipeline", workgroupSize: [4, 1, 1] });
 "#,
         ),
     ];

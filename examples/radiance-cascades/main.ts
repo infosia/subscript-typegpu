@@ -95,7 +95,7 @@ const SURFACE_EDGE: f32 = 0.002;
 
 // One clip-space corner of the full-screen triangle. The generator derives the vertex
 // attribute layout and the `Vertex_STRIDE` byte stride from this class.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -106,7 +106,7 @@ class Vertex {
 
 // A scene body. `emissiveColor` is the radiance a ray takes at a hit, so a black body
 // blocks light and adds none.
-@CStruct
+@ValueType
 class DiskData {
   pos: Vec2f;
   radius: f32;
@@ -119,7 +119,7 @@ class DiskData {
   }
 }
 
-@CStruct
+@ValueType
 class BoxData {
   pos: Vec2f;
   size: Vec2f;
@@ -134,7 +134,7 @@ class BoxData {
 
 // The complete scene travels in one uniform buffer. `FixedArray` has a compile-time length,
 // so the counts 4 and 2 belong to the layout and no run-time array exists.
-@CStruct
+@ValueType
 class Scene {
   disks: FixedArray<DiskData, 4>;
   boxes: FixedArray<BoxData, 2>;
@@ -147,7 +147,7 @@ class Scene {
 
 // The per-layer uniform. `init` writes one buffer per layer once, so the six dispatches of
 // a frame differ only by their bind group.
-@CStruct
+@ValueType
 class CascadeParams {
   layer: u32;
   probes: u32;
@@ -164,7 +164,7 @@ class CascadeParams {
 
 // The vertex output. The `Vec4f` field named `position` becomes the WGSL builtin position,
 // and every other field becomes an interpolated location.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -177,7 +177,7 @@ class Varyings {
 
 // One scene query returns a distance and a color together, so the ray march reads both
 // results from one call.
-@CStruct
+@ValueType
 class SceneHit {
   dist: f32;
   color: Vec3f;
@@ -439,19 +439,19 @@ function radianceFragment(
 // The three declarations are the generator's input. It walks the typed program before the
 // run and emits `main.typegpu.ts`: the WGSL text, the entry names, and the layout specs.
 // TypeGPU resolves the same shader from the kernel function at run time.
-export const cascadePass: ComputePipelineSpec = computePipeline<CascadeLayout>(
+const cascadePass: ComputePipelineSpec = computePipeline<CascadeLayout>(
   cascadeKernel,
   { name: "cascadePass", workgroupSize: [16, 16, 1] },
 );
 
-export const fieldBuild: ComputePipelineSpec = computePipeline<FieldLayout>(fieldKernel, {
+const fieldBuild: ComputePipelineSpec = computePipeline<FieldLayout>(fieldKernel, {
   name: "fieldBuild",
   workgroupSize: [16, 16, 1],
 });
 
 // `renderPipelineL` adds the layout class, so both stages read `RenderLayout`. The target
 // format belongs to the declaration, and `init` checks the surface format against it.
-export const radianceRender: RenderPipelineSpec = renderPipelineL<
+const radianceRender: RenderPipelineSpec = renderPipelineL<
   RenderLayout,
   Vertex,
   Varyings

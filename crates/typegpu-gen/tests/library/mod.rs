@@ -227,10 +227,13 @@ fn main() {{
 #[test]
 fn every_library_method_has_the_sc6_body() {
     let root = support::root();
-    let files = [SourceFile::new(
-        "typegpu-types.ts",
-        support::read(&root.join("lib/typegpu-types.ts")),
-    )];
+    let files = [
+        SourceFile::new(
+            "typegpu-types.ts",
+            support::read(&root.join("lib/typegpu-types.ts")),
+        ),
+        SourceFile::entry("entry.ts", ""),
+    ];
     let module = subscript_compiler::check_program(&files).expect("check type library");
     assert_eq!(
         module
@@ -285,7 +288,7 @@ fn every_library_method_has_the_sc6_body() {
 
 #[test]
 fn sdf_library_helpers_emit_and_validate() {
-    let files = support::source_files(SourceFile::new(
+    let files = support::source_files(SourceFile::entry(
         "sdf-library-test.ts",
         r#"
 import { Vec2f, Vec3f } from "./typegpu-types";
@@ -304,7 +307,7 @@ function sdfKernel(res: Layout, ctx: ComputeInvocation): void {
   value += opSmoothUnion(1.0, 2.0, 0.5);
   res.output[0] = value;
 }
-export const sdf: ComputePipelineSpec = computePipeline<Layout>(sdfKernel, { name: "sdf", workgroupSize: [1, 1, 1] });
+const sdf: ComputePipelineSpec = computePipeline<Layout>(sdfKernel, { name: "sdf", workgroupSize: [1, 1, 1] });
 "#,
     ));
     let generated = subscript_typegpu_gen::generate(&files)
@@ -331,7 +334,7 @@ export const sdf: ComputePipelineSpec = computePipeline<Layout>(sdfKernel, { nam
 
 #[test]
 fn radiance_cascade_library_helpers_emit_and_validate() {
-    let files = support::source_files(SourceFile::new(
+    let files = support::source_files(SourceFile::entry(
         "radiance-cascade-library-test.ts",
         r#"
 import { Vec2f, Vec2u, Vec4f } from "./typegpu-types";
@@ -349,7 +352,7 @@ function cascadeKernel(res: Layout, ctx: ComputeInvocation): void {
   const gathered: Vec2f = radianceGatherUv(layer % 4, merged, 256.0, 512.0);
   res.output[layer] = new Vec4f(gathered.x, gathered.y, angle + start, end);
 }
-export const cascade: ComputePipelineSpec = computePipeline<Layout>(cascadeKernel, { name: "cascade", workgroupSize: [1, 1, 1] });
+const cascade: ComputePipelineSpec = computePipeline<Layout>(cascadeKernel, { name: "cascade", workgroupSize: [1, 1, 1] });
 "#,
     ));
     let generated = subscript_typegpu_gen::generate(&files).unwrap_or_else(|diagnostics| {
@@ -405,7 +408,7 @@ fn radiance_cascade_host_helpers_return_committed_dimensions_and_sides() {
 
 #[test]
 fn noise_library_helpers_emit_and_validate() {
-    let files = support::source_files(SourceFile::new(
+    let files = support::source_files(SourceFile::entry(
         "noise-library-test.ts",
         r#"
 import { Vec3f } from "./typegpu-types";
@@ -418,7 +421,7 @@ function noiseKernel(res: Layout, ctx: ComputeInvocation): void {
   const noise: f32 = perlin3d(new Vec3f(0.25, 0.5, 0.75));
   res.output[0] = sample.value + noise + ((sample.state & 255) as f32);
 }
-export const noise: ComputePipelineSpec = computePipeline<Layout>(noiseKernel, { name: "noise", workgroupSize: [1, 1, 1] });
+const noise: ComputePipelineSpec = computePipeline<Layout>(noiseKernel, { name: "noise", workgroupSize: [1, 1, 1] });
 "#,
     ));
     let generated = subscript_typegpu_gen::generate(&files)
@@ -441,7 +444,7 @@ export const noise: ComputePipelineSpec = computePipeline<Layout>(noiseKernel, {
 
 #[test]
 fn color_library_helpers_emit_and_validate() {
-    let files = support::source_files(SourceFile::new(
+    let files = support::source_files(SourceFile::entry(
         "color-library-test.ts",
         r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
@@ -460,7 +463,7 @@ function colorKernel(res: Layout, ctx: ComputeInvocation): void {
   res.output[7] = oklabToRgb(input);
   res.output[8] = oklabGamutClipAdaptiveL05(input, 0.2);
 }
-export const color: ComputePipelineSpec = computePipeline<Layout>(colorKernel, { name: "color", workgroupSize: [1, 1, 1] });
+const color: ComputePipelineSpec = computePipeline<Layout>(colorKernel, { name: "color", workgroupSize: [1, 1, 1] });
 "#,
     ));
     let generated = subscript_typegpu_gen::generate(&files)
@@ -487,14 +490,14 @@ export const color: ComputePipelineSpec = computePipeline<Layout>(colorKernel, {
 
 #[test]
 fn sort_library_kernels_emit_and_validate_from_imports() {
-    let files = support::source_files(SourceFile::new(
+    let files = support::source_files(SourceFile::entry(
         "sort-library-test.ts",
         r#"
 import { ComputePipelineSpec, computePipeline } from "./typegpu";
 import { BitonicSortResources, PrefixScanApplyResources, PrefixScanBlockResources, bitonicSortStep, prefixScanApplyF32, prefixScanBlockF32 } from "./typegpu-sort";
-export const bitonic: ComputePipelineSpec = computePipeline<BitonicSortResources>(bitonicSortStep, { name: "bitonic", workgroupSize: [256, 1, 1] });
-export const scanBlock: ComputePipelineSpec = computePipeline<PrefixScanBlockResources>(prefixScanBlockF32, { name: "scanBlock", workgroupSize: [256, 1, 1] });
-export const scanApply: ComputePipelineSpec = computePipeline<PrefixScanApplyResources>(prefixScanApplyF32, { name: "scanApply", workgroupSize: [256, 1, 1] });
+const bitonic: ComputePipelineSpec = computePipeline<BitonicSortResources>(bitonicSortStep, { name: "bitonic", workgroupSize: [256, 1, 1] });
+const scanBlock: ComputePipelineSpec = computePipeline<PrefixScanBlockResources>(prefixScanBlockF32, { name: "scanBlock", workgroupSize: [256, 1, 1] });
+const scanApply: ComputePipelineSpec = computePipeline<PrefixScanApplyResources>(prefixScanApplyF32, { name: "scanApply", workgroupSize: [256, 1, 1] });
 "#,
     ));
     let generated = subscript_typegpu_gen::generate(&files)
@@ -549,12 +552,12 @@ fn bitonic_non_power_of_two_length_has_the_named_red_trap() {
 
 #[test]
 fn ui_library_kernels_emit_and_validate_from_imports() {
-    let files = support::source_files(SourceFile::new(
+    let files = support::source_files(SourceFile::entry(
         "ui-library-test.ts",
         r#"
 import { RenderPipelineSpec, renderPipelineL } from "./typegpu";
 import { UiRenderLayout, UiVertex, UiVarying, uiVertex, uiFragment } from "./typegpu-ui";
-export const ui: RenderPipelineSpec = renderPipelineL<UiRenderLayout, UiVertex, UiVarying>(uiVertex, uiFragment, { format: "rgba8unorm" });
+const ui: RenderPipelineSpec = renderPipelineL<UiRenderLayout, UiVertex, UiVarying>(uiVertex, uiFragment, { format: "rgba8unorm" });
 "#,
     ));
     let generated = subscript_typegpu_gen::generate(&files)

@@ -11,7 +11,7 @@ does not say otherwise. Schemas are `schema.md`.
 - **RN1 — A render pipeline is a module-level `const`.** The
   generator recognizes the declaration functions by declaring file
   (`typegpu.ts`) and name, never by name alone.
-  `export const tri = renderPipeline<Vertex, Varyings>(vert, frag,
+  `const tri = renderPipeline<Vertex, Varyings>(vert, frag,
   { format: "rgba8unorm" });`. `renderPipeline` is a library generic
   function with a real body that returns a `RenderPipelineSpec` (the
   target format, the primitive topology, the cull mode). The
@@ -37,7 +37,7 @@ does not say otherwise. Schemas are `schema.md`.
 
 ## Vertex input
 
-- **RN4 — The vertex schema is a `@CStruct` class.** Its fields are
+- **RN4 — The vertex schema is a `@ValueType` class.** Its fields are
   the attributes, in declaration order, at `@location(n)` from 0.
   The vertex buffer layout is the schema's layout: `arrayStride` is
   `X_STRIDE`, each attribute's `offset` is `X_OFFSET_<field>`, and
@@ -60,7 +60,7 @@ does not say otherwise. Schemas are `schema.md`.
 
 ## Inter-stage data
 
-- **RN7 — The varyings class.** Rev 1, 2026-08-23. A `@CStruct`
+- **RN7 — The varyings class.** Rev 1, 2026-08-23. A `@ValueType`
   class whose field named `position` of type `Vec4f` is
   `@builtin(position)`, and whose other fields are `@location(n)` in
   declaration order from 0, with `@interpolate(flat)` for integer
@@ -73,7 +73,7 @@ does not say otherwise. Schemas are `schema.md`.
   vertex schema. A varyings class with no `position: Vec4f` field is
   a diagnostic.
 - **RN8 — The fragment output.** A `Vec4f` return is `@location(0)
-  vec4<f32>`. A multiple-target form (a `@CStruct` return with one
+  vec4<f32>`. A multiple-target form (a `@ValueType` return with one
   `@location(n)` per `Vec4f` field) arrives with a library overload
   that types it, in a later phase. Until then every declaration
   types the fragment return as `Vec4f`, and a different return fails

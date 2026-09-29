@@ -555,7 +555,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1717,7 +1717,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1933,7 +1933,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1962,7 +1962,7 @@ dependencies = [
 [[package]]
 name = "subscript-bindgen"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=93a4041#93a40417e48395de1fdb2b28bae921d46c741e2e"
+source = "git+https://github.com/infosia/subscript.git?rev=2fa77ec#2fa77ecafdf6c1866b5ac631d4d2ad23038d9cf1"
 dependencies = [
  "clang-sys",
 ]
@@ -1970,7 +1970,7 @@ dependencies = [
 [[package]]
 name = "subscript-codegen"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=93a4041#93a40417e48395de1fdb2b28bae921d46c741e2e"
+source = "git+https://github.com/infosia/subscript.git?rev=2fa77ec#2fa77ecafdf6c1866b5ac631d4d2ad23038d9cf1"
 dependencies = [
  "cc",
  "cranelift-codegen",
@@ -1987,7 +1987,7 @@ dependencies = [
 [[package]]
 name = "subscript-compiler"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=93a4041#93a40417e48395de1fdb2b28bae921d46c741e2e"
+source = "git+https://github.com/infosia/subscript.git?rev=2fa77ec#2fa77ecafdf6c1866b5ac631d4d2ad23038d9cf1"
 dependencies = [
  "regress",
  "serde",
@@ -1999,7 +1999,7 @@ dependencies = [
 [[package]]
 name = "subscript-runtime"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=93a4041#93a40417e48395de1fdb2b28bae921d46c741e2e"
+source = "git+https://github.com/infosia/subscript.git?rev=2fa77ec#2fa77ecafdf6c1866b5ac631d4d2ad23038d9cf1"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -2683,7 +2683,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

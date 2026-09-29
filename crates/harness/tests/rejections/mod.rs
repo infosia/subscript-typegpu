@@ -19,24 +19,14 @@ fn read(path: &Path) -> String {
 }
 
 fn files(fixture: &Path) -> Vec<SourceFile> {
-    let root = root();
-    vec![
-        SourceFile::ambient(
-            "subscript-typegpu.generated.d.ts",
-            read(&root.join("lib/subscript-typegpu.generated.d.ts")),
-        ),
-        SourceFile::ambient(
-            "wire-enum-aliases.generated.d.ts",
-            read(&root.join("lib/wire-enum-aliases.generated.d.ts")),
-        ),
-        SourceFile::new("webgpu.ts", read(&root.join("lib/webgpu.ts"))),
-        SourceFile::new("typegpu-types.ts", read(&root.join("lib/typegpu-types.ts"))),
-        SourceFile::new("typegpu.ts", read(&root.join("lib/typegpu.ts"))),
-        SourceFile::new(
-            fixture.file_name().expect("fixture name").to_string_lossy(),
-            read(fixture),
-        ),
-    ]
+    let program = SourceFile::entry(
+        fixture.file_name().expect("fixture name").to_string_lossy(),
+        read(fixture),
+    );
+    let mut files = subscript_typegpu_gen::load_library_files(&root().join("lib"), &program)
+        .unwrap_or_else(|error| panic!("load {}: {error}", fixture.display()));
+    files.push(program);
+    files
 }
 
 #[test]

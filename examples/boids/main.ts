@@ -58,7 +58,7 @@ const MAX_SPEED: f32 = 0.018;
 
 // The vertex record. The generator emits Vertex_STRIDE from this class, so the host code
 // never counts bytes.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -69,7 +69,7 @@ class Vertex {
 
 // The instance record. One buffer serves the kernel as storage and the draw as an instance
 // vertex buffer. No copy moves the state between the two passes.
-@CStruct
+@ValueType
 class Boid {
   position: Vec2f;
   velocity: Vec2f;
@@ -82,7 +82,7 @@ class Boid {
 
 // The inter-stage record. The field named `position` becomes the clip-space builtin, and
 // `color` becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   color: Vec4f;
@@ -189,7 +189,7 @@ function boidFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
 
 // `guarded: true` makes the kernel skip an invocation past the end of the flock. A workgroup
 // of 64 over 96 boids starts 128 invocations, and 32 of them do no work.
-export const boidUpdate: ComputePipelineSpec = computePipeline<BoidLayout>(updateBoids, {
+const boidUpdate: ComputePipelineSpec = computePipeline<BoidLayout>(updateBoids, {
   name: "boidUpdate",
   workgroupSize: [64, 1, 1],
   guarded: true,
@@ -197,7 +197,7 @@ export const boidUpdate: ComputePipelineSpec = computePipeline<BoidLayout>(updat
 
 // The instanced form takes a vertex schema and an instance schema. It needs no bind group,
 // because the boid state arrives through vertex buffer slot 1.
-export const boidRender: RenderPipelineSpec = renderPipelineInstanced<
+const boidRender: RenderPipelineSpec = renderPipelineInstanced<
   Vertex,
   Boid,
   Varyings

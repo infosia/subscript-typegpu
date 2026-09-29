@@ -47,7 +47,7 @@ import {
 
 // One atomic counter. Every invocation adds to the same address, so the final value is the
 // number of invocations that ran.
-@CStruct
+@ValueType
 class Counter {
   value: AtomicU32;
 
@@ -80,7 +80,7 @@ const DISPATCH_3D: FixedArray<u32, 3> = [5, 3, 3];
 
 // `guarded: true` makes the generator wrap the kernel body in a global-id bounds
 // check. TypeGPU adds the same check inside `createGuardedComputePipeline`.
-export const count1d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
+const count1d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
   name: "count1d",
   workgroupSize: [8, 1, 1],
   guarded: true,
@@ -88,13 +88,13 @@ export const count1d: ComputePipelineSpec = computePipeline<CounterLayout>(count
 
 // The three declarations differ only in the workgroup shape, so one kernel body exercises
 // the guard on one axis, on two axes, and on three.
-export const count2d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
+const count2d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
   name: "count2d",
   workgroupSize: [4, 4, 1],
   guarded: true,
 });
 
-export const count3d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
+const count3d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
   name: "count3d",
   workgroupSize: [4, 2, 2],
   guarded: true,

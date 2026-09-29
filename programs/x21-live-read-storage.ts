@@ -73,7 +73,7 @@ function blurKernel(res: BlurLayout, ctx: ComputeInvocation): void {
   res.target.store(new Vec2i(x, y), new Vec4f(value, 0.0, 0.0, 1.0));
 }
 
-export const blurPass: ComputePipelineSpec = computePipeline<BlurLayout>(
+const blurPass: ComputePipelineSpec = computePipeline<BlurLayout>(
   blurKernel,
   { name: "blurPass", workgroupSize: [4, 4, 1] },
 );

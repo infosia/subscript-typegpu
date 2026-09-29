@@ -162,8 +162,7 @@ fn inspect_expr(
         ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
-        | ExprKind::Field { obj: operand, .. }
-        | ExprKind::JsonResultValue(operand) => visit!(operand),
+        | ExprKind::Field { obj: operand, .. } => visit!(operand),
         ExprKind::Binary { left, right, .. }
         | ExprKind::Assign {
             target: left,
@@ -212,11 +211,7 @@ fn inspect_expr(
         ExprKind::Lambda { body, .. } => {
             inspect_statements(module, body, program_name, inspection);
         }
-        ExprKind::Yield(value) => {
-            if let Some(value) = value {
-                visit!(value);
-            }
-        }
+        ExprKind::Yield(Some(value)) => visit!(value),
         ExprKind::AsyncCall { callee, args } => {
             if let AsyncCallee::Method { receiver, .. } = callee {
                 visit!(receiver);
@@ -299,9 +294,14 @@ fn inspect_statements(
                     inspect_statements(module, &case.body, program_name, inspection);
                 }
             }
-            Stmt::Block(body) => {
+            Stmt::Block(body) | Stmt::Using { body, .. } => {
                 inspect_statements(module, body, program_name, inspection);
             }
+            Stmt::Try { body, handler, .. } => {
+                inspect_statements(module, body, program_name, inspection);
+                inspect_statements(module, handler, program_name, inspection);
+            }
+            Stmt::Throw { value, .. } => inspect_expr(module, value, program_name, inspection),
             Stmt::Break(_) | Stmt::Continue(_) => {}
         }
     }

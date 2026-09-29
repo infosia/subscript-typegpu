@@ -72,7 +72,7 @@ const EDIT_DRAW: u32 = 2;
 
 // The vertex record. The generator emits Vertex_STRIDE from this class, so the host code
 // never counts bytes.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -83,7 +83,7 @@ class Vertex {
 
 // The edit uniform. `point` is in cell coordinates, not pixels, and `mode` carries one of
 // the three EDIT_ constants.
-@CStruct
+@ValueType
 class EditParams {
   point: Vec2f;
   mode: u32;
@@ -96,7 +96,7 @@ class EditParams {
 
 // The inter-stage record. The field named `position` becomes the clip-space builtin, and
 // `uv` becomes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -227,21 +227,21 @@ function lifeFragment(
 
 // The workgroup is 8 by 8, so one workgroup covers 64 cells. 128 divides by 8, and no
 // invocation falls outside the grid.
-export const lifeStep: ComputePipelineSpec = computePipeline<LifeStepLayout>(
+const lifeStep: ComputePipelineSpec = computePipeline<LifeStepLayout>(
   lifeStepKernel,
   { name: "lifeStep", workgroupSize: [8, 8, 1] },
 );
 
 // The edit kernel covers the whole grid with the same workgroup size, so one dispatch count
 // serves both compute pipelines.
-export const lifeEdit: ComputePipelineSpec = computePipeline<LifeEditLayout>(
+const lifeEdit: ComputePipelineSpec = computePipeline<LifeEditLayout>(
   lifeEditKernel,
   { name: "lifeEdit", workgroupSize: [8, 8, 1] },
 );
 
 // The topology is a triangle strip, so four vertices make two triangles. TypeGPU draws its
 // display pass from a fullscreen triangle instead.
-export const lifeRender: RenderPipelineSpec = renderPipelineL<
+const lifeRender: RenderPipelineSpec = renderPipelineL<
   LifeRenderLayout,
   Vertex,
   Varyings

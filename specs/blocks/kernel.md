@@ -8,7 +8,7 @@ P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
 2026-08-23. Rev 9 (K19 Rev 4 FixedArray constants), 2026-08-24. Rev 10 (K14
 Rev 6 literal suffixes), 2026-08-24. Rev 11 (K14 Rev 6 logic
 parentheses), 2026-08-24. Rev 12 (K5 Rev 1 `using`, absence test),
-2026-08-30. Rev 13 (K14 Rev 7 bitwise parentheses), 2026-09-01. Rev 14 (K14 Rev 8 bitwise pairs), 2026-09-01. Plan §3 D2, D3, D7, D9 and §4
+2026-08-30. Rev 13 (K14 Rev 7 bitwise parentheses), 2026-09-01. Rev 14 (K14 Rev 8 bitwise pairs), 2026-09-01. Rev 15 (K7 `throw` and `try`, K14 Rev 9 source names), 2026-09-29. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -62,6 +62,7 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   initializer, a condition, and a step, `while`, `return`. P4 adds
   `switch`, `break`, `continue`. A `for...of` over a `FixedArray` is
   emitted as an index loop. Any other statement is a diagnostic.
+  `throw` and `try` (subscript §115) are diagnostics under this rule.
 - **K8 — `let` and `const` map to `var` and `let`.** A subscript
   `const` binding emits a WGSL `let`. A subscript `let` binding emits
   a WGSL `var`. A value class local is always `var`, because the
@@ -121,7 +122,14 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   declaration order, binding declarations in group and binding
   order, module constants and private and workgroup variables in
   declaration order, helpers in dependency order, the entry
-  function. Rev 4 and earlier placed module variables before the
+  function. Rev 9: WGSL names are source names. Two program
+  declarations that share one source name in one WGSL module are a
+  diagnostic, because subscript §125 gives each module its own
+  top-level names. Two classes in the checked program that share one
+  source name, where at least one is a `@ValueType` class, are the
+  same diagnostic, because the generator finds a value class by its
+  source name. Callees with no dependency between them are emitted
+  in source-name order. Rev 4 and earlier placed module variables before the
   bindings. Rev 5 moved them after, so one order serves a module
   with and without shells, and every `.wgsl` golden was regenerated
   under it. Every emitted integer literal carries its
@@ -227,7 +235,7 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   positions (a workgroup variable with an initializer) is a
   diagnostic.
 - **K21 — Atomics.** `AtomicU32` and `AtomicI32` are library value
-  classes (`@CStruct`, one field, size 4, align 4) legal as a schema
+  classes (`@ValueType`, one field, size 4, align 4) legal as a schema
   field and as a workgroup variable type. Their methods `load()`,
   `store(v)`, `add(v)`, `sub(v)`, `min(v)`, `max(v)`, `exchange(v)`
   (each returning the old value where WGSL does) have real host
@@ -309,7 +317,7 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   adds `Vec2b`, `Vec3b`, and `Vec4b` with `boolean` fields `x`, `y`,
   `z`, `w`, the methods `any(): boolean`, `all(): boolean`, and
   `not()`. They are value classes, not schemas: a `Vec*b` field in a
-  `@CStruct` class is an SC5 diagnostic, because WGSL gives `bool`
+  `@ValueType` class is an SC5 diagnostic, because WGSL gives `bool`
   no host-shareable layout. Every float and integer vector gains
   `lt(other)`, `le(other)`, `gt(other)`, `ge(other)`, `eq(other)`,
   and `ne(other)`, each returning the `Vec*b` of the same width,
@@ -336,7 +344,7 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   z, w)`, `vec4<f32>(v, w)`, `vec2<f32>(s)`, `vec3<f32>(s)`, and
   `vec4<f32>(s)`, with `i32` and `u32` for the other families. The factories join
   the K9 `vec3f` family. A swizzle is never an assignment target,
-  because subscript R37 forbids a write accessor on a `@CStruct`
+  because subscript R37 forbids a write accessor on a `@ValueType`
   value class.
 - **K28 — The P8 rejections.** Rev 1 adds the slice 2 set: a
   shell with a non-literal body, a shell whose function is a kernel,
@@ -353,7 +361,7 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 ## WGSL shells (P8 slice 2)
 
 - **K29 — A WGSL shell is a source function with two bodies.** A
-  module-level declaration `export const addBias: WgslShellSpec =
+  module-level declaration `const addBias: WgslShellSpec =
   wgslShell(addBiasFn, { body: "return input + SHELL_BIAS;" })`
   marks the module-level function `addBiasFn` as a shell.
   `wgslShell` is a library function in `lib/typegpu.ts` with a real

@@ -30,7 +30,7 @@ import {
   Vertex_STRIDE,
 } from "./x05-live-triangle.typegpu";
 
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
   color: Vec3f;
@@ -41,7 +41,7 @@ class Vertex {
   }
 }
 
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   color: Vec3f;
@@ -63,7 +63,7 @@ function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(input.color.x, input.color.y, input.color.z, 1.0);
 }
 
-export const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, {
+const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, {
   format: "rgba8unorm",
 });
 

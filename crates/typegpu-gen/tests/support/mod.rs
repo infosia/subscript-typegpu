@@ -23,7 +23,7 @@ pub(crate) fn program_files(program: &Path) -> Vec<SourceFile> {
         .file_name()
         .expect("program file name")
         .to_string_lossy();
-    source_files(SourceFile::new(name, read(program)))
+    source_files(SourceFile::entry(name, read(program)))
 }
 
 pub(crate) fn source_files(program: SourceFile) -> Vec<SourceFile> {

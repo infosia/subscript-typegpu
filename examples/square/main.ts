@@ -33,7 +33,7 @@ import {
 
 // The vertex schema. The generator lays out both fields for the vertex buffer and emits
 // `Vertex_STRIDE`, the byte distance between two vertices.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
   color: Vec4f;
@@ -46,7 +46,7 @@ class Vertex {
 
 // The record that travels from the vertex stage to the fragment stage. The `position`
 // field carries the clip-space position builtin, and `color` takes location 0.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   color: Vec4f;
@@ -74,7 +74,7 @@ function squareFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
 
 // The index format belongs to the declaration. TypeGPU attaches the index buffer to
 // the pipeline with `withIndexBuffer` instead.
-export const square: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const square: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
   squareVertex,
   squareFragment,
   { format: "bgra8unorm", indexFormat: "uint16" },

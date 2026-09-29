@@ -6,7 +6,7 @@ import {
 
 // The host sizing of one cascade set. `cascadeProbes` counts the probes on one axis of cascade
 // 0, `cascadeDim` is the texture width, and `cascadeCount` is the layer count.
-@CStruct
+@ValueType
 export class CascadeDimensions {
   cascadeProbes: u32;
   cascadeDim: u32;

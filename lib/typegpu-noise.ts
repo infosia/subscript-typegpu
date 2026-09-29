@@ -8,7 +8,7 @@ import {
 // `randF32` returns an exact `u32` state and an `f32` value in the range [0, 1).
 // The value scales by 2^-32 through `f32`, which keeps 24 significant bits.
 // A rounded upper endpoint clamps to the largest `f32` below 1.
-@CStruct
+@ValueType
 export class RandomF32 {
   state: u32;
   value: f32;

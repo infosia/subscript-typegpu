@@ -26,7 +26,7 @@ import {
   kernelDepth_WORKGROUP_Z,
 } from "./b09-kernel-depth.typegpu";
 
-@CStruct
+@ValueType
 class DepthItem {
   value: u32;
   constructor(value: u32) { this.value = value; }
@@ -59,7 +59,7 @@ function depthKernel(res: DepthLayout, ctx: ComputeInvocation): void {
   res.output[ctx.globalId.x] = new DepthItem(value);
 }
 
-export const kernelDepth: ComputePipelineSpec = computePipeline<DepthLayout>(depthKernel, {
+const kernelDepth: ComputePipelineSpec = computePipeline<DepthLayout>(depthKernel, {
   name: "kernelDepth",
   workgroupSize: [8, 1, 1],
 });

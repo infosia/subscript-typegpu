@@ -41,7 +41,7 @@ function guardedKernel(res: GuardedLayout, ctx: ComputeInvocation): void {
   res.output[ctx.globalId.x] = ctx.globalId.x + 100;
 }
 
-export const guardedPipeline: ComputePipelineSpec = computePipeline<GuardedLayout>(
+const guardedPipeline: ComputePipelineSpec = computePipeline<GuardedLayout>(
   guardedKernel,
   {
     name: "guardedPipeline",

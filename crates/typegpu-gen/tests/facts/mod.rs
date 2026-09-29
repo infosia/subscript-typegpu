@@ -5,7 +5,7 @@ use crate::support;
 fn generate_with_library(name: &str, source: &str) -> subscript_typegpu_gen::Generated {
     let mut files = support::b01_files();
     files.pop();
-    files.push(SourceFile::new(name, source));
+    files.push(SourceFile::entry(name, source));
     subscript_typegpu_gen::generate(&files).unwrap_or_else(|diagnostics| {
         panic!(
             "generation failed: {}",
@@ -27,7 +27,7 @@ import {
   Outer_OFFSET_inner_value,
 } from "./facts.typegpu";
 
-@CStruct
+@ValueType
 class Inner {
   value: u32;
 
@@ -36,7 +36,7 @@ class Inner {
   }
 }
 
-@CStruct
+@ValueType
 class Outer {
   inner: Inner;
 
@@ -45,7 +45,7 @@ class Outer {
   }
 }
 
-@CStruct
+@ValueType
 class ArrayRoot {
   items: FixedArray<Inner, 2>;
 
@@ -104,7 +104,7 @@ import { Missing_SIZE } from "./missing.typegpu";
             r#"
 import { Bad_SIZE } from "./illegal.typegpu";
 
-@CStruct
+@ValueType
 class Bad {
   value: string;
 
@@ -141,7 +141,7 @@ fn support_import_intent_uses_declarations_instead_of_name_case() {
         "lowercase.ts",
         r#"
 import { lower_SIZE } from "./lowercase.typegpu";
-@CStruct class lower { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class lower { value: u32; constructor(value: u32) { this.value = value; } }
 "#,
     );
     assert!(lowercase_schema.support_module.contains("lower_SIZE"));
@@ -153,7 +153,7 @@ import { UPPER_WGSL } from "./uppercase.typegpu";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
 class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = 1; }
-export const UPPER: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "UPPER", workgroupSize: [1, 1, 1] });
+const UPPER: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "UPPER", workgroupSize: [1, 1, 1] });
 "#,
     );
     assert!(uppercase_pipeline.support_module.contains("UPPER_WGSL"));

@@ -12,7 +12,7 @@ const shell: WgslShellSpec = wgslShell<(res: EmptyLayout, ctx: ComputeInvocation
   body: "return;",
 });
 
-export const rejected: ComputePipelineSpec = computePipeline<EmptyLayout>(both, {
+const rejected: ComputePipelineSpec = computePipeline<EmptyLayout>(both, {
   name: "rejected",
   workgroupSize: [1, 1, 1],
 });

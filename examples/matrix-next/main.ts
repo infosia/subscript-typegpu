@@ -48,7 +48,7 @@ import {
 
 // One 4-by-4 matrix as a single schema value. TypeGPU keeps the dimensions in a separate
 // uniform and grows its element array, because its sliders change the matrix size.
-@CStruct
+@ValueType
 class Matrix {
   size: Vec2u;
   body: FixedArray<f32, 16>;
@@ -119,14 +119,14 @@ function tiledKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
 
 // The declaration names the kernel and the workgroup size. A size of one thread suits a
 // kernel that already loops over every cell.
-export const naive: ComputePipelineSpec = computePipeline<MatrixLayout>(naiveKernel, {
+const naive: ComputePipelineSpec = computePipeline<MatrixLayout>(naiveKernel, {
   name: "naive",
   workgroupSize: [1, 1, 1],
 });
 
 // The workgroup size belongs to the declaration. The generator writes it into the
 // WGSL and into `tiled_WORKGROUP_X`, which the pipeline below reads.
-export const tiled: ComputePipelineSpec = computePipeline<MatrixLayout>(tiledKernel, {
+const tiled: ComputePipelineSpec = computePipeline<MatrixLayout>(tiledKernel, {
   name: "tiled",
   workgroupSize: [4, 4, 1],
 });

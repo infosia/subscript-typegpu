@@ -34,7 +34,7 @@ import {
   State_STRIDE,
 } from "./b22-first-program.typegpu";
 
-@CStruct
+@ValueType
 class State {
   counter: u32;
   incrementBy: u32;
@@ -59,7 +59,7 @@ function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
   res.state[0] = state;
 }
 
-export const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
+const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
   incrementCounter,
   {
     name: "firstProgram",

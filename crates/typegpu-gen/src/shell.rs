@@ -10,7 +10,7 @@ use subscript_compiler::{Diagnostic, Pos, RuleCode};
 pub(crate) struct Shell {
     /// The shell name, which is the shelled function's name without generic arguments.
     pub(crate) name: String,
-    /// The name of the module-level function that carries the host body.
+    /// The declaration symbol of the module-level function that carries the host body.
     pub(crate) function: String,
     /// The WGSL statements that become the emitted function body.
     pub(crate) body: String,
@@ -50,21 +50,18 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
 /// Reports whether `name` calls the library function `expected` that `typegpu.ts` declares.
 ///
 /// The generator recognizes a declaration function by declaring file and name, never by name alone
-/// (RN1). `name` carries the generic arguments, so the comparison drops them first. The declaring
-/// file is the function's own position, or the position of its first parameter.
+/// (RN1). `name` is the callee's declaration symbol, which carries the generic arguments, so the
+/// comparison drops them first. The declaring file is the function's own position, or the position
+/// of its first parameter.
 fn library_call(module: &Module, name: &str, expected: &str) -> bool {
     crate::base_name(name) == expected
-        && module
-            .functions
-            .iter()
-            .find(|function| function.name == name)
-            .is_some_and(|function| {
-                function.pos.file == "typegpu.ts"
-                    || function
-                        .params
-                        .first()
-                        .is_some_and(|param| param.pos.file == "typegpu.ts")
-            })
+        && crate::pipeline::function(module, name).is_some_and(|function| {
+            function.pos.file == "typegpu.ts"
+                || function
+                    .params
+                    .first()
+                    .is_some_and(|param| param.pos.file == "typegpu.ts")
+        })
 }
 
 /// Reads the `body` member of a `WgslShellSpec` descriptor literal (K29).
@@ -294,8 +291,9 @@ fn visit_expr(module: &Module, expr: &Expr, diagnostics: &mut Vec<Diagnostic>, l
         ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
-        | ExprKind::Field { obj: operand, .. }
-        | ExprKind::JsonResultValue(operand) => visit_expr(module, operand, diagnostics, location),
+        | ExprKind::Field { obj: operand, .. } => {
+            visit_expr(module, operand, diagnostics, location)
+        }
         ExprKind::Binary { left, right, .. }
         | ExprKind::Assign {
             target: left,
@@ -385,8 +383,15 @@ fn visit_statements(
                     visit_statements(module, &case.body, diagnostics, location);
                 }
             }
-            Stmt::Block(body) => visit_statements(module, body, diagnostics, location),
-            _ => {}
+            Stmt::Block(body) | Stmt::Using { body, .. } => {
+                visit_statements(module, body, diagnostics, location);
+            }
+            Stmt::Try { body, handler, .. } => {
+                visit_statements(module, body, diagnostics, location);
+                visit_statements(module, handler, diagnostics, location);
+            }
+            Stmt::Throw { value, .. } => visit_expr(module, value, diagnostics, location),
+            Stmt::Break(_) | Stmt::Continue(_) => {}
         }
     }
 }
@@ -607,12 +612,14 @@ pub(crate) fn validate_collisions(
     }
 }
 
-/// Reports whether the named function is a shell, whose subscript body the emitter never walks.
+/// Reports whether the function of this declaration symbol is a shell, whose subscript body the
+/// emitter never walks.
 pub(crate) fn function_is_shell(program: &ShellProgram, name: &str) -> bool {
     program.shells.iter().any(|shell| shell.function == name)
 }
 
-/// Returns the shell of the named function, or `None` when the function is not a shell.
+/// Returns the shell of the function of this declaration symbol, or `None` when the function is
+/// not a shell.
 pub(crate) fn shell_for_function<'a>(program: &'a ShellProgram, name: &str) -> Option<&'a Shell> {
     program.shells.iter().find(|shell| shell.function == name)
 }
@@ -632,10 +639,7 @@ pub(crate) fn validate_signature<'a>(
     shell: &Shell,
     layouts: &[crate::pipeline::Layout],
 ) -> Result<&'a Function, Diagnostic> {
-    let function = module
-        .functions
-        .iter()
-        .find(|function| function.name == shell.function)
+    let function = crate::pipeline::function(module, &shell.function)
         .ok_or_else(|| diagnostic("K29", "WGSL shell function is absent", shell.pos.clone()))?;
     if function.is_async || function.is_generator {
         return Err(diagnostic(

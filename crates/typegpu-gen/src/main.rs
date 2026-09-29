@@ -72,7 +72,7 @@ fn run() -> Result<(), String> {
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or_else(|| format!("program has no UTF-8 file name: {}", program.display()))?;
-    let program_file = SourceFile::new(program_name, read(&program)?);
+    let program_file = SourceFile::entry(program_name, read(&program)?);
     let mut files = subscript_typegpu_gen::load_library_files(&library, &program_file)
         .map_err(|error| error.to_string())?;
     // The program goes last. A module resolves against the files before it in load order (LB1).

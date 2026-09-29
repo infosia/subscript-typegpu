@@ -62,7 +62,7 @@ const CELL_COUNT: u32 = GRID_SIZE * GRID_SIZE;
 
 // One corner of the render strip. The generator derives `Vertex_STRIDE` from this class, and
 // the vertex buffer layout follows the field order.
-@CStruct
+@ValueType
 class Vertex {
   position: Vec2f;
 
@@ -73,7 +73,7 @@ class Vertex {
 
 // One grid cell. The velocity counts cells per step and the density is a unitless amount near
 // 0 to 1. TypeGPU packs the same three values into one `vec4f` and leaves the fourth free.
-@CStruct
+@ValueType
 class FluidCell {
   velocity: Vec2f;
   density: f32;
@@ -86,7 +86,7 @@ class FluidCell {
 
 // The obstacle center on the normalized X axis, where -1 is the left edge and 1 the right edge.
 // TypeGPU carries four integer obstacle boxes and moves them from slider callbacks.
-@CStruct
+@ValueType
 class FluidParams {
   obstacleX: f32;
 
@@ -96,7 +96,7 @@ class FluidParams {
 }
 
 // The vertex output. `position` is clip space and `uv` runs 0 to 1 across the surface.
-@CStruct
+@ValueType
 class Varyings {
   position: Vec4f;
   uv: Vec2f;
@@ -317,24 +317,24 @@ function fluidFragment(
 // The four declarations name the kernel, the layout type, and the workgroup size. The generator
 // reads them ahead of the run and emits the WGSL, the entry names, and the layout facts.
 // TypeGPU builds the same WGSL at run time from the kernel function.
-export const flow: ComputePipelineSpec = computePipeline<FluidLayout>(flowKernel, {
+const flow: ComputePipelineSpec = computePipeline<FluidLayout>(flowKernel, {
   name: "flow",
   workgroupSize: [8, 8, 1],
 });
 
-export const evaporate: ComputePipelineSpec = computePipeline<FluidLayout>(evaporateKernel, {
+const evaporate: ComputePipelineSpec = computePipeline<FluidLayout>(evaporateKernel, {
   name: "evaporate",
   workgroupSize: [8, 8, 1],
 });
 
-export const obstacle: ComputePipelineSpec = computePipeline<FluidLayout>(obstacleKernel, {
+const obstacle: ComputePipelineSpec = computePipeline<FluidLayout>(obstacleKernel, {
   name: "obstacle",
   workgroupSize: [8, 8, 1],
 });
 
 // The render declaration fixes the color target format and the strip topology. `init` compares
 // the same format constant against the surface format the host reports.
-export const fluidRender: RenderPipelineSpec = renderPipelineL<
+const fluidRender: RenderPipelineSpec = renderPipelineL<
   FluidRenderLayout,
   Vertex,
   Varyings

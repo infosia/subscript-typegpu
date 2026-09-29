@@ -46,7 +46,7 @@ import {
 
 // The block kernel comes from the sort module, and this file declares its pipeline. A
 // workgroup of 256 threads matches the block width the kernel and the host oracle assume.
-export const prefixScanBlockPipeline: ComputePipelineSpec = computePipeline<
+const prefixScanBlockPipeline: ComputePipelineSpec = computePipeline<
   PrefixScanBlockResources
 >(prefixScanBlockF32, {
   name: "prefixScanBlockPipeline",
@@ -55,7 +55,7 @@ export const prefixScanBlockPipeline: ComputePipelineSpec = computePipeline<
 
 // The second kernel adds one block offset to every value. Both pipelines share the workgroup
 // size, so a value and its offset stay in the same block.
-export const prefixScanApplyPipeline: ComputePipelineSpec = computePipeline<
+const prefixScanApplyPipeline: ComputePipelineSpec = computePipeline<
   PrefixScanApplyResources
 >(prefixScanApplyF32, {
   name: "prefixScanApplyPipeline",

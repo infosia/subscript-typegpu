@@ -5,7 +5,7 @@ use crate::support;
 fn generate(source: &str) -> subscript_typegpu_gen::Generated {
     let mut files = support::b01_files();
     files.pop();
-    files.push(SourceFile::new("kernel-test.ts", source));
+    files.push(SourceFile::entry("kernel-test.ts", source));
     subscript_typegpu_gen::generate(&files).unwrap_or_else(|diagnostics| {
         panic!(
             "kernel test generation failed: {}",
@@ -21,7 +21,7 @@ fn generate(source: &str) -> subscript_typegpu_gen::Generated {
 fn reject(source: &str) -> subscript_compiler::Diagnostic {
     let mut files = support::b01_files();
     files.pop();
-    files.push(SourceFile::new("kernel-test.ts", source));
+    files.push(SourceFile::entry("kernel-test.ts", source));
     let diagnostics = subscript_typegpu_gen::generate(&files)
         .expect_err("kernel uniformity fixture unexpectedly generated");
     assert_eq!(
@@ -57,7 +57,7 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
   shared.set(index, inputValue + outputValue + sharedValue);
   res.output.set(index, shared.get(index));
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#;
     let index_source = r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, Storage, WorkgroupArray, computePipeline, workgroupArray } from "./typegpu";
@@ -71,7 +71,7 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
   shared[index] = inputValue + outputValue + sharedValue;
   res.output[index] = shared[index];
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#;
     let method_wgsl = &generate(method_source).pipelines[0].1;
     let index_wgsl = &generate(index_source).pipelines[0].1;
@@ -116,7 +116,7 @@ fn cl6_storage_barrier_alone_is_not_host_runnable() {
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline, storageBarrier } from "./typegpu";
 class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { storageBarrier(); }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
         false,
     );
@@ -128,10 +128,10 @@ fn cl6_storage_atomic_alone_is_not_host_runnable() {
         r#"
 import { AtomicU32 } from "./typegpu-types";
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
-@CStruct class Counter { value: AtomicU32; constructor(value: AtomicU32) { this.value = value; } }
+@ValueType class Counter { value: AtomicU32; constructor(value: AtomicU32) { this.value = value; } }
 class Layout { counters: MutStorage<Counter>; constructor(counters: MutStorage<Counter>) { this.counters = counters; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.counters[0].value.add(1); }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
         false,
     );
@@ -145,7 +145,7 @@ import { ComputeInvocation, ComputePipelineSpec, MutStorage, PrivateVar, compute
 class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 const state: PrivateVar<u32> = privateVar<u32>(1);
 function kernel(res: Layout, ctx: ComputeInvocation): void { state.$ = state.$ + 1; }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
         false,
     );
@@ -159,7 +159,7 @@ import { ComputeInvocation, ComputePipelineSpec, MutStorage, WorkgroupVar, compu
 class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 const shared: WorkgroupVar<u32> = workgroupVar<u32>();
 function kernel(res: Layout, ctx: ComputeInvocation): void { shared.$ = 1; }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
         false,
     );
@@ -173,7 +173,7 @@ import { ComputeInvocation, ComputePipelineSpec, MutStorage, PrivateVar, compute
 class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 const state: PrivateVar<u32> = privateVar<u32>(1);
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = state.$; }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
         true,
     );
@@ -187,7 +187,7 @@ fn pipeline_name_must_match_its_declaration() {
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
 class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = 1; }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { workgroupSize: [1, 1, 1] });
 "#,
             "options omit name",
         ),
@@ -196,7 +196,7 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { w
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
 class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = 1; }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "other", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "other", workgroupSize: [1, 1, 1] });
 "#,
             "options name is `other`",
         ),
@@ -212,8 +212,8 @@ fn local_shadow_of_a_binding_is_renamed_for_every_reference() {
     let generated = generate(
         r#"
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, Uniform, computePipeline } from "./typegpu";
-@CStruct class Params { value: u32; constructor(value: u32) { this.value = value; } }
-@CStruct class Result { local: u32; reread: u32; constructor(local: u32, reread: u32) { this.local = local; this.reread = reread; } }
+@ValueType class Params { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class Result { local: u32; reread: u32; constructor(local: u32, reread: u32) { this.local = local; this.reread = reread; } }
 class Layout { params: Uniform<Params>; output: MutStorage<Result>; constructor(params: Uniform<Params>, output: MutStorage<Result>) { this.params = params; this.output = output; } }
 function shadow(res: Layout, ctx: ComputeInvocation): void {
   let params: Params = res.params.$;
@@ -221,7 +221,7 @@ function shadow(res: Layout, ctx: ComputeInvocation): void {
   const reread: Params = res.params.$;
   res.output[0] = new Result(params.value, reread.value);
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(shadow, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(shadow, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -244,7 +244,7 @@ fn uniform_stride_loop_with_conditional_binding_load_emits() {
     let generated = generate(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage, WorkgroupArray, workgroupArray, workgroupBarrier } from "./typegpu";
-@CStruct class Item { value: f32; constructor(value: f32) { this.value = value; } }
+@ValueType class Item { value: f32; constructor(value: f32) { this.value = value; } }
 class Layout { input: Storage<Item>; constructor(input: Storage<Item>) { this.input = input; } }
 const partials: WorkgroupArray<f32> = workgroupArray<f32>(4);
 function reduction(res: Layout, ctx: ComputeInvocation): void {
@@ -259,7 +259,7 @@ function reduction(res: Layout, ctx: ComputeInvocation): void {
     stride = stride / 2;
   }
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(reduction, { name: "pipeline", workgroupSize: [4, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(reduction, { name: "pipeline", workgroupSize: [4, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -273,7 +273,7 @@ fn k22_rejects_non_uniform_continue_from_a_barrier_loop() {
     let loop_exit = reject(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
-@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   let running: boolean = true;
@@ -284,7 +284,7 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
   }
   res.output[0] = new Item(1);
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
 "#,
     );
     assert!(loop_exit.message.contains("`continue` statement"));
@@ -296,7 +296,7 @@ fn k22_taints_loop_writes_after_non_uniform_exits_and_steps() {
     let loop_exit = reject(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
-@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   let count: u32 = 0;
@@ -307,7 +307,7 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
   if (count === 4) { workgroupBarrier(); }
   res.output[0] = new Item(count);
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
 "#,
     );
     assert!(loop_exit.message.contains("barrier statement"));
@@ -316,7 +316,7 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { n
     let continue_exit = reject(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
-@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   let count: u32 = 0;
@@ -327,7 +327,7 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
   if (count === 4) { workgroupBarrier(); }
   res.output[0] = new Item(count);
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
 "#,
     );
     assert!(continue_exit.message.contains("barrier statement"));
@@ -336,7 +336,7 @@ export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { n
     let non_uniform_step = reject(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, workgroupBarrier } from "./typegpu";
-@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   let index: u32 = 0;
@@ -344,7 +344,7 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
   if (index < 4) { workgroupBarrier(); }
   res.output[0] = new Item(index);
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
 "#,
     );
     assert!(non_uniform_step.message.contains("barrier statement"));
@@ -359,7 +359,7 @@ fn switch_grouping_module_constants_and_nested_control_flow_emit() {
         r#"
 import { Mat2x2f, Vec2u, vec2f, vec2u } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
-@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 const LIMIT: u32 = 4;
 const OFFSET: Vec2u = vec2u(1, 2);
@@ -387,7 +387,7 @@ function depth(res: Layout, ctx: ComputeInvocation): void {
   }
   res.output[0] = new Item(result + (BASIS.mulVec(vec2f(1.0, 0.0)).x as u32));
 }
-export const depthPipeline: ComputePipelineSpec = computePipeline<Layout>(depth, { name: "depthPipeline", workgroupSize: [1, 1, 1] });
+const depthPipeline: ComputePipelineSpec = computePipeline<Layout>(depth, { name: "depthPipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -412,8 +412,8 @@ fn private_workgroup_variables_barriers_and_builtins_emit() {
     let generated = generate(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, PrivateVar, privateVar, WorkgroupArray, workgroupArray, workgroupBarrier, WorkgroupVar, workgroupVar } from "./typegpu";
-@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
-@CStruct class Initial { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class Item { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class Initial { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 const BASE: u32 = 3;
 const privateState: PrivateVar<Initial> = privateVar<Initial>(new Initial(BASE));
@@ -426,7 +426,7 @@ function variables(res: Layout, ctx: ComputeInvocation): void {
   workgroupBarrier();
   res.output[ctx.globalId.x] = new Item(sharedValues[(sharedValues.length() - 1)] + privateState.$.value);
 }
-export const variablePipeline: ComputePipelineSpec = computePipeline<Layout>(variables, { name: "variablePipeline", workgroupSize: [4, 1, 1] });
+const variablePipeline: ComputePipelineSpec = computePipeline<Layout>(variables, { name: "variablePipeline", workgroupSize: [4, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -451,7 +451,7 @@ fn uniform_reads_binding_lengths_and_workgroup_indices_follow_k22() {
     let generated = generate(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, Storage, Uniform, WorkgroupArray, workgroupArray, workgroupBarrier } from "./typegpu";
-@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { params: Uniform<Item>; input: Storage<Item>; output: MutStorage<Item>; constructor(params: Uniform<Item>, input: Storage<Item>, output: MutStorage<Item>) { this.params = params; this.input = input; this.output = output; } }
 const hist: WorkgroupArray<u32> = workgroupArray<u32>(4);
 function kernel(res: Layout, ctx: ComputeInvocation): void {
@@ -460,7 +460,7 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
   const secondRead: u32 = hist[ctx.localIndex];
   res.output[0] = new Item(firstRead + secondRead);
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -474,13 +474,13 @@ fn k19_folds_checked_scalar_constant_expressions() {
     let generated = generate(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
-@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 const SUM: u32 = 4 + 5 * 2;
 const NEXT: u32 = SUM + 1;
 const SCALE: f32 = 1.5 + 2.25;
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = new Item(NEXT + (SCALE as u32)); }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -495,12 +495,12 @@ fn k14_suffixes_a_folded_u32_above_i32_max() {
     let generated = generate(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
-@CStruct class Item { value: u32; constructor(value: u32) { this.value = value; } }
+@ValueType class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 const LARGE: u32 = 2147483647 + 1;
 const MINIMUM: i32 = -2147483648;
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[ctx.globalId.x] = new Item(LARGE + (MINIMUM as u32)); }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -515,7 +515,7 @@ fn atomic_storage_and_workgroup_places_emit_every_operation() {
         r#"
 import { AtomicI32, AtomicU32 } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, storageBarrier, WorkgroupVar, workgroupVar } from "./typegpu";
-@CStruct class Counters { unsigned: AtomicU32; signed: AtomicI32; constructor(unsigned: AtomicU32, signed: AtomicI32) { this.unsigned = unsigned; this.signed = signed; } }
+@ValueType class Counters { unsigned: AtomicU32; signed: AtomicI32; constructor(unsigned: AtomicU32, signed: AtomicI32) { this.unsigned = unsigned; this.signed = signed; } }
 class Layout { counters: MutStorage<Counters>; constructor(counters: MutStorage<Counters>) { this.counters = counters; } }
 const localCounter: WorkgroupVar<AtomicU32> = workgroupVar<AtomicU32>();
 function atomics(res: Layout, ctx: ComputeInvocation): void {
@@ -532,7 +532,7 @@ function atomics(res: Layout, ctx: ComputeInvocation): void {
   res.counters[0].signed.store(-2147483648);
   storageBarrier();
 }
-export const atomicPipeline: ComputePipelineSpec = computePipeline<Layout>(atomics, { name: "atomicPipeline", workgroupSize: [1, 1, 1] });
+const atomicPipeline: ComputePipelineSpec = computePipeline<Layout>(atomics, { name: "atomicPipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -564,12 +564,12 @@ fn atomic_receiver_emits_a_conditional_index_prelude() {
         r#"
 import { AtomicU32 } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
-@CStruct class Counter { value: AtomicU32; constructor(value: AtomicU32) { this.value = value; } }
+@ValueType class Counter { value: AtomicU32; constructor(value: AtomicU32) { this.value = value; } }
 class Layout { counters: MutStorage<Counter>; constructor(counters: MutStorage<Counter>) { this.counters = counters; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   res.counters[ctx.localIndex === 0 ? 1 : 2].value.add(1);
 }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -591,13 +591,13 @@ fn conditional_uses_control_flow_and_all_identifiers_use_one_mangler() {
     let generated = generate(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
-@CStruct class Word { let: f32; constructor(value: f32) { this.let = value; } }
+@ValueType class Word { let: f32; constructor(value: f32) { this.let = value; } }
 class Layout { new: Storage<Word>; constructor(values: Storage<Word>) { this.new = values; } }
 function loop(res: Layout, ctx: ComputeInvocation): void {
   const item: Word = res.new[0];
   const value: f32 = ctx.globalId.x > 0 ? item.let : 1.0;
 }
-export const names: ComputePipelineSpec = computePipeline<Layout>(loop, { name: "names", workgroupSize: [1, 1, 1] });
+const names: ComputePipelineSpec = computePipeline<Layout>(loop, { name: "names", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -618,7 +618,7 @@ import { Vec2h } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
 class HalfLayout { values: Storage<Vec2h>; constructor(values: Storage<Vec2h>) { this.values = values; } }
 function half(res: HalfLayout, ctx: ComputeInvocation): void { const value: Vec2h = res.values[0]; }
-export const halfPipeline: ComputePipelineSpec = computePipeline<HalfLayout>(half, { name: "halfPipeline", workgroupSize: [2, 3, 4] });
+const halfPipeline: ComputePipelineSpec = computePipeline<HalfLayout>(half, { name: "halfPipeline", workgroupSize: [2, 3, 4] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -640,7 +640,7 @@ function groups(a: First, b: Second, ctx: ComputeInvocation): void {
   const value: Vec4f = b.values[0];
 }
 
-export const grouped: ComputePipelineSpec = computePipeline2<First, Second>(groups, { name: "grouped", workgroupSize: [1, 1, 1] });
+const grouped: ComputePipelineSpec = computePipeline2<First, Second>(groups, { name: "grouped", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -661,7 +661,7 @@ fn control_flow_operators_casts_helpers_and_builtins_emit_as_wgsl() {
         r#"
 import { clamp, fract, sign, Vec4f } from "./typegpu-types";
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, Storage } from "./typegpu";
-@CStruct class Pack { values: FixedArray<Vec4f, 2>; constructor(values: FixedArray<Vec4f, 2>) { this.values = values; } }
+@ValueType class Pack { values: FixedArray<Vec4f, 2>; constructor(values: FixedArray<Vec4f, 2>) { this.values = values; } }
 class Layout { input: Storage<Pack>; output: MutStorage<Pack>; constructor(input: Storage<Pack>, output: MutStorage<Pack>) { this.input = input; this.output = output; } }
 function helper(value: f32): f32 { return clamp(value, 0.0, 1.0); }
 function operations(res: Layout, ctx: ComputeInvocation): void {
@@ -679,7 +679,7 @@ function operations(res: Layout, ctx: ComputeInvocation): void {
   res.output[0] = pack;
 }
 
-export const operationPipeline: ComputePipelineSpec = computePipeline<Layout>(operations, { name: "operationPipeline", workgroupSize: [4, 1, 1] });
+const operationPipeline: ComputePipelineSpec = computePipeline<Layout>(operations, { name: "operationPipeline", workgroupSize: [4, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -718,7 +718,7 @@ function precedence(res: Layout, ctx: ComputeInvocation): void {
   const rounded: f32 = (Math.fround(1.0 + 2.0) as f32) * s;
 }
 
-export const precedencePipeline: ComputePipelineSpec = computePipeline<Layout>(precedence, { name: "precedencePipeline", workgroupSize: [1, 1, 1] });
+const precedencePipeline: ComputePipelineSpec = computePipeline<Layout>(precedence, { name: "precedencePipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -749,7 +749,7 @@ function logical(res: Layout, ctx: ComputeInvocation): void {
   }
 }
 
-export const logicalPipeline: ComputePipelineSpec = computePipeline<Layout>(logical, { name: "logicalPipeline", workgroupSize: [1, 1, 1] });
+const logicalPipeline: ComputePipelineSpec = computePipeline<Layout>(logical, { name: "logicalPipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -773,7 +773,7 @@ function bitwise(res: Layout, ctx: ComputeInvocation): void {
   res.values[0] = masked + combined + grouped;
 }
 
-export const bitwisePipeline: ComputePipelineSpec = computePipeline<Layout>(bitwise, { name: "bitwisePipeline", workgroupSize: [1, 1, 1] });
+const bitwisePipeline: ComputePipelineSpec = computePipeline<Layout>(bitwise, { name: "bitwisePipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -833,7 +833,7 @@ function mappings(res: MappingLayout, ctx: ComputeInvocation): void {
   const fractional: f32 = fract(scalar); const signed: f32 = sign(scalar);
 }
 
-export const mappingPipeline: ComputePipelineSpec = computePipeline<MappingLayout>(mappings, { name: "mappingPipeline", workgroupSize: [1, 1, 1] });
+const mappingPipeline: ComputePipelineSpec = computePipeline<MappingLayout>(mappings, { name: "mappingPipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -880,7 +880,7 @@ fn conditional_preludes_stay_at_their_runtime_evaluation_site() {
     let generated = generate(
         r#"
 import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
-@CStruct class Pack {
+@ValueType class Pack {
   left: FixedArray<f32, 2>;
   right: FixedArray<f32, 2>;
   constructor(left: FixedArray<f32, 2>, right: FixedArray<f32, 2>) { this.left = left; this.right = right; }
@@ -898,7 +898,7 @@ function control(res: Layout, ctx: ComputeInvocation): void {
   const pack: Pack = res.packs[0];
   for (const value of (flag ? pack.left : pack.right)) { i += value as u32; }
 }
-export const controlPipeline: ComputePipelineSpec = computePipeline<Layout>(control, { name: "controlPipeline", workgroupSize: [1, 1, 1] });
+const controlPipeline: ComputePipelineSpec = computePipeline<Layout>(control, { name: "controlPipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -940,9 +940,9 @@ import { ComputeInvocation, ComputePipelineSpec, MutStorage, WgslShellSpec, comp
 class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 wgslDeclarations("const SHELL_BIAS: u32 = 7u;");
 function addBias(input: u32): u32 { print(`host=${input}`); return input + 100; }
-export const shell: WgslShellSpec = wgslShell<(input: u32) => u32>(addBias, { body: "return input + SHELL_BIAS;" });
+const shell: WgslShellSpec = wgslShell<(input: u32) => u32>(addBias, { body: "return input + SHELL_BIAS;" });
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = addBias(5); }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -977,7 +977,7 @@ const shell: WgslShellSpec = wgslShell<(input: u32) => u32>(choose, {
   body: "    if (input > 0u) {\n      return input;\n\n    }\n    return 0u;",
 });
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[0] = choose(1); }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;
@@ -998,7 +998,7 @@ fn guarded_pipeline_emits_the_hidden_last_binding_and_three_axis_fence() {
 import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
 class Layout { output: MutStorage<u32>; constructor(output: MutStorage<u32>) { this.output = output; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void { res.output[ctx.globalId.x] = 9; }
-export const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 2, 1], guarded: true });
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 2, 1], guarded: true });
 "#,
     );
     let wgsl = &generated.pipelines[0].1;

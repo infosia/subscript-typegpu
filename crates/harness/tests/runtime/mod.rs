@@ -495,9 +495,9 @@ fn render_declaration_helpers_execute_their_real_host_bodies() {
         r#"
 import { FragmentInvocation, renderPipeline, renderPipelineInstanced, renderPipelineL, RenderPipelineSpec, VertexInvocation } from "./typegpu";
 import { Vec2f, Vec4f } from "./typegpu-types";
-@CStruct class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
-@CStruct class Instance { offset: Vec2f; constructor(offset: Vec2f) { this.offset = offset; } }
-@CStruct class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
+@ValueType class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
+@ValueType class Instance { offset: Vec2f; constructor(offset: Vec2f) { this.offset = offset; } }
+@ValueType class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
 class Layout {}
 function vert(value: Vertex, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(0.0, 0.0, 0.0, 1.0)); }
 function vertL(res: Layout, value: Vertex, ctx: VertexInvocation): Varyings { return vert(value, ctx); }
