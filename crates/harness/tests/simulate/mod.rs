@@ -2,9 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use subscript_compiler::hir::{
-    source_name, AsyncCallee, Callee, Expr, ExprKind, Module, Stmt, TplPart,
-};
+use subscript_compiler::hir::{AsyncCallee, Callee, Expr, ExprKind, Module, Stmt, Symbol, TplPart};
 use subscript_compiler::CheckOptions;
 use subscript_typegpu_gen::Generated;
 
@@ -43,8 +41,8 @@ fn programs() -> Vec<PathBuf> {
     programs
 }
 
-fn simulation_spec_index(symbol: &str) -> Option<usize> {
-    let name = source_name(symbol);
+fn simulation_spec_index(symbol: &Symbol) -> Option<usize> {
+    let name = symbol.source_name();
     Some(match name.split('<').next().unwrap_or(&name) {
         "simulateCompute" | "simulateComputeThreads" => 2,
         "simulateCompute2" => 3,
@@ -73,10 +71,10 @@ fn statement_pos(statement: &Stmt) -> Option<&subscript_compiler::Pos> {
     }
 }
 
-fn is_library_simulation(module: &Module, symbol: &str) -> bool {
+fn is_library_simulation(module: &Module, symbol: &Symbol) -> bool {
     simulation_spec_index(symbol).is_some()
         && module.functions.iter().any(|function| {
-            function.symbol == symbol
+            function.symbol == *symbol
                 && (function.pos.file == "typegpu.ts"
                     || function
                         .params
@@ -95,14 +93,14 @@ fn assert_pair(
     module: &Module,
     generated: &Generated,
     expression: &Expr,
-    callee: &str,
+    callee: &Symbol,
     args: &[Expr],
     failures: &mut Vec<String>,
 ) {
     if !is_library_simulation(module, callee) {
         return;
     }
-    let callee_name = source_name(callee);
+    let callee_name = callee.source_name();
     let method = callee_name.split('<').next().unwrap_or(&callee_name);
     let Some(spec_index) = simulation_spec_index(callee) else {
         return;
@@ -124,9 +122,9 @@ fn assert_pair(
         failures.push(format!("{call} does not pass a Global pipeline spec"));
         return;
     };
-    let declaration = source_name(declaration);
+    let declaration = declaration.source_name();
     let kernel_symbol = kernel;
-    let kernel = source_name(kernel_symbol);
+    let kernel = kernel_symbol.source_name();
     let Some(pipeline) = generated
         .compute_pipelines
         .iter()
@@ -146,10 +144,10 @@ fn assert_pair(
         failures.push(format!("{call} does not pass Global `{expected}`"));
         return;
     };
-    if source_name(constant) != expected {
+    if constant.source_name() != expected {
         failures.push(format!(
             "{call} passes `{}`, expected `{expected}` for kernel `{kernel}`",
-            source_name(constant)
+            constant.source_name()
         ));
         return;
     }

@@ -5,7 +5,7 @@ use crate::TryAny;
 use std::collections::{BTreeMap, BTreeSet};
 
 use subscript_compiler::hir::{
-    BinOp, Callee, Expr, ExprKind, ForOfKind, Function, Module, Stmt, UnOp,
+    BinOp, Callee, Expr, ExprKind, ForOfKind, Function, Module, Stmt, Symbol, UnOp,
 };
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
@@ -93,7 +93,7 @@ fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
 
 /// Returns the module-level function of this declaration symbol, and `None` when the module
 /// declares none.
-fn function<'a>(module: &'a Module, symbol: &str) -> Option<&'a Function> {
+fn function<'a>(module: &'a Module, symbol: &Symbol) -> Option<&'a Function> {
     crate::pipeline::function(module, symbol)
 }
 
@@ -128,7 +128,7 @@ fn statement_pos(statement: &Stmt) -> Option<&Pos> {
 /// The generator recognizes a library function by declaring file, never by name alone (RN1). A
 /// generic instantiation can carry a position outside the library, so a parameter's file and the
 /// first statement's file both count.
-fn function_declared_in(module: &Module, name: &str, file: &str) -> bool {
+fn function_declared_in(module: &Module, name: &Symbol, file: &str) -> bool {
     function(module, name).is_some_and(|function| {
         function.pos.file == file
             || function.params.iter().any(|param| param.pos.file == file)
@@ -220,7 +220,7 @@ enum KernelGlobalKind {
 #[derive(Debug, Clone)]
 struct KernelGlobal {
     /// The checker's declaration symbol, which a global reference carries.
-    symbol: String,
+    symbol: Symbol,
     /// The author's declaration name, which the emitter mangles (K14).
     name: String,
     /// The value type. A wrapper gives the `T` it carries, never the wrapper class.
@@ -232,7 +232,7 @@ struct KernelGlobal {
 }
 
 /// Collects the declaration symbols of the module-level declarations that `expr` reads.
-fn global_names_expr(expr: &Expr, out: &mut BTreeSet<String>) {
+fn global_names_expr(expr: &Expr, out: &mut BTreeSet<Symbol>) {
     if let ExprKind::Global(name) = &expr.kind {
         out.insert(name.clone());
     }
@@ -286,7 +286,7 @@ fn global_names_expr(expr: &Expr, out: &mut BTreeSet<String>) {
 }
 
 /// Runs `global_names_expr` over every expression the statement holds, nested bodies included.
-fn global_names_stmt(statement: &Stmt, out: &mut BTreeSet<String>) {
+fn global_names_stmt(statement: &Stmt, out: &mut BTreeSet<Symbol>) {
     match statement {
         Stmt::Let { init, .. } | Stmt::Expr(init) => global_names_expr(init, out),
         Stmt::Return {
@@ -454,7 +454,7 @@ fn kernel_globals(
             }
             _ => None,
         };
-        let (ty, kind) = match wrapper {
+        let (ty, kind) = match wrapper.as_ref().map(|(name, args)| (name.as_str(), *args)) {
             Some(("privateVar", [init])) => (
                 wrapper_item_type(module, &global.ty, "value", &global.pos)?.ok_or_else(|| {
                     diagnostic(
@@ -612,13 +612,13 @@ fn expression_blocks_host(module: &Module, expression: &Expr) -> Result<bool, Di
             let callee_blocks = match callee {
                 Callee::Func(name) => {
                     matches!(
-                        crate::base_name(name),
+                        crate::base_name(name).as_str(),
                         "workgroupBarrier" | "storageBarrier"
                     ) && function_declared_in(module, name, "typegpu.ts")
                 }
                 Callee::Method { recv, name } => {
                     atomic_scalar(module, &recv.ty, &expression.pos)?.is_some()
-                        || (name == "$=" && is_private_var(module, &recv.ty))
+                        || (name.source_name() == "$=" && is_private_var(module, &recv.ty))
                         || expression_blocks_host(module, recv)?
                 }
                 Callee::Value(value) => expression_blocks_host(module, value)?,
@@ -1270,9 +1270,9 @@ fn fold_binary(
 /// Returns a K19 diagnostic for every other initializer, and the diagnostics of `fold_binary`.
 fn fold_constant_expr(
     module: &Module,
-    globals: &BTreeMap<String, KernelGlobal>,
-    cache: &mut BTreeMap<String, FoldedConstant>,
-    visiting: &mut BTreeSet<String>,
+    globals: &BTreeMap<Symbol, KernelGlobal>,
+    cache: &mut BTreeMap<Symbol, FoldedConstant>,
+    visiting: &mut BTreeSet<Symbol>,
     expr: &Expr,
 ) -> Result<FoldedConstant, Diagnostic> {
     match &expr.kind {
@@ -1327,12 +1327,12 @@ fn fold_constant_expr(
             callee: Callee::Func(name),
             args,
         } if function_declared_in(module, name, "typegpu-types.ts") => {
-            let constructor = mapping::free_function(name).ok_or_else(|| {
+            let constructor = mapping::free_function(&crate::base_name(name)).ok_or_else(|| {
                 diagnostic(
                     "K19",
                     format!(
                         "module constant calls unsupported function `{}`",
-                        crate::source_name(name)
+                        name.source_name()
                     ),
                     expr.pos.clone(),
                 )
@@ -1342,7 +1342,7 @@ fn fold_constant_expr(
                     "K19",
                     format!(
                         "module constant calls non-vector factory `{}`",
-                        crate::source_name(name)
+                        name.source_name()
                     ),
                     expr.pos.clone(),
                 ));
@@ -1399,10 +1399,10 @@ fn fold_constant_expr(
 /// initializer that reads a declaration after it, so a cycle never reaches a checked program.
 fn fold_global_constant(
     module: &Module,
-    globals: &BTreeMap<String, KernelGlobal>,
-    cache: &mut BTreeMap<String, FoldedConstant>,
-    visiting: &mut BTreeSet<String>,
-    symbol: &str,
+    globals: &BTreeMap<Symbol, KernelGlobal>,
+    cache: &mut BTreeMap<Symbol, FoldedConstant>,
+    visiting: &mut BTreeSet<Symbol>,
+    symbol: &Symbol,
 ) -> Result<FoldedConstant, Diagnostic> {
     if let Some(value) = cache.get(symbol) {
         return Ok(value.clone());
@@ -1411,7 +1411,7 @@ fn fold_global_constant(
         generator_diagnostic(
             format!(
                 "global `{}` disappeared from typed HIR",
-                crate::source_name(symbol)
+                symbol.source_name()
             ),
             Pos::new("", 1, 1),
         )
@@ -1434,7 +1434,7 @@ fn fold_global_constant(
             global.pos.clone(),
         ));
     }
-    if !visiting.insert(symbol.to_owned()) {
+    if !visiting.insert(symbol.clone()) {
         return Err(generator_diagnostic(
             format!("module constant cycle includes `{name}`"),
             global.pos.clone(),
@@ -1443,7 +1443,7 @@ fn fold_global_constant(
     let value = fold_constant_expr(module, globals, cache, visiting, init);
     visiting.remove(symbol);
     let value = value?;
-    cache.insert(symbol.to_owned(), value.clone());
+    cache.insert(symbol.clone(), value.clone());
     Ok(value)
 }
 
@@ -1458,7 +1458,7 @@ fn fold_global_constant(
 /// a variable.
 fn constant_snippet(
     module: &Module,
-    globals: &BTreeMap<String, KernelGlobal>,
+    globals: &BTreeMap<Symbol, KernelGlobal>,
     expr: &Expr,
 ) -> Result<Snippet, Diagnostic> {
     match &expr.kind {
@@ -1470,7 +1470,7 @@ fn constant_snippet(
                 generator_diagnostic(
                     format!(
                         "global `{}` disappeared from typed HIR",
-                        crate::source_name(symbol)
+                        symbol.source_name()
                     ),
                     expr.pos.clone(),
                 )
@@ -1534,12 +1534,12 @@ fn constant_snippet(
             callee: Callee::Func(name),
             args,
         } if function_declared_in(module, name, "typegpu-types.ts") => {
-            let Some(factory) = mapping::free_function(name) else {
+            let Some(factory) = mapping::free_function(&crate::base_name(name)) else {
                 return Err(diagnostic(
                     "K19",
                     format!(
                         "module constant calls unsupported function `{}`",
-                        crate::source_name(name)
+                        name.source_name()
                     ),
                     expr.pos.clone(),
                 ));
@@ -1549,7 +1549,7 @@ fn constant_snippet(
                     "K19",
                     format!(
                         "module constant calls non-vector factory `{}`",
-                        crate::source_name(name)
+                        name.source_name()
                     ),
                     expr.pos.clone(),
                 ));
@@ -1683,7 +1683,7 @@ fn emit_kernel_globals(module: &Module, globals: &[KernelGlobal]) -> Result<Stri
 ///
 /// The declaring file and the empty argument list both must match, so a program's own function of
 /// the same name is not a barrier.
-fn barrier_call<'a>(module: &Module, expr: &'a Expr) -> Option<&'a str> {
+fn barrier_call(module: &Module, expr: &Expr) -> Option<String> {
     let ExprKind::Call {
         callee: Callee::Func(name),
         args,
@@ -1695,7 +1695,7 @@ fn barrier_call<'a>(module: &Module, expr: &'a Expr) -> Option<&'a str> {
         return None;
     }
     let base = crate::base_name(name);
-    matches!(base, "workgroupBarrier" | "storageBarrier").then_some(base)
+    matches!(base.as_str(), "workgroupBarrier" | "storageBarrier").then_some(base)
 }
 
 // K18 permits continue because WGSL targets the enclosing loop through a switch.
@@ -1848,7 +1848,7 @@ struct Emitter<'a> {
     /// Each layout parameter name and its group index, so a field access on one is a binding.
     layout_params: BTreeMap<String, usize>,
     /// The layout class names, which a kernel local must never take (PI6).
-    layout_names: BTreeSet<String>,
+    layout_symbols: BTreeSet<Symbol>,
     /// The invocation parameter name, whose field reads are builtins (PI4, RN3).
     invocation_param: String,
     /// The entry point kind, which decides the legal builtins and the legal texture methods.
@@ -1856,7 +1856,7 @@ struct Emitter<'a> {
     /// Every binding, by group and field name.
     bindings: BTreeMap<(usize, String), BindingRef>,
     /// Every module-level declaration the call graph reads, by name.
-    globals: BTreeMap<String, KernelGlobal>,
+    globals: BTreeMap<Symbol, KernelGlobal>,
     /// The emitted name of each parameter and local (K14).
     local_names: BTreeMap<String, String>,
     /// The builtins the body reads. The entry point declares these parameters and no other (PI4).
@@ -1936,7 +1936,7 @@ impl<'a> Emitter<'a> {
         Ok(Self {
             module,
             layout_params,
-            layout_names: layouts.iter().map(|layout| layout.name.clone()).collect(),
+            layout_symbols: layouts.iter().map(|layout| layout.symbol.clone()).collect(),
             invocation_param: kernel
                 .params
                 .get(invocation_index)
@@ -1977,7 +1977,7 @@ impl<'a> Emitter<'a> {
         Self {
             module,
             layout_params: BTreeMap::new(),
-            layout_names: BTreeSet::new(),
+            layout_symbols: BTreeSet::new(),
             invocation_param: String::new(),
             invocation_kind: InvocationKind::None,
             bindings: BTreeMap::new(),
@@ -2045,7 +2045,9 @@ impl<'a> Emitter<'a> {
             ExprKind::Call {
                 callee: Callee::Method { recv, name },
                 args,
-            } if (name == "$" && args.is_empty()) || (name == "get" && args.len() == 1) => {
+            } if (name.source_name() == "$" && args.is_empty())
+                || (name.source_name() == "get" && args.len() == 1) =>
+            {
                 self.global_root(recv)
             }
             _ => None,
@@ -2102,7 +2104,7 @@ impl<'a> Emitter<'a> {
             args,
         } = &recv.kind
         {
-            if name == "$" && args.is_empty() {
+            if name.source_name() == "$" && args.is_empty() {
                 if let Some(global) = self.wrapper_ref(recv) {
                     return Ok(Snippet::atom(mapping::ident(&global.name)));
                 }
@@ -2226,7 +2228,7 @@ impl<'a> Emitter<'a> {
                     return Err(generator_diagnostic(
                         format!(
                             "global `{}` has no kernel declaration",
-                            crate::source_name(symbol)
+                            symbol.source_name()
                         ),
                         expr.pos.clone(),
                     ));
@@ -2535,7 +2537,7 @@ impl<'a> Emitter<'a> {
             }
             Callee::Func(name) => {
                 let base = crate::base_name(name);
-                if matches!(base, "workgroupBarrier" | "storageBarrier")
+                if matches!(base.as_str(), "workgroupBarrier" | "storageBarrier")
                     && function_declared_in(self.module, name, "typegpu.ts")
                 {
                     return Err(diagnostic(
@@ -2546,12 +2548,10 @@ impl<'a> Emitter<'a> {
                 }
                 let is_library = function(self.module, name)
                     .is_some_and(|function| function.pos.file == "typegpu-types.ts");
-                let mapped = is_library.then(|| mapping::free_function(name)).flatten();
-                let called = mapped.unwrap_or_else(|| crate::base_name(name));
-                let called = if mapped.is_some() {
-                    called.to_owned()
-                } else {
-                    mapping::ident(called)
+                let mapped = is_library.then(|| mapping::free_function(&base)).flatten();
+                let called = match mapped {
+                    Some(mapped) => mapped.to_owned(),
+                    None => mapping::ident(&base),
                 };
                 let (args, prelude) = self.snippets(args)?;
                 Ok(Snippet {
@@ -2561,6 +2561,7 @@ impl<'a> Emitter<'a> {
                 })
             }
             Callee::Method { recv, name } => {
+                let name = name.source_name();
                 if atomic_scalar(self.module, &recv.ty, &expr.pos)?.is_some() {
                     let place = self.atomic_place(recv)?;
                     let (args, args_prelude) = self.snippets(args)?;
@@ -2573,7 +2574,7 @@ impl<'a> Emitter<'a> {
                             &recv.pos,
                         )
                     })?;
-                    let builtin = match mapping::method(receiver, name) {
+                    let builtin = match mapping::method(receiver, &name) {
                         Some(MethodEmission::Atomic(builtin)) => builtin,
                         _ => {
                             return Err(diagnostic(
@@ -2845,7 +2846,7 @@ impl<'a> Emitter<'a> {
                         expr.pos.clone(),
                     ));
                 }
-                let Some(emission) = mapping::method(receiver, name) else {
+                let Some(emission) = mapping::method(receiver, &name) else {
                     return Err(diagnostic(
                         "K10",
                         format!("method `{receiver}.{name}` is outside K10"),
@@ -3004,8 +3005,8 @@ impl<'a> Emitter<'a> {
                         pos.clone(),
                     ));
                 }
-                if class_name(self.module, ty)
-                    .is_some_and(|class| self.layout_names.contains(class))
+                if crate::pipeline::class_symbol(self.module, ty)
+                    .is_some_and(|class| self.layout_symbols.contains(class))
                 {
                     return Err(diagnostic(
                         "PI6",
@@ -3123,8 +3124,8 @@ impl<'a> Emitter<'a> {
                                 pos.clone(),
                             ));
                         }
-                        if class_name(self.module, ty)
-                            .is_some_and(|class| self.layout_names.contains(class))
+                        if crate::pipeline::class_symbol(self.module, ty)
+                            .is_some_and(|class| self.layout_symbols.contains(class))
                         {
                             return Err(diagnostic(
                                 "PI6",
@@ -3451,10 +3452,9 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                     kind: KernelGlobalKind::Constant(_),
                     ..
                 }) => UniformityTaint::Uniform,
-                _ => UniformityTaint::NonUniform(format!(
-                    "global variable `{}`",
-                    crate::source_name(name)
-                )),
+                _ => {
+                    UniformityTaint::NonUniform(format!("global variable `{}`", name.source_name()))
+                }
             },
             ExprKind::Field { obj, name } if matches!(&obj.kind, ExprKind::Local(param, _) if param == &self.emitter.invocation_param) => {
                 UniformityTaint::NonUniform(format!(
@@ -3503,7 +3503,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                 )),
                 Callee::Method { recv, name }
                     if args.is_empty()
-                        && name == "$"
+                        && name.source_name() == "$"
                         && self
                             .emitter
                             .binding_ref(recv)
@@ -3513,7 +3513,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                 }
                 Callee::Method { recv, name }
                     if args.is_empty()
-                        && name == "length"
+                        && name.source_name() == "length"
                         && self.emitter.binding_root(recv).is_some() =>
                 {
                     UniformityTaint::Uniform
@@ -4097,7 +4097,7 @@ fn last_barrier_position(module: &Module, statements: &[Stmt]) -> Option<(u32, u
 }
 
 /// Collects the names of the functions that `expr` calls directly.
-fn called_functions_expr(expr: &Expr, out: &mut BTreeSet<String>) {
+fn called_functions_expr(expr: &Expr, out: &mut BTreeSet<Symbol>) {
     match &expr.kind {
         ExprKind::Call { callee, args } => {
             if let Callee::Func(name) = callee {
@@ -4150,7 +4150,7 @@ fn called_functions_expr(expr: &Expr, out: &mut BTreeSet<String>) {
 }
 
 /// Runs `called_functions_expr` over every expression the statement holds, nested bodies included.
-fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<String>) {
+fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<Symbol>) {
     match stmt {
         Stmt::Let { init, .. } | Stmt::Expr(init) => called_functions_expr(init, out),
         Stmt::Return {
@@ -4223,10 +4223,11 @@ fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<String>) {
     }
 }
 
-/// Appends the schema name that `ty` names to `out`, once, in first-use order (K14).
+/// Appends the declaration symbol of the schema class that `ty` names to `out`, once, in
+/// first-use order (K14).
 ///
 /// A library class carries its own WGSL spelling and declares no struct, so it never enters.
-/// `seen` holds the names already appended.
+/// `seen` holds the symbols already appended.
 ///
 /// # Errors
 ///
@@ -4234,8 +4235,8 @@ fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<String>) {
 fn collect_schema_type(
     module: &Module,
     ty: &Type,
-    seen: &mut BTreeSet<String>,
-    out: &mut Vec<String>,
+    seen: &mut BTreeSet<Symbol>,
+    out: &mut Vec<Symbol>,
     pos: &Pos,
 ) -> Result<(), Diagnostic> {
     match ty {
@@ -4244,9 +4245,9 @@ fn collect_schema_type(
             if class.is_value
                 && class.pos.file != "typegpu-types.ts"
                 && class.pos.file != "typegpu.ts"
-                && seen.insert(class.name.clone())
+                && seen.insert(class.symbol.clone())
             {
-                out.push(class.name.clone());
+                out.push(class.symbol.clone());
             }
         }
         Type::FixedArray(item, _) => collect_schema_type(module, item, seen, out, pos)?,
@@ -4256,7 +4257,7 @@ fn collect_schema_type(
     Ok(())
 }
 
-/// Appends the schema names that `expr` and its sub-expressions carry, in first-use order.
+/// Appends the schema classes that `expr` and its sub-expressions carry, in first-use order.
 ///
 /// Every expression carries its own type, so the walk reads the type first and then descends.
 ///
@@ -4266,8 +4267,8 @@ fn collect_schema_type(
 fn collect_schema_expr(
     module: &Module,
     expr: &Expr,
-    seen: &mut BTreeSet<String>,
-    out: &mut Vec<String>,
+    seen: &mut BTreeSet<Symbol>,
+    out: &mut Vec<Symbol>,
 ) -> Result<(), Diagnostic> {
     collect_schema_type(module, &expr.ty, seen, out, &expr.pos)?;
     match &expr.kind {
@@ -4334,7 +4335,7 @@ fn collect_schema_expr(
     Ok(())
 }
 
-/// Appends the schema names that one statement carries, its declared types included.
+/// Appends the schema classes that one statement carries, its declared types included.
 ///
 /// # Errors
 ///
@@ -4342,8 +4343,8 @@ fn collect_schema_expr(
 fn collect_schema_stmt(
     module: &Module,
     stmt: &Stmt,
-    seen: &mut BTreeSet<String>,
-    out: &mut Vec<String>,
+    seen: &mut BTreeSet<Symbol>,
+    out: &mut Vec<Symbol>,
 ) -> Result<(), Diagnostic> {
     match stmt {
         Stmt::Let { ty, init, .. } => {
@@ -4426,7 +4427,8 @@ fn collect_schema_stmt(
     Ok(())
 }
 
-/// Returns the schema names that one compute pipeline's WGSL module declares.
+/// Returns the declaration symbols of the schema classes that one compute pipeline's WGSL module
+/// declares.
 ///
 /// The order is first use: the bindings, then the reached globals, then the helper signatures
 /// and bodies. K14 fixes that order for the emitted structs.
@@ -4435,11 +4437,11 @@ fn collect_schema_stmt(
 ///
 /// Returns a K2 diagnostic for a cycle in the call graph. A reached global with no WGSL form
 /// gives a K19 or K20 diagnostic.
-pub(crate) fn referenced_schema_names(
+pub(crate) fn referenced_schema_classes(
     module: &Module,
     pipeline: &Pipeline,
     shells: &crate::shell::ShellProgram,
-) -> Result<Vec<String>, Diagnostic> {
+) -> Result<Vec<Symbol>, Diagnostic> {
     let kernel = function(module, &pipeline.entry).ok_or_else(|| {
         generator_diagnostic(
             "the kernel disappeared from typed HIR",
@@ -4480,10 +4482,10 @@ pub(crate) fn referenced_schema_names(
 ///
 /// The emitted helper order then follows the author's names and not the checker's module
 /// identities (K14).
-fn source_order(symbols: BTreeSet<String>) -> Vec<String> {
+fn source_order(symbols: BTreeSet<Symbol>) -> Vec<Symbol> {
     let mut ordered = symbols
         .into_iter()
-        .map(|symbol| (crate::source_name(&symbol), symbol))
+        .map(|symbol| (symbol.source_name(), symbol))
         .collect::<Vec<_>>();
     ordered.sort();
     ordered.into_iter().map(|(_, symbol)| symbol).collect()
@@ -4499,22 +4501,22 @@ fn source_order(symbols: BTreeSet<String>) -> Vec<String> {
 ///
 /// Returns a K14 diagnostic that names the shared source name.
 fn validate_unique_sources(
-    entries: &[&str],
-    dependencies: &[String],
+    entries: &[&Symbol],
+    dependencies: &[Symbol],
     globals: &[KernelGlobal],
     pos: &Pos,
 ) -> Result<(), Diagnostic> {
-    let mut owners = BTreeMap::<String, &str>::new();
+    let mut owners = BTreeMap::<String, &Symbol>::new();
     let functions = entries
         .iter()
         .copied()
-        .chain(dependencies.iter().map(String::as_str))
+        .chain(dependencies)
         .map(|symbol| (crate::base_name(symbol), symbol));
     let declarations = globals
         .iter()
-        .map(|global| (global.name.as_str(), global.symbol.as_str()));
+        .map(|global| (global.name.clone(), &global.symbol));
     for (name, symbol) in functions.chain(declarations) {
-        let emitted = mapping::ident(name);
+        let emitted = mapping::ident(&name);
         match owners.get(&emitted) {
             Some(owner) if *owner != symbol => {
                 return Err(diagnostic(
@@ -4545,33 +4547,33 @@ fn dependencies(
     module: &Module,
     kernel: &Function,
     shells: &crate::shell::ShellProgram,
-) -> Result<Vec<String>, Diagnostic> {
+) -> Result<Vec<Symbol>, Diagnostic> {
     /// Visits one function and appends it after the functions it calls. `stack` holds the current
     /// path, which detects a cycle, and `done` holds the functions already appended.
     fn visit(
         module: &Module,
-        name: &str,
+        name: &Symbol,
         shells: &crate::shell::ShellProgram,
-        stack: &mut Vec<String>,
-        done: &mut BTreeSet<String>,
-        order: &mut Vec<String>,
+        stack: &mut Vec<Symbol>,
+        done: &mut BTreeSet<Symbol>,
+        order: &mut Vec<Symbol>,
         pos: &Pos,
     ) -> Result<(), Diagnostic> {
         if done.contains(name) {
             return Ok(());
         }
         if crate::shell::function_is_shell(shells, name) {
-            done.insert(name.to_owned());
-            order.push(name.to_owned());
+            done.insert(name.clone());
+            order.push(name.clone());
             return Ok(());
         }
         if let Some(start) = stack.iter().position(|item| item == name) {
             let mut cycle = stack
                 .iter()
                 .skip(start)
-                .map(|item| crate::source_name(item))
+                .map(|item| item.source_name())
                 .collect::<Vec<_>>();
-            cycle.push(crate::source_name(name));
+            cycle.push(name.source_name());
             return Err(diagnostic(
                 "K2",
                 format!("recursive helper cycle: {}", cycle.join(" -> ")),
@@ -4587,7 +4589,7 @@ fn dependencies(
         ) {
             return Ok(());
         }
-        stack.push(name.to_owned());
+        stack.push(name.clone());
         let mut calls = BTreeSet::new();
         for stmt in &function.body {
             called_functions_stmt(stmt, &mut calls);
@@ -4596,8 +4598,8 @@ fn dependencies(
             visit(module, &called, shells, stack, done, order, &function.pos)?;
         }
         stack.pop();
-        done.insert(name.to_owned());
-        order.push(name.to_owned());
+        done.insert(name.clone());
+        order.push(name.clone());
         Ok(())
     }
     let mut calls = BTreeSet::new();
@@ -4647,8 +4649,8 @@ fn module_scope_names(
     structs: &[(String, String)],
     layouts: &[crate::pipeline::Layout],
     globals: &[KernelGlobal],
-    helpers: &[String],
-    entries: &[&str],
+    helpers: &[Symbol],
+    entries: &[&Symbol],
     declaration_names: Option<&BTreeSet<String>>,
 ) -> BTreeSet<String> {
     let mut names = structs
@@ -4665,9 +4667,13 @@ fn module_scope_names(
     names.extend(
         helpers
             .iter()
-            .map(|name| mapping::ident(crate::base_name(name))),
+            .map(|name| mapping::ident(&crate::base_name(name))),
     );
-    names.extend(entries.iter().map(|name| mapping::ident(name)));
+    names.extend(
+        entries
+            .iter()
+            .map(|name| mapping::ident(&crate::base_name(name))),
+    );
     names.extend(declaration_names.into_iter().flatten().cloned());
     names.extend(
         [
@@ -4819,7 +4825,7 @@ pub(crate) fn emit(
         &pipeline.layouts,
         &globals,
         &helpers,
-        &[crate::base_name(&pipeline.entry)],
+        &[&pipeline.entry],
         shells.declarations.as_ref().map(|item| &item.names),
     );
     validate_statement_subset(&kernel.body)?;
@@ -4851,33 +4857,32 @@ pub(crate) fn emit(
     for name in &helpers {
         let helper = function(module, name).ok_or_else(|| {
             generator_diagnostic(
-                format!(
-                    "helper `{}` disappeared from typed HIR",
-                    crate::source_name(name)
-                ),
+                format!("helper `{}` disappeared from typed HIR", name.source_name()),
                 pipeline.pos.clone(),
             )
         })?;
         if helper.is_async || helper.is_generator {
             return Err(diagnostic(
                 "K2",
-                format!(
-                    "helper `{}` is async or a generator",
-                    crate::source_name(name)
-                ),
+                format!("helper `{}` is async or a generator", name.source_name()),
                 helper.pos.clone(),
             ));
         }
         validate_statement_subset(&helper.body)?;
         for param in &helper.params {
-            let takes_layout = class_name(module, &param.ty)
-                .is_some_and(|name| pipeline.layouts.iter().any(|layout| layout.name == name));
+            let takes_layout =
+                crate::pipeline::class_symbol(module, &param.ty).is_some_and(|symbol| {
+                    pipeline
+                        .layouts
+                        .iter()
+                        .any(|layout| layout.symbol == *symbol)
+                });
             if takes_layout || class_name(module, &param.ty) == Some("ComputeInvocation") {
                 return Err(diagnostic(
                     "K2",
                     format!(
                         "helper `{}` takes a layout class or ComputeInvocation",
-                        crate::source_name(name)
+                        name.source_name()
                     ),
                     param.pos.clone(),
                 ));
@@ -4903,7 +4908,7 @@ pub(crate) fn emit(
         };
         helper_text.push_str(&format!(
             "fn {}({}){result} {{\n",
-            mapping::ident(crate::base_name(name)),
+            mapping::ident(&crate::base_name(name)),
             params.join(", ")
         ));
         helper_emitter.statements(&helper.body, 1, &mut helper_text)?;
@@ -5006,7 +5011,7 @@ pub(crate) fn emit(
     ));
     out.push_str(&format!(
         "fn {}({}) {{\n",
-        mapping::ident(crate::base_name(&pipeline.entry)),
+        mapping::ident(&crate::base_name(&pipeline.entry)),
         parameters.join(", ")
     ));
     out.push_str(&entry_body);
@@ -5014,7 +5019,8 @@ pub(crate) fn emit(
     Ok(EmittedWgsl { text: out, spans })
 }
 
-/// Returns the schema names that one render pipeline's WGSL module declares.
+/// Returns the declaration symbols of the schema classes that one render pipeline's WGSL module
+/// declares.
 ///
 /// The order is first use: the bindings, then the vertex call graph, then the fragment call
 /// graph. K14 fixes that order for the emitted structs.
@@ -5023,11 +5029,11 @@ pub(crate) fn emit(
 ///
 /// Returns a K2 diagnostic for a cycle in a call graph. An entry point or a helper that the
 /// module does not declare gives a generator diagnostic.
-pub(crate) fn referenced_render_schema_names(
+pub(crate) fn referenced_render_schema_classes(
     module: &Module,
     pipeline: &RenderPipeline,
     shells: &crate::shell::ShellProgram,
-) -> Result<Vec<String>, Diagnostic> {
+) -> Result<Vec<Symbol>, Diagnostic> {
     let mut seen = BTreeSet::new();
     let mut out = Vec::new();
     for layout in &pipeline.layouts {
@@ -5081,13 +5087,13 @@ pub(crate) fn referenced_render_schema_names(
     // A vertex schema and the varyings class reach the module as attributed structs, which
     // `render_interface_structs` writes (RN4, RN7). A plain struct for either repeats the
     // name.
-    let interface_names = pipeline
+    let interface_classes = pipeline
         .vertex_buffers
         .iter()
-        .map(|buffer| buffer.schema.as_str())
-        .chain(std::iter::once(pipeline.varyings_name.as_str()))
+        .map(|buffer| &buffer.symbol)
+        .chain(std::iter::once(&pipeline.varyings_symbol))
         .collect::<BTreeSet<_>>();
-    out.retain(|name| !interface_names.contains(name.as_str()));
+    out.retain(|symbol| !interface_classes.contains(symbol));
     Ok(out)
 }
 
@@ -5109,13 +5115,7 @@ fn render_interface_structs(
         let class = module
             .classes
             .iter()
-            .find(|class| class.name == buffer.schema && class.pos.file == pipeline.pos.file)
-            .or_else(|| {
-                module
-                    .classes
-                    .iter()
-                    .find(|class| class.name == buffer.schema)
-            })
+            .find(|class| class.symbol == buffer.symbol)
             .ok_or_else(|| {
                 generator_diagnostic(
                     format!(
@@ -5197,26 +5197,25 @@ fn render_helpers(
     for name in names {
         let helper = function(module, &name).ok_or_else(|| {
             generator_diagnostic(
-                format!(
-                    "helper `{}` disappeared from typed HIR",
-                    crate::source_name(&name)
-                ),
+                format!("helper `{}` disappeared from typed HIR", name.source_name()),
                 pipeline.pos.clone(),
             )
         })?;
         if helper.is_async || helper.is_generator {
             return Err(diagnostic(
                 "K2",
-                format!(
-                    "helper `{}` is async or a generator",
-                    crate::source_name(&name)
-                ),
+                format!("helper `{}` is async or a generator", name.source_name()),
                 helper.pos.clone(),
             ));
         }
         for param in &helper.params {
-            let takes_layout = class_name(module, &param.ty)
-                .is_some_and(|name| pipeline.layouts.iter().any(|layout| layout.name == name));
+            let takes_layout =
+                crate::pipeline::class_symbol(module, &param.ty).is_some_and(|symbol| {
+                    pipeline
+                        .layouts
+                        .iter()
+                        .any(|layout| layout.symbol == *symbol)
+                });
             if takes_layout
                 || matches!(
                     class_name(module, &param.ty),
@@ -5227,7 +5226,7 @@ fn render_helpers(
                     "K2",
                     format!(
                         "helper `{}` takes a layout class or invocation class",
-                        crate::source_name(&name)
+                        name.source_name()
                     ),
                     param.pos.clone(),
                 ));
@@ -5253,7 +5252,7 @@ fn render_helpers(
         };
         out.push_str(&format!(
             "fn {}({}){result} {{\n",
-            mapping::ident(crate::base_name(&name)),
+            mapping::ident(&crate::base_name(&name)),
             params.join(", ")
         ));
         emitter.statements(&helper.body, 1, &mut out)?;
@@ -5300,10 +5299,7 @@ pub(crate) fn emit_render(
         &pipeline.layouts,
         &globals,
         &helper_names,
-        &[
-            crate::base_name(&pipeline.vertex_entry),
-            crate::base_name(&pipeline.fragment_entry),
-        ],
+        &[&pipeline.vertex_entry, &pipeline.fragment_entry],
         shells.declarations.as_ref().map(|item| &item.names),
     );
     module_names.insert(mapping::ident(&pipeline.varyings_name));
@@ -5438,7 +5434,7 @@ pub(crate) fn emit_render(
     out.push_str("@vertex\n");
     out.push_str(&format!(
         "fn {}({}) -> {} {{\n",
-        mapping::ident(crate::base_name(&pipeline.vertex_entry)),
+        mapping::ident(&crate::base_name(&pipeline.vertex_entry)),
         vertex_parameters.join(", "),
         mapping::ident(&pipeline.varyings_name)
     ));
@@ -5468,7 +5464,7 @@ pub(crate) fn emit_render(
     let fragment_result = "@location(0u) vec4<f32>";
     out.push_str(&format!(
         "fn {}({}) -> {fragment_result} {{\n",
-        mapping::ident(crate::base_name(&pipeline.fragment_entry)),
+        mapping::ident(&crate::base_name(&pipeline.fragment_entry)),
         fragment_parameters.join(", ")
     ));
     out.push_str(&fragment_body);

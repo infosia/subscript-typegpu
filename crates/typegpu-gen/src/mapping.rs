@@ -692,9 +692,8 @@ pub(crate) fn math(function: MathFn) -> Option<&'static str> {
 
 /// Returns the WGSL name of a library free function or vector factory (K11, K27).
 ///
-/// The lookup drops the call's generic arguments first. A name outside the table gives `None`.
-pub(crate) fn free_function(name: &str) -> Option<&'static str> {
-    let base = crate::base_name(name);
+/// `base` is the source name without generic arguments. A name outside the table gives `None`.
+pub(crate) fn free_function(base: &str) -> Option<&'static str> {
     Some(match base {
         "clamp" => "clamp",
         "mix" => "mix",

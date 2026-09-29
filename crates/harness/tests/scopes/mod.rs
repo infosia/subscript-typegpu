@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use subscript_compiler::hir::{AsyncCallee, Callee, Expr, ExprKind, Module, Stmt, TplPart};
+use subscript_compiler::hir::{AsyncCallee, Callee, Expr, ExprKind, Module, Stmt, Symbol, TplPart};
 use subscript_compiler::CheckOptions;
 use subscript_compiler::Type;
 
@@ -68,8 +68,8 @@ fn is_validation_filter(module: &Module, expression: &Expr) -> bool {
         == Some(*value)
 }
 
-fn is_library_creation(module: &Module, symbol: &str) -> bool {
-    let file = match subscript_compiler::hir::source_name(symbol).as_str() {
+fn is_library_creation(module: &Module, symbol: &Symbol) -> bool {
+    let file = match symbol.source_name().as_str() {
         "createComputePipeline" | "createRenderPipeline" => "typegpu.ts",
         "UiRenderer.create" | "UiRenderer.createHost" => "typegpu-ui.ts",
         _ => return false,
@@ -77,7 +77,7 @@ fn is_library_creation(module: &Module, symbol: &str) -> bool {
     module
         .functions
         .iter()
-        .any(|function| function.symbol == symbol && function.pos.file == file)
+        .any(|function| function.symbol == *symbol && function.pos.file == file)
 }
 
 fn is_device_creation(module: &Module, receiver: &Expr, name: &str) -> bool {
@@ -113,7 +113,7 @@ fn visit_expr(
             ExprKind::Call {
                 callee: Callee::Method { name, .. },
                 args,
-            } if name == "pushErrorScope"
+            } if name.source_name() == "pushErrorScope"
                 && matches!(args.as_slice(), [filter] if is_validation_filter(module, filter)) =>
             {
                 calls.push(ProgramCall::Push);
@@ -121,7 +121,7 @@ fn visit_expr(
             ExprKind::AsyncCall {
                 callee: AsyncCallee::Method { name, .. },
                 ..
-            } if name == "popErrorScope" => calls.push(ProgramCall::Pop),
+            } if name.source_name() == "popErrorScope" => calls.push(ProgramCall::Pop),
             ExprKind::Call {
                 callee: Callee::Func(name),
                 ..
@@ -129,11 +129,15 @@ fn visit_expr(
             ExprKind::Call {
                 callee: Callee::Method { recv, name },
                 ..
-            } if is_device_creation(module, recv, name) => calls.push(ProgramCall::Creation),
+            } if is_device_creation(module, recv, &name.source_name()) => {
+                calls.push(ProgramCall::Creation)
+            }
             ExprKind::AsyncCall {
                 callee: AsyncCallee::Method { receiver, name, .. },
                 ..
-            } if is_device_creation(module, receiver, name) => calls.push(ProgramCall::Creation),
+            } if is_device_creation(module, receiver, &name.source_name()) => {
+                calls.push(ProgramCall::Creation)
+            }
             _ => {}
         }
     }

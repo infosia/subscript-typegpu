@@ -316,7 +316,7 @@ fn binding_size(
             let class = crate::class(module, id.0, "emit::binding_size", pos)?;
             schemas
                 .iter()
-                .find(|schema| schema.name == class.name)
+                .find(|schema| schema.symbol == class.symbol)
                 .map(|schema| schema.tree.clone())
                 .or_else(|| crate::schema::library_tree(module, class))
         }
@@ -437,7 +437,7 @@ pub(crate) fn support_module(
                 .flat_map(|pipeline| &pipeline.layouts),
         )
     {
-        if emitted_resources.insert(layout.name.clone()) {
+        if emitted_resources.insert(&layout.symbol) {
             emit_resources_class(&mut out, layout);
         }
     }
@@ -490,7 +490,7 @@ pub(crate) fn support_module(
              export const {name}_HOST_RUNNABLE: boolean = {host_runnable};\n",
             name = pipeline.declaration,
             wgsl = escape_string(text),
-            entry = crate::mapping::ident(crate::base_name(&pipeline.entry)),
+            entry = crate::mapping::ident(&crate::base_name(&pipeline.entry)),
             x = pipeline.workgroup[0],
             y = pipeline.workgroup[1],
             z = pipeline.workgroup[2],
@@ -521,8 +521,8 @@ pub(crate) fn support_module(
              export const {name}_TARGET_FORMAT: GPUTextureFormat = \"{format}\";\n",
             name = pipeline.declaration,
             wgsl = escape_string(text),
-            vertex = crate::mapping::ident(crate::base_name(&pipeline.vertex_entry)),
-            fragment = crate::mapping::ident(crate::base_name(&pipeline.fragment_entry)),
+            vertex = crate::mapping::ident(&crate::base_name(&pipeline.vertex_entry)),
+            fragment = crate::mapping::ident(&crate::base_name(&pipeline.fragment_entry)),
             format = pipeline.target_format,
         ));
         if let Some(index_format) = &pipeline.index_format {
@@ -566,7 +566,7 @@ pub(crate) fn support_module(
         for buffer in &pipeline.vertex_buffers {
             let schema = schemas
                 .iter()
-                .find(|schema| schema.name == buffer.schema)
+                .find(|schema| schema.symbol == buffer.symbol)
                 .ok_or_else(|| {
                     generator_diagnostic(
                         format!("vertex schema `{}` has no generated layout", buffer.schema),

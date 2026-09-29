@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use subscript_compiler::hir::{Callee, Expr, ExprKind, Module, Stmt};
+use subscript_compiler::hir::{Callee, Expr, ExprKind, Module, Stmt, Symbol};
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 use crate::pipeline::{self, BindingKind, Layout};
@@ -21,6 +21,8 @@ pub(crate) struct VertexAttribute {
 pub(crate) struct VertexBuffer {
     /// The vertex or instance schema name, whose layout gives the stride and the offsets.
     pub(crate) schema: String,
+    /// The schema class's declaration symbol, which identifies the class.
+    pub(crate) symbol: Symbol,
     /// The slot: 0 for the vertex schema and 1 for the instance schema.
     pub(crate) slot: u32,
     /// The step mode, `vertex` or `instance`.
@@ -50,15 +52,17 @@ pub(crate) struct RenderPipeline {
     /// The module-level `const` name that carries the declaration.
     pub(crate) declaration: String,
     /// The vertex kernel's declaration symbol. Its source name is the `@vertex` entry point.
-    pub(crate) vertex_entry: String,
+    pub(crate) vertex_entry: Symbol,
     /// The fragment kernel's declaration symbol. Its source name is the `@fragment` entry point.
-    pub(crate) fragment_entry: String,
+    pub(crate) fragment_entry: Symbol,
     /// The layout classes, in group order from 0.
     pub(crate) layouts: Vec<Layout>,
     /// The vertex buffer slots, in slot order.
     pub(crate) vertex_buffers: Vec<VertexBuffer>,
     /// The varyings class name. The class is not a schema and carries no layout constants (RN7).
     pub(crate) varyings_name: String,
+    /// The varyings class's declaration symbol, which identifies the class.
+    pub(crate) varyings_symbol: Symbol,
     /// The varyings fields, in declaration order.
     pub(crate) varyings: Vec<Varying>,
     /// The `GPUTextureFormat` of the color target, from the declaration's spec (RN12).
@@ -95,12 +99,12 @@ fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
 /// The tuple is the layout count, the vertex schema's parameter index after the layouts, and the
 /// instance schema's index after the layouts when the form takes one. Every other call gives
 /// `None`. The declaring file identifies the library function, never the name alone.
-fn render_shape(module: &Module, name: &str) -> Option<(usize, usize, Option<usize>)> {
+fn render_shape(module: &Module, name: &Symbol) -> Option<(usize, usize, Option<usize>)> {
     let declaration = pipeline::function(module, name)?;
     if declaration.params.first()?.pos.file != "typegpu.ts" {
         return None;
     }
-    Some(match crate::base_name(name) {
+    Some(match crate::base_name(name).as_str() {
         "renderPipeline" => (0, 0, None),
         "renderPipelineL" => (1, 0, None),
         "renderPipelineInstanced" => (0, 0, Some(1)),
@@ -237,13 +241,14 @@ fn vertex_buffer(
     }
     Ok(VertexBuffer {
         schema: class.name.clone(),
+        symbol: class.symbol.clone(),
         slot,
         step_mode,
         attributes,
     })
 }
 
-/// Reads the varyings class into its name and its fields (RN7).
+/// Reads the varyings class into its declaration and its fields (RN7).
 ///
 /// The `position` field emits `@builtin(position)` and takes no location, so the other fields
 /// number from 0 in declaration order. An integer field emits `@interpolate(flat)`.
@@ -252,7 +257,11 @@ fn vertex_buffer(
 ///
 /// Returns an RN7 diagnostic when the type is not a program `@ValueType` class, when it has no
 /// `position: Vec4f` field, or when a field type is outside RN7.
-fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varying>), Diagnostic> {
+fn varyings<'a>(
+    module: &'a Module,
+    ty: &Type,
+    pos: &Pos,
+) -> Result<(&'a subscript_compiler::hir::ClassDef, Vec<Varying>), Diagnostic> {
     let class = value_class(module, ty, pos)?.ok_or_else(|| {
         diagnostic(
             "RN7",
@@ -304,7 +313,7 @@ fn varyings(module: &Module, ty: &Type, pos: &Pos) -> Result<(String, Vec<Varyin
             flat,
         });
     }
-    Ok((class.name.clone(), fields))
+    Ok((class, fields))
 }
 
 /// Reports whether `ty` is a legal varying field type (RN7).
@@ -750,22 +759,24 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
                 }
             }
         }
-        let (varyings_name, varyings) = match varyings(module, &vertex.ret, &vertex.pos) {
+        let (varyings_class, varyings) = match varyings(module, &vertex.ret, &vertex.pos) {
             Ok(value) => value,
             Err(error) => {
                 diagnostics.push(error);
                 continue;
             }
         };
+        let varyings_name = varyings_class.name.clone();
+        let varyings_symbol = varyings_class.symbol.clone();
         let overlaps_vertex = vertex_buffers
             .iter()
-            .any(|buffer| buffer.schema == varyings_name);
+            .any(|buffer| buffer.symbol == varyings_symbol);
         let overlaps_binding = layouts
             .iter()
             .flat_map(|layout| &layout.bindings)
             .any(|binding| {
-                pipeline::class_name(module, &binding.item_ty)
-                    .is_some_and(|name| name == varyings_name)
+                pipeline::class_symbol(module, &binding.item_ty)
+                    .is_some_and(|symbol| *symbol == varyings_symbol)
             });
         // A varyings class carries `@location` attributes and gets no layout, so one class never
         // serves as both a varyings class and a vertex schema or a binding item (RN7).
@@ -817,6 +828,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             layouts,
             vertex_buffers,
             varyings_name,
+            varyings_symbol,
             varyings,
             target_format,
             index_format,
@@ -835,12 +847,13 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
     }
 }
 
-/// Returns the vertex and instance schema names of every render pipeline.
-pub(crate) fn schema_names(pipelines: &[RenderPipeline]) -> BTreeSet<String> {
+/// Returns the declaration symbols of the vertex and instance schema classes of every render
+/// pipeline.
+pub(crate) fn schema_classes(pipelines: &[RenderPipeline]) -> BTreeSet<Symbol> {
     pipelines
         .iter()
         .flat_map(|pipeline| &pipeline.vertex_buffers)
-        .map(|buffer| buffer.schema.clone())
+        .map(|buffer| buffer.symbol.clone())
         .collect()
 }
 
@@ -996,7 +1009,7 @@ fn binding_reads_stmt(
 fn stage_bindings(
     module: &Module,
     pipeline: &RenderPipeline,
-    entry: &str,
+    entry: &Symbol,
 ) -> Result<BTreeSet<(usize, String)>, Diagnostic> {
     let Some(kernel) = pipeline::function(module, entry) else {
         return Ok(BTreeSet::new());
@@ -1119,7 +1132,7 @@ fn written_binding_expr(
             callee: Callee::Method { recv, name },
             args,
         } => {
-            if name == "set" {
+            if name.source_name() == "set" {
                 if let Some(binding) = binding_key(recv, layout_params) {
                     out.push(binding);
                 }

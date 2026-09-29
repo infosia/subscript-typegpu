@@ -93,8 +93,9 @@ fn inspect_expr(
             ..
         } = &expression.kind
         {
+            let name = name.source_name();
             if matches!(name.as_str(), "get" | "set")
-                && is_authored_method(source, expression, name)
+                && is_authored_method(source, expression, &name)
             {
                 if let Some(wrapper) = wrapper_name(module, recv) {
                     let replacement = if name == "get" {

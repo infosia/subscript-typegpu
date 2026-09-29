@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use subscript_compiler::hir::{Callee, ClassDef, Expr, ExprKind, Function, Module, Stmt};
+use subscript_compiler::hir::{Callee, ClassDef, Expr, ExprKind, Function, Module, Stmt, Symbol};
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 /// The address space and the resource kind of one layout binding (PI5, TX1).
@@ -191,6 +191,8 @@ pub(crate) struct Binding {
 pub(crate) struct Layout {
     /// The layout class name.
     pub(crate) name: String,
+    /// The layout class's declaration symbol, which identifies the class.
+    pub(crate) symbol: Symbol,
     /// The bind group index, which is the kernel's parameter order (PI2).
     pub(crate) group: u32,
     /// The bindings, in field declaration order. A guarded declaration appends its guard last.
@@ -203,7 +205,7 @@ pub(crate) struct Pipeline {
     /// The module-level `const` name that carries the declaration.
     pub(crate) declaration: String,
     /// The kernel function's declaration symbol. Its source name is the WGSL entry point.
-    pub(crate) entry: String,
+    pub(crate) entry: Symbol,
     /// The workgroup size, from the descriptor literal.
     pub(crate) workgroup: [u32; 3],
     /// Whether sequential host simulation keeps the kernel's behavior (CL2).
@@ -241,6 +243,12 @@ fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
 pub(crate) fn class_name<'a>(module: &'a Module, ty: &Type) -> Option<&'a str> {
     let Type::Class(id) = ty else { return None };
     module.classes.get(id.0).map(|class| class.name.as_str())
+}
+
+/// Returns the declaration symbol of a class type, and `None` for every other type.
+pub(crate) fn class_symbol<'a>(module: &'a Module, ty: &Type) -> Option<&'a Symbol> {
+    let Type::Class(id) = ty else { return None };
+    module.classes.get(id.0).map(|class| &class.symbol)
 }
 
 /// Renders one type the way the checker prints it, for a diagnostic message.
@@ -664,6 +672,7 @@ pub(crate) fn layout(
     }
     Ok(Layout {
         name: class.name.clone(),
+        symbol: class.symbol.clone(),
         group,
         bindings,
     })
@@ -845,11 +854,11 @@ fn guarded_option(module: &Module, expr: &Expr) -> Result<bool, Diagnostic> {
 ///
 /// A callee and a function reference carry the checker's declaration symbol, so the symbol and
 /// never the source name identifies the function.
-pub(crate) fn function<'a>(module: &'a Module, symbol: &str) -> Option<&'a Function> {
+pub(crate) fn function<'a>(module: &'a Module, symbol: &Symbol) -> Option<&'a Function> {
     module
         .functions
         .iter()
-        .find(|function| function.symbol == symbol)
+        .find(|function| function.symbol == *symbol)
 }
 
 /// Returns the layout count of a `computePipeline` declaration function, and `None` for every
@@ -857,13 +866,13 @@ pub(crate) fn function<'a>(module: &'a Module, symbol: &str) -> Option<&'a Funct
 ///
 /// The layout count is the group count (PI2). The declaring file identifies the library function,
 /// so a program's own `computePipeline` never matches (PI1).
-fn compute_arity(module: &Module, name: &str) -> Option<usize> {
+fn compute_arity(module: &Module, name: &Symbol) -> Option<usize> {
     let base = crate::base_name(name);
     let declaration = function(module, name)?;
     if declaration.params.first()?.pos.file != "typegpu.ts" {
         return None;
     }
-    Some(match base {
+    Some(match base.as_str() {
         "computePipeline" => 1,
         "computePipeline2" => 2,
         "computePipeline3" => 3,
@@ -1023,10 +1032,7 @@ pub(crate) fn discover(
         // parameter count matches the form. Either failure here is a generator defect.
         let Some(kernel) = function(module, entry) else {
             diagnostics.push(generator_diagnostic(
-                format!(
-                    "kernel `{}` disappeared from typed HIR",
-                    crate::source_name(entry)
-                ),
+                format!("kernel `{}` disappeared from typed HIR", entry),
                 global.init.pos.clone(),
             ));
             continue;
@@ -1170,21 +1176,21 @@ pub(crate) fn discover(
     }
 }
 
-/// Returns the author schema names that the pipelines' binding item types reach.
+/// Returns the declaration symbols of the author schema classes that the pipelines' binding item
+/// types name.
 ///
 /// The result excludes the library vector, matrix, and atomic classes, which carry no generated
 /// layout constants.
-pub(crate) fn schema_names(module: &Module, pipelines: &[Pipeline]) -> BTreeSet<String> {
+pub(crate) fn schema_classes(module: &Module, pipelines: &[Pipeline]) -> BTreeSet<Symbol> {
     pipelines
         .iter()
         .flat_map(|pipeline| &pipeline.layouts)
         .flat_map(|layout| &layout.bindings)
-        .filter_map(|binding| class_name(module, &binding.item_ty))
-        .filter(|name| {
-            module.classes.iter().any(|class| {
-                class.name == **name && class.is_value && class.pos.file != "typegpu-types.ts"
-            })
+        .filter_map(|binding| match &binding.item_ty {
+            Type::Class(id) => module.classes.get(id.0),
+            _ => None,
         })
-        .map(str::to_owned)
+        .filter(|class| class.is_value && class.pos.file != "typegpu-types.ts")
+        .map(|class| class.symbol.clone())
         .collect()
 }

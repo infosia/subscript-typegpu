@@ -127,8 +127,11 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   diagnostic, because subscript §125 gives each module its own
   top-level names. Two classes in the checked program that share one
   source name, where at least one is a `@ValueType` class, are the
-  same diagnostic, because the generator finds a value class by its
-  source name. Callees with no dependency between them are emitted
+  same diagnostic, because WGSL struct names and layout constant
+  names are source names. Two classes that share one source name,
+  where the generator uses one as a layout and the other as a layout,
+  a schema, or a varyings class, are the same diagnostic, because
+  support-module exports are named by source name. Callees with no dependency between them are emitted
   in source-name order. Rev 4 and earlier placed module variables before the
   bindings. Rev 5 moved them after, so one order serves a module
   with and without shells, and every `.wgsl` golden was regenerated

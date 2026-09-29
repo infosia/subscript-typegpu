@@ -122,7 +122,7 @@ fn inspect_expr(
             ExprKind::Call {
                 callee: Callee::Method { name, .. },
                 ..
-            } if name == "copyTextureToBuffer"
+            } if name.source_name() == "copyTextureToBuffer"
         ) {
             inspection.pixel_oracle = true;
         }

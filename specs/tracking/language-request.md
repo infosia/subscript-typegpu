@@ -300,3 +300,30 @@ predates the re-pin.
 Evidence at `2fa77ec`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
 397.2 s wall on a warm build (harness `tests/main.rs` 348.9 s).
+
+### Typed symbols: re-pin to `5c5ec98` (2026-09-30)
+
+Request: the HIR carried §125 identities as text in `String` fields,
+so a comparison with a source name compiled and missed at run time.
+Evidence from the `2fa77ec` re-pin: `cargo check` found none of the
+§125 breaks, the survey found them by reading, and a program
+`RandomF32` resolved to the library class with no diagnostic. The
+request went to subscript on 2026-09-29. It landed as §131 (`hir::Symbol`,
+`ClassDef.symbol`), with no language change and no golden move.
+The subscript range `2fa77ec..5c5ec98` also amends §130: `@CStruct`
+is the general unknown-decorator S100.
+
+Downstream changes: the generator and the harness tests compare
+`Symbol` with `Symbol`, and read `source_name()` only for output
+names. Schema, layout, and varyings lookups use `ClassDef.symbol`.
+The text helpers that parsed identity markers are removed. Lookups
+that stay by name: support-module import names (an import carries a
+name only), WGSL struct text keyed by the output struct name, the
+constructed matrix column class name in `typegpu-types.ts`, and the
+library class classifications. K14 Rev 9 adds layout classes:
+fixture `k14-shared-layout-name.ts`, red before the check (the support
+module exported `BitonicSortResourcesResources` twice), green after.
+
+Evidence at `5c5ec98`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
+383.8 s wall on a warm build.

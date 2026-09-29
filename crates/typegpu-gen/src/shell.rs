@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use subscript_compiler::hir::{Callee, Expr, ExprKind, Function, Module, Stmt};
+use subscript_compiler::hir::{Callee, Expr, ExprKind, Function, Module, Stmt, Symbol};
 use subscript_compiler::{Diagnostic, Pos, RuleCode};
 
 /// One WGSL shell: a source function whose GPU body is author WGSL (K29).
@@ -11,7 +11,7 @@ pub(crate) struct Shell {
     /// The shell name, which is the shelled function's name without generic arguments.
     pub(crate) name: String,
     /// The declaration symbol of the module-level function that carries the host body.
-    pub(crate) function: String,
+    pub(crate) function: Symbol,
     /// The WGSL statements that become the emitted function body.
     pub(crate) body: String,
     /// The declaration position.
@@ -53,7 +53,7 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
 /// (RN1). `name` is the callee's declaration symbol, which carries the generic arguments, so the
 /// comparison drops them first. The declaring file is the function's own position, or the position
 /// of its first parameter.
-fn library_call(module: &Module, name: &str, expected: &str) -> bool {
+fn library_call(module: &Module, name: &Symbol, expected: &str) -> bool {
     crate::base_name(name) == expected
         && crate::pipeline::function(module, name).is_some_and(|function| {
             function.pos.file == "typegpu.ts"
@@ -496,7 +496,7 @@ pub(crate) fn discover(module: &Module) -> Result<ShellProgram, Vec<Diagnostic>>
         match descriptor_body(module, options) {
             Ok(body) => match tokens(&body, &options.pos) {
                 Ok(_) => shells.push(Shell {
-                    name: crate::base_name(function).to_owned(),
+                    name: crate::base_name(function),
                     function: function.clone(),
                     body,
                     pos: global.pos.clone(),
@@ -614,14 +614,17 @@ pub(crate) fn validate_collisions(
 
 /// Reports whether the function of this declaration symbol is a shell, whose subscript body the
 /// emitter never walks.
-pub(crate) fn function_is_shell(program: &ShellProgram, name: &str) -> bool {
-    program.shells.iter().any(|shell| shell.function == name)
+pub(crate) fn function_is_shell(program: &ShellProgram, name: &Symbol) -> bool {
+    program.shells.iter().any(|shell| shell.function == *name)
 }
 
 /// Returns the shell of the function of this declaration symbol, or `None` when the function is
 /// not a shell.
-pub(crate) fn shell_for_function<'a>(program: &'a ShellProgram, name: &str) -> Option<&'a Shell> {
-    program.shells.iter().find(|shell| shell.function == name)
+pub(crate) fn shell_for_function<'a>(
+    program: &'a ShellProgram,
+    name: &Symbol,
+) -> Option<&'a Shell> {
+    program.shells.iter().find(|shell| shell.function == *name)
 }
 
 /// Checks one shell's signature against the K2 helper rules and returns the function.
@@ -649,9 +652,11 @@ pub(crate) fn validate_signature<'a>(
         ));
     }
     for param in &function.params {
-        if crate::pipeline::class_name(module, &param.ty).is_some_and(|name| {
-            name == "ComputeInvocation" || layouts.iter().any(|layout| layout.name == name)
-        }) {
+        let takes_layout = crate::pipeline::class_symbol(module, &param.ty)
+            .is_some_and(|symbol| layouts.iter().any(|layout| layout.symbol == *symbol));
+        if takes_layout
+            || crate::pipeline::class_name(module, &param.ty) == Some("ComputeInvocation")
+        {
             return Err(diagnostic(
                 "K29",
                 format!(

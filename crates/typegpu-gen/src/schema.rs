@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeSet, HashSet};
 
-use subscript_compiler::hir::{ClassDef, Module};
+use subscript_compiler::hir::{ClassDef, Module, Symbol};
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 use crate::layout::{self, Matrix, Member, Scalar, Struct, TypeTree, Vector};
@@ -12,6 +12,8 @@ use crate::layout::{self, Matrix, Member, Scalar, Struct, TypeTree, Vector};
 pub(crate) struct Schema {
     /// The class name, as the author declared it.
     pub(crate) name: String,
+    /// The class's declaration symbol, which identifies the class.
+    pub(crate) symbol: Symbol,
     /// The layout tree, with the members in declaration order (SC2).
     pub(crate) tree: TypeTree,
     /// The class declaration position.
@@ -327,7 +329,8 @@ fn uniform_violation(tree: &TypeTree, path: &str) -> Option<String> {
     }
 }
 
-/// Returns the names of the schemas that a `Uniform<T>` wrapper carries (PI7).
+/// Returns the declaration symbols of the schema classes that a `Uniform<T>` wrapper carries
+/// (PI7).
 ///
 /// The checker instantiates one class per `T`, so the module holds a `Uniform<...>` class for every
 /// uniform binding item. The caller runs the LY11 check on these schemas alone.
@@ -335,8 +338,8 @@ fn uniform_violation(tree: &TypeTree, path: &str) -> Option<String> {
 /// # Errors
 ///
 /// If a wrapper names a class the module does not hold, returns an internal diagnostic.
-fn uniform_schema_names(module: &Module) -> Result<BTreeSet<String>, Diagnostic> {
-    let mut names = BTreeSet::new();
+fn uniform_schema_classes(module: &Module) -> Result<BTreeSet<Symbol>, Diagnostic> {
+    let mut classes = BTreeSet::new();
     for class in &module.classes {
         if class.pos.file != "typegpu.ts" || class.is_value || !class.name.starts_with("Uniform<") {
             continue;
@@ -350,14 +353,14 @@ fn uniform_schema_names(module: &Module) -> Result<BTreeSet<String>, Diagnostic>
             ty => ty,
         };
         if let Type::Class(id) = ty {
-            names.insert(
-                crate::class(module, id.0, "schema::uniform_schema_names", &field.pos)?
-                    .name
+            classes.insert(
+                crate::class(module, id.0, "schema::uniform_schema_classes", &field.pos)?
+                    .symbol
                     .clone(),
             );
         }
     }
-    Ok(names)
+    Ok(classes)
 }
 
 /// Adds the class at `index` and the classes its fields reach to `reachable` (SC1).
@@ -417,11 +420,13 @@ fn collect_type_reachable(
     Ok(())
 }
 
-/// Collects every schema class that the intended names reach, with its layout tree.
+/// Collects every schema class that the schema uses reach, with its layout tree.
 ///
-/// `intended` names the schemas that the imports, the bindings, and the kernels require.
-/// `import_pos` positions a diagnostic about a name that no class matches. The result follows
-/// the module's class declaration order, not the order of `intended`.
+/// `intended` holds the declaration symbols of the classes that the bindings, the vertex buffers,
+/// and the kernels require. `imported` holds the schema names that the support-module import
+/// requires. An import carries only a name, so a name resolves to the schema candidate of that
+/// name. `import_pos` positions a diagnostic about a use that no schema candidate matches. The
+/// result follows the module's class declaration order, not the order of the uses.
 ///
 /// # Errors
 ///
@@ -430,20 +435,36 @@ fn collect_type_reachable(
 /// violation, and SC11 a field name that holds `_`.
 pub(crate) fn discover(
     module: &Module,
-    intended: &BTreeSet<String>,
+    intended: &BTreeSet<Symbol>,
+    imported: &BTreeSet<String>,
     import_pos: Option<&Pos>,
 ) -> Result<Vec<Schema>, Vec<Diagnostic>> {
-    let uniform_names = uniform_schema_names(module).map_err(|error| vec![error])?;
+    let uniform_classes = uniform_schema_classes(module).map_err(|error| vec![error])?;
     let mut schemas = Vec::new();
     let mut diagnostics = Vec::new();
     let mut reachable = BTreeSet::new();
-    // First pass: resolve each intended name to a class and collect the classes its fields reach.
-    for name in intended {
-        let Some((index, class)) = module
+    // Each use resolves to the index of a schema candidate, or to `None` when no candidate
+    // matches. The set orders the uses by source name and drops a repeated use of one class.
+    let candidate = |matches: &dyn Fn(&ClassDef) -> bool| {
+        module
             .classes
             .iter()
-            .enumerate()
-            .find(|(_, class)| class.name == *name && is_schema_candidate(class))
+            .position(|class| matches(class) && is_schema_candidate(class))
+    };
+    let uses = imported
+        .iter()
+        .map(|name| (name.clone(), candidate(&|class| class.name == *name)))
+        .chain(intended.iter().map(|symbol| {
+            (
+                symbol.source_name(),
+                candidate(&|class| class.symbol == *symbol),
+            )
+        }))
+        .collect::<BTreeSet<_>>();
+    // First pass: resolve each use to a class and collect the classes its fields reach.
+    for (name, index) in uses {
+        let Some((index, class)) =
+            index.and_then(|index| module.classes.get(index).map(|class| (index, class)))
         else {
             diagnostics.push(diagnostic(
                 "SC1",
@@ -490,6 +511,7 @@ pub(crate) fn discover(
             Ok(tree) => {
                 let schema = Schema {
                     name: class.name.clone(),
+                    symbol: class.symbol.clone(),
                     tree,
                     pos: class.pos.clone(),
                     field_positions: class.fields.iter().map(|field| field.pos.clone()).collect(),
@@ -498,7 +520,7 @@ pub(crate) fn discover(
                 // layouts already agree (SC9, then SC10).
                 if let Some(error) = identity_diagnostic(&schema).map_err(|error| vec![error])? {
                     diagnostics.push(error);
-                } else if uniform_names.contains(&schema.name) {
+                } else if uniform_classes.contains(&schema.symbol) {
                     if let Some(message) = uniform_violation(&schema.tree, "") {
                         diagnostics.push(diagnostic(
                             "SC10",

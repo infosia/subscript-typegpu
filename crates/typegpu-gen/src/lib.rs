@@ -29,7 +29,7 @@ pub use ui_atlas::generate_ui_atlas;
 
 use std::collections::BTreeSet;
 
-use subscript_compiler::hir::{Expr, ExprKind, Module};
+use subscript_compiler::hir::{Expr, ExprKind, Module, Symbol};
 use subscript_compiler::{CheckOptions, Diagnostic, Pos, RuleCode, SourceFile};
 
 use crate::layout::{Layout, TypeTree};
@@ -51,24 +51,15 @@ pub(crate) fn wgsl_i32_literal(value: i64) -> String {
     }
 }
 
-/// Returns a type or function name without its declaration identity and its generic arguments.
+/// Returns the source spelling of a declaration symbol without its generic arguments.
 ///
-/// A callee, a function reference, and a global reference carry the checker's declaration symbol,
-/// `[[identity:<kind>:<hex>]]name<args>`. The result is the source spelling `name`.
-pub(crate) fn base_name(name: &str) -> &str {
-    let name = name.split('<').next().unwrap_or(name);
-    // The identity precedes the source spelling, so the source spelling is a suffix of the symbol.
-    let source = source_name(name);
-    if name.ends_with(source.as_str()) {
-        &name[name.len() - source.len()..]
-    } else {
-        name
+/// A generic instance symbol spells `name<args>`. The result is `name`.
+pub(crate) fn base_name(symbol: &Symbol) -> String {
+    let mut source = symbol.source_name();
+    if let Some(start) = source.find('<') {
+        source.truncate(start);
     }
-}
-
-/// Returns the source spelling of a declaration symbol, generic arguments included.
-pub(crate) fn source_name(symbol: &str) -> String {
-    subscript_compiler::hir::source_name(symbol)
+    source
 }
 
 /// Reads one field of a descriptor literal by name.
@@ -111,7 +102,7 @@ pub struct GeneratedComputePipeline {
     /// The module-level pipeline declaration.
     pub declaration: String,
     /// The declaration symbol of the kernel function, as a function reference carries it.
-    pub kernel: String,
+    pub kernel: Symbol,
     /// Whether sequential host simulation preserves the kernel's behavior.
     pub host_runnable: bool,
 }
@@ -202,9 +193,9 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
 
 /// Rejects two program classes that share one source name when one of them is a value class (K14).
 ///
-/// The generator finds a schema, a layout, and a varyings class by its source name, and the
-/// emitted WGSL names a struct by it. Two modules can each declare a class of one name. A value
-/// class then has no single WGSL struct and no single set of layout constants.
+/// The emitted WGSL names a struct by the class's source name, and the support module names the
+/// layout constants by it. Two modules can each declare a class of one name. A value class then
+/// has no single WGSL struct and no single set of layout constants.
 ///
 /// # Errors
 ///
@@ -213,7 +204,7 @@ fn validate_unique_classes(module: &Module) -> Result<(), Diagnostic> {
     let mut owners =
         std::collections::BTreeMap::<String, &subscript_compiler::hir::ClassDef>::new();
     for class in &module.classes {
-        let name = source_name(&class.name);
+        let name = class.name.clone();
         match owners.get(&name) {
             Some(owner) if owner.is_value || class.is_value => {
                 return Err(diagnostic(
@@ -225,6 +216,48 @@ fn validate_unique_classes(module: &Module) -> Result<(), Diagnostic> {
             Some(_) => {}
             None => {
                 owners.insert(name, class);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Rejects two used classes that share one source name when one of them is a layout class (K14).
+///
+/// The support module names a layout's resources class and its constructor by the layout's
+/// source name, and names a schema's layout constants by the schema's source name. Two modules
+/// can each declare a class of one name. A layout class then shares its exports with the other
+/// class. `layouts` holds the layout class symbols, and `others` holds the schema and varyings
+/// class symbols. A class that neither list names keeps its source name to itself.
+///
+/// # Errors
+///
+/// Returns a K14 diagnostic at the second class, in module order, that names the shared source
+/// name.
+fn validate_unique_layouts(
+    module: &Module,
+    layouts: &[&Symbol],
+    others: &[&Symbol],
+) -> Result<(), Diagnostic> {
+    let mut owners = std::collections::BTreeMap::<&str, (&Symbol, bool)>::new();
+    for class in &module.classes {
+        let is_layout = layouts.contains(&&class.symbol);
+        if !is_layout && !others.contains(&&class.symbol) {
+            continue;
+        }
+        match owners.get(class.name.as_str()) {
+            Some((owner, owner_is_layout))
+                if **owner != class.symbol && (*owner_is_layout || is_layout) =>
+            {
+                return Err(diagnostic(
+                    "K14",
+                    format!("two program classes share the source name `{}`", class.name),
+                    class.pos.clone(),
+                ));
+            }
+            Some(_) => {}
+            None => {
+                owners.insert(class.name.as_str(), (&class.symbol, is_layout));
             }
         }
     }
@@ -365,7 +398,8 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     // poisoned import carries the imported names, and nothing here lowers this HIR (SC1a).
     let options = discovery_options(files)?;
     let module = subscript_compiler::check_program_with(files, &options)?;
-    // Every class lookup below resolves a source name, so the check runs before the first one.
+    // Every emitted struct name and layout constant name below is a source name, so the check
+    // runs before the first one.
     validate_unique_classes(&module).map_err(|item| vec![item])?;
     let support = support_import(&module)?;
     let shell_program = shell::discover(&module)?;
@@ -373,20 +407,19 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     let render_definitions = render::discover(&module)?;
     let kernel_names = pipeline_definitions
         .iter()
-        .map(|pipeline| pipeline.entry.as_str())
-        .chain(render_definitions.iter().flat_map(|pipeline| {
-            [
-                pipeline.vertex_entry.as_str(),
-                pipeline.fragment_entry.as_str(),
-            ]
-        }))
+        .map(|pipeline| &pipeline.entry)
+        .chain(
+            render_definitions
+                .iter()
+                .flat_map(|pipeline| [&pipeline.vertex_entry, &pipeline.fragment_entry]),
+        )
         .collect::<BTreeSet<_>>();
     // A shell keeps its subscript body for the host lane and never reaches the walker. A kernel is
     // the opposite, so one function cannot be both (K29).
     if let Some(shell) = shell_program
         .shells
         .iter()
-        .find(|shell| kernel_names.contains(shell.function.as_str()))
+        .find(|shell| kernel_names.contains(&shell.function))
     {
         return Err(vec![diagnostic(
             "K29",
@@ -418,22 +451,43 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         .collect::<BTreeSet<_>>();
     // A class is a schema when a schema use reaches it (SC1). The uses are the program's import,
     // the binding items, the vertex and instance schemas, and the kernel call graph.
-    let mut intended = intended_schemas(support.as_ref(), &pipeline_declarations);
-    intended.extend(pipeline::schema_names(&module, &pipeline_definitions));
-    intended.extend(render::schema_names(&render_definitions));
+    let imported = intended_schemas(support.as_ref(), &pipeline_declarations);
+    let mut intended = pipeline::schema_classes(&module, &pipeline_definitions);
+    intended.extend(render::schema_classes(&render_definitions));
     for pipeline in &pipeline_definitions {
         intended.extend(
-            kernel::referenced_schema_names(&module, pipeline, &shell_program)
+            kernel::referenced_schema_classes(&module, pipeline, &shell_program)
                 .map_err(|item| vec![item])?,
         );
     }
     for pipeline in &render_definitions {
         intended.extend(
-            kernel::referenced_render_schema_names(&module, pipeline, &shell_program)
+            kernel::referenced_render_schema_classes(&module, pipeline, &shell_program)
                 .map_err(|item| vec![item])?,
         );
     }
-    let schemas = schema::discover(&module, &intended, support.as_ref().map(|item| &item.pos))?;
+    let schemas = schema::discover(
+        &module,
+        &intended,
+        &imported,
+        support.as_ref().map(|item| &item.pos),
+    )?;
+    // The support module names each layout's exports by the layout's source name, so the check
+    // runs before the first export.
+    let layout_symbols = all_layouts
+        .iter()
+        .map(|layout| &layout.symbol)
+        .collect::<Vec<_>>();
+    let other_symbols = schemas
+        .iter()
+        .map(|schema| &schema.symbol)
+        .chain(
+            render_definitions
+                .iter()
+                .map(|pipeline| &pipeline.varyings_symbol),
+        )
+        .collect::<Vec<_>>();
+    validate_unique_layouts(&module, &layout_symbols, &other_symbols).map_err(|item| vec![item])?;
     // Every name the emitter writes at module scope. A shell or a raw declaration that repeats one
     // of them is a diagnostic, so the set must be complete before the collision check (K30).
     let mut generated_names = schemas
@@ -443,12 +497,12 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     generated_names.extend(
         pipeline_definitions
             .iter()
-            .map(|pipeline| base_name(&pipeline.entry).to_owned()),
+            .map(|pipeline| base_name(&pipeline.entry)),
     );
     generated_names.extend(render_definitions.iter().flat_map(|pipeline| {
         [
-            base_name(&pipeline.vertex_entry).to_owned(),
-            base_name(&pipeline.fragment_entry).to_owned(),
+            base_name(&pipeline.vertex_entry),
+            base_name(&pipeline.fragment_entry),
         ]
     }));
     generated_names.extend(
@@ -481,7 +535,7 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     if let Some(pipeline) = render_definitions.iter().find(|pipeline| {
         schemas
             .iter()
-            .any(|schema| schema.name == pipeline.varyings_name)
+            .any(|schema| schema.symbol == pipeline.varyings_symbol)
     }) {
         return Err(vec![diagnostic(
             "RN7",
@@ -515,11 +569,11 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
             }
             // Only the structs this module references reach its text, in first-use order (K14). A
             // referenced struct pulls in the structs its members name.
-            let references = kernel::referenced_schema_names(&module, pipeline, &shell_program)?;
+            let references = kernel::referenced_schema_classes(&module, pipeline, &shell_program)?;
             let mut names = Vec::new();
             let mut seen = BTreeSet::new();
-            for name in references {
-                if let Some(schema) = schemas.iter().find(|schema| schema.name == name) {
+            for symbol in references {
+                if let Some(schema) = schemas.iter().find(|schema| schema.symbol == symbol) {
                     append_tree(&schema.tree, &mut names, &mut seen);
                 }
             }
@@ -553,13 +607,15 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         .iter()
         .map(|pipeline| {
             let references =
-                kernel::referenced_render_schema_names(&module, pipeline, &shell_program)?;
+                kernel::referenced_render_schema_classes(&module, pipeline, &shell_program)?;
+            // `wgsl_structs` holds one entry per schema, in schema order.
             let selected_structs = references
                 .iter()
-                .filter_map(|name| {
-                    wgsl_structs
+                .filter_map(|symbol| {
+                    schemas
                         .iter()
-                        .find(|(schema, _)| schema == name)
+                        .position(|schema| schema.symbol == *symbol)
+                        .and_then(|index| wgsl_structs.get(index))
                         .cloned()
                 })
                 .collect::<Vec<_>>();
