@@ -327,3 +327,27 @@ module exported `BitonicSortResourcesResources` twice), green after.
 Evidence at `5c5ec98`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
 383.8 s wall on a warm build.
+
+### Re-pin to `86fd064` (2026-10-01)
+
+The workspace pin moves from `5c5ec98` to `86fd064`. The subscript
+range holds 24 commits, §132 through §141. The `swc_ecma_parser` fork
+stays at `affcb6e`. No source in this repository changes.
+
+- §132, §133, §134, §138, §139, §140, §141: no source here uses the
+  affected forms (no `Worker` containers, no `import type`, no
+  top-level blocks, no regex literals).
+- §135: the generic bodies in `lib/typegpu.ts` and `lib/typegpu-ui.ts`
+  read no member of a type parameter. All 87 programs and examples
+  check clean at the new pin.
+- §136: every mirror constant is a small `uint64_t` value, and
+  `tools/regen.sh` leaves no diff.
+- §137: the lib import graph has no cycle and no module initializer
+  prints. No golden moved.
+- Rust API: `ExprKind::Lambda` gains `id`, and `Module.top_level` is
+  in module run order. Both match sites use `..`, so the workspace
+  compiles without an edit.
+
+Evidence at `86fd064`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
+407.7 s wall.
