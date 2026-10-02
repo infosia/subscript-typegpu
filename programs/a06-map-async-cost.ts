@@ -31,12 +31,12 @@ export async function prepareMapAsync(): Promise<void> {
 
 async function prepareReadback(): Promise<void> {
   const adapter = await gpu.requestAdapter();
-  if (adapter === null) {
+  if (adapter == null) {
     print("FAIL adapter");
     return;
   }
   const device = await adapter.requestDevice();
-  if (device === null) {
+  if (device == null) {
     print("FAIL device");
     adapter.dispose();
     return;
@@ -75,7 +75,7 @@ export async function measureMapAsync(): Promise<void> {
 
 async function measureReadback(): Promise<void> {
   const readback = activeReadback;
-  if (readback === null) {
+  if (readback == null) {
     print("FAIL prepare");
     return;
   }
@@ -88,13 +88,13 @@ async function measureReadback(): Promise<void> {
   const expected: FixedArray<u8, 8> = [3, 1, 4, 1, 5, 9, 2, 6];
   let index: i32 = 0;
   while (index < expected.length && index < bytes.length) {
-    if (bytes[index] !== expected[index]) {
+    if (bytes[index] != expected[index]) {
       print(`FAIL byte ${index}`);
       return;
     }
     index += 1;
   }
-  if (bytes.length !== expected.length) {
+  if (bytes.length != expected.length) {
     print(`FAIL length ${bytes.length}`);
     return;
   }
@@ -115,9 +115,9 @@ function cleanupReadback(): void {
   activeReadback = null;
   activeDevice = null;
   activeAdapter = null;
-  if (readback !== null) readback.dispose();
-  if (device !== null) device.dispose();
-  if (adapter !== null) adapter.dispose();
+  if (readback != null) readback.dispose();
+  if (device != null) device.dispose();
+  if (adapter != null) adapter.dispose();
   gpu.dispose();
   if (mapPassed) print("PASS");
 }

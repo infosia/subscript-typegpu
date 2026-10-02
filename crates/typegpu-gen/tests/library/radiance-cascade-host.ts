@@ -15,9 +15,9 @@ export function main(): void {
   while (count <= 8) {
     let layer: u32 = 0;
     while (layer < count) {
-      const expected: u32 = (count - 1 - layer) % 2 === 0 ? 0 : 1;
+      const expected: u32 = (count - 1 - layer) % 2 == 0 ? 0 : 1;
       const actual: u32 = cascadeWriteSide(count, layer);
-      if (actual !== expected) {
+      if (actual != expected) {
         print(`FAIL cascadeWriteSide count=${count} layer=${layer} expected=${expected} actual=${actual}`);
       }
       layer += 1;

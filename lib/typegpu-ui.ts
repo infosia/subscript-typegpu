@@ -302,7 +302,7 @@ export class UiContext {
   // and clears the press, key-press, and text-input state. A stack still open traps `UIT2`.
   end(): void {
     this.requireFrame("end");
-    if (this.idCount !== 0 || this.layoutCount !== 0 || this.clipCount !== 1 || this.currentRoot !== 0 || this.containerDepth !== 0 || this.treeCount !== 0) {
+    if (this.idCount != 0 || this.layoutCount != 0 || this.clipCount != 1 || this.currentRoot != 0 || this.containerDepth != 0 || this.treeCount != 0) {
       uiTrap("UIT2", "end", `ids=${this.idCount} layouts=${this.layoutCount} clips=${this.clipCount} root=${this.currentRoot} containers=${this.containerDepth} trees=${this.treeCount}`);
     }
     if (!this.updatedFocus) this.focus = 0;
@@ -313,7 +313,7 @@ export class UiContext {
     }
     for (let i: i32 = 0; i < this.rootCount; i += 1) {
       const root: UiRoot = this.roots[i];
-      if (this.mousePressed !== 0 && root.id === this.nextHoverRoot && root.zindex >= 0 && root.zindex < this.lastZindex) {
+      if (this.mousePressed != 0 && root.id == this.nextHoverRoot && root.zindex >= 0 && root.zindex < this.lastZindex) {
         this.lastZindex += 1;
         root.zindex = this.lastZindex;
       }
@@ -335,12 +335,12 @@ export class UiContext {
     while (cursor < this.commandCount && this.commandRoots[cursor] < 0) cursor += 1;
     for (let i: i32 = 0; i < this.rootCount; i += 1) {
       this.roots[i].start = cursor;
-      while (cursor < this.commandCount && this.commandRoots[cursor] === i) cursor += 1;
+      while (cursor < this.commandCount && this.commandRoots[cursor] == i) cursor += 1;
       this.roots[i].end = cursor;
     }
     this.orderCount = 0;
     for (let i: i32 = 0; i < this.rootCount; i += 1) {
-      if (this.orderCount === this.order.length) this.order.push(i);
+      if (this.orderCount == this.order.length) this.order.push(i);
       else this.order[this.orderCount] = i;
       this.orderCount += 1;
       let j: i32 = this.orderCount - 1;
@@ -390,7 +390,7 @@ export class UiContext {
   // Returns the FNV-1a hash of `label` under the id stack, and records it as `lastId`.
   // Two widgets with one label in one scope share one id.
   getId(label: string): u32 {
-    let hash: u32 = this.idCount === 0 ? 2166136261 : this.ids[this.idCount - 1];
+    let hash: u32 = this.idCount == 0 ? 2166136261 : this.ids[this.idCount - 1];
     for (let i: i32 = 0; i < label.length; i += 1) hash = (hash ^ (label.charCodeAt(i) as u32)) * 16777619;
     this.lastId = hash;
     return hash;
@@ -398,14 +398,14 @@ export class UiContext {
   // Opens an id scope, so that the calls up to `popId()` hash under `label`.
   pushId(label: string): void { this.requireFrame("pushId"); this.pushIdValue(this.getId(label)); }
   private pushIdValue(id: u32): void {
-    if (this.idCount === this.ids.length) this.ids.push(id);
+    if (this.idCount == this.ids.length) this.ids.push(id);
     else this.ids[this.idCount] = id;
     this.idCount += 1;
   }
   // Leaves the innermost id scope. A call with no open scope traps `UIT2`.
   popId(): void {
     this.requireFrame("popId");
-    if (this.idCount === 0) uiTrap("UIT2", "popId", "depth=0");
+    if (this.idCount == 0) uiTrap("UIT2", "popId", "depth=0");
     this.idCount -= 1;
   }
   // Moves focus to `id` and marks focus as fresh, so that `end()` keeps it.
@@ -414,22 +414,22 @@ export class UiContext {
   // inside this frame's hover root. It returns false outside every root container.
   mouseOver(rect: UiRect): boolean {
     this.requireFrame("mouseOver");
-    return this.currentRoot !== 0 && this.currentRoot === this.hoverRoot
+    return this.currentRoot != 0 && this.currentRoot == this.hoverRoot
       && uiContains(rect, this.mouseX, this.mouseY) && uiContains(this.getClip(), this.mouseX, this.mouseY);
   }
   // Applies the hover and focus rules to the widget with `id` and `rect`.
   // `UI_OPT_NO_INTERACT` skips them, and `UI_OPT_HOLD_FOCUS` keeps focus after the release.
   updateControl(id: u32, rect: UiRect, opt: u32 = 0): void {
     this.requireFrame("updateControl");
-    if (this.focus === id) this.updatedFocus = true;
-    if ((opt & UI_OPT_NO_INTERACT) !== 0) return;
+    if (this.focus == id) this.updatedFocus = true;
+    if ((opt & UI_OPT_NO_INTERACT) != 0) return;
     const over: boolean = this.mouseOver(rect);
-    if (over && this.mouseDown === 0) this.hover = id;
-    if (this.focus === id) {
-      if ((this.mouseDown === 0 && (opt & UI_OPT_HOLD_FOCUS) === 0) || (this.mousePressed !== 0 && !over)) this.setFocus(0);
+    if (over && this.mouseDown == 0) this.hover = id;
+    if (this.focus == id) {
+      if ((this.mouseDown == 0 && (opt & UI_OPT_HOLD_FOCUS) == 0) || (this.mousePressed != 0 && !over)) this.setFocus(0);
     }
-    if (this.hover === id && this.mousePressed !== 0) this.setFocus(id);
-    if (this.hover === id && this.mousePressed === 0 && !over) this.hover = 0;
+    if (this.hover == id && this.mousePressed != 0) this.setFocus(id);
+    if (this.hover == id && this.mousePressed == 0 && !over) this.hover = 0;
   }
   // Returns a copy of the innermost clip rect.
   getClip(): UiRect { this.requireFrame("getClip"); return uiCopy(this.clips[this.clipCount - 1]); }
@@ -437,7 +437,7 @@ export class UiContext {
   // result emits nothing.
   pushClip(rect: UiRect): void { this.requireFrame("pushClip"); this.pushClipValue(uiIntersection(this.getClip(), rect)); }
   private pushClipValue(rect: UiRect): void {
-    if (this.clipCount === this.clips.length) this.clips.push(rect);
+    if (this.clipCount == this.clips.length) this.clips.push(rect);
     else this.clips[this.clipCount] = rect;
     this.clipCount += 1;
   }
@@ -448,14 +448,14 @@ export class UiContext {
     this.clipCount -= 1;
   }
   private append(kind: i32, rect: UiRect, color: u32 = 0, id: i32 = 0, text: string = ""): void {
-    if (this.commandCount === this.commands.length) this.commands.push(new UiCommand(0, rect));
+    if (this.commandCount == this.commands.length) this.commands.push(new UiCommand(0, rect));
     const command: UiCommand = this.commands[this.commandCount];
     command.kind = kind;
     command.x = rect.x; command.y = rect.y; command.w = rect.w; command.h = rect.h;
     command.color = color; command.id = id; command.text = text;
-    const owner: i32 = this.rootDepth === 0 ? -1 : this.rootStack[this.rootDepth - 1];
+    const owner: i32 = this.rootDepth == 0 ? -1 : this.rootStack[this.rootDepth - 1];
     if (this.commandCount > 0 && owner < this.commandRoots[this.commandCount - 1]) this.groupCommands = true;
-    if (this.commandCount === this.commandRoots.length) this.commandRoots.push(owner);
+    if (this.commandCount == this.commandRoots.length) this.commandRoots.push(owner);
     else this.commandRoots[this.commandCount] = owner;
     this.commandCount += 1;
   }
@@ -464,7 +464,7 @@ export class UiContext {
     const clip: UiRect = this.getClip();
     const visible: UiRect = uiIntersection(rect, clip);
     if (visible.w <= 0 || visible.h <= 0) return;
-    const partial: boolean = visible.x !== rect.x || visible.y !== rect.y || visible.w !== rect.w || visible.h !== rect.h;
+    const partial: boolean = visible.x != rect.x || visible.y != rect.y || visible.w != rect.w || visible.h != rect.h;
     if (partial) this.append(1, visible);
     this.append(kind, rect, color, id, text);
     if (partial) this.append(1, uiCopy(UI_UNCLIPPED));
@@ -498,7 +498,7 @@ export class UiContext {
   // A layout body uses content coordinates after the scroll offset.
   pushLayout(body: UiRect, scrollX: i32 = 0, scrollY: i32 = 0): void {
     this.requireFrame("pushLayout");
-    if (this.layoutCount === this.layouts.length) this.layouts.push(new UiLayout(body));
+    if (this.layoutCount == this.layouts.length) this.layouts.push(new UiLayout(body));
     const layout: UiLayout = this.layouts[this.layoutCount];
     layout.body = new UiRect(body.x - scrollX, body.y - scrollY, body.w, body.h);
     layout.widths[0] = 0; layout.widthCount = 1; layout.height = 0;
@@ -515,7 +515,7 @@ export class UiContext {
   }
   private layout(method: string): UiLayout {
     this.requireFrame(method);
-    if (this.layoutCount === 0) uiTrap("UIT2", method, "depth=0");
+    if (this.layoutCount == 0) uiTrap("UIT2", method, "depth=0");
     return this.layouts[this.layoutCount - 1];
   }
   // Starts a row of up to 16 items, as microui's `mu_layout_row`. A width of 0 takes
@@ -544,20 +544,20 @@ export class UiContext {
   layoutNext(): UiRect {
     const layout: UiLayout = this.layout("layoutNext");
     let rect: UiRect = uiCopy(layout.next);
-    if (layout.nextType !== 0) {
-      const absolute: boolean = layout.nextType === 2;
+    if (layout.nextType != 0) {
+      const absolute: boolean = layout.nextType == 2;
       layout.nextType = 0;
       if (absolute) { this.lastRect = uiCopy(rect); return rect; }
     } else {
-      if (layout.item === layout.widthCount) {
+      if (layout.item == layout.widthCount) {
         layout.item = 0;
         layout.x = layout.indent;
         layout.y = layout.nextRow;
       }
-      let width: i32 = layout.widthCount === 0 ? 0 : layout.widths[layout.item];
+      let width: i32 = layout.widthCount == 0 ? 0 : layout.widths[layout.item];
       let height: i32 = layout.height;
-      if (width === 0) width = this.style.width + this.style.padding * 2;
-      if (height === 0) height = this.style.height + this.style.padding * 2;
+      if (width == 0) width = this.style.width + this.style.padding * 2;
+      if (height == 0) height = this.style.height + this.style.padding * 2;
       if (width < 0) width += layout.body.w - layout.x + 1;
       if (height < 0) height += layout.body.h - layout.y + 1;
       rect = new UiRect(layout.x, layout.y, width, height);
@@ -597,11 +597,11 @@ export class UiContext {
   // Each root retains its command owner index.
   beginRoot(root: UiRoot): void {
     this.requireFrame("beginRoot");
-    if (this.rootDepth === this.rootStack.length) this.rootStack.push(this.rootCount);
+    if (this.rootDepth == this.rootStack.length) this.rootStack.push(this.rootCount);
     else this.rootStack[this.rootDepth] = this.rootCount;
     this.rootDepth += 1;
     this.currentRoot = root.id;
-    if (this.rootCount === this.roots.length) this.roots.push(root);
+    if (this.rootCount == this.roots.length) this.roots.push(root);
     else this.roots[this.rootCount] = root;
     this.rootCount += 1;
     if (uiContains(root.rect, this.mouseX, this.mouseY) && root.zindex > this.nextHoverZ) {
@@ -612,9 +612,9 @@ export class UiContext {
   // Closes the innermost root container. A call with no open root traps `UIT2`.
   endRoot(): void {
     this.requireFrame("endRoot");
-    if (this.currentRoot === 0) uiTrap("UIT2", "endRoot", "root=0");
+    if (this.currentRoot == 0) uiTrap("UIT2", "endRoot", "root=0");
     this.rootDepth -= 1;
-    this.currentRoot = this.rootDepth === 0 ? 0 : this.roots[this.rootStack[this.rootDepth - 1]].id;
+    this.currentRoot = this.rootDepth == 0 ? 0 : this.roots[this.rootStack[this.rootDepth - 1]].id;
   }
   // Returns the root indices by ascending z-index, valid after `end()`.
   // The array is new on each call.
@@ -624,17 +624,17 @@ export class UiContext {
     return result;
   }
   private commandLine(command: UiCommand): string {
-    if (command.kind === 1) return `clip ${command.x} ${command.y} ${command.w} ${command.h}`;
+    if (command.kind == 1) return `clip ${command.x} ${command.y} ${command.w} ${command.h}`;
     const color: string = uiColorText(command.color);
-    if (command.kind === 2) return `rect ${command.x} ${command.y} ${command.w} ${command.h} ${color}`;
-    if (command.kind === 3) return `text ${command.x} ${command.y} ${color} "${command.text}"`;
+    if (command.kind == 2) return `rect ${command.x} ${command.y} ${command.w} ${command.h} ${color}`;
+    if (command.kind == 3) return `text ${command.x} ${command.y} ${color} "${command.text}"`;
     return `icon ${command.id} ${command.x} ${command.y} ${command.w} ${command.h} ${color}`;
   }
   // Returns one line per command in draw order, then one line per root container.
   // With a root container in the frame, a command outside every root is dropped.
   dumpCommands(): string[] {
     const lines: string[] = [];
-    if (this.rootCount === 0) {
+    if (this.rootCount == 0) {
       for (let i: i32 = 0; i < this.commandCount; i += 1) lines.push(this.commandLine(this.commands[i]));
     }
     for (let i: i32 = 0; i < this.orderCount; i += 1) {
@@ -651,9 +651,9 @@ export class UiContext {
   // The title bar and the two scrollbar colors take no border.
   drawFrame(rect: UiRect, colorId: i32): void {
     this.drawRect(rect, this.style.colors[colorId]);
-    if (colorId === UI_COLOR_TITLE_BG || colorId === UI_COLOR_SCROLL_BASE || colorId === UI_COLOR_SCROLL_THUMB) return;
+    if (colorId == UI_COLOR_TITLE_BG || colorId == UI_COLOR_SCROLL_BASE || colorId == UI_COLOR_SCROLL_THUMB) return;
     const border: u32 = this.style.colors[UI_COLOR_BORDER];
-    if (border / 16777216 === 0) return;
+    if (border / 16777216 == 0) return;
     this.drawRect(new UiRect(rect.x, rect.y - 1, rect.w, 1), border);
     this.drawRect(new UiRect(rect.x, rect.y + rect.h, rect.w, 1), border);
     this.drawRect(new UiRect(rect.x - 1, rect.y - 1, 1, rect.h + 2), border);
@@ -663,15 +663,15 @@ export class UiContext {
   // `UI_OPT_NO_FRAME` draws nothing.
   drawControlFrame(id: u32, rect: UiRect, colorId: i32, opt: u32 = 0): void {
     this.requireFrame("drawControlFrame");
-    if ((opt & UI_OPT_NO_FRAME) === 0) this.drawFrame(rect, colorId + (this.focus === id ? 2 : this.hover === id ? 1 : 0));
+    if ((opt & UI_OPT_NO_FRAME) == 0) this.drawFrame(rect, colorId + (this.focus == id ? 2 : this.hover == id ? 1 : 0));
   }
   // Draws `text` clipped to `rect` and centered on the vertical axis. `opt` selects the
   // horizontal alignment, which is left by default.
   drawControlText(text: string, rect: UiRect, colorId: i32, opt: u32 = 0): void {
     let x: i32 = rect.x + this.style.padding;
     const width: i32 = this.textWidth(text);
-    if ((opt & UI_OPT_ALIGN_CENTER) !== 0) x = rect.x + (rect.w - width) / 2;
-    else if ((opt & UI_OPT_ALIGN_RIGHT) !== 0) x = rect.x + rect.w - width - this.style.padding;
+    if ((opt & UI_OPT_ALIGN_CENTER) != 0) x = rect.x + (rect.w - width) / 2;
+    else if ((opt & UI_OPT_ALIGN_RIGHT) != 0) x = rect.x + rect.w - width - this.style.padding;
     this.pushClip(rect);
     this.drawText(text, x, rect.y + (rect.h - UI_TEXT_HEIGHT) / 2, this.style.colors[colorId]);
     this.popClip();
@@ -684,12 +684,12 @@ export class UiContext {
     this.updateControl(id, rect, opt);
     this.drawControlFrame(id, rect, UI_COLOR_BUTTON, opt);
     this.drawControlText(label, rect, UI_COLOR_TEXT, opt);
-    return this.focus === id && this.mousePressed === UI_MOUSE_LEFT ? UI_RES_SUBMIT : 0;
+    return this.focus == id && this.mousePressed == UI_MOUSE_LEFT ? UI_RES_SUBMIT : 0;
   }
   // Draws a button that carries the atlas icon `icon` and returns `UI_RES_SUBMIT` on a
   // left press. The icon index is the id, because there is no label.
   buttonIcon(icon: i32, opt: u32 = 0): u32 {
-    let id: u32 = this.idCount === 0 ? 2166136261 : this.ids[this.idCount - 1];
+    let id: u32 = this.idCount == 0 ? 2166136261 : this.ids[this.idCount - 1];
     let bytes: u32 = icon as u32;
     for (let i: i32 = 0; i < 4; i += 1) { id = (id ^ (bytes % 256)) * 16777619; bytes /= 256; }
     this.lastId = id;
@@ -697,7 +697,7 @@ export class UiContext {
     this.updateControl(id, rect, opt);
     this.drawControlFrame(id, rect, UI_COLOR_BUTTON, opt);
     this.drawIcon(icon, rect, this.style.colors[UI_COLOR_TEXT]);
-    return this.focus === id && this.mousePressed === UI_MOUSE_LEFT ? UI_RES_SUBMIT : 0;
+    return this.focus == id && this.mousePressed == UI_MOUSE_LEFT ? UI_RES_SUBMIT : 0;
   }
   // Draws a box and a label. A press inverts `state.value` and returns `UI_RES_CHANGE`.
   checkbox(label: string, state: UiState<boolean>): u32 {
@@ -705,7 +705,7 @@ export class UiContext {
     const rect: UiRect = this.layoutNext();
     this.updateControl(id, rect);
     let response: u32 = 0;
-    if (this.focus === id && this.mousePressed === UI_MOUSE_LEFT) {
+    if (this.focus == id && this.mousePressed == UI_MOUSE_LEFT) {
       state.value = !state.value; response = UI_RES_CHANGE;
     }
     const box: UiRect = new UiRect(rect.x, rect.y, rect.h, rect.h);
@@ -723,17 +723,17 @@ export class UiContext {
     this.updateControl(id, rect, opt);
     const old: f32 = state.value;
     let value: f32 = old;
-    if (this.focus === id && (this.mouseDown | this.mousePressed) === UI_MOUSE_LEFT) {
+    if (this.focus == id && (this.mouseDown | this.mousePressed) == UI_MOUSE_LEFT) {
       value = low + ((this.mouseX - rect.x) as f32) * (high - low) / (rect.w as f32);
-      if (step !== 0) value = (((value + step / 2) / step) as i32 as f32) * step;
+      if (step != 0) value = (((value + step / 2) / step) as i32 as f32) * step;
     }
     state.value = value < low ? low : value > high ? high : value;
     this.drawControlFrame(id, rect, UI_COLOR_BASE, opt);
-    const x: i32 = high === low ? 0 : ((state.value - low) * ((rect.w - this.style.thumbSize) as f32) / (high - low)) as i32;
+    const x: i32 = high == low ? 0 : ((state.value - low) * ((rect.w - this.style.thumbSize) as f32) / (high - low)) as i32;
     this.drawControlFrame(id, new UiRect(rect.x + x, rect.y, this.style.thumbSize, rect.h), UI_COLOR_BUTTON, opt);
     this.drawControlText(uiNumberText(state.value), rect, UI_COLOR_TEXT,
-      (opt & (UI_OPT_ALIGN_CENTER | UI_OPT_ALIGN_RIGHT)) === 0 ? opt | UI_OPT_ALIGN_CENTER : opt);
-    return old !== state.value ? UI_RES_CHANGE : 0;
+      (opt & (UI_OPT_ALIGN_CENTER | UI_OPT_ALIGN_RIGHT)) == 0 ? opt | UI_OPT_ALIGN_CENTER : opt);
+    return old != state.value ? UI_RES_CHANGE : 0;
   }
   // Draws a number field and writes into `state`. A horizontal drag under focus adds
   // the pointer delta times `step`. It returns `UI_RES_CHANGE` when the value moves.
@@ -742,11 +742,11 @@ export class UiContext {
     const rect: UiRect = this.layoutNext();
     this.updateControl(id, rect, opt);
     const old: f32 = state.value;
-    if (this.focus === id && this.mouseDown === UI_MOUSE_LEFT) state.value += (this.mouseDeltaX as f32) * step;
+    if (this.focus == id && this.mouseDown == UI_MOUSE_LEFT) state.value += (this.mouseDeltaX as f32) * step;
     this.drawControlFrame(id, rect, UI_COLOR_BASE, opt);
     this.drawControlText(uiNumberText(state.value), rect, UI_COLOR_TEXT,
-      (opt & (UI_OPT_ALIGN_CENTER | UI_OPT_ALIGN_RIGHT)) === 0 ? opt | UI_OPT_ALIGN_CENTER : opt);
-    return old !== state.value ? UI_RES_CHANGE : 0;
+      (opt & (UI_OPT_ALIGN_CENTER | UI_OPT_ALIGN_RIGHT)) == 0 ? opt | UI_OPT_ALIGN_CENTER : opt);
+    return old != state.value ? UI_RES_CHANGE : 0;
   }
   // Draws a text field and edits `state.value` while it holds focus. It appends the
   // frame's text, removes one byte on backspace, and returns `UI_RES_SUBMIT` on return.
@@ -755,15 +755,15 @@ export class UiContext {
     const rect: UiRect = this.layoutNext();
     this.updateControl(id, rect, opt | UI_OPT_HOLD_FOCUS);
     let response: u32 = 0;
-    if (this.focus === id) {
+    if (this.focus == id) {
       if (this.textInput.length > 0) { state.value += this.textInput; response |= UI_RES_CHANGE; }
-      if ((this.keyPressed & UI_KEY_BACKSPACE) !== 0 && state.value.length > 0) {
+      if ((this.keyPressed & UI_KEY_BACKSPACE) != 0 && state.value.length > 0) {
         state.value = state.value.slice(0, state.value.length - 1); response |= UI_RES_CHANGE;
       }
-      if ((this.keyPressed & UI_KEY_RETURN) !== 0) { this.setFocus(0); response |= UI_RES_SUBMIT; }
+      if ((this.keyPressed & UI_KEY_RETURN) != 0) { this.setFocus(0); response |= UI_RES_SUBMIT; }
     }
     this.drawControlFrame(id, rect, UI_COLOR_BASE, opt);
-    if (this.focus === id) {
+    if (this.focus == id) {
       const width: i32 = this.textWidth(state.value);
       const x: i32 = rect.x + uiMin(this.style.padding, rect.w - this.style.padding - width - 1);
       const y: i32 = rect.y + (rect.h - UI_TEXT_HEIGHT) / 2;
@@ -790,11 +790,11 @@ export class UiContext {
       let width: i32 = 0;
       while (true) {
         const word: i32 = cursor;
-        while (cursor < text.length && text.charCodeAt(cursor) !== 32 && text.charCodeAt(cursor) !== 10) cursor += 1;
+        while (cursor < text.length && text.charCodeAt(cursor) != 32 && text.charCodeAt(cursor) != 10) cursor += 1;
         width += this.textWidth(text.slice(word, cursor));
-        if (width > rect.w && end !== start) break;
+        if (width > rect.w && end != start) break;
         end = cursor;
-        if (cursor === text.length || text.charCodeAt(cursor) === 10) break;
+        if (cursor == text.length || text.charCodeAt(cursor) == 10) break;
         width += this.textWidth(" "); cursor += 1;
       }
       this.drawText(text.slice(start, end), rect.x, rect.y, this.style.colors[UI_COLOR_TEXT]);
@@ -809,15 +809,15 @@ export class UiContext {
     let oldest: i32 = -1;
     let age: i32 = this.frame;
     for (let i: i32 = 0; i < 48; i += 1) {
-      if (this.treeIds[i] === id) slot = i;
+      if (this.treeIds[i] == id) slot = i;
       if (this.treeFrames[i] < age) { age = this.treeFrames[i]; oldest = i; }
     }
     let active: boolean = slot >= 0;
-    const expanded: boolean = (opt & UI_OPT_EXPANDED) !== 0 ? !active : active;
+    const expanded: boolean = (opt & UI_OPT_EXPANDED) != 0 ? !active : active;
     this.layoutRow(this.fullWidth, 0);
     const rect: UiRect = this.layoutNext();
     this.updateControl(id, rect);
-    if (this.focus === id && this.mousePressed === UI_MOUSE_LEFT) active = !active;
+    if (this.focus == id && this.mousePressed == UI_MOUSE_LEFT) active = !active;
     if (active) {
       if (slot < 0) {
         if (oldest < 0) uiTrap("UIT4", "treeHeader", "slots=48 available=0");
@@ -826,7 +826,7 @@ export class UiContext {
       this.treeIds[slot] = id; this.treeFrames[slot] = this.frame;
     } else if (slot >= 0) { this.treeIds[slot] = 0; this.treeFrames[slot] = 0; }
     if (!tree) this.drawControlFrame(id, rect, UI_COLOR_BUTTON);
-    else if (this.hover === id) this.drawFrame(rect, UI_COLOR_BUTTON_HOVER);
+    else if (this.hover == id) this.drawFrame(rect, UI_COLOR_BUTTON_HOVER);
     this.drawIcon(expanded ? UI_ICON_EXPANDED : UI_ICON_COLLAPSED,
       new UiRect(rect.x, rect.y, rect.h, rect.h), this.style.colors[UI_COLOR_TEXT]);
     this.drawControlText(label, new UiRect(rect.x + rect.h - this.style.padding, rect.y,
@@ -841,10 +841,10 @@ export class UiContext {
   // layout and opens an id scope, so a non-zero result requires `endTreenode()`.
   beginTreenode(label: string, opt: u32 = 0): u32 {
     const response: u32 = this.treeHeader(label, opt, true);
-    if (response !== 0) {
+    if (response != 0) {
       this.layout("beginTreenode").indent += this.style.indent;
       this.pushIdValue(this.lastId);
-      if (this.treeCount === this.treeDepths.length) this.treeDepths.push(this.idCount);
+      if (this.treeCount == this.treeDepths.length) this.treeDepths.push(this.idCount);
       else this.treeDepths[this.treeCount] = this.idCount;
       this.treeCount += 1;
     }
@@ -853,7 +853,7 @@ export class UiContext {
   // Closes a tree node. A call without its `beginTreenode` traps `UIT2`.
   endTreenode(): void {
     this.requireFrame("endTreenode");
-    if (this.treeCount === 0 || this.treeDepths[this.treeCount - 1] !== this.idCount) uiTrap("UIT2", "endTreenode", `depth=${this.treeCount}`);
+    if (this.treeCount == 0 || this.treeDepths[this.treeCount - 1] != this.idCount) uiTrap("UIT2", "endTreenode", `depth=${this.treeCount}`);
     this.treeCount -= 1;
     this.layout("endTreenode").indent -= this.style.indent;
     this.popId();
@@ -863,13 +863,13 @@ export class UiContext {
     let age: i32 = this.frame;
     for (let i: i32 = 0; i < 48; i += 1) {
       const record: UiRoot = this.containers[i];
-      if (record.id === id) {
-        if (record.open || (opt & UI_OPT_CLOSED) === 0) record.lastUpdate = this.frame;
+      if (record.id == id) {
+        if (record.open || (opt & UI_OPT_CLOSED) == 0) record.lastUpdate = this.frame;
         return i;
       }
       if (record.lastUpdate < age) { age = record.lastUpdate; oldest = i; }
     }
-    if ((opt & UI_OPT_CLOSED) !== 0) return -1;
+    if ((opt & UI_OPT_CLOSED) != 0) return -1;
     // The pool retains every container that the current frame uses.
     if (oldest < 0) uiTrap("UIT4", "container", "slots=48 available=0");
     const record: UiRoot = this.containers[oldest];
@@ -880,7 +880,7 @@ export class UiContext {
     return oldest;
   }
   private pushContainer(slot: i32, kind: i32): void {
-    if (this.containerDepth === this.containerStack.length) {
+    if (this.containerDepth == this.containerStack.length) {
       this.containerStack.push(slot); this.containerKinds.push(kind);
     } else {
       this.containerStack[this.containerDepth] = slot; this.containerKinds[this.containerDepth] = kind;
@@ -900,7 +900,7 @@ export class UiContext {
       : new UiRect(body.x, body.y + body.h, body.w, this.style.scrollbarSize);
     this.updateControl(id, base);
     let scroll: i32 = vertical ? record.scrollY : record.scrollX;
-    if (this.focus === id && this.mouseDown === UI_MOUSE_LEFT) scroll += (vertical ? this.mouseDeltaY : this.mouseDeltaX) * content / length;
+    if (this.focus == id && this.mouseDown == UI_MOUSE_LEFT) scroll += (vertical ? this.mouseDeltaY : this.mouseDeltaX) * content / length;
     scroll = uiMax(0, uiMin(maximum, scroll));
     if (vertical) record.scrollY = scroll; else record.scrollX = scroll;
     this.drawFrame(base, UI_COLOR_SCROLL_BASE);
@@ -912,7 +912,7 @@ export class UiContext {
   }
   private containerBody(slot: i32, body: UiRect, opt: u32): void {
     const record: UiRoot = this.containers[slot];
-    if ((opt & UI_OPT_NO_SCROLL) === 0) {
+    if ((opt & UI_OPT_NO_SCROLL) == 0) {
       const width: i32 = record.contentWidth + this.style.padding * 2;
       const height: i32 = record.contentHeight + this.style.padding * 2;
       this.pushClip(body);
@@ -937,56 +937,56 @@ export class UiContext {
     const record: UiRoot = this.containers[slot];
     if (!record.open) return 0;
     this.pushIdValue(id);
-    if (record.rect.w === 0) record.rect = rect;
+    if (record.rect.w == 0) record.rect = rect;
     this.pushContainer(slot, 1);
     this.beginRoot(record);
     this.pushClipValue(uiCopy(UI_UNCLIPPED));
     rect = record.rect;
     let body: UiRect = rect;
-    if ((opt & UI_OPT_NO_FRAME) === 0) this.drawFrame(rect, UI_COLOR_WINDOW_BG);
-    if ((opt & UI_OPT_NO_TITLE) === 0) {
+    if ((opt & UI_OPT_NO_FRAME) == 0) this.drawFrame(rect, UI_COLOR_WINDOW_BG);
+    if ((opt & UI_OPT_NO_TITLE) == 0) {
       const titleRect: UiRect = new UiRect(rect.x, rect.y, rect.w, this.style.titleHeight);
       this.drawFrame(titleRect, UI_COLOR_TITLE_BG);
       const titleId: u32 = this.getId("!title");
       this.updateControl(titleId, titleRect, opt);
       this.drawControlText(title, titleRect, UI_COLOR_TITLE_TEXT, opt);
-      if (this.focus === titleId && this.mouseDown === UI_MOUSE_LEFT) {
+      if (this.focus == titleId && this.mouseDown == UI_MOUSE_LEFT) {
         record.rect = new UiRect(record.rect.x + this.mouseDeltaX, record.rect.y + this.mouseDeltaY, record.rect.w, record.rect.h);
       }
       body.y += titleRect.h; body.h -= titleRect.h;
-      if ((opt & UI_OPT_NO_CLOSE) === 0) {
+      if ((opt & UI_OPT_NO_CLOSE) == 0) {
         const closeId: u32 = this.getId("!close");
         const closeRect: UiRect = new UiRect(titleRect.x + titleRect.w - titleRect.h, titleRect.y, titleRect.h, titleRect.h);
         this.drawIcon(UI_ICON_CLOSE, closeRect, this.style.colors[UI_COLOR_TITLE_TEXT]);
         this.updateControl(closeId, closeRect, opt);
-        if (this.focus === closeId && this.mousePressed === UI_MOUSE_LEFT) record.open = false;
+        if (this.focus == closeId && this.mousePressed == UI_MOUSE_LEFT) record.open = false;
       }
     }
     this.containerBody(slot, body, opt);
-    if ((opt & UI_OPT_NO_RESIZE) === 0) {
+    if ((opt & UI_OPT_NO_RESIZE) == 0) {
       const size: i32 = this.style.titleHeight;
       const resizeId: u32 = this.getId("!resize");
       this.updateControl(resizeId, new UiRect(rect.x + rect.w - size, rect.y + rect.h - size, size, size), opt);
-      if (this.focus === resizeId && this.mouseDown === UI_MOUSE_LEFT) {
+      if (this.focus == resizeId && this.mouseDown == UI_MOUSE_LEFT) {
         record.rect = new UiRect(record.rect.x, record.rect.y, uiMax(96, record.rect.w + this.mouseDeltaX), uiMax(64, record.rect.h + this.mouseDeltaY));
       }
     }
-    if ((opt & UI_OPT_AUTO_SIZE) !== 0) {
+    if ((opt & UI_OPT_AUTO_SIZE) != 0) {
       const layout: UiLayout = this.layout("beginWindow");
       record.rect = new UiRect(record.rect.x, record.rect.y, record.contentWidth + record.rect.w - layout.body.w,
         record.contentHeight + record.rect.h - layout.body.h);
     }
-    if ((opt & UI_OPT_POPUP) !== 0 && this.mousePressed !== 0 && this.hoverRoot !== id) record.open = false;
+    if ((opt & UI_OPT_POPUP) != 0 && this.mousePressed != 0 && this.hoverRoot != id) record.open = false;
     this.pushClip(record.body);
     return UI_RES_ACTIVE;
   }
   private endContainer(method: string, kind: i32): void {
     this.requireFrame(method);
-    if (this.containerDepth === 0) uiTrap("UIT2", method, "depth=0");
-    if (this.containerKinds[this.containerDepth - 1] !== kind) uiTrap("UIT2", method, `kind=${this.containerKinds[this.containerDepth - 1]}`);
+    if (this.containerDepth == 0) uiTrap("UIT2", method, "depth=0");
+    if (this.containerKinds[this.containerDepth - 1] != kind) uiTrap("UIT2", method, `kind=${this.containerKinds[this.containerDepth - 1]}`);
     const record: UiRoot = this.containers[this.containerStack[this.containerDepth - 1]];
     this.popClip();
-    if (kind !== 2) { this.popClip(); this.endRoot(); }
+    if (kind != 2) { this.popClip(); this.endRoot(); }
     const extent: UiRect = this.popLayout();
     record.contentWidth = extent.w; record.contentHeight = extent.h;
     this.popId();
@@ -1000,7 +1000,7 @@ export class UiContext {
   // content extent. A call with no open container traps `UIT2`.
   currentContainer(): UiRoot {
     this.requireFrame("currentContainer");
-    if (this.containerDepth === 0) uiTrap("UIT2", "currentContainer", "depth=0");
+    if (this.containerDepth == 0) uiTrap("UIT2", "currentContainer", "depth=0");
     return this.containers[this.containerStack[this.containerDepth - 1]];
   }
   // Opens a non-root container over the next layout item and clips its widgets to it.
@@ -1011,7 +1011,7 @@ export class UiContext {
     if (slot < 0) uiTrap("UIT2", "beginPanel", "closed=true");
     const record: UiRoot = this.containers[slot];
     record.rect = this.layoutNext();
-    if ((opt & UI_OPT_NO_FRAME) === 0) this.drawFrame(record.rect, UI_COLOR_PANEL_BG);
+    if ((opt & UI_OPT_NO_FRAME) == 0) this.drawFrame(record.rect, UI_COLOR_PANEL_BG);
     this.pushContainer(slot, 2);
     this.containerBody(slot, record.rect, opt);
     this.pushClip(record.body);
@@ -1033,7 +1033,7 @@ export class UiContext {
   // The popup fits itself to its content, and a press outside it closes it.
   beginPopup(label: string): u32 {
     const response: u32 = this.beginWindow(label, new UiRect(0, 0, 0, 0), UI_OPT_POPUP | UI_OPT_AUTO_SIZE | UI_OPT_NO_RESIZE | UI_OPT_NO_SCROLL | UI_OPT_NO_TITLE | UI_OPT_CLOSED);
-    if (response !== 0) this.containerKinds[this.containerDepth - 1] = 3;
+    if (response != 0) this.containerKinds[this.containerDepth - 1] = 3;
     return response;
   }
   // Closes the popup. A call without `beginPopup` traps `UIT2`.
@@ -1143,13 +1143,13 @@ export class UiDrawRange {
 
 function uiValidateRenderer(facts: UiPipelineFacts, capacity: u32): void {
   // A uint16 index addresses at most 65,536 vertices.
-  if (capacity === 0 || capacity > 16384) {
+  if (capacity == 0 || capacity > 16384) {
     uiTrap("UIT1", "UiRenderer", `capacity=${capacity} maximum=16384`);
   }
-  if (facts.spec.topology !== "triangle-list") {
+  if (facts.spec.topology != "triangle-list") {
     uiTrap("UIT1", "UiRenderer", `topology=${facts.spec.topology}`);
   }
-  if (facts.spec.indexFormat !== "uint16") {
+  if (facts.spec.indexFormat != "uint16") {
     uiTrap("UIT1", "UiRenderer", `indexFormat=${facts.spec.indexFormat}`);
   }
 }
@@ -1294,10 +1294,10 @@ export class UiRenderer {
     const bytes: u8[] = Context.bytesOf<FixedArray<UiVertex, 4>>(values);
     const offset: i32 = (this.quadCount as i32) * bytes.length;
     for (let i: i32 = 0; i < bytes.length; i += 1) {
-      if (offset + i === this.vertexBytes.length) this.vertexBytes.push(bytes[i]);
+      if (offset + i == this.vertexBytes.length) this.vertexBytes.push(bytes[i]);
       else this.vertexBytes[offset + i] = bytes[i];
     }
-    if (this.rangeCount === 0) this.startRange(this.clip);
+    if (this.rangeCount == 0) this.startRange(this.clip);
     this.ranges[this.rangeCount - 1].count += 6;
     this.quadCount = count;
     this.indexCount += 6;
@@ -1305,8 +1305,8 @@ export class UiRenderer {
 
   private startRange(clip: UiRect): void {
     this.clip = uiCopy(clip);
-    if (this.rangeCount === 0 || this.ranges[this.rangeCount - 1].count !== 0) {
-      if (this.rangeCount === this.ranges.length) this.ranges.push(new UiDrawRange(this.indexCount, clip));
+    if (this.rangeCount == 0 || this.ranges[this.rangeCount - 1].count != 0) {
+      if (this.rangeCount == this.ranges.length) this.ranges.push(new UiDrawRange(this.indexCount, clip));
       this.rangeCount += 1;
     }
     const range: UiDrawRange = this.ranges[this.rangeCount - 1];
@@ -1316,18 +1316,18 @@ export class UiRenderer {
   private commands(context: UiContext, start: i32, end: i32): void {
     for (let i: i32 = start; i < end; i += 1) {
       const command: UiCommand = context.commands[i];
-      if (command.kind === 1) {
+      if (command.kind == 1) {
         this.startRange(new UiRect(command.x, command.y, command.w, command.h));
         continue;
       }
-      if (command.kind === 2) {
+      if (command.kind == 2) {
         this.quad(command.x, command.y, command.w, command.h, UI_ATLAS_WHITE, command.color);
-      } else if (command.kind === 4) {
+      } else if (command.kind == 4) {
         const w: i32 = UI_ATLAS_RECT_W[command.id];
         const h: i32 = UI_ATLAS_RECT_H[command.id];
         this.quad(command.x + (command.w - w) / 2, command.y + (command.h - h) / 2,
           w, h, command.id, command.color);
-      } else if (command.kind === 3) {
+      } else if (command.kind == 3) {
         let x: i32 = command.x;
         for (let j: i32 = 0; j < command.text.length; j += 1) {
           const byte: i32 = command.text.charCodeAt(j);
@@ -1349,12 +1349,12 @@ export class UiRenderer {
     this.rangeCount = 0;
     this.clip = uiCopy(UI_UNCLIPPED);
     const order: i32[] = context.drawOrder();
-    if (context.rootCount === 0) this.commands(context, 0, context.commandCount);
+    if (context.rootCount == 0) this.commands(context, 0, context.commandCount);
     for (let i: i32 = 0; i < order.length; i += 1) {
       const root: UiRoot = context.roots[order[i]];
       this.commands(context, root.start, root.end);
     }
-    if (this.rangeCount > 0 && this.ranges[this.rangeCount - 1].count === 0) this.rangeCount -= 1;
+    if (this.rangeCount > 0 && this.ranges[this.rangeCount - 1].count == 0) this.rangeCount -= 1;
   }
 
   // Builds the frame, writes the buffers, and records one scissored draw per range into
@@ -1363,14 +1363,14 @@ export class UiRenderer {
   render(context: UiContext, pass: GPURenderPassEncoder, width: u32, height: u32): void {
     this.build(context);
     this.viewport.write(this.queue, 0, Context.bytesOf<UiViewport>(new UiViewport(width as f32, height as f32)));
-    if (this.quadCount === 0) { pass.setScissorRect(0, 0, width, height); return; }
+    if (this.quadCount == 0) { pass.setScissorRect(0, 0, width, height); return; }
     this.vertices.write(this.queue, 0, this.vertexBytes);
     this.pipeline.bind(pass, [this.group], [this.vertices.handle()]);
     this.pipeline.setIndexBuffer(pass, this.indices.handle());
     for (let i: i32 = 0; i < this.rangeCount; i += 1) {
       const range: UiDrawRange = this.ranges[i];
       const clip: UiRect = uiIntersection(range.clip, new UiRect(0, 0, width as i32, height as i32));
-      if (clip.w === 0 || clip.h === 0) continue;
+      if (clip.w == 0 || clip.h == 0) continue;
       pass.setScissorRect(clip.x as u32, clip.y as u32, clip.w as u32, clip.h as u32);
       pass.drawIndexed(range.count, 1, range.first, 0, 0);
     }

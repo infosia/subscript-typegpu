@@ -48,27 +48,27 @@ fn optional_aggregates_use_one_conditional_boundary_constructor_call() {
         (
             "toSubscriptTypegpuColorTargetState",
             "SubscriptTypegpuColorTargetState",
-            &["nullableBlend !== null ? toSubscriptTypegpuBlendState(nullableBlend) : null"][..],
+            &["nullableBlend != null ? toSubscriptTypegpuBlendState(nullableBlend) : null"][..],
         ),
         (
             "toSubscriptTypegpuRenderPipelineDescriptor",
             "SubscriptTypegpuRenderPipelineDescriptor",
             &[
-                "nullableDepthStencil !== null ? toSubscriptTypegpuDepthStencilState(nullableDepthStencil) : null",
-                "nullableFragment !== null ? toSubscriptTypegpuFragmentState(nullableFragment) : null",
+                "nullableDepthStencil != null ? toSubscriptTypegpuDepthStencilState(nullableDepthStencil) : null",
+                "nullableFragment != null ? toSubscriptTypegpuFragmentState(nullableFragment) : null",
             ][..],
         ),
         (
             "toSubscriptTypegpuComputePassDescriptor",
             "SubscriptTypegpuComputePassDescriptor",
-            &["nullableTimestampWrites !== null ? toSubscriptTypegpuPassTimestampWrites(nullableTimestampWrites) : null"][..],
+            &["nullableTimestampWrites != null ? toSubscriptTypegpuPassTimestampWrites(nullableTimestampWrites) : null"][..],
         ),
         (
             "toSubscriptTypegpuRenderPassDescriptor",
             "SubscriptTypegpuRenderPassDescriptor",
             &[
-                "nullableDepthStencilAttachment !== null ? toSubscriptTypegpuRenderPassDepthStencilAttachment(nullableDepthStencilAttachment) : null",
-                "nullableTimestampWrites !== null ? toSubscriptTypegpuPassTimestampWrites(nullableTimestampWrites) : null",
+                "nullableDepthStencilAttachment != null ? toSubscriptTypegpuRenderPassDepthStencilAttachment(nullableDepthStencilAttachment) : null",
+                "nullableTimestampWrites != null ? toSubscriptTypegpuPassTimestampWrites(nullableTimestampWrites) : null",
             ][..],
         ),
         (

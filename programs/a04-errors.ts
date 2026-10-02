@@ -7,13 +7,13 @@ import { gpu, GPUAdapter, GPUDevice, GPUError } from "./webgpu";
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -41,7 +41,7 @@ export async function main(): Promise<void> {
     const scoped: GPUError | null = await device.popErrorScope();
     device.nextUncapturedError();
     device.deviceLostInfo();
-    if (scoped === null) {
+    if (scoped == null) {
       print("errors:empty");
     } else {
       print("pipeline:invalid");

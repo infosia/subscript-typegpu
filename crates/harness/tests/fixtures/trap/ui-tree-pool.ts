@@ -9,7 +9,7 @@ export function main(): void {
     // A toggle reserves a pool slot for the default-expanded node.
     ui.hover = ui.getId(label);
     ui.inputMouseDown(0, 0, UI_MOUSE_LEFT);
-    if (ui.beginTreenode(label, UI_OPT_EXPANDED) !== 0) ui.endTreenode();
+    if (ui.beginTreenode(label, UI_OPT_EXPANDED) != 0) ui.endTreenode();
   }
   ui.popLayout();
   ui.end();

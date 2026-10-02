@@ -5877,7 +5877,7 @@ fn render_method_param_helpers(
             } => {
                 if emitted.insert(format!("nullable-handle:{boundary_name}")) {
                     out.push_str(&format!(
-                        "function toNullable{boundary_name}(value: {api_name} | null): {boundary_name} | null {{\n  if (value === null) {{\n    return null;\n  }}\n  return value.{raw_field};\n}}\n\n"
+                        "function toNullable{boundary_name}(value: {api_name} | null): {boundary_name} | null {{\n  if (value == null) {{\n    return null;\n  }}\n  return value.{raw_field};\n}}\n\n"
                     ));
                 }
             }
@@ -5975,7 +5975,7 @@ fn render_required_limits(
         return Ok(());
     }
     out.push_str(
-        "function defaultRequiredLimitU32(value: u32 = 0): u32 {\n  return value;\n}\n\nfunction defaultRequiredLimitU64(value: u64 = 0): u64 {\n  return value;\n}\n\nfunction toRequiredLimitU32(value: u32): u32 {\n  if (value === 0) {\n    return 4294967295;\n  }\n  return value;\n}\n\n",
+        "function defaultRequiredLimitU32(value: u32 = 0): u32 {\n  return value;\n}\n\nfunction defaultRequiredLimitU64(value: u64 = 0): u64 {\n  return value;\n}\n\nfunction toRequiredLimitU32(value: u32): u32 {\n  if (value == 0) {\n    return 4294967295;\n  }\n  return value;\n}\n\n",
     );
     for (api_name, (boundary_name, fields, _)) in plans {
         out.push_str(&format!("@Descriptor\nexport class {api_name} {{\n"));
@@ -6012,7 +6012,7 @@ fn render_required_limits(
             let conjunction = if index == 0 { "  return " } else { "    && " };
             let terminator = if index + 1 == fields.len() { ";" } else { "" };
             out.push_str(&format!(
-                "{conjunction}{default_helper}(value.{}) === 0{terminator}\n",
+                "{conjunction}{default_helper}(value.{}) == 0{terminator}\n",
                 field.name,
             ));
         }
@@ -6151,7 +6151,7 @@ fn render_descriptor_conversion(
         };
         let helper = optional_enum_helper_name(descriptor, field, public_name);
         out.push_str(&format!(
-            "function {helper}(value: {}): {public_name} {{\n  if (value.{} !== undefined) {{\n    return value.{};\n  }}\n  return {undefined_key:?};\n}}\n\n",
+            "function {helper}(value: {}): {public_name} {{\n  if (value.{} != undefined) {{\n    return value.{};\n  }}\n  return {undefined_key:?};\n}}\n\n",
             descriptor.name, field.name, field.name
         ));
     }
@@ -6164,7 +6164,7 @@ fn render_descriptor_conversion(
         let local = format!("nullable{}", naming::pascal(&field.name));
         let argument = match &field.conversion {
             DescriptorFieldConversion::NullableDescriptor { boundary_name, .. } => {
-                format!("{local} !== null ? to{boundary_name}({local}) : null")
+                format!("{local} != null ? to{boundary_name}({local}) : null")
             }
             DescriptorFieldConversion::RequiredLimits {
                 api_name,
@@ -6392,7 +6392,7 @@ fn render_descriptor_helpers(out: &mut String, descriptors: &[DescriptorPlan]) {
                         .map(|candidate| candidate.name.as_str())
                         .unwrap_or_default();
                     out.push_str(&format!(
-                        "function toOptional{boundary_name}(value: {api_name} | null): {boundary_name} {{\n  if (value === null) {{\n    return new {boundary_name}({});\n  }}\n  return to{boundary_name}(value);\n}}\n\n",
+                        "function toOptional{boundary_name}(value: {api_name} | null): {boundary_name} {{\n  if (value == null) {{\n    return new {boundary_name}({});\n  }}\n  return to{boundary_name}(value);\n}}\n\n",
                         absent_values.join(", ")
                     ));
                 }
@@ -6402,7 +6402,7 @@ fn render_descriptor_helpers(out: &mut String, descriptors: &[DescriptorPlan]) {
                     raw_field,
                 } if emitted.insert(format!("nullable-handle:{boundary_name}")) => {
                     out.push_str(&format!(
-                        "function toNullable{boundary_name}(value: {api_name} | null): {boundary_name} | null {{\n  if (value === null) {{\n    return null;\n  }}\n  return value.{raw_field};\n}}\n\n"
+                        "function toNullable{boundary_name}(value: {api_name} | null): {boundary_name} | null {{\n  if (value == null) {{\n    return null;\n  }}\n  return value.{raw_field};\n}}\n\n"
                     ));
                 }
                 _ => {}
@@ -6761,20 +6761,20 @@ fn render_async_method(
         begin_args.join(", ")
     ));
     out.push_str("    let status: i32 = subscript_typegpu_future_status(this.instance, future);\n");
-    out.push_str("    while (status === 0) {\n");
+    out.push_str("    while (status == 0) {\n");
     out.push_str("      subscript_typegpu_instance_process_events(this.instance);\n");
     out.push_str("      status = subscript_typegpu_future_status(this.instance, future);\n");
-    out.push_str("      if (status === 0) {\n");
+    out.push_str("      if (status == 0) {\n");
     out.push_str("        await Context.suspend();\n");
     out.push_str("      }\n");
     out.push_str("    }\n");
     if boolean_result {
         out.push_str(
-            "    subscript_typegpu_future_drop(this.instance, future);\n    return status === 1;\n",
+            "    subscript_typegpu_future_drop(this.instance, future);\n    return status == 1;\n",
         );
     } else {
         out.push_str(
-            "    if (status !== 1) {\n      subscript_typegpu_future_drop(this.instance, future);\n      return null;\n    }\n",
+            "    if (status != 1) {\n      subscript_typegpu_future_drop(this.instance, future);\n      return null;\n    }\n",
         );
         let result = result_class.unwrap_or("void");
         let take = take.unwrap_or_default();
@@ -6807,7 +6807,7 @@ fn render_mapped_range_methods(
     out.push_str("      index = index + 1;\n");
     out.push_str("    }\n");
     out.push_str(&format!(
-        "    if ({read}(this.{}, offset, bytes) !== 1) {{\n",
+        "    if ({read}(this.{}, offset, bytes) != 1) {{\n",
         interface.raw_field
     ));
     out.push_str("      return [];\n");
@@ -6816,7 +6816,7 @@ fn render_mapped_range_methods(
     out.push_str("  }\n\n");
     out.push_str("  writeMappedRange(offset: u64, data: u8[]): boolean {\n");
     out.push_str(&format!(
-        "    return {write}(this.{}, offset, data) === 1;\n",
+        "    return {write}(this.{}, offset, data) == 1;\n",
         interface.raw_field
     ));
     out.push_str("  }\n\n");
@@ -6849,7 +6849,7 @@ fn render_typed_read_f32(out: &mut String, interface: &InterfacePlan, function: 
     out.push_str("      index = index + 1;\n");
     out.push_str("    }\n");
     out.push_str(&format!(
-        "    if ({function}(this.{}, offset, values) !== 1) {{\n",
+        "    if ({function}(this.{}, offset, values) != 1) {{\n",
         interface.raw_field
     ));
     out.push_str("      return [];\n");
@@ -6887,17 +6887,17 @@ fn render_error_scope_pop_method(
         interface.raw_field
     ));
     out.push_str("    let status: i32 = subscript_typegpu_future_status(this.instance, future);\n");
-    out.push_str("    while (status === 0) {\n");
+    out.push_str("    while (status == 0) {\n");
     out.push_str("      subscript_typegpu_instance_process_events(this.instance);\n");
     out.push_str("      status = subscript_typegpu_future_status(this.instance, future);\n");
     if !host_owned {
-        out.push_str("      if (status === 0) {\n");
+        out.push_str("      if (status == 0) {\n");
         out.push_str("        await Context.suspend();\n");
         out.push_str("      }\n");
     }
     out.push_str("    }\n");
     out.push_str(
-        "    if (status !== 1) {\n      subscript_typegpu_future_drop(this.instance, future);\n      return null;\n    }\n",
+        "    if (status != 1) {\n      subscript_typegpu_future_drop(this.instance, future);\n      return null;\n    }\n",
     );
     out.push_str(&format!(
         "    const record: {record} = new {record}({});\n",
@@ -6971,7 +6971,7 @@ fn render_result_record_fill_method(
         }
         RecordFillSuccess::StatusOne => {
             out.push_str(&format!(
-                "    if ({call} !== 1) {{\n      return null;\n    }}\n"
+                "    if ({call} != 1) {{\n      return null;\n    }}\n"
             ));
         }
     }
@@ -7095,7 +7095,7 @@ fn render_operation_nullable_descriptor_branches(
                 "missing matched argument",
             )
         })?;
-        out.push_str(&format!("{indent}if ({name} === null) {{\n"));
+        out.push_str(&format!("{indent}if ({name} == null) {{\n"));
         *boundary_args.get_mut(argument_index).ok_or_else(|| {
             internal(
                 "api::render_operation_nullable_descriptor_branches",

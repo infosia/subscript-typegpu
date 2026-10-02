@@ -9,9 +9,9 @@ import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
 
 export async function main(): Promise<void> {
   const adapter: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapter === null) { print("FAIL adapter"); return; }
+  if (adapter == null) { print("FAIL adapter"); return; }
   const device: GPUDevice | null = await adapter.requestDevice();
-  if (device === null) { print("FAIL device"); return; }
+  if (device == null) { print("FAIL device"); return; }
   using source: Buffer<u16> = createBuffer<u16>(
     device,
     2,

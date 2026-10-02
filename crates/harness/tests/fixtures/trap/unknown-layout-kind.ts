@@ -9,9 +9,9 @@ import { gpu, GPUAdapter, GPUDevice } from "./webgpu";
 
 export async function main(): Promise<void> {
   const adapter: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapter === null) { print("FAIL adapter"); return; }
+  if (adapter == null) { print("FAIL adapter"); return; }
   const device: GPUDevice | null = await adapter.requestDevice();
-  if (device === null) { print("FAIL device"); return; }
+  if (device == null) { print("FAIL device"); return; }
   const spec: BindGroupLayoutSpec = { entries: [{
     binding: 4,
     visibility: COMPUTE_VISIBILITY,

@@ -104,22 +104,22 @@ function zeroPixels(): Vec4f[] {
 }
 
 function same(left: Vec4f, right: Vec4f): boolean {
-  return left.x === right.x
-    && left.y === right.y
-    && left.z === right.z
-    && left.w === right.w;
+  return left.x == right.x
+    && left.y == right.y
+    && left.z == right.z
+    && left.w == right.w;
 }
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -160,7 +160,7 @@ export async function main(): Promise<void> {
       [uploadLive_WORKGROUP_X, uploadLive_WORKGROUP_Y, uploadLive_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }

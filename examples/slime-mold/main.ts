@@ -206,11 +206,11 @@ function moveAgents(res: SlimeMoveLayout, ctx: ComputeInvocation): void {
   // cases pick a side at random. Otherwise the agent turns toward the stronger sensor.
   if (
     (left > forward && right > forward)
-    || (forward === 0.0 && left === 0.0 && right === 0.0)
+    || (forward == 0.0 && left == 0.0 && right == 0.0)
   ) {
     const random: RandomF32 = randF32(agent.randomState);
     agent.randomState = random.state;
-    if ((agent.randomState & 1) === 0) {
+    if ((agent.randomState & 1) == 0) {
       agent.heading += TURN_SPEED;
     } else {
       agent.heading -= TURN_SPEED;
@@ -396,7 +396,7 @@ export function init(
 ): void {
   // The pipeline declares its target format literally. A surface with another format ends the
   // example before any draw.
-  if (format !== slimeRender_TARGET_FORMAT) {
+  if (format != slimeRender_TARGET_FORMAT) {
     print(`FAIL format expected=${slimeRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -509,7 +509,7 @@ export function init(
     slimeRender,
   );
   const validationError = hostDevice.popErrorScope();
-  if (validationError !== null) {
+  if (validationError != null) {
     renderPipeline.dispose();
     diffusePipeline.dispose();
     movePipeline.dispose();
@@ -586,11 +586,11 @@ export function frame(
 ): void {
   // A failed `init` leaves the state empty, and the frame ends without a draw. TypeGPU reports
   // the same failure as an exception.
-  if (activeState === null) return;
+  if (activeState == null) return;
   const active = activeState;
   // Frame parity diffuses A into B, then agents sense A and deposit into B.
   // The render pass displays B before the pair swaps on the next frame.
-  const readsA: boolean = frameCount % 2 === 0;
+  const readsA: boolean = frameCount % 2 == 0;
   const moveGroup: GPUBindGroup = readsA ? active.moveAB : active.moveBA;
   const diffuseGroup: GPUBindGroup = readsA ? active.diffuseAB : active.diffuseBA;
   const displayGroup: GPUBindGroup = readsA ? active.renderB : active.renderA;
@@ -636,7 +636,7 @@ export function frame(
 // creation order, so a bind group never outlives the textures and the buffers it names.
 // TypeGPU releases the same resources with one `root.destroy()` call.
 export function shutdown(): void {
-  if (activeState === null) return;
+  if (activeState == null) return;
   const active = activeState;
   active.renderB.dispose();
   active.renderA.dispose();

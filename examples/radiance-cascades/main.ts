@@ -582,16 +582,16 @@ export function init(
 ): void {
   // The generator fixed the color target format. A surface with another format is a failure
   // here, not a reason to rebuild the pipeline.
-  if (format !== radianceRender_TARGET_FORMAT) {
+  if (format != radianceRender_TARGET_FORMAT) {
     print(`FAIL format expected=${radianceRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
   // The kernels read the committed sizes as constants. The host sizing must agree with them,
   // so a mismatch stops `init` before any resource exists.
   const dimensions = cascadeDimensions(OUTPUT_SIZE);
-  if (dimensions.cascadeProbes !== CASCADE_PROBES
-    || dimensions.cascadeDim !== CASCADE_DIM
-    || dimensions.cascadeCount !== CASCADE_COUNT) {
+  if (dimensions.cascadeProbes != CASCADE_PROBES
+    || dimensions.cascadeDim != CASCADE_DIM
+    || dimensions.cascadeCount != CASCADE_COUNT) {
     print("FAIL committed cascade dimensions");
     return;
   }
@@ -735,7 +735,7 @@ export function init(
   const validationError = hostDevice.popErrorScope();
   // The failure path releases every handle this function created, newest first. Nothing else
   // frees them, because the state never received them.
-  if (validationError !== null) {
+  if (validationError != null) {
     renderPipeline.dispose();
     fieldPipeline.dispose();
     cascadePipeline.dispose();
@@ -770,7 +770,7 @@ export function init(
   layer = 0;
   while (layer < CASCADE_COUNT) {
     const side: u32 = cascadeWriteSide(CASCADE_COUNT, layer);
-    const sourceSide: u32 = side === 0 ? 1 : 0;
+    const sourceSide: u32 = side == 0 ? 1 : 0;
     // The top layer has no layer above it, so it binds its own view. The kernel skips the merge
     // there, and the binding stays valid.
     const upperLayer: u32 = layer + 1 < CASCADE_COUNT ? layer + 1 : layer;
@@ -831,11 +831,11 @@ export function frame(
   buttons: u32,
 ): void {
   // A failed `init` leaves no state. The host still calls `frame`, so the guard returns.
-  if (activeState === null) return;
+  if (activeState == null) return;
   const active = activeState;
   // The host gives the pointer in surface pixels with y down. The scene works in field units
   // of [0, 1] with y up, so the y axis flips here.
-  if (buttons !== 0 && pointerX >= 0.0 && pointerY >= 0.0) {
+  if (buttons != 0 && pointerX >= 0.0 && pointerY >= 0.0) {
     const point = new Vec2f(
       clamp(pointerX / (width as f32), 0.0, 1.0),
       clamp(1.0 - pointerY / (height as f32), 0.0, 1.0),
@@ -916,7 +916,7 @@ export function frame(
 // Releases every handle in the reverse order of creation: groups, sampler, views, textures,
 // buffers, then pipelines. The device and the frame view belong to the host.
 export function shutdown(): void {
-  if (activeState === null) return;
+  if (activeState == null) return;
   const active = activeState;
   active.renderGroup.dispose();
   active.fieldGroup.dispose();

@@ -77,13 +77,13 @@ const saxpy: ComputePipelineSpec = computePipeline<SaxpyLayout>(saxpyKernel, {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -118,7 +118,7 @@ export async function main(): Promise<void> {
       [saxpy_WORKGROUP_X, saxpy_WORKGROUP_Y, saxpy_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print("pipeline:invalid");
       print("FAIL");
       return;

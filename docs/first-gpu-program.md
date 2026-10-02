@@ -121,7 +121,7 @@ dispatch adds invocations without any other change.
       ],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print("pipeline:invalid");
       print("FAIL");
       return;

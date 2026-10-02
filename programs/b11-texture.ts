@@ -96,9 +96,9 @@ const texturePass: ComputePipelineSpec = computePipeline2<TextureLayout, ParamsL
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  if (adapterResult == null) { print("FAIL adapter"); gpu.dispose(); return; }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  if (deviceResult == null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
   {
     using adapter = adapterResult;
     using device = deviceResult;
@@ -135,7 +135,7 @@ export async function main(): Promise<void> {
       [texturePass_WORKGROUP_X, texturePass_WORKGROUP_Y, texturePass_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print("pipeline:invalid");
       print("FAIL");
       return;

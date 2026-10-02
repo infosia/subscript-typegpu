@@ -351,3 +351,28 @@ stays at `affcb6e`. No source in this repository changes.
 Evidence at `86fd064`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
 407.7 s wall.
+
+### Re-pin to `de41409`, and `==` / `!=` (2026-10-02)
+
+The workspace pin moves from `86fd064` to `de41409`. The subscript
+range holds §142 through §144. The `swc_ecma_parser` fork stays at
+`affcb6e`. §142 and §143 need no source change here.
+
+§144 makes `==` and `!=` legal, with the type rules, the result, and
+the lowering of `===` and `!==`. Owner decision of 2026-10-02: every
+script source in this repository writes `==` and `!=`. The change
+covers `lib/`, `programs/`, `examples/`, test fixtures, script
+sources in Rust tests, the `lib/webgpu.ts` emitter in
+`crates/webgpu-gen/src/api.rs`, and the code quotes in `docs/`. The
+diff is 1,272 changed lines, and each one differs from its old line
+only by the operator spelling. `tools/gen-layout-vectors.mjs` is a
+Node.js script and keeps `===`. No hygiene rule rejects `===`.
+
+The library host-runner tests in `crates/typegpu-gen/tests/library`
+link the newest harness rlib in `target/debug/deps`. Run alone after
+a pin change, they use a stale rlib until a workspace build replaces
+it. The gate is not affected.
+
+Evidence at `de41409`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
+389.5 s wall. No WGSL or `.expected` golden moved.

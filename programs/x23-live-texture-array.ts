@@ -67,9 +67,9 @@ function arrayPingPongKernel(res: ArrayPingPongLayout, ctx: ComputeInvocation): 
   if (ctx.globalId.x >= WIDTH || ctx.globalId.y >= HEIGHT || ctx.globalId.z >= LAYERS) return;
   const coords = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);
   const layer: i32 = ctx.globalId.z as i32;
-  const pairedLayer: i32 = layer === 0 ? 1 : 0;
-  const pairScale: f32 = layer === 0 ? 0.5 : 0.0;
-  const coordinateStep: Vec4f = layer === 1
+  const pairedLayer: i32 = layer == 0 ? 1 : 0;
+  const pairScale: f32 = layer == 0 ? 0.5 : 0.0;
+  const coordinateStep: Vec4f = layer == 1
     ? new Vec4f(1.0, 1.0, 0.0, 0.0)
     : new Vec4f(0.0, 0.0, 0.0, 0.0);
   const current: Vec4f = res.source.load(coords, layer);
@@ -183,7 +183,7 @@ function allZero(values: FixedArray<Vec4f, 4>): boolean {
   let index: i32 = 0;
   while (index < 4) {
     const value: Vec4f = values[index];
-    if (value.x !== 0.0 || value.y !== 0.0 || value.z !== 0.0 || value.w !== 0.0) {
+    if (value.x != 0.0 || value.y != 0.0 || value.z != 0.0 || value.w != 0.0) {
       return false;
     }
     index += 1;
@@ -193,14 +193,14 @@ function allZero(values: FixedArray<Vec4f, 4>): boolean {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -268,7 +268,7 @@ export async function main(): Promise<void> {
       [layerReadback_WORKGROUP_X, layerReadback_WORKGROUP_Y, layerReadback_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }

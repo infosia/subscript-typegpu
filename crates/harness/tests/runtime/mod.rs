@@ -392,14 +392,14 @@ function three(a: State, b: State, c: State, ctx: ComputeInvocation): void { a.v
 function four(a: State, b: State, c: State, d: State, ctx: ComputeInvocation): void { a.values.push(ctx.localIndex); b.values.push(ctx.localIndex); c.values.push(ctx.localIndex); d.values.push(ctx.localIndex); }
 function builtins(state: BuiltinState, ctx: ComputeInvocation): void {
   const expectedIndex: u32 = (ctx.localId.z * 2 + ctx.localId.y) * 4 + ctx.localId.x;
-  if (ctx.localIndex !== expectedIndex) state.failures += 1;
-  if (ctx.workgroupId.x !== ctx.globalId.x / 4) state.failures += 1;
-  if (ctx.workgroupId.y !== ctx.globalId.y / 2) state.failures += 1;
-  if (ctx.workgroupId.z !== ctx.globalId.z / 2) state.failures += 1;
-  if (ctx.localId.x !== ctx.globalId.x % 4) state.failures += 1;
-  if (ctx.localId.y !== ctx.globalId.y % 2) state.failures += 1;
-  if (ctx.localId.z !== ctx.globalId.z % 2) state.failures += 1;
-  if (ctx.numWorkgroups.x !== 2 || ctx.numWorkgroups.y !== 2 || ctx.numWorkgroups.z !== 1) state.failures += 1;
+  if (ctx.localIndex != expectedIndex) state.failures += 1;
+  if (ctx.workgroupId.x != ctx.globalId.x / 4) state.failures += 1;
+  if (ctx.workgroupId.y != ctx.globalId.y / 2) state.failures += 1;
+  if (ctx.workgroupId.z != ctx.globalId.z / 2) state.failures += 1;
+  if (ctx.localId.x != ctx.globalId.x % 4) state.failures += 1;
+  if (ctx.localId.y != ctx.globalId.y % 2) state.failures += 1;
+  if (ctx.localId.z != ctx.globalId.z % 2) state.failures += 1;
+  if (ctx.numWorkgroups.x != 2 || ctx.numWorkgroups.y != 2 || ctx.numWorkgroups.z != 1) state.failures += 1;
   state.count += 1;
 }
 export function main(): void {

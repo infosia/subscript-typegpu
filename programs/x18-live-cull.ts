@@ -97,8 +97,8 @@ function covered(
   frontFace: GPUFrontFace,
 ): boolean {
   const area: f32 = signedArea(a, b, c);
-  const front: boolean = frontFace === "ccw" ? area > 0.0 : area < 0.0;
-  if ((cullMode === "back" && !front) || (cullMode === "front" && front)) {
+  const front: boolean = frontFace == "ccw" ? area > 0.0 : area < 0.0;
+  if ((cullMode == "back" && !front) || (cullMode == "front" && front)) {
     return false;
   }
   const e0 = edge(a, b, p);
@@ -134,10 +134,10 @@ async function checkImage(
       );
       const expectedR: u8 = hit ? 255 : 0;
       const o = y * 256 + x * 4;
-      if (pixels[o] !== expectedR
-        || pixels[o + 1] !== 0
-        || pixels[o + 2] !== 0
-        || pixels[o + 3] !== 255) {
+      if (pixels[o] != expectedR
+        || pixels[o + 1] != 0
+        || pixels[o + 2] != 0
+        || pixels[o + 3] != 255) {
         print(`FAIL ${label} ${x},${y}`);
         return false;
       }
@@ -151,13 +151,13 @@ async function checkImage(
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -225,7 +225,7 @@ export async function main(): Promise<void> {
       culled,
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -269,7 +269,7 @@ export async function main(): Promise<void> {
       indexBytes,
       0,
     );
-    if (order[0] !== 0 || order[1] !== 2 || order[2] !== 1) {
+    if (order[0] != 0 || order[1] != 2 || order[2] != 1) {
       print("FAIL index readback");
       return;
     }

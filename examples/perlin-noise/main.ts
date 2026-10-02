@@ -153,7 +153,7 @@ export function init(
 ): void {
   // The declaration fixes the target format literally. A surface with another format ends
   // the example before it creates any resource.
-  if (format !== noise_TARGET_FORMAT) {
+  if (format != noise_TARGET_FORMAT) {
     print(`FAIL format expected=${noise_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -201,7 +201,7 @@ export function init(
   const validationError = hostDevice.popErrorScope();
   // All three handles belong to the script here, so it releases them before it reports the
   // failure and leaves the module state empty.
-  if (validationError !== null) {
+  if (validationError != null) {
     pipeline.dispose();
     frameBuffer.dispose();
     vertices.dispose();
@@ -242,11 +242,11 @@ export function frame(
   const vertices = activeVertices;
   const frameBuffer = activeFrameBuffer;
   const group = activeGroup;
-  if (device === null) return;
-  if (pipeline === null) return;
-  if (vertices === null) return;
-  if (frameBuffer === null) return;
-  if (group === null) return;
+  if (device == null) return;
+  if (pipeline == null) return;
+  if (vertices == null) return;
+  if (frameBuffer == null) return;
+  if (group == null) return;
   // The host reports no clock, so the frame count divided by 60 stands for seconds on a
   // 60 Hz surface. TypeGPU reads the animation timestamp instead.
   frameCount += 1;
@@ -290,10 +290,10 @@ export function frame(
 // The host calls this one time before it releases the device. TypeGPU frees the same kind of
 // resource through `root.destroy`, and this layer disposes each handle by name.
 export function shutdown(): void {
-  if (activeGroup !== null) activeGroup.dispose();
-  if (activeFrameBuffer !== null) activeFrameBuffer.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activePipeline !== null) activePipeline.dispose();
+  if (activeGroup != null) activeGroup.dispose();
+  if (activeFrameBuffer != null) activeFrameBuffer.dispose();
+  if (activeVertices != null) activeVertices.dispose();
+  if (activePipeline != null) activePipeline.dispose();
   activeFrameBuffer = null;
   activeVertices = null;
   activePipeline = null;

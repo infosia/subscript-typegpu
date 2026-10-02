@@ -80,13 +80,13 @@ const blended: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -126,7 +126,7 @@ export async function main(): Promise<void> {
       blended,
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print("pipeline:invalid");
       print("FAIL");
       return;
@@ -145,7 +145,7 @@ export async function main(): Promise<void> {
     pass.end();
     using command = encoder.finishDefault();
     device.queue.submit([command]);
-    if (blended.blend === null) {
+    if (blended.blend == null) {
       print("FAIL blend missing");
       return;
     }

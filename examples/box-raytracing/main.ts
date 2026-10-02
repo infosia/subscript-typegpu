@@ -231,7 +231,7 @@ function boxFragment(
     new Vec3f(0.0, 0.0, 0.0),
     new Vec3f(7.0 * BOX_SIZE, 7.0 * BOX_SIZE, 7.0 * BOX_SIZE),
   );
-  if (bounds.hit === 0) return new Vec4f(0.0, 0.0, 0.0, 0.0);
+  if (bounds.hit == 0) return new Vec4f(0.0, 0.0, 0.0, 0.0);
 
   let densitySum: f32 = 0.0;
   let inverseColor = new Vec3f(0.0, 0.0, 0.0);
@@ -240,7 +240,7 @@ function boxFragment(
   // back into x, y, and z, because a flat storage array carries one stride.
   for (let index: u32 = 0; index < CELL_COUNT; index += 1) {
     const cell: BoxCell = res.cells[index];
-    if (cell.isActive === 0) continue;
+    if (cell.isActive == 0) continue;
     const x: u32 = index / 49;
     const y: u32 = (index % 49) / 7;
     const z: u32 = index % 7;
@@ -255,7 +255,7 @@ function boxFragment(
       minimum,
       minimum.add(new Vec3f(BOX_SIZE, BOX_SIZE, BOX_SIZE)),
     );
-    if (intersection.hit === 0) continue;
+    if (intersection.hit == 0) continue;
     // The traversed length through each box adds density and inverse albedo.
     const boxDensity: f32 = scalarMax(0.0, intersection.tMax - intersection.tMin)
       * MATERIAL_DENSITY * MATERIAL_DENSITY;
@@ -343,7 +343,7 @@ export function init(
 ): void {
   // The generator pins the target format into the pipeline. A mismatch with the host surface
   // fails here, not inside pipeline creation.
-  if (format !== boxes_TARGET_FORMAT) {
+  if (format != boxes_TARGET_FORMAT) {
     print(`FAIL format expected=${boxes_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -424,7 +424,7 @@ export function init(
   const validationError = hostDevice.popErrorScope();
   // The error path disposes every handle that the failed run already created, because no
   // finalizer runs later.
-  if (validationError !== null) {
+  if (validationError != null) {
     pipeline.dispose();
     camera.dispose();
     cells.dispose();
@@ -470,11 +470,11 @@ export function frame(
   const group = activeGroup;
   // A null field means `init` failed or never ran. The frame returns, because the layers
   // report failure as a value.
-  if (device === null) return;
-  if (pipeline === null) return;
-  if (vertices === null) return;
-  if (camera === null) return;
-  if (group === null) return;
+  if (device == null) return;
+  if (pipeline == null) return;
+  if (vertices == null) return;
+  if (camera == null) return;
+  if (group == null) return;
   // The frame count is the only clock the window host offers. 60 frames stand for one second,
   // and ROTATION_SPEED turns that into the orbit angle.
   frameCount += 1;
@@ -523,11 +523,11 @@ export function frame(
 // The host calls `shutdown` once, before it releases the device. The bind group goes first,
 // because it names the other handles.
 export function shutdown(): void {
-  if (activeGroup !== null) activeGroup.dispose();
-  if (activeCamera !== null) activeCamera.dispose();
-  if (activeCells !== null) activeCells.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activePipeline !== null) activePipeline.dispose();
+  if (activeGroup != null) activeGroup.dispose();
+  if (activeCamera != null) activeCamera.dispose();
+  if (activeCells != null) activeCells.dispose();
+  if (activeVertices != null) activeVertices.dispose();
+  if (activePipeline != null) activePipeline.dispose();
   // The null assignments make a second `shutdown` call safe.
   activeCamera = null;
   activeCells = null;

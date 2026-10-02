@@ -388,7 +388,7 @@ function inputValue(): VectorInput {
 }
 
 function exactF32(left: f32, right: f32): boolean {
-  return Math.f32ToBits(left as f64) === Math.f32ToBits(right as f64);
+  return Math.f32ToBits(left as f64) == Math.f32ToBits(right as f64);
 }
 
 function exactVec4f(left: Vec4f, right: Vec4f): boolean {
@@ -397,27 +397,27 @@ function exactVec4f(left: Vec4f, right: Vec4f): boolean {
 }
 
 function exactVec4i(left: Vec4i, right: Vec4i): boolean {
-  return left.x === right.x && left.y === right.y && left.z === right.z && left.w === right.w;
+  return left.x == right.x && left.y == right.y && left.z == right.z && left.w == right.w;
 }
 
 function exactVec2i(left: Vec2i, right: Vec2i): boolean {
-  return left.x === right.x && left.y === right.y;
+  return left.x == right.x && left.y == right.y;
 }
 
 function exactVec3i(left: Vec3i, right: Vec3i): boolean {
-  return left.x === right.x && left.y === right.y && left.z === right.z;
+  return left.x == right.x && left.y == right.y && left.z == right.z;
 }
 
 function exactVec4u(left: Vec4u, right: Vec4u): boolean {
-  return left.x === right.x && left.y === right.y && left.z === right.z && left.w === right.w;
+  return left.x == right.x && left.y == right.y && left.z == right.z && left.w == right.w;
 }
 
 function exactVec2u(left: Vec2u, right: Vec2u): boolean {
-  return left.x === right.x && left.y === right.y;
+  return left.x == right.x && left.y == right.y;
 }
 
 function exactVec3u(left: Vec3u, right: Vec3u): boolean {
-  return left.x === right.x && left.y === right.y && left.z === right.z;
+  return left.x == right.x && left.y == right.y && left.z == right.z;
 }
 
 function near(left: f32, right: f32): boolean {
@@ -471,9 +471,9 @@ function nearOutput(left: VectorOutput, right: VectorOutput): boolean {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  if (adapterResult == null) { print("FAIL adapter"); gpu.dispose(); return; }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  if (deviceResult == null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
   {
     using adapter = adapterResult;
     using device = deviceResult;
@@ -488,7 +488,7 @@ export async function main(): Promise<void> {
       [vectorBuiltins_WORKGROUP_X, vectorBuiltins_WORKGROUP_Y, vectorBuiltins_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }

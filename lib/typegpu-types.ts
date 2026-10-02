@@ -43,7 +43,7 @@ export class Vec2f {
   // carries no such guard, so a zero input makes the CPU lane and the GPU disagree.
   normalize(): Vec2f {
     const magnitude: f32 = this.length();
-    if (magnitude === 0.0) {
+    if (magnitude == 0.0) {
       return new Vec2f(0.0, 0.0);
     }
     return this.scale(1.0 / magnitude);
@@ -88,8 +88,8 @@ export class Vec2f {
   le(other: Vec2f): Vec2b { return new Vec2b(this.x <= other.x, this.y <= other.y); }
   gt(other: Vec2f): Vec2b { return new Vec2b(this.x > other.x, this.y > other.y); }
   ge(other: Vec2f): Vec2b { return new Vec2b(this.x >= other.x, this.y >= other.y); }
-  eq(other: Vec2f): Vec2b { return new Vec2b(this.x === other.x, this.y === other.y); }
-  ne(other: Vec2f): Vec2b { return new Vec2b(this.x !== other.x, this.y !== other.y); }
+  eq(other: Vec2f): Vec2b { return new Vec2b(this.x == other.x, this.y == other.y); }
+  ne(other: Vec2f): Vec2b { return new Vec2b(this.x != other.x, this.y != other.y); }
   // Takes `other` where the mask component is `true` and the receiver where it is `false`.
   // WGSL `select(v, other, mask)`.
   select(other: Vec2f, mask: Vec2b): Vec2f { return new Vec2f(mask.x ? other.x : this.x, mask.y ? other.y : this.y); }
@@ -145,7 +145,7 @@ export class Vec3f {
 
   normalize(): Vec3f {
     const magnitude: f32 = this.length();
-    if (magnitude === 0.0) {
+    if (magnitude == 0.0) {
       return new Vec3f(0.0, 0.0, 0.0);
     }
     return this.scale(1.0 / magnitude);
@@ -182,8 +182,8 @@ export class Vec3f {
   le(other: Vec3f): Vec3b { return new Vec3b(this.x <= other.x, this.y <= other.y, this.z <= other.z); }
   gt(other: Vec3f): Vec3b { return new Vec3b(this.x > other.x, this.y > other.y, this.z > other.z); }
   ge(other: Vec3f): Vec3b { return new Vec3b(this.x >= other.x, this.y >= other.y, this.z >= other.z); }
-  eq(other: Vec3f): Vec3b { return new Vec3b(this.x === other.x, this.y === other.y, this.z === other.z); }
-  ne(other: Vec3f): Vec3b { return new Vec3b(this.x !== other.x, this.y !== other.y, this.z !== other.z); }
+  eq(other: Vec3f): Vec3b { return new Vec3b(this.x == other.x, this.y == other.y, this.z == other.z); }
+  ne(other: Vec3f): Vec3b { return new Vec3b(this.x != other.x, this.y != other.y, this.z != other.z); }
   select(other: Vec3f, mask: Vec3b): Vec3f { return new Vec3f(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z); }
   // The swizzles are read accessors, WGSL `v.xy`. A swizzle is never an assignment target, so a
   // kernel writes the component fields instead.
@@ -234,7 +234,7 @@ export class Vec4f {
 
   normalize(): Vec4f {
     const magnitude: f32 = this.length();
-    if (magnitude === 0.0) {
+    if (magnitude == 0.0) {
       return new Vec4f(0.0, 0.0, 0.0, 0.0);
     }
     return this.scale(1.0 / magnitude);
@@ -271,8 +271,8 @@ export class Vec4f {
   le(other: Vec4f): Vec4b { return new Vec4b(this.x <= other.x, this.y <= other.y, this.z <= other.z, this.w <= other.w); }
   gt(other: Vec4f): Vec4b { return new Vec4b(this.x > other.x, this.y > other.y, this.z > other.z, this.w > other.w); }
   ge(other: Vec4f): Vec4b { return new Vec4b(this.x >= other.x, this.y >= other.y, this.z >= other.z, this.w >= other.w); }
-  eq(other: Vec4f): Vec4b { return new Vec4b(this.x === other.x, this.y === other.y, this.z === other.z, this.w === other.w); }
-  ne(other: Vec4f): Vec4b { return new Vec4b(this.x !== other.x, this.y !== other.y, this.z !== other.z, this.w !== other.w); }
+  eq(other: Vec4f): Vec4b { return new Vec4b(this.x == other.x, this.y == other.y, this.z == other.z, this.w == other.w); }
+  ne(other: Vec4f): Vec4b { return new Vec4b(this.x != other.x, this.y != other.y, this.z != other.z, this.w != other.w); }
   select(other: Vec4f, mask: Vec4b): Vec4f { return new Vec4f(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z, mask.w ? other.w : this.w); }
   get xy(): Vec2f { return new Vec2f(this.x, this.y); }
   get xz(): Vec2f { return new Vec2f(this.x, this.z); }
@@ -313,8 +313,8 @@ export class Vec2i {
   le(other: Vec2i): Vec2b { return new Vec2b(this.x <= other.x, this.y <= other.y); }
   gt(other: Vec2i): Vec2b { return new Vec2b(this.x > other.x, this.y > other.y); }
   ge(other: Vec2i): Vec2b { return new Vec2b(this.x >= other.x, this.y >= other.y); }
-  eq(other: Vec2i): Vec2b { return new Vec2b(this.x === other.x, this.y === other.y); }
-  ne(other: Vec2i): Vec2b { return new Vec2b(this.x !== other.x, this.y !== other.y); }
+  eq(other: Vec2i): Vec2b { return new Vec2b(this.x == other.x, this.y == other.y); }
+  ne(other: Vec2i): Vec2b { return new Vec2b(this.x != other.x, this.y != other.y); }
   select(other: Vec2i, mask: Vec2b): Vec2i { return new Vec2i(mask.x ? other.x : this.x, mask.y ? other.y : this.y); }
 }
 
@@ -345,8 +345,8 @@ export class Vec3i {
   le(other: Vec3i): Vec3b { return new Vec3b(this.x <= other.x, this.y <= other.y, this.z <= other.z); }
   gt(other: Vec3i): Vec3b { return new Vec3b(this.x > other.x, this.y > other.y, this.z > other.z); }
   ge(other: Vec3i): Vec3b { return new Vec3b(this.x >= other.x, this.y >= other.y, this.z >= other.z); }
-  eq(other: Vec3i): Vec3b { return new Vec3b(this.x === other.x, this.y === other.y, this.z === other.z); }
-  ne(other: Vec3i): Vec3b { return new Vec3b(this.x !== other.x, this.y !== other.y, this.z !== other.z); }
+  eq(other: Vec3i): Vec3b { return new Vec3b(this.x == other.x, this.y == other.y, this.z == other.z); }
+  ne(other: Vec3i): Vec3b { return new Vec3b(this.x != other.x, this.y != other.y, this.z != other.z); }
   select(other: Vec3i, mask: Vec3b): Vec3i { return new Vec3i(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z); }
   get xy(): Vec2i { return new Vec2i(this.x, this.y); }
   get xz(): Vec2i { return new Vec2i(this.x, this.z); }
@@ -381,8 +381,8 @@ export class Vec4i {
   le(other: Vec4i): Vec4b { return new Vec4b(this.x <= other.x, this.y <= other.y, this.z <= other.z, this.w <= other.w); }
   gt(other: Vec4i): Vec4b { return new Vec4b(this.x > other.x, this.y > other.y, this.z > other.z, this.w > other.w); }
   ge(other: Vec4i): Vec4b { return new Vec4b(this.x >= other.x, this.y >= other.y, this.z >= other.z, this.w >= other.w); }
-  eq(other: Vec4i): Vec4b { return new Vec4b(this.x === other.x, this.y === other.y, this.z === other.z, this.w === other.w); }
-  ne(other: Vec4i): Vec4b { return new Vec4b(this.x !== other.x, this.y !== other.y, this.z !== other.z, this.w !== other.w); }
+  eq(other: Vec4i): Vec4b { return new Vec4b(this.x == other.x, this.y == other.y, this.z == other.z, this.w == other.w); }
+  ne(other: Vec4i): Vec4b { return new Vec4b(this.x != other.x, this.y != other.y, this.z != other.z, this.w != other.w); }
   select(other: Vec4i, mask: Vec4b): Vec4i { return new Vec4i(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z, mask.w ? other.w : this.w); }
   get xy(): Vec2i { return new Vec2i(this.x, this.y); }
   get xz(): Vec2i { return new Vec2i(this.x, this.z); }
@@ -419,8 +419,8 @@ export class Vec2u {
   le(other: Vec2u): Vec2b { return new Vec2b(this.x <= other.x, this.y <= other.y); }
   gt(other: Vec2u): Vec2b { return new Vec2b(this.x > other.x, this.y > other.y); }
   ge(other: Vec2u): Vec2b { return new Vec2b(this.x >= other.x, this.y >= other.y); }
-  eq(other: Vec2u): Vec2b { return new Vec2b(this.x === other.x, this.y === other.y); }
-  ne(other: Vec2u): Vec2b { return new Vec2b(this.x !== other.x, this.y !== other.y); }
+  eq(other: Vec2u): Vec2b { return new Vec2b(this.x == other.x, this.y == other.y); }
+  ne(other: Vec2u): Vec2b { return new Vec2b(this.x != other.x, this.y != other.y); }
   select(other: Vec2u, mask: Vec2b): Vec2u { return new Vec2u(mask.x ? other.x : this.x, mask.y ? other.y : this.y); }
 }
 
@@ -450,8 +450,8 @@ export class Vec3u {
   le(other: Vec3u): Vec3b { return new Vec3b(this.x <= other.x, this.y <= other.y, this.z <= other.z); }
   gt(other: Vec3u): Vec3b { return new Vec3b(this.x > other.x, this.y > other.y, this.z > other.z); }
   ge(other: Vec3u): Vec3b { return new Vec3b(this.x >= other.x, this.y >= other.y, this.z >= other.z); }
-  eq(other: Vec3u): Vec3b { return new Vec3b(this.x === other.x, this.y === other.y, this.z === other.z); }
-  ne(other: Vec3u): Vec3b { return new Vec3b(this.x !== other.x, this.y !== other.y, this.z !== other.z); }
+  eq(other: Vec3u): Vec3b { return new Vec3b(this.x == other.x, this.y == other.y, this.z == other.z); }
+  ne(other: Vec3u): Vec3b { return new Vec3b(this.x != other.x, this.y != other.y, this.z != other.z); }
   select(other: Vec3u, mask: Vec3b): Vec3u { return new Vec3u(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z); }
   get xy(): Vec2u { return new Vec2u(this.x, this.y); }
   get xz(): Vec2u { return new Vec2u(this.x, this.z); }
@@ -485,8 +485,8 @@ export class Vec4u {
   le(other: Vec4u): Vec4b { return new Vec4b(this.x <= other.x, this.y <= other.y, this.z <= other.z, this.w <= other.w); }
   gt(other: Vec4u): Vec4b { return new Vec4b(this.x > other.x, this.y > other.y, this.z > other.z, this.w > other.w); }
   ge(other: Vec4u): Vec4b { return new Vec4b(this.x >= other.x, this.y >= other.y, this.z >= other.z, this.w >= other.w); }
-  eq(other: Vec4u): Vec4b { return new Vec4b(this.x === other.x, this.y === other.y, this.z === other.z, this.w === other.w); }
-  ne(other: Vec4u): Vec4b { return new Vec4b(this.x !== other.x, this.y !== other.y, this.z !== other.z, this.w !== other.w); }
+  eq(other: Vec4u): Vec4b { return new Vec4b(this.x == other.x, this.y == other.y, this.z == other.z, this.w == other.w); }
+  ne(other: Vec4u): Vec4b { return new Vec4b(this.x != other.x, this.y != other.y, this.z != other.z, this.w != other.w); }
   select(other: Vec4u, mask: Vec4b): Vec4u { return new Vec4u(mask.x ? other.x : this.x, mask.y ? other.y : this.y, mask.z ? other.z : this.z, mask.w ? other.w : this.w); }
   get xy(): Vec2u { return new Vec2u(this.x, this.y); }
   get xz(): Vec2u { return new Vec2u(this.x, this.z); }

@@ -56,7 +56,7 @@ class ShellLayout {
 }
 
 function shellKernel(res: ShellLayout, ctx: ComputeInvocation): void {
-  if (ctx.globalId.x === 0) {
+  if (ctx.globalId.x == 0) {
     res.output[0] = addBias(5);
   }
 }
@@ -71,13 +71,13 @@ const shellPipeline: ComputePipelineSpec = computePipeline<ShellLayout>(
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -106,7 +106,7 @@ export async function main(): Promise<void> {
       ],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -131,7 +131,7 @@ export async function main(): Promise<void> {
       [1, 1, 1],
       shellPipeline_HOST_RUNNABLE,
     );
-    if (gpuValue !== host.output[0]) {
+    if (gpuValue != host.output[0]) {
       print(`FAIL gpu=${gpuValue} host=${host.output[0]}`);
       return;
     }

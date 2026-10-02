@@ -458,7 +458,7 @@ function advectVelocityKernel(res: VelocityAdvectionLayout, ctx: ComputeInvocati
   const x: u32 = ctx.globalId.x;
   const y: u32 = ctx.globalId.y;
   const coords = new Vec2i(x as i32, y as i32);
-  if (x === 0 || y === 0 || x + 1 === SIM_N || y + 1 === SIM_N) {
+  if (x == 0 || y == 0 || x + 1 == SIM_N || y + 1 == SIM_N) {
     res.target.store(coords, new Vec4f(0.0, 0.0, 0.0, 0.0));
     res.viscosityRhs.store(coords, new Vec4f(0.0, 0.0, 0.0, 0.0));
     return;
@@ -951,9 +951,9 @@ export function init(
   // The three render pipelines share one generated target format. A surface with another
   // format is a failure here, not a reason to rebuild them.
   if (
-    format !== inkRender_TARGET_FORMAT
-    || format !== velocityRender_TARGET_FORMAT
-    || format !== imageRender_TARGET_FORMAT
+    format != inkRender_TARGET_FORMAT
+    || format != velocityRender_TARGET_FORMAT
+    || format != imageRender_TARGET_FORMAT
   ) {
     print(`FAIL format expected=${imageRender_TARGET_FORMAT} actual=${format}`);
     return;
@@ -1297,7 +1297,7 @@ export function init(
   // The failure path releases every handle this function created, newest first. Nothing else
   // frees them, because the state never received them.
   const validationError = hostDevice.popErrorScope();
-  if (validationError !== null) {
+  if (validationError != null) {
     disposeGroups(renderGroups);
     disposeGroups(groups);
     disposeRender(render);
@@ -1343,13 +1343,13 @@ export function frame(
   buttons: u32,
 ): void {
   // A failed `init` leaves no state. The host still calls `frame`, so the guard returns.
-  if (activeState === null) return;
+  if (activeState == null) return;
   const active = activeState;
   // The host reports one key per frame and clears the slot, so a press acts once. 49, 50, and
   // 51 are the Unicode scalars of `1`, `2`, and `3`.
-  if (key === 49) displayMode = DISPLAY_INK;
-  if (key === 50) displayMode = DISPLAY_VELOCITY;
-  if (key === 51) displayMode = DISPLAY_IMAGE;
+  if (key == 49) displayMode = DISPLAY_INK;
+  if (key == 50) displayMode = DISPLAY_VELOCITY;
+  if (key == 51) displayMode = DISPLAY_IMAGE;
 
   // An idle pointer leaves the brush inactive. The splat kernel then writes zeros over the
   // force and the added ink, so no force survives into the next frame.
@@ -1358,7 +1358,7 @@ export function frame(
   let brushActive: f32 = 0.0;
   const pointerValid: boolean = pointerX >= 0.0 && pointerY >= 0.0
     && width > 0 && height > 0;
-  const drawing: boolean = pointerValid && buttons !== 0;
+  const drawing: boolean = pointerValid && buttons != 0;
   // The host reports surface pixels with y down. The grid runs from 0 to `SIM_N` with y up,
   // so the y axis flips here.
   if (pointerValid) {
@@ -1541,12 +1541,12 @@ export function frame(
   let renderGroup: GPUBindGroup = inkAIsCurrent
     ? active.renderGroups[RENDER_GROUP_IMAGE_A]
     : active.renderGroups[RENDER_GROUP_IMAGE_B];
-  if (displayMode === DISPLAY_INK) {
+  if (displayMode == DISPLAY_INK) {
     renderPipeline = active.render[RENDER_INK];
     renderGroup = inkAIsCurrent
       ? active.renderGroups[RENDER_GROUP_INK_A]
       : active.renderGroups[RENDER_GROUP_INK_B];
-  } else if (displayMode === DISPLAY_VELOCITY) {
+  } else if (displayMode == DISPLAY_VELOCITY) {
     renderPipeline = active.render[RENDER_VELOCITY];
     renderGroup = velocityAIsCurrent
       ? active.renderGroups[RENDER_GROUP_VELOCITY_A]
@@ -1582,7 +1582,7 @@ export function frame(
 // Releases every handle in the reverse order of creation: groups, sampler, views, textures,
 // buffers, then pipelines. The device and the frame view belong to the host.
 export function shutdown(): void {
-  if (activeState === null) return;
+  if (activeState == null) return;
   const active = activeState;
   disposeGroups(active.renderGroups);
   disposeGroups(active.groups);

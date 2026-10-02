@@ -191,7 +191,7 @@ export function init(
 ): void {
   // The host picks the surface format. The generator baked one format into the pipeline,
   // so a mismatch stops the example here instead of at pipeline creation.
-  if (format !== confettiRender_TARGET_FORMAT) {
+  if (format != confettiRender_TARGET_FORMAT) {
     print(`FAIL format expected=${confettiRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -268,7 +268,7 @@ export function init(
   // A null check replaces the exception a browser port throws. The failure path frees the
   // four handles this function already created.
   const validationError = hostDevice.popErrorScope();
-  if (validationError !== null) {
+  if (validationError != null) {
     renderPipeline.dispose();
     computePipeline.dispose();
     particleBuffer.dispose();
@@ -315,12 +315,12 @@ export function frame(
   const group = activeGroup;
   const vertices = activeVertices;
   const particles = activeParticles;
-  if (device === null) return;
-  if (computePipeline === null) return;
-  if (renderPipeline === null) return;
-  if (group === null) return;
-  if (vertices === null) return;
-  if (particles === null) return;
+  if (device == null) return;
+  if (computePipeline == null) return;
+  if (renderPipeline == null) return;
+  if (group == null) return;
+  if (vertices == null) return;
+  if (particles == null) return;
   // One encoder records the update and the draw. The compute pass comes first, so the draw
   // reads the positions this frame produced.
   using encoder = device.createCommandEncoderDefault();
@@ -357,11 +357,11 @@ export function frame(
 // The host calls shutdown once. The script frees every GPU handle by hand, because this
 // library keeps no finalizer and no reference count for scripts.
 export function shutdown(): void {
-  if (activeGroup !== null) activeGroup.dispose();
-  if (activeParticles !== null) activeParticles.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activeRender !== null) activeRender.dispose();
-  if (activeCompute !== null) activeCompute.dispose();
+  if (activeGroup != null) activeGroup.dispose();
+  if (activeParticles != null) activeParticles.dispose();
+  if (activeVertices != null) activeVertices.dispose();
+  if (activeRender != null) activeRender.dispose();
+  if (activeCompute != null) activeCompute.dispose();
   activeGroup = null;
   activeParticles = null;
   activeVertices = null;

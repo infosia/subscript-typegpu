@@ -10,12 +10,12 @@ import { gpu, GPUAdapter, GPUBufferUsage, GPUDevice } from "./webgpu";
 
 export async function main(): Promise<void> {
   const adapter: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapter === null) {
+  if (adapter == null) {
     print("FAIL adapter");
     return;
   }
   const device: GPUDevice | null = await adapter.requestDevice();
-  if (device === null) {
+  if (device == null) {
     print("FAIL device");
     return;
   }

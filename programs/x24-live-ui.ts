@@ -25,9 +25,9 @@ export async function main(): Promise<void> {
   ui.endWindow();
   ui.end();
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  if (adapterResult == null) { print("FAIL adapter"); gpu.dispose(); return; }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  if (deviceResult == null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
   {
     using adapter = adapterResult;
     using device = deviceResult;
@@ -38,8 +38,8 @@ export async function main(): Promise<void> {
     );
     using renderer = UiRenderer.create(device, facts, 64);
     const error = await device.popErrorScope();
-    if (error !== null) { print(`FAIL validation ${error.message.split("\n")[0]}`); return; }
-    if (uiPipeline_WGSL.length === 0) { print("FAIL shader"); return; }
+    if (error != null) { print(`FAIL validation ${error.message.split("\n")[0]}`); return; }
+    if (uiPipeline_WGSL.length == 0) { print("FAIL shader"); return; }
     using target = device.createTexture({
       label: "x24-target", size: { width: 256, height: 256 }, format: "rgba8unorm",
       usage: GPUTextureUsage.RENDER_ATTACHMENT + GPUTextureUsage.COPY_SRC,
@@ -75,7 +75,7 @@ export async function main(): Promise<void> {
           const offset: i32 = y * 1024 + x * 4;
           const got: u32 = (pixels[offset] as u32) + (pixels[offset + 1] as u32) * 256
             + (pixels[offset + 2] as u32) * 65536 + (pixels[offset + 3] as u32) * 16777216;
-          if (got !== colors[i]) {
+          if (got != colors[i]) {
             print(`FAIL x=${x} y=${y} expected=${colors[i]} got=${got}`);
             readback.unmap();
             return;

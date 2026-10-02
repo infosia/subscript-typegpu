@@ -44,11 +44,11 @@ let renderer: UiRenderer | null = null;
 // The log keeps the newest 8000 characters. It drops whole lines from the front, so a
 // partial line never reaches the panel.
 function appendLog(message: string): void {
-  if (logText.length !== 0) logText += "\n";
+  if (logText.length != 0) logText += "\n";
   logText += message;
   while (logText.length > 8000) {
     let end: i32 = 0;
-    while (end < logText.length && logText.charCodeAt(end) !== 10) end += 1;
+    while (end < logText.length && logText.charCodeAt(end) != 10) end += 1;
     logText = logText.slice(end < logText.length ? end + 1 : end);
   }
   logUpdated = true;
@@ -57,7 +57,7 @@ function appendLog(message: string): void {
 // A widget both draws and reports in one call, the immediate-mode contract. `UI_RES_SUBMIT`
 // marks the frame on which a left press completes.
 function logButton(number: i32): void {
-  if ((ui.button(`Button ${number}`) & UI_RES_SUBMIT) !== 0) {
+  if ((ui.button(`Button ${number}`) & UI_RES_SUBMIT) != 0) {
     appendLog(`Pressed button ${number}`);
   }
 }
@@ -73,13 +73,13 @@ function colorHex(value: f32): string {
 // The first window. `beginWindow` returns zero when the window is closed, and the rect
 // argument applies on the first frame only.
 function demoWindow(): void {
-  if (ui.beginWindow("Demo Window", new UiRect(40, 40, 300, 450)) === 0) return;
+  if (ui.beginWindow("Demo Window", new UiRect(40, 40, 300, 450)) == 0) return;
   // The container record is live state the program reads and writes. This clamp restores the
   // minimum size on every frame, because a drag can shrink the window below it.
   const window = ui.currentContainer();
   window.rect = new UiRect(window.rect.x, window.rect.y,
     window.rect.w < 240 ? 240 : window.rect.w, window.rect.h < 300 ? 300 : window.rect.h);
-  if (ui.header("Window Info") !== 0) {
+  if (ui.header("Window Info") != 0) {
     // A row of item widths in pixels. A negative width reaches to that many pixels from the
     // right edge, and a height of 0 takes the style height.
     ui.layoutRow([54, -1], 0);
@@ -88,42 +88,42 @@ function demoWindow(): void {
     ui.label("Size:");
     ui.label(`${window.rect.w}, ${window.rect.h}`);
   }
-  if (ui.header("Test Buttons", UI_OPT_EXPANDED) !== 0) {
+  if (ui.header("Test Buttons", UI_OPT_EXPANDED) != 0) {
     ui.layoutRow([86, -110, -1], 0);
     ui.label("Test buttons 1:");
     logButton(1);
     logButton(2);
     ui.label("Test buttons 2:");
     logButton(3);
-    if ((ui.button("Popup") & UI_RES_SUBMIT) !== 0) ui.openPopup("Test Popup");
-    if (ui.beginPopup("Test Popup") !== 0) {
+    if ((ui.button("Popup") & UI_RES_SUBMIT) != 0) ui.openPopup("Test Popup");
+    if (ui.beginPopup("Test Popup") != 0) {
       ui.button("Hello");
       ui.button("World");
       ui.endPopup();
     }
   }
-  if (ui.header("Tree and Text", UI_OPT_EXPANDED) !== 0) {
+  if (ui.header("Tree and Text", UI_OPT_EXPANDED) != 0) {
     ui.layoutRow([140, -1], 0);
     ui.layoutBeginColumn();
-    if (ui.beginTreenode("Test 1") !== 0) {
-      if (ui.beginTreenode("Test 1a") !== 0) {
+    if (ui.beginTreenode("Test 1") != 0) {
+      if (ui.beginTreenode("Test 1a") != 0) {
         ui.label("Hello");
         ui.label("world");
         ui.endTreenode();
       }
-      if (ui.beginTreenode("Test 1b") !== 0) {
+      if (ui.beginTreenode("Test 1b") != 0) {
         logButton(1);
         logButton(2);
         ui.endTreenode();
       }
       ui.endTreenode();
     }
-    if (ui.beginTreenode("Test 2") !== 0) {
+    if (ui.beginTreenode("Test 2") != 0) {
       ui.layoutRow([54, 54], 0);
       for (let number: i32 = 3; number <= 6; number += 1) logButton(number);
       ui.endTreenode();
     }
-    if (ui.beginTreenode("Test 3") !== 0) {
+    if (ui.beginTreenode("Test 3") != 0) {
       for (let index: i32 = 0; index < 3; index += 1) {
         ui.checkbox(`Checkbox ${index + 1}`, checks[index]);
       }
@@ -135,7 +135,7 @@ function demoWindow(): void {
     ui.text("Open a tree to explore its controls. Buttons add messages to the log. Drag a slider to change the background.");
     ui.layoutEndColumn();
   }
-  if (ui.header("Background Color", UI_OPT_EXPANDED) !== 0) {
+  if (ui.header("Background Color", UI_OPT_EXPANDED) != 0) {
     ui.layoutRow([-78, -1], 74);
     ui.layoutBeginColumn();
     ui.layoutRow([46, -1], 0);
@@ -160,7 +160,7 @@ function demoWindow(): void {
 // The second window. It shows the log in a scrolled panel and appends a line from the
 // textbox or the button.
 function logWindow(): void {
-  if (ui.beginWindow("Log Window", new UiRect(350, 40, 300, 200)) === 0) return;
+  if (ui.beginWindow("Log Window", new UiRect(350, 40, 300, 200)) == 0) return;
   ui.layoutRow([-1], -25);
   ui.beginPanel("Log Output");
   const panel = ui.currentContainer();
@@ -176,9 +176,9 @@ function logWindow(): void {
   // The textbox and the button share one submit path. A return key inside the textbox and a
   // button press both append the text and clear the field.
   ui.layoutRow([-70, -1], 0);
-  let submitted: boolean = (ui.textbox("message", input) & UI_RES_SUBMIT) !== 0;
+  let submitted: boolean = (ui.textbox("message", input) & UI_RES_SUBMIT) != 0;
   if (submitted) ui.setFocus(ui.lastId);
-  if ((ui.button("Submit") & UI_RES_SUBMIT) !== 0) submitted = true;
+  if ((ui.button("Submit") & UI_RES_SUBMIT) != 0) submitted = true;
   if (submitted) {
     appendLog(input.value);
     input.value = "";
@@ -193,7 +193,7 @@ export function init(
 ): void {
   // The pipeline declares its format literally. A surface with another format
   // ends the example before any draw.
-  if (format !== uiPipeline_TARGET_FORMAT) {
+  if (format != uiPipeline_TARGET_FORMAT) {
     print(`FAIL format expected=${uiPipeline_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -241,8 +241,8 @@ export function frame(
   // check ends the frame.
   const activeDevice: GPUHostOwnedDevice | null = ownedDevice;
   const activeRenderer: UiRenderer | null = renderer;
-  if (activeDevice === null) return;
-  if (activeRenderer === null) return;
+  if (activeDevice == null) return;
+  if (activeRenderer == null) return;
   const x: i32 = pointerX as i32;
   const y: i32 = pointerY as i32;
   // The host reports the pointer in surface pixels, the space the UI layout uses.
@@ -250,8 +250,8 @@ export function frame(
   // The host reports buttons as level state. microui's SDL loop receives press
   // and release events, so this loop derives the edges.
   for (let bit: u32 = 1; bit <= 4; bit *= 2) {
-    if ((buttons & bit) !== 0 && (previousButtons & bit) === 0) ui.inputMouseDown(x, y, bit);
-    if ((buttons & bit) === 0 && (previousButtons & bit) !== 0) ui.inputMouseUp(x, y, bit);
+    if ((buttons & bit) != 0 && (previousButtons & bit) == 0) ui.inputMouseDown(x, y, bit);
+    if ((buttons & bit) == 0 && (previousButtons & bit) != 0) ui.inputMouseUp(x, y, bit);
   }
   previousButtons = buttons;
   // One frame of UI. `begin` clears the command list, the two window functions fill it, and
@@ -282,7 +282,7 @@ export function frame(
 // The host calls this one time before it releases the device. `dispose` releases the
 // pipeline, the atlas, and the buffers, and the host owns the device the wrapper held.
 export function shutdown(): void {
-  if (renderer !== null) {
+  if (renderer != null) {
     renderer.dispose();
     renderer = null;
   }

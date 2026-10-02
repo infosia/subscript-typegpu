@@ -72,10 +72,10 @@ const uniformReread: ComputePipelineSpec = computePipeline<ShadowLayout>(shadowK
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  if (adapterResult == null) { print("FAIL adapter"); gpu.dispose(); return; }
   print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -112,7 +112,7 @@ export async function main(): Promise<void> {
       [uniformReread_WORKGROUP_X, uniformReread_WORKGROUP_Y, uniformReread_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -136,7 +136,7 @@ export async function main(): Promise<void> {
       0,
     );
     print("readback:mapped");
-    if (result[0].local !== 12 || result[0].reread !== 5) {
+    if (result[0].local != 12 || result[0].reread != 5) {
       print(`FAIL local=${result[0].local} reread=${result[0].reread}`);
       return;
     }

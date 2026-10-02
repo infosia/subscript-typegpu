@@ -203,7 +203,7 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
   const y: u32 = ctx.globalId.y;
   const index: u32 = y * GRID_SIZE + x;
   let level: u32 = res.current[index].level;
-  if (level === 0 || level >= WALL_LEVEL) return;
+  if (level == 0 || level >= WALL_LEVEL) return;
 
   // Gravity first. The cell gives the space below what it can take, up to the per-frame cap.
   if (y > 0) {
@@ -221,7 +221,7 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
       }
     }
   }
-  if (level === 0) return;
+  if (level == 0) return;
 
   // Then one sideways move toward the lower of the two horizontal neighbors.
   let targetIndex: u32 = index;
@@ -244,7 +244,7 @@ function atomicFlowKernel(res: AtomicFluidLayout, ctx: ComputeInvocation): void 
   }
   // A difference of one or less stops the move, so a flat surface never swaps water forever.
   // The quarter share levels the pair over several frames and never overshoots.
-  if (targetIndex !== index && level > targetLevel + 1) {
+  if (targetIndex != index && level > targetLevel + 1) {
     const sideways: u32 = minU32((level - targetLevel) / 4, SIDE_STEP);
     if (sideways > 0) {
       res.next[index].level.sub(sideways as i32);
@@ -276,14 +276,14 @@ function atomicBrushKernel(res: AtomicBrushLayout, ctx: ComputeInvocation): void
   const y: u32 = ctx.globalId.y;
   const index: u32 = y * GRID_SIZE + x;
   const brush: BrushParams = res.brush.$;
-  if (brush.active === 0) return;
+  if (brush.active == 0) return;
   const point = new Vec2f(x as f32, y as f32);
   if (sdLine(point, brush.previous, brush.current) > BRUSH_RADIUS) return;
-  if (brush.mode === BRUSH_WALL) {
+  if (brush.mode == BRUSH_WALL) {
     res.cells[index].level.store(WALL_LEVEL);
     return;
   }
-  if (brush.mode === BRUSH_ERASE) {
+  if (brush.mode == BRUSH_ERASE) {
     res.cells[index].level.store(0);
     return;
   }
@@ -390,7 +390,7 @@ export function init(
 ): void {
   // The pipeline declares its target format literally. A surface with another format ends the
   // example before any draw.
-  if (format !== atomicFluidRender_TARGET_FORMAT) {
+  if (format != atomicFluidRender_TARGET_FORMAT) {
     print(`FAIL format expected=${atomicFluidRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -440,8 +440,8 @@ export function init(
   for (let index: u32 = 0; index < CELL_COUNT; index += 1) {
     const x: u32 = index % GRID_SIZE;
     const y: u32 = index / GRID_SIZE;
-    const border: boolean = x === 0 || x + 1 === GRID_SIZE || y === 0;
-    const shelf: boolean = y === 18 && x > 10 && x < 27;
+    const border: boolean = x == 0 || x + 1 == GRID_SIZE || y == 0;
+    const shelf: boolean = y == 18 && x > 10 && x < 27;
     let level: u32 = 0;
     if (border || shelf) {
       level = WALL_LEVEL;
@@ -509,7 +509,7 @@ export function init(
     atomicFluidRender,
   );
   const validationError = hostDevice.popErrorScope();
-  if (validationError !== null) {
+  if (validationError != null) {
     renderPipeline.dispose();
     brushPipeline.dispose();
     finalizePipeline.dispose();
@@ -627,29 +627,29 @@ export function frame(
   const cellsA = activeCellsA;
   const cellsB = activeCellsB;
   const brush = activeBrush;
-  if (device === null) return;
-  if (flowPipeline === null) return;
-  if (finalizePipeline === null) return;
-  if (brushPipeline === null) return;
-  if (renderPipeline === null) return;
-  if (flowGroupAB === null) return;
-  if (flowGroupBA === null) return;
-  if (finalizeGroupAB === null) return;
-  if (finalizeGroupBA === null) return;
-  if (brushGroupA === null) return;
-  if (brushGroupB === null) return;
-  if (renderGroupA === null) return;
-  if (renderGroupB === null) return;
-  if (vertices === null) return;
-  if (cellsA === null) return;
-  if (cellsB === null) return;
-  if (brush === null) return;
+  if (device == null) return;
+  if (flowPipeline == null) return;
+  if (finalizePipeline == null) return;
+  if (brushPipeline == null) return;
+  if (renderPipeline == null) return;
+  if (flowGroupAB == null) return;
+  if (flowGroupBA == null) return;
+  if (finalizeGroupAB == null) return;
+  if (finalizeGroupBA == null) return;
+  if (brushGroupA == null) return;
+  if (brushGroupB == null) return;
+  if (renderGroupA == null) return;
+  if (renderGroupB == null) return;
+  if (vertices == null) return;
+  if (cellsA == null) return;
+  if (cellsB == null) return;
+  if (brush == null) return;
 
   // Key 49, key 50, and key 48 are `1`, `2`, and `0`. TypeGPU picks the same brush from a select
   // and erases while the right button is down.
-  if (key === 49) brushMode = BRUSH_WATER_MODE;
-  if (key === 50) brushMode = BRUSH_WALL;
-  if (key === 48) brushMode = BRUSH_ERASE;
+  if (key == 49) brushMode = BRUSH_WATER_MODE;
+  if (key == 50) brushMode = BRUSH_WALL;
+  if (key == 48) brushMode = BRUSH_ERASE;
 
   // The brush needs a segment. A release forgets the previous point, so the first sample after a
   // press starts and ends the segment on the same cell.
@@ -658,7 +658,7 @@ export function frame(
   let previousX: f32 = 0.0;
   let previousY: f32 = 0.0;
   let brushActive: u32 = 0;
-  const primaryDown: boolean = (buttons & 1) !== 0;
+  const primaryDown: boolean = (buttons & 1) != 0;
   if (!primaryDown) {
     previousPointerX = -1.0;
     previousPointerY = -1.0;
@@ -676,7 +676,7 @@ export function frame(
     previousY = previousPointerY >= 0.0 ? previousPointerY : currentY;
     // A zero-length segment has no direction, so a still pointer moves the start of the segment
     // by one thousandth of a cell.
-    if (previousX === currentX && previousY === currentY) {
+    if (previousX == currentX && previousY == currentY) {
       previousX = currentX > 0.001 ? currentX - 0.001 : currentX + 0.001;
     }
     brushActive = 1;
@@ -686,7 +686,7 @@ export function frame(
 
   // Frame parity names the source and the target. The brush and the render group both take the
   // target, so a stroke lands on the state the frame displays.
-  const useAB: boolean = frameCount % 2 === 0;
+  const useAB: boolean = frameCount % 2 == 0;
   const nextCells: GPUBuffer = useAB ? cellsB : cellsA;
   const flowGroup: GPUBindGroup = useAB ? flowGroupAB : flowGroupBA;
   const finalizeGroup: GPUBindGroup = useAB ? finalizeGroupAB : finalizeGroupBA;
@@ -742,22 +742,22 @@ export function frame(
 // creation order, so a bind group never outlives the buffers it names.
 // TypeGPU releases the same resources with one `root.destroy()` call.
 export function shutdown(): void {
-  if (activeRenderGroupB !== null) activeRenderGroupB.dispose();
-  if (activeRenderGroupA !== null) activeRenderGroupA.dispose();
-  if (activeBrushGroupB !== null) activeBrushGroupB.dispose();
-  if (activeBrushGroupA !== null) activeBrushGroupA.dispose();
-  if (activeFinalizeGroupBA !== null) activeFinalizeGroupBA.dispose();
-  if (activeFinalizeGroupAB !== null) activeFinalizeGroupAB.dispose();
-  if (activeFlowGroupBA !== null) activeFlowGroupBA.dispose();
-  if (activeFlowGroupAB !== null) activeFlowGroupAB.dispose();
-  if (activeBrush !== null) activeBrush.dispose();
-  if (activeCellsB !== null) activeCellsB.dispose();
-  if (activeCellsA !== null) activeCellsA.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activeRender !== null) activeRender.dispose();
-  if (activeBrushPipeline !== null) activeBrushPipeline.dispose();
-  if (activeFinalize !== null) activeFinalize.dispose();
-  if (activeFlow !== null) activeFlow.dispose();
+  if (activeRenderGroupB != null) activeRenderGroupB.dispose();
+  if (activeRenderGroupA != null) activeRenderGroupA.dispose();
+  if (activeBrushGroupB != null) activeBrushGroupB.dispose();
+  if (activeBrushGroupA != null) activeBrushGroupA.dispose();
+  if (activeFinalizeGroupBA != null) activeFinalizeGroupBA.dispose();
+  if (activeFinalizeGroupAB != null) activeFinalizeGroupAB.dispose();
+  if (activeFlowGroupBA != null) activeFlowGroupBA.dispose();
+  if (activeFlowGroupAB != null) activeFlowGroupAB.dispose();
+  if (activeBrush != null) activeBrush.dispose();
+  if (activeCellsB != null) activeCellsB.dispose();
+  if (activeCellsA != null) activeCellsA.dispose();
+  if (activeVertices != null) activeVertices.dispose();
+  if (activeRender != null) activeRender.dispose();
+  if (activeBrushPipeline != null) activeBrushPipeline.dispose();
+  if (activeFinalize != null) activeFinalize.dispose();
+  if (activeFlow != null) activeFlow.dispose();
   // The cleared state leaves no released handle reachable from module scope.
   activeRenderGroupB = null;
   activeRenderGroupA = null;

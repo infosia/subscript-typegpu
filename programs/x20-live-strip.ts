@@ -90,9 +90,9 @@ function pixelCenter(x: i32, y: i32): Vec2f {
 
 function triangleCovered(point: Vec2f, a: Vec2f, b: Vec2f, c: Vec2f): boolean {
   const area: f32 = signedArea(a, b, c);
-  const front: boolean = stripLive.frontFace === "ccw" ? area > 0.0 : area < 0.0;
-  if ((stripLive.cullMode === "back" && !front)
-    || (stripLive.cullMode === "front" && front)) {
+  const front: boolean = stripLive.frontFace == "ccw" ? area > 0.0 : area < 0.0;
+  if ((stripLive.cullMode == "back" && !front)
+    || (stripLive.cullMode == "front" && front)) {
     return false;
   }
   const ab: f32 = edge(a, b, point);
@@ -106,8 +106,8 @@ function stripCovered(point: Vec2f, vertices: FixedArray<Vec2f, 4>): boolean {
   let triangle: i32 = 0;
   while (triangle < vertices.length - 2) {
     // Expand n vertices into n-2 triangles, flipping odd winding before applying RN19 culling.
-    const a: Vec2f = triangle % 2 === 0 ? vertices[triangle] : vertices[triangle + 1];
-    const b: Vec2f = triangle % 2 === 0 ? vertices[triangle + 1] : vertices[triangle];
+    const a: Vec2f = triangle % 2 == 0 ? vertices[triangle] : vertices[triangle + 1];
+    const b: Vec2f = triangle % 2 == 0 ? vertices[triangle + 1] : vertices[triangle];
     const c: Vec2f = vertices[triangle + 2];
     if (triangleCovered(point, a, b, c)) return true;
     triangle += 1;
@@ -123,12 +123,12 @@ function noCenterOnStripEdge(vertices: FixedArray<Vec2f, 4>): boolean {
       const point: Vec2f = pixelCenter(x, y);
       let triangle: i32 = 0;
       while (triangle < vertices.length - 2) {
-        const a: Vec2f = triangle % 2 === 0 ? vertices[triangle] : vertices[triangle + 1];
-        const b: Vec2f = triangle % 2 === 0 ? vertices[triangle + 1] : vertices[triangle];
+        const a: Vec2f = triangle % 2 == 0 ? vertices[triangle] : vertices[triangle + 1];
+        const b: Vec2f = triangle % 2 == 0 ? vertices[triangle + 1] : vertices[triangle];
         const c: Vec2f = vertices[triangle + 2];
-        if (edge(a, b, point) === 0.0
-          || edge(b, c, point) === 0.0
-          || edge(c, a, point) === 0.0) {
+        if (edge(a, b, point) == 0.0
+          || edge(b, c, point) == 0.0
+          || edge(c, a, point) == 0.0) {
           return false;
         }
         triangle += 1;
@@ -142,14 +142,14 @@ function noCenterOnStripEdge(vertices: FixedArray<Vec2f, 4>): boolean {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -207,7 +207,7 @@ export async function main(): Promise<void> {
       stripLive,
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -251,10 +251,10 @@ export async function main(): Promise<void> {
         const expectedG: u8 = covered ? 153 : 0;
         const expectedB: u8 = covered ? 191 : 0;
         const offset: i32 = y * 256 + x * 4;
-        if (pixels[offset] !== expectedR
-          || pixels[offset + 1] !== expectedG
-          || pixels[offset + 2] !== expectedB
-          || pixels[offset + 3] !== 255) {
+        if (pixels[offset] != expectedR
+          || pixels[offset + 1] != expectedG
+          || pixels[offset + 2] != expectedB
+          || pixels[offset + 3] != 255) {
           print(
             `FAIL x=${x} y=${y} expected=${expectedR},${expectedG},${expectedB},255 got=${pixels[offset]},${pixels[offset + 1]},${pixels[offset + 2]},${pixels[offset + 3]}`,
           );

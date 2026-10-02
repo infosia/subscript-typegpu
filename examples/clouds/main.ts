@@ -219,7 +219,7 @@ export function init(
 ): void {
   // The generator pins the target format into the pipeline. A mismatch with the host surface
   // fails here, not inside pipeline creation.
-  if (format !== clouds_TARGET_FORMAT) {
+  if (format != clouds_TARGET_FORMAT) {
     print(`FAIL format expected=${clouds_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -291,7 +291,7 @@ export function init(
   const validationError = hostDevice.popErrorScope();
   // The error path disposes every handle that the failed run already created, because no
   // finalizer runs later.
-  if (validationError !== null) {
+  if (validationError != null) {
     pipeline.dispose();
     linearSampler.dispose();
     noiseView.dispose();
@@ -345,11 +345,11 @@ export function frame(
   const frameBuffer = activeFrameBuffer;
   // A null field means `init` failed or never ran. The frame returns, because the layers
   // report failure as a value.
-  if (device === null) return;
-  if (pipeline === null) return;
-  if (group === null) return;
-  if (vertices === null) return;
-  if (frameBuffer === null) return;
+  if (device == null) return;
+  if (pipeline == null) return;
+  if (group == null) return;
+  if (vertices == null) return;
+  if (frameBuffer == null) return;
   // The wrap keeps the uniform time small. The cloud drift repeats every CLOUD_TIME_PERIOD frames.
   frameCount = (frameCount + 1) % CLOUD_TIME_PERIOD;
   using queue = device.queue();
@@ -397,13 +397,13 @@ export function frame(
 // The host calls `shutdown` once, before it releases the device. The bind group goes first,
 // because it names the other handles.
 export function shutdown(): void {
-  if (activeGroup !== null) activeGroup.dispose();
-  if (activeSampler !== null) activeSampler.dispose();
-  if (activeNoiseView !== null) activeNoiseView.dispose();
-  if (activeNoiseTexture !== null) activeNoiseTexture.dispose();
-  if (activeFrameBuffer !== null) activeFrameBuffer.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activePipeline !== null) activePipeline.dispose();
+  if (activeGroup != null) activeGroup.dispose();
+  if (activeSampler != null) activeSampler.dispose();
+  if (activeNoiseView != null) activeNoiseView.dispose();
+  if (activeNoiseTexture != null) activeNoiseTexture.dispose();
+  if (activeFrameBuffer != null) activeFrameBuffer.dispose();
+  if (activeVertices != null) activeVertices.dispose();
+  if (activePipeline != null) activePipeline.dispose();
   // The null assignments make a second `shutdown` call safe.
   activeGroup = null;
   activeSampler = null;

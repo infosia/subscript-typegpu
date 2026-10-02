@@ -86,10 +86,10 @@ function f32Bytes(values: f32[]): u8[] {
 }
 
 function equalBytes(left: u8[], right: u8[]): boolean {
-  if (left.length !== right.length) return false;
+  if (left.length != right.length) return false;
   let index: i32 = 0;
   while (index < left.length) {
-    if (left[index] !== right[index]) return false;
+    if (left[index] != right[index]) return false;
     index += 1;
   }
   return true;
@@ -220,7 +220,7 @@ export async function main(): Promise<void> {
   // The API layer polls the future itself, so the script never pumps the event loop. A null
   // adapter reports the failure by value, because the layers carry no exceptions.
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     gpu.dispose();
     print("check:scan8 fail");
     print("check:scan123 fail");
@@ -228,7 +228,7 @@ export async function main(): Promise<void> {
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     adapterResult.dispose();
     gpu.dispose();
     print("check:scan8 fail");
@@ -262,7 +262,7 @@ export async function main(): Promise<void> {
       [256, 1, 1],
     );
     const validationError = await device.popErrorScope();
-    if (validationError === null) {
+    if (validationError == null) {
       // Three lengths. 8 and 123 fit inside one padded block, and 4096 spans 16 blocks, so
       // the second and third passes carry real work.
       scan8 = await checkLength(device, blockPipeline, applyPipeline, 8);

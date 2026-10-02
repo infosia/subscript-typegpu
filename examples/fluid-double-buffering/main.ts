@@ -190,9 +190,9 @@ function flowFromCell(
     if (amount > source.density) amount = source.density;
   }
   let contribution: f32 = 0.0;
-  if (myX === x && myY === y) {
+  if (myX == x && myY == y) {
     contribution = source.density - amount;
-  } else if (myX === x + (source.velocity.x as i32) && myY === y + (source.velocity.y as i32)) {
+  } else if (myX == x + (source.velocity.x as i32) && myY == y + (source.velocity.y as i32)) {
     contribution += amount;
   }
   return contribution;
@@ -226,10 +226,10 @@ function flowKernel(res: FluidLayout, ctx: ComputeInvocation): void {
   for (let neighbor: i32 = 0; neighbor < 5; neighbor += 1) {
     let sourceX: i32 = x as i32;
     let sourceY: i32 = y as i32;
-    if (neighbor === 1) sourceY += 1;
-    if (neighbor === 2) sourceY -= 1;
-    if (neighbor === 3) sourceX += 1;
-    if (neighbor === 4) sourceX -= 1;
+    if (neighbor == 1) sourceY += 1;
+    if (neighbor == 2) sourceY -= 1;
+    if (neighbor == 3) sourceX += 1;
+    if (neighbor == 4) sourceX -= 1;
     if (sourceX >= 0 && sourceY >= 0 && sourceX < (GRID_SIZE as i32) && sourceY < (GRID_SIZE as i32)) {
       const source: FluidCell = res.source[(sourceY as u32) * GRID_SIZE + (sourceX as u32)];
       const destinationX: i32 = sourceX + (source.velocity.x as i32);
@@ -373,7 +373,7 @@ export function init(
 ): void {
   // The pipeline declares its target format literally. A surface with another format ends the
   // example before any draw.
-  if (format !== fluidRender_TARGET_FORMAT) {
+  if (format != fluidRender_TARGET_FORMAT) {
     print(`FAIL format expected=${fluidRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -470,7 +470,7 @@ export function init(
     fluidRender,
   );
   const validationError = hostDevice.popErrorScope();
-  if (validationError !== null) {
+  if (validationError != null) {
     renderPipeline.dispose();
     obstaclePipeline.dispose();
     evaporatePipeline.dispose();
@@ -602,26 +602,26 @@ export function frame(
   const renderB = activeRenderB;
   const vertices = activeVertices;
   const params = activeParams;
-  if (device === null) return;
-  if (flowPipeline === null) return;
-  if (evaporatePipeline === null) return;
-  if (obstaclePipeline === null) return;
-  if (renderPipeline === null) return;
-  if (flowAB === null) return;
-  if (flowBA === null) return;
-  if (evaporateAB === null) return;
-  if (evaporateBA === null) return;
-  if (obstacleAB === null) return;
-  if (obstacleBA === null) return;
-  if (renderA === null) return;
-  if (renderB === null) return;
-  if (vertices === null) return;
-  if (params === null) return;
+  if (device == null) return;
+  if (flowPipeline == null) return;
+  if (evaporatePipeline == null) return;
+  if (obstaclePipeline == null) return;
+  if (renderPipeline == null) return;
+  if (flowAB == null) return;
+  if (flowBA == null) return;
+  if (evaporateAB == null) return;
+  if (evaporateBA == null) return;
+  if (obstacleAB == null) return;
+  if (obstacleBA == null) return;
+  if (renderA == null) return;
+  if (renderB == null) return;
+  if (vertices == null) return;
+  if (params == null) return;
   // Key 65 and key 97 are `A`, and key 68 and key 100 are `D`, in upper and lower case.
   // The pointer maps its surface X through a grid cell into the same -1 to 1 obstacle space.
-  if (key === 65 || key === 97) obstacleX -= 0.08;
-  if (key === 68 || key === 100) obstacleX += 0.08;
-  if ((buttons & 1) !== 0 && pointerX >= 0.0) {
+  if (key == 65 || key == 97) obstacleX -= 0.08;
+  if (key == 68 || key == 100) obstacleX += 0.08;
+  if ((buttons & 1) != 0 && pointerX >= 0.0) {
     const gridRadius: f32 = ((GRID_SIZE - 1) as f32) * 0.5;
     const pointerCell: f32 =
       (pointerX / (width as f32)) * ((GRID_SIZE - 1) as f32);
@@ -639,7 +639,7 @@ export function frame(
     0,
     Context.bytesOf<FluidParams>(new FluidParams(obstacleX)),
   );
-  const writesToB: boolean = frameCount % 2 === 1;
+  const writesToB: boolean = frameCount % 2 == 1;
   // Each pass reads what the pass before it wrote, so flow, evaporate, and obstacle chain
   // inside one frame. The last pass leaves the result in the grid the display group reads.
   // The next frame reverses every role.
@@ -680,22 +680,22 @@ export function frame(
 // creation order, so a bind group never outlives the buffers it names.
 // TypeGPU releases the same resources with one `root.destroy()` call.
 export function shutdown(): void {
-  if (activeRenderB !== null) activeRenderB.dispose();
-  if (activeRenderA !== null) activeRenderA.dispose();
-  if (activeObstacleBA !== null) activeObstacleBA.dispose();
-  if (activeObstacleAB !== null) activeObstacleAB.dispose();
-  if (activeEvaporateBA !== null) activeEvaporateBA.dispose();
-  if (activeEvaporateAB !== null) activeEvaporateAB.dispose();
-  if (activeFlowBA !== null) activeFlowBA.dispose();
-  if (activeFlowAB !== null) activeFlowAB.dispose();
-  if (activeParams !== null) activeParams.dispose();
-  if (activeCellsB !== null) activeCellsB.dispose();
-  if (activeCellsA !== null) activeCellsA.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activeRender !== null) activeRender.dispose();
-  if (activeObstacle !== null) activeObstacle.dispose();
-  if (activeEvaporate !== null) activeEvaporate.dispose();
-  if (activeFlow !== null) activeFlow.dispose();
+  if (activeRenderB != null) activeRenderB.dispose();
+  if (activeRenderA != null) activeRenderA.dispose();
+  if (activeObstacleBA != null) activeObstacleBA.dispose();
+  if (activeObstacleAB != null) activeObstacleAB.dispose();
+  if (activeEvaporateBA != null) activeEvaporateBA.dispose();
+  if (activeEvaporateAB != null) activeEvaporateAB.dispose();
+  if (activeFlowBA != null) activeFlowBA.dispose();
+  if (activeFlowAB != null) activeFlowAB.dispose();
+  if (activeParams != null) activeParams.dispose();
+  if (activeCellsB != null) activeCellsB.dispose();
+  if (activeCellsA != null) activeCellsA.dispose();
+  if (activeVertices != null) activeVertices.dispose();
+  if (activeRender != null) activeRender.dispose();
+  if (activeObstacle != null) activeObstacle.dispose();
+  if (activeEvaporate != null) activeEvaporate.dispose();
+  if (activeFlow != null) activeFlow.dispose();
   // The cleared state leaves no released handle reachable from module scope.
   activeRenderB = null;
   activeRenderA = null;

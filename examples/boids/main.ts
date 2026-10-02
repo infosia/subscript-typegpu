@@ -119,7 +119,7 @@ function updateBoids(res: BoidLayout, ctx: ComputeInvocation): void {
   // TypeGPU gives each rule its own radius and sums raw offsets for separation.
   // This port uses one perception radius and weights separation by inverse square distance.
   for (let otherIndex: u32 = 0; otherIndex < BOID_COUNT; otherIndex += 1) {
-    if (otherIndex !== index) {
+    if (otherIndex != index) {
       const other: Boid = res.previous[otherIndex];
       const deltaX: f32 = other.position.x - boid.position.x;
       const deltaY: f32 = other.position.y - boid.position.y;
@@ -224,7 +224,7 @@ export function init(
 ): void {
   // The generator pins the target format into the pipeline. A mismatch with the host surface
   // fails here, not inside pipeline creation.
-  if (format !== boidRender_TARGET_FORMAT) {
+  if (format != boidRender_TARGET_FORMAT) {
     print(`FAIL format expected=${boidRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -300,7 +300,7 @@ export function init(
   const validationError = hostDevice.popErrorScope();
   // The error path disposes every handle that the failed run already created, because no
   // finalizer runs later.
-  if (validationError !== null) {
+  if (validationError != null) {
     renderPipeline.dispose();
     computePipeline.dispose();
     boidsB.dispose();
@@ -363,15 +363,15 @@ export function frame(
   const boidsB = activeBoidsB;
   // A null field means `init` failed or never ran. The frame returns, because the layers
   // report failure as a value.
-  if (device === null) return;
-  if (computePipeline === null) return;
-  if (renderPipeline === null) return;
-  if (groupAB === null) return;
-  if (groupBA === null) return;
-  if (vertices === null) return;
-  if (boidsA === null) return;
-  if (boidsB === null) return;
-  const useAB: boolean = frameCount % 2 === 0;
+  if (device == null) return;
+  if (computePipeline == null) return;
+  if (renderPipeline == null) return;
+  if (groupAB == null) return;
+  if (groupBA == null) return;
+  if (vertices == null) return;
+  if (boidsA == null) return;
+  if (boidsB == null) return;
+  const useAB: boolean = frameCount % 2 == 0;
   // The frame swaps the storage roles and renders the buffer that compute writes.
   const computeGroup: GPUBindGroup = useAB ? groupAB : groupBA;
   const instanceBuffer: GPUBuffer = useAB ? boidsB : boidsA;
@@ -415,13 +415,13 @@ export function frame(
 // The host calls `shutdown` once, before it releases the device. The bind groups go first,
 // because they name the other handles.
 export function shutdown(): void {
-  if (activeGroupBA !== null) activeGroupBA.dispose();
-  if (activeGroupAB !== null) activeGroupAB.dispose();
-  if (activeBoidsB !== null) activeBoidsB.dispose();
-  if (activeBoidsA !== null) activeBoidsA.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activeRender !== null) activeRender.dispose();
-  if (activeCompute !== null) activeCompute.dispose();
+  if (activeGroupBA != null) activeGroupBA.dispose();
+  if (activeGroupAB != null) activeGroupAB.dispose();
+  if (activeBoidsB != null) activeBoidsB.dispose();
+  if (activeBoidsA != null) activeBoidsA.dispose();
+  if (activeVertices != null) activeVertices.dispose();
+  if (activeRender != null) activeRender.dispose();
+  if (activeCompute != null) activeCompute.dispose();
   // The null assignments make a second `shutdown` call safe.
   activeGroupBA = null;
   activeGroupAB = null;

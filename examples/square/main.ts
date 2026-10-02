@@ -94,7 +94,7 @@ export function init(
 ): void {
   // The declaration fixes the target format literally. A surface with another format ends
   // the example before it creates any resource.
-  if (format !== square_TARGET_FORMAT) {
+  if (format != square_TARGET_FORMAT) {
     print(`FAIL format expected=${square_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -147,7 +147,7 @@ export function init(
   const validationError = hostDevice.popErrorScope();
   // All three handles belong to the script here, so it releases them before it reports the
   // failure and leaves the module state empty.
-  if (validationError !== null) {
+  if (validationError != null) {
     createdPipeline.dispose();
     indexBuffer.dispose();
     vertices.dispose();
@@ -177,16 +177,16 @@ export function frame(
   const pipeline: RenderPipeline | null = activePipeline;
   const vertices: GPUBuffer | null = activeVertices;
   const indices: GPUBuffer | null = activeIndices;
-  if (device === null) {
+  if (device == null) {
     return;
   }
-  if (pipeline === null) {
+  if (pipeline == null) {
     return;
   }
-  if (vertices === null) {
+  if (vertices == null) {
     return;
   }
-  if (indices === null) {
+  if (indices == null) {
     return;
   }
   // The host acquires and presents the surface texture. The wrapper borrows the view for one
@@ -226,15 +226,15 @@ export function frame(
 // The host calls this one time before it releases the device. TypeGPU frees the same kind of
 // resource through `root.destroy`, and this layer disposes each handle by name.
 export function shutdown(): void {
-  if (activeIndices !== null) {
+  if (activeIndices != null) {
     activeIndices.dispose();
     activeIndices = null;
   }
-  if (activeVertices !== null) {
+  if (activeVertices != null) {
     activeVertices.dispose();
     activeVertices = null;
   }
-  if (activePipeline !== null) {
+  if (activePipeline != null) {
     activePipeline.dispose();
     activePipeline = null;
   }

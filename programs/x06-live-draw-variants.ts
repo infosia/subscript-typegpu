@@ -116,9 +116,9 @@ function noCenterOnEdge(a: Vec2f, b: Vec2f, c: Vec2f): boolean {
     let x: i32 = 0;
     while (x < 64) {
       const point: Vec2f = pixelCenter(x, y);
-      if (edge(a, b, point) === 0.0
-        || edge(b, c, point) === 0.0
-        || edge(c, a, point) === 0.0) {
+      if (edge(a, b, point) == 0.0
+        || edge(b, c, point) == 0.0
+        || edge(c, a, point) == 0.0) {
         return false;
       }
       x = x + 1;
@@ -153,14 +153,14 @@ function covers(
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -248,7 +248,7 @@ export async function main(): Promise<void> {
       quad,
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -296,11 +296,11 @@ export async function main(): Promise<void> {
         // Instances rasterize in order, so a later covered instance owns the pixel.
         while (instanceIndex < 3) {
           if (covers(point, vertexValues, instanceValues[instanceIndex])) {
-            if (instanceIndex === 0) {
+            if (instanceIndex == 0) {
               expectedR = 255;
               expectedG = 0;
               expectedB = 0;
-            } else if (instanceIndex === 1) {
+            } else if (instanceIndex == 1) {
               expectedR = 0;
               expectedG = 255;
               expectedB = 0;
@@ -313,10 +313,10 @@ export async function main(): Promise<void> {
           instanceIndex = instanceIndex + 1;
         }
         const offset: i32 = y * 256 + x * 4;
-        if (pixels[offset] !== expectedR
-          || pixels[offset + 1] !== expectedG
-          || pixels[offset + 2] !== expectedB
-          || pixels[offset + 3] !== 255) {
+        if (pixels[offset] != expectedR
+          || pixels[offset + 1] != expectedG
+          || pixels[offset + 2] != expectedB
+          || pixels[offset + 3] != 255) {
           print(
             `FAIL x=${x} y=${y} expected=${expectedR},${expectedG},${expectedB},255 got=${pixels[offset]},${pixels[offset + 1]},${pixels[offset + 2]},${pixels[offset + 3]}`,
           );

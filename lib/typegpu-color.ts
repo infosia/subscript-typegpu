@@ -77,10 +77,10 @@ export function rgbToHsv(c: Vec3f): Vec3f {
   const chroma: f32 = maximum - minimum;
   let hue: f32 = 0.0;
   if (chroma > 0.0) {
-    if (maximum === c.x) {
+    if (maximum == c.x) {
       hue = (c.y - c.z) / chroma;
       if (hue < 0.0) hue += 6.0;
-    } else if (maximum === c.y) {
+    } else if (maximum == c.y) {
       hue = (c.z - c.x) / chroma + 2.0;
     } else {
       hue = (c.x - c.y) / chroma + 4.0;

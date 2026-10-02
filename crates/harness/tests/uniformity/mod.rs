@@ -38,7 +38,7 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage, wo
 @ValueType class Item { value: u32; constructor(value: u32) { this.value = value; } }
 class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
 function nonUniform(res: Layout, ctx: ComputeInvocation): void {
-  if (ctx.localIndex === 0) { workgroupBarrier(); }
+  if (ctx.localIndex == 0) { workgroupBarrier(); }
   res.output[ctx.globalId.x] = new Item(ctx.localIndex);
 }
 const pipeline: ComputePipelineSpec = computePipeline<Layout>(nonUniform, { name: "pipeline", workgroupSize: [4, 1, 1] });

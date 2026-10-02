@@ -358,7 +358,7 @@ function defaultRequiredLimitU64(value: u64 = 0): u64 {
 }
 
 function toRequiredLimitU32(value: u32): u32 {
-  if (value === 0) {
+  if (value == 0) {
     return 4294967295;
   }
   return value;
@@ -438,38 +438,38 @@ function toSubscriptTypegpuLimits(value: GPURequiredLimits): SubscriptTypegpuLim
 }
 
 function isGPURequiredLimitsEmpty(value: GPURequiredLimits): boolean {
-  return defaultRequiredLimitU32(value.maxTextureDimension1D) === 0
-    && defaultRequiredLimitU32(value.maxTextureDimension2D) === 0
-    && defaultRequiredLimitU32(value.maxTextureDimension3D) === 0
-    && defaultRequiredLimitU32(value.maxTextureArrayLayers) === 0
-    && defaultRequiredLimitU32(value.maxBindGroups) === 0
-    && defaultRequiredLimitU32(value.maxBindGroupsPlusVertexBuffers) === 0
-    && defaultRequiredLimitU32(value.maxBindingsPerBindGroup) === 0
-    && defaultRequiredLimitU32(value.maxDynamicUniformBuffersPerPipelineLayout) === 0
-    && defaultRequiredLimitU32(value.maxDynamicStorageBuffersPerPipelineLayout) === 0
-    && defaultRequiredLimitU32(value.maxSampledTexturesPerShaderStage) === 0
-    && defaultRequiredLimitU32(value.maxSamplersPerShaderStage) === 0
-    && defaultRequiredLimitU32(value.maxStorageBuffersPerShaderStage) === 0
-    && defaultRequiredLimitU32(value.maxStorageTexturesPerShaderStage) === 0
-    && defaultRequiredLimitU32(value.maxUniformBuffersPerShaderStage) === 0
-    && defaultRequiredLimitU64(value.maxUniformBufferBindingSize) === 0
-    && defaultRequiredLimitU64(value.maxStorageBufferBindingSize) === 0
-    && defaultRequiredLimitU32(value.minUniformBufferOffsetAlignment) === 0
-    && defaultRequiredLimitU32(value.minStorageBufferOffsetAlignment) === 0
-    && defaultRequiredLimitU32(value.maxVertexBuffers) === 0
-    && defaultRequiredLimitU64(value.maxBufferSize) === 0
-    && defaultRequiredLimitU32(value.maxVertexAttributes) === 0
-    && defaultRequiredLimitU32(value.maxVertexBufferArrayStride) === 0
-    && defaultRequiredLimitU32(value.maxInterStageShaderVariables) === 0
-    && defaultRequiredLimitU32(value.maxColorAttachments) === 0
-    && defaultRequiredLimitU32(value.maxColorAttachmentBytesPerSample) === 0
-    && defaultRequiredLimitU32(value.maxComputeWorkgroupStorageSize) === 0
-    && defaultRequiredLimitU32(value.maxComputeInvocationsPerWorkgroup) === 0
-    && defaultRequiredLimitU32(value.maxComputeWorkgroupSizeX) === 0
-    && defaultRequiredLimitU32(value.maxComputeWorkgroupSizeY) === 0
-    && defaultRequiredLimitU32(value.maxComputeWorkgroupSizeZ) === 0
-    && defaultRequiredLimitU32(value.maxComputeWorkgroupsPerDimension) === 0
-    && defaultRequiredLimitU32(value.maxImmediateSize) === 0;
+  return defaultRequiredLimitU32(value.maxTextureDimension1D) == 0
+    && defaultRequiredLimitU32(value.maxTextureDimension2D) == 0
+    && defaultRequiredLimitU32(value.maxTextureDimension3D) == 0
+    && defaultRequiredLimitU32(value.maxTextureArrayLayers) == 0
+    && defaultRequiredLimitU32(value.maxBindGroups) == 0
+    && defaultRequiredLimitU32(value.maxBindGroupsPlusVertexBuffers) == 0
+    && defaultRequiredLimitU32(value.maxBindingsPerBindGroup) == 0
+    && defaultRequiredLimitU32(value.maxDynamicUniformBuffersPerPipelineLayout) == 0
+    && defaultRequiredLimitU32(value.maxDynamicStorageBuffersPerPipelineLayout) == 0
+    && defaultRequiredLimitU32(value.maxSampledTexturesPerShaderStage) == 0
+    && defaultRequiredLimitU32(value.maxSamplersPerShaderStage) == 0
+    && defaultRequiredLimitU32(value.maxStorageBuffersPerShaderStage) == 0
+    && defaultRequiredLimitU32(value.maxStorageTexturesPerShaderStage) == 0
+    && defaultRequiredLimitU32(value.maxUniformBuffersPerShaderStage) == 0
+    && defaultRequiredLimitU64(value.maxUniformBufferBindingSize) == 0
+    && defaultRequiredLimitU64(value.maxStorageBufferBindingSize) == 0
+    && defaultRequiredLimitU32(value.minUniformBufferOffsetAlignment) == 0
+    && defaultRequiredLimitU32(value.minStorageBufferOffsetAlignment) == 0
+    && defaultRequiredLimitU32(value.maxVertexBuffers) == 0
+    && defaultRequiredLimitU64(value.maxBufferSize) == 0
+    && defaultRequiredLimitU32(value.maxVertexAttributes) == 0
+    && defaultRequiredLimitU32(value.maxVertexBufferArrayStride) == 0
+    && defaultRequiredLimitU32(value.maxInterStageShaderVariables) == 0
+    && defaultRequiredLimitU32(value.maxColorAttachments) == 0
+    && defaultRequiredLimitU32(value.maxColorAttachmentBytesPerSample) == 0
+    && defaultRequiredLimitU32(value.maxComputeWorkgroupStorageSize) == 0
+    && defaultRequiredLimitU32(value.maxComputeInvocationsPerWorkgroup) == 0
+    && defaultRequiredLimitU32(value.maxComputeWorkgroupSizeX) == 0
+    && defaultRequiredLimitU32(value.maxComputeWorkgroupSizeY) == 0
+    && defaultRequiredLimitU32(value.maxComputeWorkgroupSizeZ) == 0
+    && defaultRequiredLimitU32(value.maxComputeWorkgroupsPerDimension) == 0
+    && defaultRequiredLimitU32(value.maxImmediateSize) == 0;
 }
 
 @Descriptor
@@ -848,28 +848,28 @@ export class GPUDeviceDescriptor {
 }
 
 function toOptionalSubscriptTypegpuBufferBindingLayout(value: GPUBufferBindingLayout | null): SubscriptTypegpuBufferBindingLayout {
-  if (value === null) {
+  if (value == null) {
     return new SubscriptTypegpuBufferBindingLayout("binding-not-used", false, 0);
   }
   return toSubscriptTypegpuBufferBindingLayout(value);
 }
 
 function toOptionalSubscriptTypegpuSamplerBindingLayout(value: GPUSamplerBindingLayout | null): SubscriptTypegpuSamplerBindingLayout {
-  if (value === null) {
+  if (value == null) {
     return new SubscriptTypegpuSamplerBindingLayout("binding-not-used");
   }
   return toSubscriptTypegpuSamplerBindingLayout(value);
 }
 
 function toOptionalSubscriptTypegpuTextureBindingLayout(value: GPUTextureBindingLayout | null): SubscriptTypegpuTextureBindingLayout {
-  if (value === null) {
+  if (value == null) {
     return new SubscriptTypegpuTextureBindingLayout("binding-not-used", "undefined", false);
   }
   return toSubscriptTypegpuTextureBindingLayout(value);
 }
 
 function toOptionalSubscriptTypegpuStorageTextureBindingLayout(value: GPUStorageTextureBindingLayout | null): SubscriptTypegpuStorageTextureBindingLayout {
-  if (value === null) {
+  if (value == null) {
     return new SubscriptTypegpuStorageTextureBindingLayout("binding-not-used", "undefined", "undefined");
   }
   return toSubscriptTypegpuStorageTextureBindingLayout(value);
@@ -886,21 +886,21 @@ function toSubscriptTypegpuBindGroupLayoutEntryArray(values: GPUBindGroupLayoutE
 }
 
 function toNullableSubscriptTypegpuBuffer(value: GPUBuffer | null): SubscriptTypegpuBuffer | null {
-  if (value === null) {
+  if (value == null) {
     return null;
   }
   return value.buffer;
 }
 
 function toNullableSubscriptTypegpuSampler(value: GPUSampler | null): SubscriptTypegpuSampler | null {
-  if (value === null) {
+  if (value == null) {
     return null;
   }
   return value.sampler;
 }
 
 function toNullableSubscriptTypegpuTextureView(value: GPUTextureView | null): SubscriptTypegpuTextureView | null {
-  if (value === null) {
+  if (value == null) {
     return null;
   }
   return value.textureView;
@@ -941,7 +941,7 @@ function toSubscriptTypegpuConstantEntryArray(values: GPUPipelineConstantEntry[]
 }
 
 function toNullableSubscriptTypegpuPipelineLayout(value: GPUPipelineLayout | null): SubscriptTypegpuPipelineLayout | null {
-  if (value === null) {
+  if (value == null) {
     return null;
   }
   return value.pipelineLayout;
@@ -995,7 +995,7 @@ function toSubscriptTypegpuRenderPassColorAttachmentArray(values: GPURenderPassC
 }
 
 function toNullableSubscriptTypegpuQuerySet(value: GPUQuerySet | null): SubscriptTypegpuQuerySet | null {
-  if (value === null) {
+  if (value == null) {
     return null;
   }
   return value.querySet;
@@ -1012,7 +1012,7 @@ function toSubscriptTypegpuCommandBufferArray(values: GPUCommandBuffer[]): Subsc
 }
 
 function toNullableSubscriptTypegpuBindGroup(value: GPUBindGroup | null): SubscriptTypegpuBindGroup | null {
-  if (value === null) {
+  if (value == null) {
     return null;
   }
   return value.bindGroup;
@@ -1051,14 +1051,14 @@ function toSubscriptTypegpuTextureDescriptor(value: GPUTextureDescriptor): Subsc
 }
 
 function resolveGPUTextureFormatForGPUTextureViewDescriptorFormat(value: GPUTextureViewDescriptor): GPUTextureFormat {
-  if (value.format !== undefined) {
+  if (value.format != undefined) {
     return value.format;
   }
   return "undefined";
 }
 
 function resolveGPUTextureViewDimensionForGPUTextureViewDescriptorDimension(value: GPUTextureViewDescriptor): GPUTextureViewDimension {
-  if (value.dimension !== undefined) {
+  if (value.dimension != undefined) {
     return value.dimension;
   }
   return "undefined";
@@ -1079,7 +1079,7 @@ function toSubscriptTypegpuTextureViewDescriptor(value: GPUTextureViewDescriptor
 }
 
 function resolveGPUCompareFunctionForGPUSamplerDescriptorCompare(value: GPUSamplerDescriptor): GPUCompareFunction {
-  if (value.compare !== undefined) {
+  if (value.compare != undefined) {
     return value.compare;
   }
   return "undefined";
@@ -1259,7 +1259,7 @@ function toSubscriptTypegpuVertexState(value: GPUVertexState): SubscriptTypegpuV
 }
 
 function resolveGPUIndexFormatForGPUPrimitiveStateStripIndexFormat(value: GPUPrimitiveState): GPUIndexFormat {
-  if (value.stripIndexFormat !== undefined) {
+  if (value.stripIndexFormat != undefined) {
     return value.stripIndexFormat;
   }
   return "undefined";
@@ -1285,7 +1285,7 @@ function toSubscriptTypegpuStencilFaceState(value: GPUStencilFaceState): Subscri
 }
 
 function resolveGPUCompareFunctionForGPUDepthStencilStateDepthCompare(value: GPUDepthStencilState): GPUCompareFunction {
-  if (value.depthCompare !== undefined) {
+  if (value.depthCompare != undefined) {
     return value.depthCompare;
   }
   return "undefined";
@@ -1333,7 +1333,7 @@ function toSubscriptTypegpuColorTargetState(value: GPUColorTargetState): Subscri
   const nullableBlend: GPUBlendState | null = defaultBlend(value.blend);
   return new SubscriptTypegpuColorTargetState(
     value.format,
-    nullableBlend !== null ? toSubscriptTypegpuBlendState(nullableBlend) : null,
+    nullableBlend != null ? toSubscriptTypegpuBlendState(nullableBlend) : null,
     defaultWriteMask(value.writeMask),
   );
 }
@@ -1355,9 +1355,9 @@ function toSubscriptTypegpuRenderPipelineDescriptor(value: GPURenderPipelineDesc
     toNullableSubscriptTypegpuPipelineLayout(defaultLayout(value.layout)),
     toSubscriptTypegpuVertexState(value.vertex),
     toSubscriptTypegpuPrimitiveState(defaultPrimitive(value.primitive)),
-    nullableDepthStencil !== null ? toSubscriptTypegpuDepthStencilState(nullableDepthStencil) : null,
+    nullableDepthStencil != null ? toSubscriptTypegpuDepthStencilState(nullableDepthStencil) : null,
     toSubscriptTypegpuMultisampleState(defaultMultisample(value.multisample)),
-    nullableFragment !== null ? toSubscriptTypegpuFragmentState(nullableFragment) : null,
+    nullableFragment != null ? toSubscriptTypegpuFragmentState(nullableFragment) : null,
   );
 }
 
@@ -1368,7 +1368,7 @@ function toSubscriptTypegpuCommandEncoderDescriptor(value: GPUCommandEncoderDesc
 }
 
 function resolveGPUTextureFormatForGPURenderBundleEncoderDescriptorDepthStencilFormat(value: GPURenderBundleEncoderDescriptor): GPUTextureFormat {
-  if (value.depthStencilFormat !== undefined) {
+  if (value.depthStencilFormat != undefined) {
     return value.depthStencilFormat;
   }
   return "undefined";
@@ -1411,7 +1411,7 @@ function toSubscriptTypegpuComputePassDescriptor(value: GPUComputePassDescriptor
   const nullableTimestampWrites: GPUPassTimestampWrites | null = defaultTimestampWrites(value.timestampWrites);
   return new SubscriptTypegpuComputePassDescriptor(
     defaultLabel(value.label),
-    nullableTimestampWrites !== null ? toSubscriptTypegpuPassTimestampWrites(nullableTimestampWrites) : null,
+    nullableTimestampWrites != null ? toSubscriptTypegpuPassTimestampWrites(nullableTimestampWrites) : null,
   );
 }
 
@@ -1436,28 +1436,28 @@ function toSubscriptTypegpuRenderPassColorAttachment(value: GPURenderPassColorAt
 }
 
 function resolveGPULoadOpForGPURenderPassDepthStencilAttachmentDepthLoadOp(value: GPURenderPassDepthStencilAttachment): GPULoadOp {
-  if (value.depthLoadOp !== undefined) {
+  if (value.depthLoadOp != undefined) {
     return value.depthLoadOp;
   }
   return "undefined";
 }
 
 function resolveGPUStoreOpForGPURenderPassDepthStencilAttachmentDepthStoreOp(value: GPURenderPassDepthStencilAttachment): GPUStoreOp {
-  if (value.depthStoreOp !== undefined) {
+  if (value.depthStoreOp != undefined) {
     return value.depthStoreOp;
   }
   return "undefined";
 }
 
 function resolveGPULoadOpForGPURenderPassDepthStencilAttachmentStencilLoadOp(value: GPURenderPassDepthStencilAttachment): GPULoadOp {
-  if (value.stencilLoadOp !== undefined) {
+  if (value.stencilLoadOp != undefined) {
     return value.stencilLoadOp;
   }
   return "undefined";
 }
 
 function resolveGPUStoreOpForGPURenderPassDepthStencilAttachmentStencilStoreOp(value: GPURenderPassDepthStencilAttachment): GPUStoreOp {
-  if (value.stencilStoreOp !== undefined) {
+  if (value.stencilStoreOp != undefined) {
     return value.stencilStoreOp;
   }
   return "undefined";
@@ -1483,9 +1483,9 @@ function toSubscriptTypegpuRenderPassDescriptor(value: GPURenderPassDescriptor):
   return new SubscriptTypegpuRenderPassDescriptor(
     defaultLabel(value.label),
     toSubscriptTypegpuRenderPassColorAttachmentArray(value.colorAttachments),
-    nullableDepthStencilAttachment !== null ? toSubscriptTypegpuRenderPassDepthStencilAttachment(nullableDepthStencilAttachment) : null,
+    nullableDepthStencilAttachment != null ? toSubscriptTypegpuRenderPassDepthStencilAttachment(nullableDepthStencilAttachment) : null,
     toNullableSubscriptTypegpuQuerySet(defaultOcclusionQuerySet(value.occlusionQuerySet)),
-    nullableTimestampWrites !== null ? toSubscriptTypegpuPassTimestampWrites(nullableTimestampWrites) : null,
+    nullableTimestampWrites != null ? toSubscriptTypegpuPassTimestampWrites(nullableTimestampWrites) : null,
   );
 }
 
@@ -1982,14 +1982,14 @@ export class GPU {
   async requestAdapter(): Promise<GPUAdapter | null> {
     const future: SubscriptTypegpuFutureId = subscript_typegpu_instance_request_adapter(this.instance);
     let status: i32 = subscript_typegpu_future_status(this.instance, future);
-    while (status === 0) {
+    while (status == 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      if (status === 0) {
+      if (status == 0) {
         await Context.suspend();
       }
     }
-    if (status !== 1) {
+    if (status != 1) {
       subscript_typegpu_future_drop(this.instance, future);
       return null;
     }
@@ -2020,7 +2020,7 @@ export class GPUAdapter {
 
   limits(): GPUSupportedLimits | null {
     const record: SubscriptTypegpuLimits = new SubscriptTypegpuLimits(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    if (subscript_typegpu_adapter_get_limits(this.adapter, record) !== 1) {
+    if (subscript_typegpu_adapter_get_limits(this.adapter, record) != 1) {
       return null;
     }
     return fromSubscriptTypegpuLimits(record);
@@ -2037,14 +2037,14 @@ export class GPUAdapter {
   async requestDevice(descriptor: GPUDeviceDescriptor = {}): Promise<GPUDevice | null> {
     const future: SubscriptTypegpuFutureId = subscript_typegpu_adapter_request_device_with_descriptor(this.instance, this.adapter, toSubscriptTypegpuDeviceDescriptor(descriptor));
     let status: i32 = subscript_typegpu_future_status(this.instance, future);
-    while (status === 0) {
+    while (status == 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      if (status === 0) {
+      if (status == 0) {
         await Context.suspend();
       }
     }
-    if (status !== 1) {
+    if (status != 1) {
       subscript_typegpu_future_drop(this.instance, future);
       return null;
     }
@@ -2077,7 +2077,7 @@ export class GPUDevice {
 
   limits(): GPUSupportedLimits | null {
     const record: SubscriptTypegpuLimits = new SubscriptTypegpuLimits(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    if (subscript_typegpu_device_get_limits(this.device, record) !== 1) {
+    if (subscript_typegpu_device_get_limits(this.device, record) != 1) {
       return null;
     }
     return fromSubscriptTypegpuLimits(record);
@@ -2108,7 +2108,7 @@ export class GPUDevice {
   }
 
   createSampler(descriptor: GPUSamplerDescriptor | null = null): GPUSampler {
-    if (descriptor === null) {
+    if (descriptor == null) {
       return new GPUSampler(subscript_typegpu_device_create_sampler(this.device, null));
     }
     return new GPUSampler(subscript_typegpu_device_create_sampler(this.device, toSubscriptTypegpuSamplerDescriptor(descriptor)));
@@ -2141,14 +2141,14 @@ export class GPUDevice {
   async createComputePipelineAsync(descriptor: GPUComputePipelineDescriptor): Promise<GPUComputePipeline | null> {
     const future: SubscriptTypegpuFutureId = subscript_typegpu_device_create_compute_pipeline_async_begin(this.instance, this.device, toSubscriptTypegpuComputePipelineDescriptor(descriptor));
     let status: i32 = subscript_typegpu_future_status(this.instance, future);
-    while (status === 0) {
+    while (status == 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      if (status === 0) {
+      if (status == 0) {
         await Context.suspend();
       }
     }
-    if (status !== 1) {
+    if (status != 1) {
       subscript_typegpu_future_drop(this.instance, future);
       return null;
     }
@@ -2158,14 +2158,14 @@ export class GPUDevice {
   async createRenderPipelineAsync(descriptor: GPURenderPipelineDescriptor): Promise<GPURenderPipeline | null> {
     const future: SubscriptTypegpuFutureId = subscript_typegpu_device_create_render_pipeline_async_begin(this.instance, this.device, toSubscriptTypegpuRenderPipelineDescriptor(descriptor));
     let status: i32 = subscript_typegpu_future_status(this.instance, future);
-    while (status === 0) {
+    while (status == 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      if (status === 0) {
+      if (status == 0) {
         await Context.suspend();
       }
     }
-    if (status !== 1) {
+    if (status != 1) {
       subscript_typegpu_future_drop(this.instance, future);
       return null;
     }
@@ -2173,7 +2173,7 @@ export class GPUDevice {
   }
 
   createCommandEncoder(descriptor: GPUCommandEncoderDescriptor | null = null): GPUCommandEncoder {
-    if (descriptor === null) {
+    if (descriptor == null) {
       return new GPUCommandEncoder(subscript_typegpu_device_create_command_encoder(this.device, null));
     }
     return new GPUCommandEncoder(subscript_typegpu_device_create_command_encoder(this.device, toSubscriptTypegpuCommandEncoderDescriptor(descriptor)));
@@ -2207,14 +2207,14 @@ export class GPUDevice {
   async popErrorScope(): Promise<GPUError | null> {
     const future: SubscriptTypegpuFutureId = subscript_typegpu_device_pop_error_scope(this.device);
     let status: i32 = subscript_typegpu_future_status(this.instance, future);
-    while (status === 0) {
+    while (status == 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      if (status === 0) {
+      if (status == 0) {
         await Context.suspend();
       }
     }
-    if (status !== 1) {
+    if (status != 1) {
       subscript_typegpu_future_drop(this.instance, future);
       return null;
     }
@@ -2263,7 +2263,7 @@ export class GPUHostOwnedDevice {
 
   limits(): GPUSupportedLimits | null {
     const record: SubscriptTypegpuLimits = new SubscriptTypegpuLimits(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    if (subscript_typegpu_device_get_limits(this.device, record) !== 1) {
+    if (subscript_typegpu_device_get_limits(this.device, record) != 1) {
       return null;
     }
     return fromSubscriptTypegpuLimits(record);
@@ -2290,7 +2290,7 @@ export class GPUHostOwnedDevice {
   }
 
   createSampler(descriptor: GPUSamplerDescriptor | null = null): GPUSampler {
-    if (descriptor === null) {
+    if (descriptor == null) {
       return new GPUSampler(subscript_typegpu_device_create_sampler(this.device, null));
     }
     return new GPUSampler(subscript_typegpu_device_create_sampler(this.device, toSubscriptTypegpuSamplerDescriptor(descriptor)));
@@ -2323,14 +2323,14 @@ export class GPUHostOwnedDevice {
   async createComputePipelineAsync(descriptor: GPUComputePipelineDescriptor): Promise<GPUComputePipeline | null> {
     const future: SubscriptTypegpuFutureId = subscript_typegpu_device_create_compute_pipeline_async_begin(this.instance, this.device, toSubscriptTypegpuComputePipelineDescriptor(descriptor));
     let status: i32 = subscript_typegpu_future_status(this.instance, future);
-    while (status === 0) {
+    while (status == 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      if (status === 0) {
+      if (status == 0) {
         await Context.suspend();
       }
     }
-    if (status !== 1) {
+    if (status != 1) {
       subscript_typegpu_future_drop(this.instance, future);
       return null;
     }
@@ -2340,14 +2340,14 @@ export class GPUHostOwnedDevice {
   async createRenderPipelineAsync(descriptor: GPURenderPipelineDescriptor): Promise<GPURenderPipeline | null> {
     const future: SubscriptTypegpuFutureId = subscript_typegpu_device_create_render_pipeline_async_begin(this.instance, this.device, toSubscriptTypegpuRenderPipelineDescriptor(descriptor));
     let status: i32 = subscript_typegpu_future_status(this.instance, future);
-    while (status === 0) {
+    while (status == 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      if (status === 0) {
+      if (status == 0) {
         await Context.suspend();
       }
     }
-    if (status !== 1) {
+    if (status != 1) {
       subscript_typegpu_future_drop(this.instance, future);
       return null;
     }
@@ -2355,7 +2355,7 @@ export class GPUHostOwnedDevice {
   }
 
   createCommandEncoder(descriptor: GPUCommandEncoderDescriptor | null = null): GPUCommandEncoder {
-    if (descriptor === null) {
+    if (descriptor == null) {
       return new GPUCommandEncoder(subscript_typegpu_device_create_command_encoder(this.device, null));
     }
     return new GPUCommandEncoder(subscript_typegpu_device_create_command_encoder(this.device, toSubscriptTypegpuCommandEncoderDescriptor(descriptor)));
@@ -2389,11 +2389,11 @@ export class GPUHostOwnedDevice {
   popErrorScope(): GPUError | null {
     const future: SubscriptTypegpuFutureId = subscript_typegpu_device_pop_error_scope(this.device);
     let status: i32 = subscript_typegpu_future_status(this.instance, future);
-    while (status === 0) {
+    while (status == 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
     }
-    if (status !== 1) {
+    if (status != 1) {
       subscript_typegpu_future_drop(this.instance, future);
       return null;
     }
@@ -2447,15 +2447,15 @@ export class GPUBuffer {
   async mapAsync(mode: u64, offset: u64 = 0, size: u64): Promise<boolean> {
     const future: SubscriptTypegpuFutureId = subscript_typegpu_buffer_map_async(this.buffer, mode, offset, size);
     let status: i32 = subscript_typegpu_future_status(this.instance, future);
-    while (status === 0) {
+    while (status == 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      if (status === 0) {
+      if (status == 0) {
         await Context.suspend();
       }
     }
     subscript_typegpu_future_drop(this.instance, future);
-    return status === 1;
+    return status == 1;
   }
 
   readMappedRange(offset: u64, size: u64): u8[] {
@@ -2465,14 +2465,14 @@ export class GPUBuffer {
       bytes.push(0);
       index = index + 1;
     }
-    if (subscript_typegpu_buffer_read_mapped_range(this.buffer, offset, bytes) !== 1) {
+    if (subscript_typegpu_buffer_read_mapped_range(this.buffer, offset, bytes) != 1) {
       return [];
     }
     return bytes;
   }
 
   writeMappedRange(offset: u64, data: u8[]): boolean {
-    return subscript_typegpu_buffer_write_mapped_range(this.buffer, offset, data) === 1;
+    return subscript_typegpu_buffer_write_mapped_range(this.buffer, offset, data) == 1;
   }
 
   // offset counts bytes; count counts f32 elements.
@@ -2483,7 +2483,7 @@ export class GPUBuffer {
       values.push(0);
       index = index + 1;
     }
-    if (subscript_typegpu_buffer_read_mapped_range_f32(this.buffer, offset, values) !== 1) {
+    if (subscript_typegpu_buffer_read_mapped_range_f32(this.buffer, offset, values) != 1) {
       return [];
     }
     return values;
@@ -2528,15 +2528,15 @@ export class GPUQueue {
   async onSubmittedWorkDone(): Promise<boolean> {
     const future: SubscriptTypegpuFutureId = subscript_typegpu_queue_on_submitted_work_done(this.instance, this.queue);
     let status: i32 = subscript_typegpu_future_status(this.instance, future);
-    while (status === 0) {
+    while (status == 0) {
       subscript_typegpu_instance_process_events(this.instance);
       status = subscript_typegpu_future_status(this.instance, future);
-      if (status === 0) {
+      if (status == 0) {
         await Context.suspend();
       }
     }
     subscript_typegpu_future_drop(this.instance, future);
-    return status === 1;
+    return status == 1;
   }
 
   writeBuffer(buffer: GPUBuffer, bufferOffset: u64, data: u8[]): void {
@@ -2576,7 +2576,7 @@ export class GPUTexture {
   }
 
   createView(descriptor: GPUTextureViewDescriptor | null = null): GPUTextureView {
-    if (descriptor === null) {
+    if (descriptor == null) {
       return new GPUTextureView(subscript_typegpu_texture_create_view(this.texture, null));
     }
     return new GPUTextureView(subscript_typegpu_texture_create_view(this.texture, toSubscriptTypegpuTextureViewDescriptor(descriptor)));
@@ -2811,7 +2811,7 @@ export class GPUCommandEncoder {
   }
 
   beginComputePass(descriptor: GPUComputePassDescriptor | null = null): GPUComputePassEncoder {
-    if (descriptor === null) {
+    if (descriptor == null) {
       return new GPUComputePassEncoder(subscript_typegpu_command_encoder_begin_compute_pass(this.commandEncoder, null));
     }
     return new GPUComputePassEncoder(subscript_typegpu_command_encoder_begin_compute_pass(this.commandEncoder, toSubscriptTypegpuComputePassDescriptor(descriptor)));
@@ -2846,7 +2846,7 @@ export class GPUCommandEncoder {
   }
 
   finish(descriptor: GPUCommandBufferDescriptor | null = null): GPUCommandBuffer {
-    if (descriptor === null) {
+    if (descriptor == null) {
       return new GPUCommandBuffer(subscript_typegpu_command_encoder_finish(this.commandEncoder, null));
     }
     return new GPUCommandBuffer(subscript_typegpu_command_encoder_finish(this.commandEncoder, toSubscriptTypegpuCommandBufferDescriptor(descriptor)));
@@ -3057,7 +3057,7 @@ export class GPURenderBundleEncoder {
   }
 
   finish(descriptor: GPURenderBundleDescriptor | null = null): GPURenderBundle {
-    if (descriptor === null) {
+    if (descriptor == null) {
       return new GPURenderBundle(subscript_typegpu_render_bundle_encoder_finish(this.renderBundleEncoder, null));
     }
     return new GPURenderBundle(subscript_typegpu_render_bundle_encoder_finish(this.renderBundleEncoder, toSubscriptTypegpuRenderBundleDescriptor(descriptor)));

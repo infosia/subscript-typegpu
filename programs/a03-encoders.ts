@@ -28,13 +28,13 @@ const SHADER: string = `
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -72,7 +72,7 @@ export async function main(): Promise<void> {
       layout: pipelineLayout,
       compute: { module: shader, entryPoint: "computeMain" },
     });
-    if (computeAsync !== null) {
+    if (computeAsync != null) {
       computeAsync.label("a03-compute-async-label");
       computeAsync.dispose();
     }
@@ -109,12 +109,12 @@ export async function main(): Promise<void> {
       },
     });
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print("pipeline:invalid");
       print("FAIL");
       return;
     }
-    if (renderAsync !== null) {
+    if (renderAsync != null) {
       renderAsync.label("a03-render-async-label");
       renderAsync.dispose();
     }

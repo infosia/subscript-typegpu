@@ -166,9 +166,9 @@ class VoronoiRenderLayout {
 // These are the four committed upstream palette literals. The random variation below
 // changes each channel by at most 0.075.
 function paletteColor(index: u32): Vec3f {
-  if (index === 0) return new Vec3f(0.9215686, 0.8117647, 1.0);
-  if (index === 1) return new Vec3f(0.7176471, 0.5450980, 0.9803922);
-  if (index === 2) return new Vec3f(0.5450980, 0.3607843, 0.9647059);
+  if (index == 0) return new Vec3f(0.9215686, 0.8117647, 1.0);
+  if (index == 1) return new Vec3f(0.7176471, 0.5450980, 0.9803922);
+  if (index == 2) return new Vec3f(0.5450980, 0.3607843, 0.9647059);
   return new Vec3f(0.4274510, 0.2666667, 0.9490196);
 }
 
@@ -426,7 +426,7 @@ export function init(
 ): void {
   // The pipeline declares its target format literally. A surface with another format ends the
   // example before any draw.
-  if (format !== voronoiRender_TARGET_FORMAT) {
+  if (format != voronoiRender_TARGET_FORMAT) {
     print(`FAIL format expected=${voronoiRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -537,7 +537,7 @@ export function init(
     voronoiRender,
   );
   const validationError = hostDevice.popErrorScope();
-  if (validationError !== null) {
+  if (validationError != null) {
     renderPipeline.dispose();
     stepPipeline.dispose();
     seedPipeline.dispose();
@@ -622,7 +622,7 @@ export function frame(
 ): void {
   // A failed `init` leaves the state empty, and the frame ends without a draw. TypeGPU reports
   // the same failure as an exception.
-  if (activeState === null) return;
+  if (activeState == null) return;
   const active = activeState;
   using queue = active.device.queue();
   // One encoder carries the whole frame. The key action, the flood step, and the render pass all
@@ -631,7 +631,7 @@ export function frame(
 
   // Key 49 is `1` and key 50 is `2`. `1` reseeds the current texture and stops the flood.
   // `2` restarts the flood at the largest offset. TypeGPU carries both actions as buttons.
-  if (key === 49) {
+  if (key == 49) {
     reseedCounter += 1;
     jumpOffset = 0;
     queue.writeBuffer(
@@ -643,7 +643,7 @@ export function frame(
       ? active.computeGroups[0]
       : active.computeGroups[1];
     active.compute[0].dispatch(encoder, [seedGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
-  } else if (key === 50) {
+  } else if (key == 50) {
     jumpOffset = START_OFFSET;
   }
 
@@ -694,7 +694,7 @@ export function frame(
 // creation order, so a bind group never outlives the views and the buffers it names.
 // TypeGPU releases the same resources with one `root.destroy()` call.
 export function shutdown(): void {
-  if (activeState === null) return;
+  if (activeState == null) return;
   const active = activeState;
   let index: i32 = 0;
   while (index < active.renderGroups.length) {

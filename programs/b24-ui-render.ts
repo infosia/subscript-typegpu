@@ -23,7 +23,7 @@ function checkColorClip(renderer: UiRenderer, name: string, color: u32, x: i32, 
   const stride: u32 = Context.bytesOf<UiVertex>(new UiVertex(new Vec2f(0, 0), new Vec2f(0, 0), 0)).length as u32;
   for (let q: u32 = 0; q < renderer.quadCount; q += 1) {
     const vertex: UiVertex = Context.fromBytes<UiVertex>(renderer.vertexBytes, q * 4 * stride);
-    if (vertex.color !== color) continue;
+    if (vertex.color != color) continue;
     for (let i: i32 = 0; i < renderer.rangeCount; i += 1) {
       const range = renderer.ranges[i];
       if (q * 6 < range.first || q * 6 >= range.first + range.count) continue;
@@ -43,11 +43,11 @@ function checkFrames(renderer: UiRenderer): void {
   ui.popClip();
   ui.drawRect(new UiRect(20, 0, 10, 10), 0xff000002);
   ui.end();
-  check("clip commands", ui.commands[0].kind === 1 && ui.commands[0].w === 10
-    && ui.commands[2].kind === 1 && ui.commands[2].w === 16777216);
+  check("clip commands", ui.commands[0].kind == 1 && ui.commands[0].w == 10
+    && ui.commands[2].kind == 1 && ui.commands[2].w == 16777216);
   renderer.build(ui);
-  check("clip exit counts", renderer.quadCount === 2 && renderer.indexCount === 12);
-  check("clip exit ranges", renderer.rangeCount === 2 && renderer.ranges[0].clip.w === 10);
+  check("clip exit counts", renderer.quadCount == 2 && renderer.indexCount == 12);
+  check("clip exit ranges", renderer.rangeCount == 2 && renderer.ranges[0].clip.w == 10);
   checkColorClip(renderer, "clip exit", 0xff000002, 25, 5);
 
   ui.begin();
@@ -63,9 +63,9 @@ function checkFrames(renderer: UiRenderer): void {
   ui.endRoot();
   ui.end();
   renderer.build(ui);
-  check("nested roots and orphan commands", renderer.quadCount === 3);
+  check("nested roots and orphan commands", renderer.quadCount == 3);
   const first: UiVertex = Context.fromBytes<UiVertex>(renderer.vertexBytes, 0);
-  check("root order", first.color === 0xff000002);
+  check("root order", first.color == 0xff000002);
   checkColorClip(renderer, "nested parent exit", 0xff000003, 25, 5);
   checkColorClip(renderer, "nested child", 0xff000002, 125, 5);
 
@@ -92,17 +92,17 @@ function checkFrames(renderer: UiRenderer): void {
   const rangeCapacity: i32 = ranges.length;
   ui.begin(); ui.end();
   renderer.build(ui);
-  check("empty frame counts", renderer.quadCount === 0 && renderer.indexCount === 0);
-  check("empty frame storage", renderer.vertexBytes.length === byteCapacity && renderer.ranges.length === rangeCapacity
-    && renderer.rangeCount === 0);
+  check("empty frame counts", renderer.quadCount == 0 && renderer.indexCount == 0);
+  check("empty frame storage", renderer.vertexBytes.length == byteCapacity && renderer.ranges.length == rangeCapacity
+    && renderer.rangeCount == 0);
   ui.begin(); ui.drawRect(new UiRect(2, 3, 4, 5), 0xff000007); ui.end();
   renderer.build(ui);
   const reused: UiVertex = Context.fromBytes<UiVertex>(bytes, 0);
-  check("frame storage reuse", renderer.vertexBytes.length === byteCapacity
-    && ranges.length === rangeCapacity && renderer.ranges[0] === firstRange && renderer.rangeCount === 1
-    && renderer.ranges[0].first === 0 && renderer.ranges[0].count === 6
-    && renderer.quadCount === 1 && renderer.indexCount === 6
-    && reused.position.x === 2.0 && reused.color === 0xff000007);
+  check("frame storage reuse", renderer.vertexBytes.length == byteCapacity
+    && ranges.length == rangeCapacity && renderer.ranges[0] == firstRange && renderer.rangeCount == 1
+    && renderer.ranges[0].first == 0 && renderer.ranges[0].count == 6
+    && renderer.quadCount == 1 && renderer.indexCount == 6
+    && reused.position.x == 2.0 && reused.color == 0xff000007);
 }
 
 export async function main(): Promise<void> {
@@ -119,9 +119,9 @@ export async function main(): Promise<void> {
   ui.endWindow();
   ui.end();
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  if (adapterResult == null) { print("FAIL adapter"); gpu.dispose(); return; }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  if (deviceResult == null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
   {
     using adapter = adapterResult;
     using device = deviceResult;
@@ -132,8 +132,8 @@ export async function main(): Promise<void> {
     );
     using renderer = UiRenderer.create(device, facts, 64);
     const error = await device.popErrorScope();
-    if (error !== null) { print("pipeline:invalid"); print("FAIL"); return; }
-    if (uiPipeline_WGSL.length === 0) { print("FAIL shader"); return; }
+    if (error != null) { print("pipeline:invalid"); print("FAIL"); return; }
+    if (uiPipeline_WGSL.length == 0) { print("FAIL shader"); return; }
     using target = device.createTexture({
       label: "b24-target", size: { width: 256, height: 256 }, format: "rgba8unorm",
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
@@ -159,7 +159,7 @@ export async function main(): Promise<void> {
     print(`vertices fnv1a ${checksum}`);
     ui.begin(); ui.end();
     renderer.render(ui, pass, 256, 256);
-    check("empty render", renderer.quadCount === 0 && renderer.indexCount === 0 && renderer.rangeCount === 0);
+    check("empty render", renderer.quadCount == 0 && renderer.indexCount == 0 && renderer.rangeCount == 0);
     pass.end();
     using command = encoder.finishDefault();
     device.queue.submit([command]);

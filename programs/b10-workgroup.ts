@@ -52,13 +52,13 @@ const sharedCounter: WorkgroupVar<AtomicU32> = workgroupVar<AtomicU32>();
 function workgroupKernel(res: WorkgroupLayout, ctx: ComputeInvocation): void {
   privateOffset.$ = privateOffset.$ + 1;
   sharedValues[ctx.localIndex] = ctx.localIndex + privateOffset.$;
-  if (ctx.localIndex === 0) {
+  if (ctx.localIndex == 0) {
     sharedCounter.$.store(0);
   }
   workgroupBarrier();
   sharedCounter.$.add(sharedValues[ctx.localIndex]);
   workgroupBarrier();
-  if (ctx.localIndex === 0) {
+  if (ctx.localIndex == 0) {
     res.counters[ctx.workgroupId.x].total.add(sharedCounter.$.load());
   }
 }
@@ -70,9 +70,9 @@ const workgroup: ComputePipelineSpec = computePipeline<WorkgroupLayout>(workgrou
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  if (adapterResult == null) { print("FAIL adapter"); gpu.dispose(); return; }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  if (deviceResult == null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
   {
     using adapter = adapterResult;
     using device = deviceResult;
@@ -91,7 +91,7 @@ export async function main(): Promise<void> {
       [workgroup_WORKGROUP_X, workgroup_WORKGROUP_Y, workgroup_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print("pipeline:invalid");
       print("FAIL");
       return;

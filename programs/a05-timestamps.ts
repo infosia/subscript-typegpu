@@ -22,7 +22,7 @@ import {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
@@ -36,7 +36,7 @@ export async function main(): Promise<void> {
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice({
     requiredFeatures: ["timestamp-query"],
   });
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     adapterResult.dispose();
     gpu.dispose();
     print("timestamps:unsupported");
@@ -46,7 +46,7 @@ export async function main(): Promise<void> {
     using adapter = adapterResult;
     using device = deviceResult;
     const pairResult: TimestampPair | null = createTimestampPair(device);
-    if (pairResult === null) {
+    if (pairResult == null) {
       print("timestamps:unsupported");
       return;
     }
@@ -62,7 +62,7 @@ export async function main(): Promise<void> {
       compute: { module: shader, entryPoint: "main" },
     });
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print("pipeline:invalid");
       print("FAIL");
       return;

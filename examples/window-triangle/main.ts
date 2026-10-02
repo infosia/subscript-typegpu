@@ -84,7 +84,7 @@ export function init(
 ): void {
   // The declaration fixes the target format literally. A surface with another format ends
   // the example before it creates any resource.
-  if (format !== tri_TARGET_FORMAT) {
+  if (format != tri_TARGET_FORMAT) {
     print(`FAIL format expected=${tri_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -128,7 +128,7 @@ export function init(
   const validationError = deviceWrapper.popErrorScope();
   // Both handles belong to the script here, so it releases them before it reports the
   // failure and leaves the module state empty.
-  if (validationError !== null) {
+  if (validationError != null) {
     createdPipeline.dispose();
     vertices.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
@@ -155,18 +155,18 @@ export function frame(
   const activeDevice: GPUHostOwnedDevice | null = ownedDevice;
   const activePipeline: RenderPipeline | null = pipeline;
   const activeVertices: GPUBuffer | null = vertexBuffer;
-  if (activeDevice === null) {
+  if (activeDevice == null) {
     return;
   }
-  if (activePipeline === null) {
+  if (activePipeline == null) {
     return;
   }
-  if (activeVertices === null) {
+  if (activeVertices == null) {
     return;
   }
   // The host delivers one key per frame, and 32 is the space scalar. Each press advances the
   // clear color by one step of three.
-  if (key === 32) {
+  if (key == 32) {
     clearIndex = (clearIndex + 1) % 3;
   }
   // The host acquires and presents the surface texture. The wrapper borrows the view for one
@@ -178,9 +178,9 @@ export function frame(
   using pass = encoder.beginRenderPass({
     colorAttachments: [{
       view: target,
-      clearValue: clearIndex === 0
+      clearValue: clearIndex == 0
         ? { r: 0.04, g: 0.06, b: 0.12, a: 1.0 }
-        : clearIndex === 1
+        : clearIndex == 1
           ? { r: 0.12, g: 0.04, b: 0.06, a: 1.0 }
           : { r: 0.04, g: 0.12, b: 0.07, a: 1.0 },
       loadOp: "clear",
@@ -206,11 +206,11 @@ export function frame(
 // The host calls this one time before it releases the device. TypeGPU frees the same kind of
 // resource through `root.destroy`, and this layer disposes each handle by name.
 export function shutdown(): void {
-  if (vertexBuffer !== null) {
+  if (vertexBuffer != null) {
     vertexBuffer.dispose();
     vertexBuffer = null;
   }
-  if (pipeline !== null) {
+  if (pipeline != null) {
     pipeline.dispose();
     pipeline = null;
   }

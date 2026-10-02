@@ -220,7 +220,7 @@ export function init(
 ): void {
   // The host picks the surface format. The generator baked one format into the pipeline,
   // so a mismatch stops the example here instead of at pipeline creation.
-  if (format !== vapor_TARGET_FORMAT) {
+  if (format != vapor_TARGET_FORMAT) {
     print(`FAIL format expected=${vapor_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -268,7 +268,7 @@ export function init(
   // A null check replaces the exception a browser port throws. The failure path frees the
   // three handles this function already created.
   const validationError = hostDevice.popErrorScope();
-  if (validationError !== null) {
+  if (validationError != null) {
     pipeline.dispose();
     frameBuffer.dispose();
     vertices.dispose();
@@ -312,11 +312,11 @@ export function frame(
   const vertices = activeVertices;
   const frameBuffer = activeFrameBuffer;
   const group = activeGroup;
-  if (device === null) return;
-  if (pipeline === null) return;
-  if (vertices === null) return;
-  if (frameBuffer === null) return;
-  if (group === null) return;
+  if (device == null) return;
+  if (pipeline == null) return;
+  if (vertices == null) return;
+  if (frameBuffer == null) return;
+  if (group == null) return;
   // The window host carries no clock, so the frame count is the only time source.
   frameCount += 1;
   using queue = device.queue();
@@ -361,10 +361,10 @@ export function frame(
 // The host calls shutdown once. The script frees every GPU handle by hand, because this
 // library keeps no finalizer and no reference count for scripts.
 export function shutdown(): void {
-  if (activeGroup !== null) activeGroup.dispose();
-  if (activeFrameBuffer !== null) activeFrameBuffer.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activePipeline !== null) activePipeline.dispose();
+  if (activeGroup != null) activeGroup.dispose();
+  if (activeFrameBuffer != null) activeFrameBuffer.dispose();
+  if (activeVertices != null) activeVertices.dispose();
+  if (activePipeline != null) activePipeline.dispose();
   activeFrameBuffer = null;
   activeVertices = null;
   activePipeline = null;

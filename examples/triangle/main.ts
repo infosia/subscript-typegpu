@@ -59,9 +59,9 @@ class Varyings {
 // the uv. This port streams the positions through a vertex buffer and picks one
 // color per corner.
 function triangleVertex(value: Vertex, ctx: VertexInvocation): Varyings {
-  const color: Vec3f = ctx.vertexIndex === 0
+  const color: Vec3f = ctx.vertexIndex == 0
     ? new Vec3f(1.0, 0.15, 0.1)
-    : ctx.vertexIndex === 1
+    : ctx.vertexIndex == 1
       ? new Vec3f(0.1, 0.9, 0.3)
       : new Vec3f(0.15, 0.3, 1.0);
   return new Varyings(
@@ -97,7 +97,7 @@ export function init(
 ): void {
   // The declaration fixes the target format literally. A surface with another format ends
   // the example before it creates any resource.
-  if (format !== triangle_TARGET_FORMAT) {
+  if (format != triangle_TARGET_FORMAT) {
     print(`FAIL format expected=${triangle_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -139,7 +139,7 @@ export function init(
   const validationError = hostDevice.popErrorScope();
   // Both handles belong to the script here, so it releases them before it reports the
   // failure and leaves the module state empty.
-  if (validationError !== null) {
+  if (validationError != null) {
     createdPipeline.dispose();
     vertices.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
@@ -168,13 +168,13 @@ export function frame(
   const device: GPUHostOwnedDevice | null = activeDevice;
   const pipeline: RenderPipeline | null = activePipeline;
   const vertices: GPUBuffer | null = activeVertices;
-  if (device === null) {
+  if (device == null) {
     return;
   }
-  if (pipeline === null) {
+  if (pipeline == null) {
     return;
   }
-  if (vertices === null) {
+  if (vertices == null) {
     return;
   }
   // The host acquires and presents the surface texture. The wrapper borrows the view for one
@@ -210,11 +210,11 @@ export function frame(
 // The host calls this one time before it releases the device. TypeGPU frees the same kind of
 // resource through `root.destroy`, and this layer disposes each handle by name.
 export function shutdown(): void {
-  if (activeVertices !== null) {
+  if (activeVertices != null) {
     activeVertices.dispose();
     activeVertices = null;
   }
-  if (activePipeline !== null) {
+  if (activePipeline != null) {
     activePipeline.dispose();
     activePipeline = null;
   }

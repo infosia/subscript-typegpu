@@ -6,10 +6,10 @@ class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) {
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   let count: u32 = 0;
   for (let index: u32 = 0; index < 4; index += 1) {
-    if (ctx.localIndex === 0) { break; }
+    if (ctx.localIndex == 0) { break; }
     count += 1;
   }
-  if (count === 4) { workgroupBarrier(); }
+  if (count == 4) { workgroupBarrier(); }
   res.output[0] = new Item(count);
 }
 const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });

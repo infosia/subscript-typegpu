@@ -23,14 +23,14 @@ fn rejected(@builtin(local_invocation_index) local: u32) {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -51,7 +51,7 @@ export async function main(): Promise<void> {
       compute: { module: shader, entryPoint: "rejected" },
     });
     const validationError = await device.popErrorScope();
-    if (validationError === null) {
+    if (validationError == null) {
       print("FAIL validation missing uniform-control-flow rejection");
       return;
     }

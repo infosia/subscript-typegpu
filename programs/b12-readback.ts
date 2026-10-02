@@ -20,21 +20,21 @@ class Particle {
 }
 
 function equalParticle(left: Particle, right: Particle): boolean {
-  return left.pos.x === right.pos.x
-    && left.pos.y === right.pos.y
-    && left.pos.z === right.pos.z
-    && left.mass === right.mass;
+  return left.pos.x == right.pos.x
+    && left.pos.y == right.pos.y
+    && left.pos.z == right.pos.z
+    && left.mass == right.mass;
 }
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();

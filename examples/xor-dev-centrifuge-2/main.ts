@@ -177,7 +177,7 @@ export function init(
 ): void {
   // The host picks the surface format. The generator baked one format into the pipeline,
   // so a mismatch stops the example here instead of at pipeline creation.
-  if (format !== tunnel_TARGET_FORMAT) {
+  if (format != tunnel_TARGET_FORMAT) {
     print(`FAIL format expected=${tunnel_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -226,7 +226,7 @@ export function init(
   // A null check replaces the exception a browser port throws. The failure path frees the
   // three handles this function already created.
   const validationError = hostDevice.popErrorScope();
-  if (validationError !== null) {
+  if (validationError != null) {
     createdPipeline.dispose();
     frameBuffer.dispose();
     vertices.dispose();
@@ -273,19 +273,19 @@ export function frame(
   const vertices: GPUBuffer | null = activeVertices;
   const frameBuffer: GPUBuffer | null = activeFrameBuffer;
   const group: GPUBindGroup | null = activeGroup;
-  if (device === null) {
+  if (device == null) {
     return;
   }
-  if (pipeline === null) {
+  if (pipeline == null) {
     return;
   }
-  if (vertices === null) {
+  if (vertices == null) {
     return;
   }
-  if (frameBuffer === null) {
+  if (frameBuffer == null) {
     return;
   }
-  if (group === null) {
+  if (group == null) {
     return;
   }
   // Time comes from the frame count divided by sixty. TypeGPU reads the
@@ -331,19 +331,19 @@ export function frame(
 // The host calls shutdown once. The script frees every GPU handle by hand, because this
 // library keeps no finalizer and no reference count for scripts.
 export function shutdown(): void {
-  if (activeGroup !== null) {
+  if (activeGroup != null) {
     activeGroup.dispose();
     activeGroup = null;
   }
-  if (activeFrameBuffer !== null) {
+  if (activeFrameBuffer != null) {
     activeFrameBuffer.dispose();
     activeFrameBuffer = null;
   }
-  if (activeVertices !== null) {
+  if (activeVertices != null) {
     activeVertices.dispose();
     activeVertices = null;
   }
-  if (activePipeline !== null) {
+  if (activePipeline != null) {
     activePipeline.dispose();
     activePipeline = null;
   }

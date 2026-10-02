@@ -111,13 +111,13 @@ function resultState(actual: Matrix, expected: Matrix): string {
   let hostNonzero: boolean = false;
   let matches: boolean = true;
   for (let i: i32 = 0; i < 16; i += 1) {
-    if (actual.body[i] !== 0.0) {
+    if (actual.body[i] != 0.0) {
       allZero = false;
     }
-    if (expected.body[i] !== 0.0) {
+    if (expected.body[i] != 0.0) {
       hostNonzero = true;
     }
-    if (actual.body[i] !== expected.body[i]) {
+    if (actual.body[i] != expected.body[i]) {
       matches = false;
     }
   }
@@ -131,13 +131,13 @@ export async function main(): Promise<void> {
   // The API layer polls the future itself, so the script never pumps the event loop. A null
   // adapter reports the failure by value, because the layers carry no exceptions.
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     gpu.dispose();
     print("check:product fail");
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     adapterResult.dispose();
     gpu.dispose();
     print("check:product fail");
@@ -208,7 +208,7 @@ export async function main(): Promise<void> {
       [multiply_WORKGROUP_X, multiply_WORKGROUP_Y, multiply_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError === null) {
+    if (validationError == null) {
       // The bind group joins the three buffers to the generated layout. The resource order
       // follows the field order of `MatrixLayout`.
       using nativeLayout = pipeline.bindGroupLayout(0);

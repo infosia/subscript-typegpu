@@ -391,7 +391,7 @@ reason = "fixture boundary-only sentinel"
     );
     assert!(generated.source.contains("compare?: GPUCompareFunction;"));
     assert!(generated.source.contains(
-        "if (value.compare !== undefined) {\n    return value.compare;\n  }\n  return \"undefined\";"
+        "if (value.compare != undefined) {\n    return value.compare;\n  }\n  return \"undefined\";"
     ));
     assert!(generated.wire_enum_aliases.contains("  \"undefined\": 0,"));
 }

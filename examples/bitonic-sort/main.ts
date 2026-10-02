@@ -189,7 +189,7 @@ export function init(
 ): void {
   // The host picks the surface format. The generator baked one format into the pipeline,
   // so a mismatch stops the example here instead of at pipeline creation.
-  if (format !== bitonicDisplay_TARGET_FORMAT) {
+  if (format != bitonicDisplay_TARGET_FORMAT) {
     print(`FAIL format expected=${bitonicDisplay_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -258,7 +258,7 @@ export function init(
   // A null check replaces the exception a browser port throws. The failure path frees the
   // five handles this function already created.
   const validationError = hostDevice.popErrorScope();
-  if (validationError !== null) {
+  if (validationError != null) {
     renderPipeline.dispose();
     computePipeline.dispose();
     vertices.dispose();
@@ -317,23 +317,23 @@ export function frame(
   const values = activeValues;
   const passBuffer = activePass;
   const vertices = activeVertices;
-  if (device === null) return;
-  if (computePipeline === null) return;
-  if (renderPipeline === null) return;
-  if (computeGroup === null) return;
-  if (renderGroup === null) return;
-  if (values === null) return;
-  if (passBuffer === null) return;
-  if (vertices === null) return;
+  if (device == null) return;
+  if (computePipeline == null) return;
+  if (renderPipeline == null) return;
+  if (computeGroup == null) return;
+  if (renderGroup == null) return;
+  if (values == null) return;
+  if (passBuffer == null) return;
+  if (vertices == null) return;
 
   using queue = device.queue();
   // The host stores the last key press as a Unicode scalar and clears the slot after this
   // call. 49 and 50 are the codes for 1 and 2, which replace the upstream buttons.
-  if (key === 49) {
+  if (key == 49) {
     queue.writeBuffer(values, 0, shuffledValueBytes());
     sortActive = false;
     sortPassIndex = 0;
-  } else if (key === 50) {
+  } else if (key == 50) {
     sortActive = true;
     sortPassIndex = 0;
   }
@@ -346,7 +346,7 @@ export function frame(
     queue.writeBuffer(passBuffer, 0, Context.bytesOf<BitonicSortPass>(currentPass));
     computePipeline.dispatchThreads(encoder, [computeGroup], COMPARATOR_COUNT, 1, 1);
     sortPassIndex += 1;
-    if (sortPassIndex === sortPassCount) sortActive = false;
+    if (sortPassIndex == sortPassCount) sortActive = false;
   }
 
   // The host passes the current surface view as a raw handle. The wrapper does not own it,
@@ -379,13 +379,13 @@ export function frame(
 // The host calls shutdown once. The script frees every GPU handle by hand, because this
 // library keeps no finalizer and no reference count for scripts.
 export function shutdown(): void {
-  if (activeRenderGroup !== null) activeRenderGroup.dispose();
-  if (activeComputeGroup !== null) activeComputeGroup.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activePass !== null) activePass.dispose();
-  if (activeValues !== null) activeValues.dispose();
-  if (activeRenderPipeline !== null) activeRenderPipeline.dispose();
-  if (activeComputePipeline !== null) activeComputePipeline.dispose();
+  if (activeRenderGroup != null) activeRenderGroup.dispose();
+  if (activeComputeGroup != null) activeComputeGroup.dispose();
+  if (activeVertices != null) activeVertices.dispose();
+  if (activePass != null) activePass.dispose();
+  if (activeValues != null) activeValues.dispose();
+  if (activeRenderPipeline != null) activeRenderPipeline.dispose();
+  if (activeComputePipeline != null) activeComputePipeline.dispose();
   activeRenderGroup = null;
   activeComputeGroup = null;
   activeVertices = null;

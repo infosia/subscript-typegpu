@@ -93,14 +93,14 @@ function itemArray(): FixedArray<Item, 64> {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -183,7 +183,7 @@ export async function main(): Promise<void> {
       [vecAdd_WORKGROUP_X, vecAdd_WORKGROUP_Y, vecAdd_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -213,7 +213,7 @@ export async function main(): Promise<void> {
     index = 0;
     while (index < 64) {
       const expected: f32 = hostLayout.out[index as u32].value;
-      if (result[index].value !== expected) {
+      if (result[index].value != expected) {
         print(`FAIL ${index} expected=${expected} got=${result[index].value}`);
         return;
       }

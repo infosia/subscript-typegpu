@@ -273,9 +273,9 @@ export function init(
   // The generator pins a target format into each pipeline. The check covers all three, so no
   // mismatch reaches pipeline creation.
   if (
-    format !== rings_TARGET_FORMAT
-    || format !== swirl_TARGET_FORMAT
-    || format !== kaleidoscope_TARGET_FORMAT
+    format != rings_TARGET_FORMAT
+    || format != swirl_TARGET_FORMAT
+    || format != kaleidoscope_TARGET_FORMAT
   ) {
     print(`FAIL format expected=${rings_TARGET_FORMAT} actual=${format}`);
     return;
@@ -348,7 +348,7 @@ export function init(
   const validationError = hostDevice.popErrorScope();
   // The error path disposes every handle that the failed run already created, because no
   // finalizer runs later.
-  if (validationError !== null) {
+  if (validationError != null) {
     kaleidoscopePipeline.dispose();
     swirlPipeline.dispose();
     ringsPipeline.dispose();
@@ -394,21 +394,21 @@ export function frame(
   const group = activeGroup;
   // The host passes the key as a Unicode scalar, so 49, 50, and 51 are the `1`, `2`, and `3`
   // keys. `patternIndex` holds the choice, because the host clears `key` after each frame.
-  if (key === 49) patternIndex = 0;
-  if (key === 50) patternIndex = 1;
-  if (key === 51) patternIndex = 2;
+  if (key == 49) patternIndex = 0;
+  if (key == 50) patternIndex = 1;
+  if (key == 51) patternIndex = 2;
   // The choice selects a whole pipeline, not a branch inside one shader. Each pattern owns a
   // compiled module of its own.
   let pipeline = activeRings;
-  if (patternIndex === 1) pipeline = activeSwirl;
-  if (patternIndex === 2) pipeline = activeKaleidoscope;
+  if (patternIndex == 1) pipeline = activeSwirl;
+  if (patternIndex == 2) pipeline = activeKaleidoscope;
   // A null field means `init` failed or never ran. The frame returns, because the layers
   // report failure as a value.
-  if (device === null) return;
-  if (pipeline === null) return;
-  if (vertices === null) return;
-  if (frameBuffer === null) return;
-  if (group === null) return;
+  if (device == null) return;
+  if (pipeline == null) return;
+  if (vertices == null) return;
+  if (frameBuffer == null) return;
+  if (group == null) return;
   // The frame count is the only clock the window host offers. 60 frames stand for one second
   // of shader time.
   frameCount += 1;
@@ -456,12 +456,12 @@ export function frame(
 // The host calls `shutdown` once, before it releases the device. The bind group goes first,
 // because it names the other handles.
 export function shutdown(): void {
-  if (activeGroup !== null) activeGroup.dispose();
-  if (activeFrameBuffer !== null) activeFrameBuffer.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activeKaleidoscope !== null) activeKaleidoscope.dispose();
-  if (activeSwirl !== null) activeSwirl.dispose();
-  if (activeRings !== null) activeRings.dispose();
+  if (activeGroup != null) activeGroup.dispose();
+  if (activeFrameBuffer != null) activeFrameBuffer.dispose();
+  if (activeVertices != null) activeVertices.dispose();
+  if (activeKaleidoscope != null) activeKaleidoscope.dispose();
+  if (activeSwirl != null) activeSwirl.dispose();
+  if (activeRings != null) activeRings.dispose();
   // The null assignments make a second `shutdown` call safe.
   activeFrameBuffer = null;
   activeVertices = null;

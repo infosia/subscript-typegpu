@@ -75,9 +75,9 @@ export function fade(value: f32): f32 {
 export function grad(hash: u32, x: f32, y: f32, z: f32): f32 {
   const code: u32 = hash & 15;
   const first: f32 = code < 8 ? x : y;
-  const second: f32 = code < 4 ? y : ((code === 12 || code === 14) ? x : z);
-  const signedFirst: f32 = (code & 1) === 0 ? first : -first;
-  const signedSecond: f32 = (code & 2) === 0 ? second : -second;
+  const second: f32 = code < 4 ? y : ((code == 12 || code == 14) ? x : z);
+  const signedFirst: f32 = (code & 1) == 0 ? first : -first;
+  const signedSecond: f32 = (code & 2) == 0 ? second : -second;
   return signedFirst + signedSecond;
 }
 

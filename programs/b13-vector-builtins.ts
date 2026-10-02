@@ -421,9 +421,9 @@ function inputValue(): VectorInput {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  if (adapterResult == null) { print("FAIL adapter"); gpu.dispose(); return; }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  if (deviceResult == null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
   {
     using adapter = adapterResult;
     using device = deviceResult;
@@ -441,7 +441,7 @@ export async function main(): Promise<void> {
       [vectorBuiltins_WORKGROUP_X, vectorBuiltins_WORKGROUP_Y, vectorBuiltins_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) { print("pipeline:invalid"); print("FAIL"); return; }
+    if (validationError != null) { print("pipeline:invalid"); print("FAIL"); return; }
     using nativeLayout = pipeline.bindGroupLayout(0);
     using bindGroup = createBindGroup(device, nativeLayout, vectorBuiltins_LAYOUT0, [bufferResource(input), bufferResource(output)]);
     using encoder = device.createCommandEncoderDefault();

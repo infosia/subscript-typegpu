@@ -98,7 +98,7 @@ function checkerBytes(): u8[] {
   while (y < 4) {
     let x: i32 = 0;
     while (x < 4) {
-      const value: u8 = ((x + y) % 2 === 0) ? 255 : 0;
+      const value: u8 = ((x + y) % 2 == 0) ? 255 : 0;
       values.push(value); values.push(value); values.push(value); values.push(255);
       x = x + 1;
     }
@@ -113,7 +113,7 @@ function checkerPixels(): Vec4f[] {
   while (y < 4) {
     let x: i32 = 0;
     while (x < 4) {
-      const value: f32 = ((x + y) % 2 === 0) ? 1.0 : 0.0;
+      const value: f32 = ((x + y) % 2 == 0) ? 1.0 : 0.0;
       pixels.push(new Vec4f(value, value, value, 1.0));
       x = x + 1;
     }
@@ -124,9 +124,9 @@ function checkerPixels(): Vec4f[] {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  if (adapterResult == null) { print("FAIL adapter"); gpu.dispose(); return; }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  if (deviceResult == null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
   {
     using adapter = adapterResult;
     using device = deviceResult;
@@ -178,7 +178,7 @@ export async function main(): Promise<void> {
       [fragmentSample_LAYOUT0], [fragmentSample_VERTEX_LAYOUT0], fragmentSample,
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -223,8 +223,8 @@ export async function main(): Promise<void> {
         );
         const offset: i32 = y * 256 + x * 4;
         const expectedValue: u8 = (expected.x * 255.0) as u8;
-        if (pixels[offset] !== expectedValue || pixels[offset + 1] !== expectedValue
-          || pixels[offset + 2] !== expectedValue || pixels[offset + 3] !== 255) {
+        if (pixels[offset] != expectedValue || pixels[offset + 1] != expectedValue
+          || pixels[offset + 2] != expectedValue || pixels[offset + 3] != 255) {
           print(`FAIL x=${x} y=${y} expected=${expectedValue} got=${pixels[offset]},${pixels[offset + 1]},${pixels[offset + 2]},${pixels[offset + 3]}`);
           return;
         }

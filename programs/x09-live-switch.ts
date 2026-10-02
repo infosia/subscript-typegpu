@@ -66,10 +66,10 @@ const liveSwitch: ComputePipelineSpec = computePipeline<SwitchLayout>(liveSwitch
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  if (adapterResult == null) { print("FAIL adapter"); gpu.dispose(); return; }
   print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  if (deviceResult == null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
   print("device:ready");
   {
     using adapter = adapterResult;
@@ -114,7 +114,7 @@ export async function main(): Promise<void> {
       [liveSwitch_WORKGROUP_X, liveSwitch_WORKGROUP_Y, liveSwitch_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -141,7 +141,7 @@ export async function main(): Promise<void> {
     index = 0;
     while (index < count) {
       const expected: u32 = hostLayout.output[index].value;
-      if (result[index as i32].value !== expected) {
+      if (result[index as i32].value != expected) {
         print(`FAIL ${index} expected=${expected} got=${result[index as i32].value}`);
         return;
       }

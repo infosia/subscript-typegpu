@@ -106,24 +106,24 @@ function particleArray(): FixedArray<Particle, 64> {
 }
 
 function equalParticle(left: Particle, right: Particle): boolean {
-  return left.pos.x === right.pos.x
-    && left.pos.y === right.pos.y
-    && left.pos.z === right.pos.z
-    && left.vel.x === right.vel.x
-    && left.vel.y === right.vel.y
-    && left.vel.z === right.vel.z;
+  return left.pos.x == right.pos.x
+    && left.pos.y == right.pos.y
+    && left.pos.z == right.pos.z
+    && left.vel.x == right.vel.x
+    && left.vel.y == right.vel.y
+    && left.vel.z == right.vel.z;
 }
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -204,7 +204,7 @@ export async function main(): Promise<void> {
       [particles_WORKGROUP_X, particles_WORKGROUP_Y, particles_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }

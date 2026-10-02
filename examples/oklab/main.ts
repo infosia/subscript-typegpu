@@ -140,7 +140,7 @@ function oklabFragment(
   // because the generator emits the WGSL before the program runs.
   if (outOfGamut) {
     const cell = input.uv.scale(24.0).floor();
-    const checker: f32 = (((cell.x as i32) + (cell.y as i32)) & 1) === 0 ? 0.0 : 1.0;
+    const checker: f32 = (((cell.x as i32) + (cell.y as i32)) & 1) == 0 ? 0.0 : 1.0;
     color = color.scale(0.1 + 0.9 * checker);
   }
   // A thin bright ring marks the pointer probe. TypeGPU moves an HTML element over the
@@ -178,7 +178,7 @@ export function init(
 ): void {
   // The host picks the surface format. The generator baked one format into the pipeline,
   // so a mismatch stops the example here instead of at pipeline creation.
-  if (format !== oklab_TARGET_FORMAT) {
+  if (format != oklab_TARGET_FORMAT) {
     print(`FAIL format expected=${oklab_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -234,7 +234,7 @@ export function init(
   // A null check replaces the exception a browser port throws. The failure path frees the
   // three handles this function already created.
   const validationError = hostDevice.popErrorScope();
-  if (validationError !== null) {
+  if (validationError != null) {
     pipeline.dispose();
     uniforms.dispose();
     vertices.dispose();
@@ -278,15 +278,15 @@ export function frame(
   const vertices = activeVertices;
   const uniforms = activeUniforms;
   const group = activeGroup;
-  if (device === null) return;
-  if (pipeline === null) return;
-  if (vertices === null) return;
-  if (uniforms === null) return;
-  if (group === null) return;
+  if (device == null) return;
+  if (pipeline == null) return;
+  if (vertices == null) return;
+  if (uniforms == null) return;
+  if (group == null) return;
   // The host stores the last key press as a Unicode scalar and clears the slot after this
   // call. 49 and 50 are the codes for 1 and 2, and each press turns the slice by 0.1 radians.
-  if (key === 49) hue -= 0.1;
-  if (key === 50) hue += 0.1;
+  if (key == 49) hue -= 0.1;
+  if (key == 50) hue += 0.1;
   // The host reports -1, -1 until the pointer first enters the window. The division turns
   // surface pixels into the 0 to 1 range, and the flip matches the uv origin.
   let pointer = new Vec2f(-10.0, -10.0);
@@ -332,10 +332,10 @@ export function frame(
 // The host calls shutdown once. The script frees every GPU handle by hand, because this
 // library keeps no finalizer and no reference count for scripts.
 export function shutdown(): void {
-  if (activeGroup !== null) activeGroup.dispose();
-  if (activeUniforms !== null) activeUniforms.dispose();
-  if (activeVertices !== null) activeVertices.dispose();
-  if (activePipeline !== null) activePipeline.dispose();
+  if (activeGroup != null) activeGroup.dispose();
+  if (activeUniforms != null) activeUniforms.dispose();
+  if (activeVertices != null) activeVertices.dispose();
+  if (activePipeline != null) activePipeline.dispose();
   activeUniforms = null;
   activeVertices = null;
   activePipeline = null;

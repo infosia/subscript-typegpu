@@ -278,7 +278,7 @@ class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) {
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   let running: boolean = true;
   while (running) {
-    if (ctx.localIndex === 0) { continue; }
+    if (ctx.localIndex == 0) { continue; }
     workgroupBarrier();
     running = false;
   }
@@ -301,10 +301,10 @@ class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) {
 function kernel(res: Layout, ctx: ComputeInvocation): void {
   let count: u32 = 0;
   for (let index: u32 = 0; index < 4; index += 1) {
-    if (ctx.localIndex === 0) { break; }
+    if (ctx.localIndex == 0) { break; }
     count += 1;
   }
-  if (count === 4) { workgroupBarrier(); }
+  if (count == 4) { workgroupBarrier(); }
   res.output[0] = new Item(count);
 }
 const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
@@ -322,9 +322,9 @@ function kernel(res: Layout, ctx: ComputeInvocation): void {
   let count: u32 = 0;
   for (let index: u32 = 0; index < 4; index += 1) {
     count += 1;
-    if (ctx.localIndex === 0) { continue; }
+    if (ctx.localIndex == 0) { continue; }
   }
-  if (count === 4) { workgroupBarrier(); }
+  if (count == 4) { workgroupBarrier(); }
   res.output[0] = new Item(count);
 }
 const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
@@ -567,7 +567,7 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } f
 @ValueType class Counter { value: AtomicU32; constructor(value: AtomicU32) { this.value = value; } }
 class Layout { counters: MutStorage<Counter>; constructor(counters: MutStorage<Counter>) { this.counters = counters; } }
 function kernel(res: Layout, ctx: ComputeInvocation): void {
-  res.counters[ctx.localIndex === 0 ? 1 : 2].value.add(1);
+  res.counters[ctx.localIndex == 0 ? 1 : 2].value.add(1);
 }
 const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [4, 1, 1] });
 "#,
@@ -889,7 +889,7 @@ import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from
 class Layout { packs: Storage<Pack>; constructor(packs: Storage<Pack>) { this.packs = packs; } }
 function control(res: Layout, ctx: ComputeInvocation): void {
   let i: u32 = 0;
-  const flag: boolean = ctx.globalId.x === (0 as u32);
+  const flag: boolean = ctx.globalId.x == (0 as u32);
   while (i < (2 as u32) ? true : false) {
     const chosen: u32 = flag ? (i > (0 as u32) ? (2 as u32) : (1 as u32)) : (0 as u32);
     i += chosen;

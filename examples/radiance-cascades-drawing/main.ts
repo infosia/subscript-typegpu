@@ -329,7 +329,7 @@ class RenderLayout {
 function sceneEditKernel(res: SceneEditLayout, ctx: ComputeInvocation): void {
   const coords = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);
   const brush: BrushParams = res.brush.$;
-  if (brush.mode === EDIT_CLEAR) {
+  if (brush.mode == EDIT_CLEAR) {
     res.scene.store(coords, new Vec4f(0.0, 0.0, 0.0, 0.0));
     return;
   }
@@ -665,7 +665,7 @@ function drawingFragment(
   ctx: FragmentInvocation,
 ): Vec4f {
   const distance: f32 = res.sdf.sampleLevel(res.linear, input.uv, 0.0).x;
-  if (res.params.$.mode === DISPLAY_SDF) {
+  if (res.params.$.mode == DISPLAY_SDF) {
     // The SDF view paints the outside red and the inside blue. The fade and the bands make the
     // distance value itself visible, and white marks the zero crossing.
     let color = distance >= 0.0
@@ -839,16 +839,16 @@ export function init(
 ): void {
   // The generator fixed the color target format. A surface with another format is a failure
   // here, not a reason to rebuild the pipeline.
-  if (format !== radianceDrawingRender_TARGET_FORMAT) {
+  if (format != radianceDrawingRender_TARGET_FORMAT) {
     print(`FAIL format expected=${radianceDrawingRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
   // The kernels read the committed sizes as constants. The host sizing must agree with them,
   // so a mismatch stops `init` before any resource exists.
   const dimensions = cascadeDimensions(LIGHT_SIZE);
-  if (dimensions.cascadeProbes !== CASCADE_PROBES
-    || dimensions.cascadeDim !== CASCADE_DIM
-    || dimensions.cascadeCount !== CASCADE_COUNT) {
+  if (dimensions.cascadeProbes != CASCADE_PROBES
+    || dimensions.cascadeDim != CASCADE_DIM
+    || dimensions.cascadeCount != CASCADE_COUNT) {
     print("FAIL committed cascade dimensions");
     return;
   }
@@ -1094,7 +1094,7 @@ export function init(
   const validationError = hostDevice.popErrorScope();
   // The failure path releases every handle this function created, newest first. Nothing else
   // frees them, because the state never received them.
-  if (validationError !== null) {
+  if (validationError != null) {
     renderPipeline.dispose();
     fieldPipeline.dispose();
     cascadePipeline.dispose();
@@ -1159,8 +1159,8 @@ export function init(
   const stepGroups: GPUBindGroup[] = [];
   index = 0;
   while (index < stepParams.length) {
-    const source: GPUTextureView = index % 2 === 0 ? floodArrayA : floodArrayB;
-    const target: GPUTextureView = index % 2 === 0 ? floodArrayB : floodArrayA;
+    const source: GPUTextureView = index % 2 == 0 ? floodArrayA : floodArrayB;
+    const target: GPUTextureView = index % 2 == 0 ? floodArrayB : floodArrayA;
     stepGroups.push(createBindGroupHost(hostDevice, stepLayout, floodStep_LAYOUT0, [
       textureResource(source),
       textureResource(target),
@@ -1181,7 +1181,7 @@ export function init(
   layer = 0;
   while (layer < CASCADE_COUNT) {
     const side: u32 = cascadeWriteSide(CASCADE_COUNT, layer);
-    const sourceSide: u32 = side === 0 ? 1 : 0;
+    const sourceSide: u32 = side == 0 ? 1 : 0;
     // The top layer has no layer above it, so it binds its own view. The kernel skips the merge
     // there, and the binding stays valid.
     const upperLayer: u32 = layer + 1 < CASCADE_COUNT ? layer + 1 : layer;
@@ -1263,22 +1263,22 @@ export function frame(
   buttons: u32,
 ): void {
   // A failed `init` leaves no state. The host still calls `frame`, so the guard returns.
-  if (activeState === null) return;
+  if (activeState == null) return;
   const active = activeState;
   // The host reports one key per frame and clears the slot, so a press acts once. 49 and 50
   // are the Unicode scalars of `1` and `2`.
-  if (key === 49) displayMode = DISPLAY_LIT;
-  if (key === 50) displayMode = DISPLAY_SDF;
+  if (key == 49) displayMode = DISPLAY_LIT;
+  if (key == 50) displayMode = DISPLAY_SDF;
   // The host reports the pointer in surface pixels, and -1 before the pointer first enters
   // the window.
   const pointerValid: boolean = pointerX >= 0.0 && pointerY >= 0.0
     && width > 0 && height > 0;
-  const drawing: boolean = pointerValid && (buttons & 1) !== 0;
+  const drawing: boolean = pointerValid && (buttons & 1) != 0;
   let mode: u32 = 0;
   let current = previousPointer;
   // The first frame clears the scene texture, and key 0 clears it again. A clear and a paint
   // never share a frame, because both go through the one edit pass.
-  if (!active.initialized || key === 48) {
+  if (!active.initialized || key == 48) {
     mode = EDIT_CLEAR;
     wasDrawing = false;
   } else if (drawing) {
@@ -1297,7 +1297,7 @@ export function frame(
   using queue = active.device.queue();
   using encoder = active.device.createCommandEncoderDefault();
   // The light chain runs only after an edit. A frame with no edit costs one render pass.
-  if (mode !== 0) {
+  if (mode != 0) {
     queue.writeBuffer(
       active.brushParams,
       0,
@@ -1362,8 +1362,8 @@ export function frame(
     active.initialized = true;
   }
   // The stroke advances only after a paint, so a clear frame keeps the previous point.
-  if (drawing && mode === EDIT_PAINT) previousPointer = current;
-  wasDrawing = drawing && mode === EDIT_PAINT;
+  if (drawing && mode == EDIT_PAINT) previousPointer = current;
+  wasDrawing = drawing && mode == EDIT_PAINT;
 
   // The host owns the frame's view and presents it. The wrapper adds the API-layer methods
   // and disposes nothing.
@@ -1395,7 +1395,7 @@ export function frame(
 // Releases every handle in the reverse order of creation: groups, sampler, views, textures,
 // buffers, then pipelines. The device and the frame view belong to the host.
 export function shutdown(): void {
-  if (activeState === null) return;
+  if (activeState == null) return;
   const active = activeState;
   let index: i32 = 0;
   while (index < active.renderGroups.length) {

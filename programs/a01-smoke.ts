@@ -13,7 +13,7 @@ import {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
@@ -21,7 +21,7 @@ export async function main(): Promise<void> {
   print("adapter:ready");
 
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -78,15 +78,15 @@ export async function main(): Promise<void> {
     let mismatch: i32 = -1;
     let index: i32 = 0;
     while (index < written.length && index < observed.length) {
-      if (mismatch === -1 && observed[index] !== written[index]) {
+      if (mismatch == -1 && observed[index] != written[index]) {
         mismatch = index;
       }
       index = index + 1;
     }
-    if (mismatch === -1 && observed.length !== written.length) {
+    if (mismatch == -1 && observed.length != written.length) {
       mismatch = index;
     }
-    if (mismatch === -1) {
+    if (mismatch == -1) {
       print("read:match");
     } else {
       print(`FAIL read-mismatch=${mismatch}`);

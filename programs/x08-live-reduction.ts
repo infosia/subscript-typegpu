@@ -69,7 +69,7 @@ function reductionKernel(res: ReductionLayout, ctx: ComputeInvocation): void {
     workgroupBarrier();
     stride = stride / 2;
   }
-  if (local === 0) {
+  if (local == 0) {
     res.output[0].total.add(partials[0] as u32);
   }
 }
@@ -81,10 +81,10 @@ const reduction: ComputePipelineSpec = computePipeline<ReductionLayout>(reductio
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  if (adapterResult == null) { print("FAIL adapter"); gpu.dispose(); return; }
   print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  if (deviceResult == null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
   print("device:ready");
   {
     using adapter = adapterResult;
@@ -146,7 +146,7 @@ export async function main(): Promise<void> {
       [reduction_WORKGROUP_X, reduction_WORKGROUP_Y, reduction_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -174,7 +174,7 @@ export async function main(): Promise<void> {
       0,
     );
     print("readback:mapped");
-    if (result.total.load() !== expected) {
+    if (result.total.load() != expected) {
       print(`FAIL expected=${expected} got=${result.total.load()}`);
       return;
     }

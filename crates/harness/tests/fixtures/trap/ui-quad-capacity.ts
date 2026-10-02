@@ -13,9 +13,9 @@ const uiPipeline: RenderPipelineSpec = renderPipelineL<UiRenderLayout, UiVertex,
 
 async function exercise(capacity: u32, spec: RenderPipelineSpec): Promise<void> {
   const adapter: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapter === null) return;
+  if (adapter == null) return;
   const device: GPUDevice | null = await adapter.requestDevice();
-  if (device === null) return;
+  if (device == null) return;
   const facts: UiPipelineFacts = new UiPipelineFacts(
     uiPipeline_WGSL, uiPipeline_VERTEX_ENTRY, uiPipeline_FRAGMENT_ENTRY,
     uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, spec,

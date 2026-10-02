@@ -179,7 +179,7 @@ function lifeStepKernel(res: LifeStepLayout, ctx: ComputeInvocation): void {
 function lifeEditKernel(res: LifeEditLayout, ctx: ComputeInvocation): void {
   const params: EditParams = res.edit.$;
   const cell = new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32);
-  if (params.mode === EDIT_CLEAR) {
+  if (params.mode == EDIT_CLEAR) {
     res.generation.store(cell, new Vec4f(0.0, 0.0, 0.0, 1.0));
     return;
   }
@@ -320,11 +320,11 @@ function gliderSeed(): Vec4f[] {
     const x: u32 = index % GRID_SIZE;
     const y: u32 = index / GRID_SIZE;
     const alive: boolean =
-      (x === center && y === center)
-      || (x === center + 1 && y === center + 1)
-      || (x + 1 === center && y === center + 2)
-      || (x === center && y === center + 2)
-      || (x === center + 1 && y === center + 2);
+      (x == center && y == center)
+      || (x == center + 1 && y == center + 1)
+      || (x + 1 == center && y == center + 2)
+      || (x == center && y == center + 2)
+      || (x == center + 1 && y == center + 2);
     pixels.push(new Vec4f(alive ? 1.0 : 0.0, 0.0, 0.0, 1.0));
     index += 1;
   }
@@ -351,7 +351,7 @@ export function init(
 ): void {
   // The generator pins the target format into the pipeline. A mismatch with the host surface
   // fails here, not inside pipeline creation.
-  if (format !== lifeRender_TARGET_FORMAT) {
+  if (format != lifeRender_TARGET_FORMAT) {
     print(`FAIL format expected=${lifeRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -441,7 +441,7 @@ export function init(
   const validationError = hostDevice.popErrorScope();
   // The error path disposes every handle that the failed run already created, because no
   // finalizer runs later.
-  if (validationError !== null) {
+  if (validationError != null) {
     renderPipeline.dispose();
     editPipeline.dispose();
     stepPipeline.dispose();
@@ -519,16 +519,16 @@ export function frame(
 ): void {
   // A null state means `init` failed or never ran. The frame returns, because the layers
   // report failure as a value.
-  if (activeState === null) return;
+  if (activeState == null) return;
   const active = activeState;
   // The host passes the key as a Unicode scalar, and 48 is the `0` key. Bit 0 of `buttons`
   // is the left button, and the host reports -1, -1 until the pointer first enters the window.
   // Grid row 0 sits at the bottom of the surface, so the pointer Y is flipped.
   let editMode: u32 = EDIT_NONE;
   let editPoint = new Vec2f(0.0, 0.0);
-  if (key === 48) {
+  if (key == 48) {
     editMode = EDIT_CLEAR;
-  } else if ((buttons & 1) !== 0 && pointerX >= 0.0 && pointerY >= 0.0) {
+  } else if ((buttons & 1) != 0 && pointerX >= 0.0 && pointerY >= 0.0) {
     editMode = EDIT_DRAW;
     editPoint = new Vec2f(
       (pointerX / (width as f32)) * ((GRID_SIZE - 1) as f32),
@@ -538,7 +538,7 @@ export function frame(
   using queue = active.device.queue();
   // The frame parity picks the step source and target. The edit pass and the render pass
   // both use the step target, so an edit lands on the grid the frame displays.
-  const readsA: boolean = frameCount % 2 === 0;
+  const readsA: boolean = frameCount % 2 == 0;
   const stepGroup: GPUBindGroup = readsA ? active.stepAB : active.stepBA;
   const editGroup: GPUBindGroup = readsA ? active.editB : active.editA;
   const displayGroup: GPUBindGroup = readsA ? active.renderB : active.renderA;
@@ -550,7 +550,7 @@ export function frame(
   active.step.dispatch(encoder, [stepGroup], GRID_SIZE / 8, GRID_SIZE / 8, 1);
   // The edit pass runs only on a frame with input. It runs after the step pass, so the brush
   // survives into the next generation.
-  if (editMode !== EDIT_NONE) {
+  if (editMode != EDIT_NONE) {
     queue.writeBuffer(
       active.editParams,
       0,
@@ -591,7 +591,7 @@ export function frame(
 // The host calls `shutdown` once, before it releases the device. The bind groups go first,
 // because they name the views and the buffers.
 export function shutdown(): void {
-  if (activeState === null) return;
+  if (activeState == null) return;
   const active = activeState;
   active.renderB.dispose();
   active.renderA.dispose();

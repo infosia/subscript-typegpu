@@ -116,13 +116,13 @@ export async function main(): Promise<void> {
   // The API layer polls the future itself, so the script never pumps the event loop. A null
   // adapter reports the failure by value, because the layers carry no exceptions.
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     gpu.dispose();
     print("check:dispatch fail");
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     adapterResult.dispose();
     gpu.dispose();
     print("check:dispatch fail");
@@ -169,7 +169,7 @@ export async function main(): Promise<void> {
       [count3d_WORKGROUP_X, count3d_WORKGROUP_Y, count3d_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError === null) {
+    if (validationError == null) {
       using firstLayout = firstPipeline.bindGroupLayout(0);
       using firstGroup = createBindGroup(
         device,
@@ -241,12 +241,12 @@ export async function main(): Promise<void> {
       const c: u32 = thirdValue.value.load();
       print(`counts=${a},${b},${c}`);
       // Noop validates the guarded pipelines but leaves each counter zeroed.
-      if (a === 0 && b === 0 && c === 0) {
+      if (a == 0 && b == 0 && c == 0) {
         state = "noop";
       } else if (
-        a === DISPATCH_1D[0] * DISPATCH_1D[1] * DISPATCH_1D[2]
-        && b === DISPATCH_2D[0] * DISPATCH_2D[1] * DISPATCH_2D[2]
-        && c === DISPATCH_3D[0] * DISPATCH_3D[1] * DISPATCH_3D[2]
+        a == DISPATCH_1D[0] * DISPATCH_1D[1] * DISPATCH_1D[2]
+        && b == DISPATCH_2D[0] * DISPATCH_2D[1] * DISPATCH_2D[2]
+        && c == DISPATCH_3D[0] * DISPATCH_3D[1] * DISPATCH_3D[2]
       ) {
         state = "pass";
       }

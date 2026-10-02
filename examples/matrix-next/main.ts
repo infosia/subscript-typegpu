@@ -152,9 +152,9 @@ function resultState(actual: Matrix, expected: Matrix): string {
   let hostNonzero: boolean = false;
   let matches: boolean = true;
   for (let i: i32 = 0; i < 16; i += 1) {
-    allZero = allZero && actual.body[i] === 0.0;
-    hostNonzero = hostNonzero || expected.body[i] !== 0.0;
-    matches = matches && actual.body[i] === expected.body[i];
+    allZero = allZero && actual.body[i] == 0.0;
+    hostNonzero = hostNonzero || expected.body[i] != 0.0;
+    matches = matches && actual.body[i] == expected.body[i];
   }
   if (allZero && hostNonzero) {
     return "noop";
@@ -172,14 +172,14 @@ export async function main(): Promise<void> {
   // Adapter and device requests return null instead of a rejected promise. A headless example
   // prints one check line per kernel, so a run with no device still reports a result.
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     gpu.dispose();
     print("check:naive fail");
     print("check:tiled fail");
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     adapterResult.dispose();
     gpu.dispose();
     print("check:naive fail");
@@ -262,7 +262,7 @@ export async function main(): Promise<void> {
     // The scope result arrives asynchronously, so the caller awaits it. Both states stay fail
     // when validation fails, and no dispatch runs.
     const validationError = await device.popErrorScope();
-    if (validationError === null) {
+    if (validationError == null) {
       // Each kernel needs its own bind group, because the product buffer differs. The layout
       // comes back from the pipeline, so the shader and the bind group cannot disagree.
       using naiveNativeLayout = naivePipeline.bindGroupLayout(0);

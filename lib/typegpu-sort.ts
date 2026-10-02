@@ -57,7 +57,7 @@ function bitonicSortStride(jShift: u32): u32 {
 }
 
 function requireBitonicSortLength(length: u32): void {
-  if (length === 0 || (length & (length - 1)) !== 0) {
+  if (length == 0 || (length & (length - 1)) != 0) {
     sortTrap("bitonicSortPassCount", `length=${length} is not a power of two`);
   }
 }
@@ -92,9 +92,9 @@ export function bitonicSortPass(length: u32, passIndex: u32): BitonicSortPass {
       j /= 2;
     }
     while (true) {
-      if (current === passIndex) return new BitonicSortPass(k, jShift);
+      if (current == passIndex) return new BitonicSortPass(k, jShift);
       current += 1;
-      if (jShift === 0) break;
+      if (jShift == 0) break;
       jShift -= 1;
     }
     k *= 2;
@@ -115,7 +115,7 @@ export function bitonicSortStep(
   const above: u32 = thread / stride;
   const lower: u32 = below + above * (stride * 2);
   const upper: u32 = lower + stride;
-  const ascending: boolean = (lower & resources.pass.$.k) === 0;
+  const ascending: boolean = (lower & resources.pass.$.k) == 0;
   const lowerValue: u32 = resources.values[lower];
   const upperValue: u32 = resources.values[upper];
   if ((ascending && lowerValue > upperValue) || (!ascending && lowerValue < upperValue)) {
@@ -173,7 +173,7 @@ export function prefixScanBlockF32(
     active /= 2;
   }
 
-  if (lane === 0) {
+  if (lane == 0) {
     resources.sums[invocation.workgroupId.x] = prefixScanShared[255];
     prefixScanShared[255] = 0.0;
   }
@@ -205,7 +205,7 @@ export function prefixScanApplyF32(
 }
 
 function requirePrefixScanLength(length: u32): void {
-  if (length === 0 || length > PREFIX_SCAN_LIMIT) {
+  if (length == 0 || length > PREFIX_SCAN_LIMIT) {
     sortTrap("prefixScanPlanF32", `length=${length} maximum=${PREFIX_SCAN_LIMIT}`);
   }
 }

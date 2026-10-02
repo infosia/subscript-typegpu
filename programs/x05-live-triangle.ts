@@ -93,9 +93,9 @@ function noCenterOnEdge(a: Vec2f, b: Vec2f, c: Vec2f): boolean {
     let x: i32 = 0;
     while (x < 64) {
       const point: Vec2f = pixelCenter(x, y);
-      if (edge(a, b, point) === 0.0
-        || edge(b, c, point) === 0.0
-        || edge(c, a, point) === 0.0) {
+      if (edge(a, b, point) == 0.0
+        || edge(b, c, point) == 0.0
+        || edge(c, a, point) == 0.0) {
         return false;
       }
       x = x + 1;
@@ -107,14 +107,14 @@ function noCenterOnEdge(a: Vec2f, b: Vec2f, c: Vec2f): boolean {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   print("adapter:ready");
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -173,7 +173,7 @@ export async function main(): Promise<void> {
       tri,
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -218,10 +218,10 @@ export async function main(): Promise<void> {
         const expectedB: u8 = inside ? 191 : 0;
         const expectedA: u8 = 255;
         const offset: i32 = y * 256 + x * 4;
-        if (pixels[offset] !== expectedR
-          || pixels[offset + 1] !== expectedG
-          || pixels[offset + 2] !== expectedB
-          || pixels[offset + 3] !== expectedA) {
+        if (pixels[offset] != expectedR
+          || pixels[offset + 1] != expectedG
+          || pixels[offset + 2] != expectedB
+          || pixels[offset + 3] != expectedA) {
           print(
             `FAIL x=${x} y=${y} expected=${expectedR},${expectedG},${expectedB},${expectedA} got=${pixels[offset]},${pixels[offset + 1]},${pixels[offset + 2]},${pixels[offset + 3]}`,
           );

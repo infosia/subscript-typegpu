@@ -69,7 +69,7 @@ function checkerBytes(): u8[] {
   while (y < 4) {
     let x: i32 = 0;
     while (x < 4) {
-      const value: u8 = ((x + y) % 2 === 0) ? 255 : 0;
+      const value: u8 = ((x + y) % 2 == 0) ? 255 : 0;
       values.push(value);
       values.push(value);
       values.push(value);
@@ -87,7 +87,7 @@ function checkerPixels(): Vec4f[] {
   while (y < 4) {
     let x: i32 = 0;
     while (x < 4) {
-      const value: f32 = ((x + y) % 2 === 0) ? 1.0 : 0.0;
+      const value: f32 = ((x + y) % 2 == 0) ? 1.0 : 0.0;
       pixels.push(new Vec4f(value, value, value, 1.0));
       x = x + 1;
     }
@@ -98,9 +98,9 @@ function checkerPixels(): Vec4f[] {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  if (adapterResult == null) { print("FAIL adapter"); gpu.dispose(); return; }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  if (deviceResult == null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
   {
     using adapter = adapterResult;
     using device = deviceResult;
@@ -144,7 +144,7 @@ export async function main(): Promise<void> {
       [textureCopy_WORKGROUP_X, textureCopy_WORKGROUP_Y, textureCopy_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -182,8 +182,8 @@ export async function main(): Promise<void> {
         const expectedG: u8 = (expected.y * 255.0) as u8;
         const expectedB: u8 = (expected.z * 255.0) as u8;
         const expectedA: u8 = (expected.w * 255.0) as u8;
-        if (pixels[offset] !== expectedR || pixels[offset + 1] !== expectedG
-          || pixels[offset + 2] !== expectedB || pixels[offset + 3] !== expectedA) {
+        if (pixels[offset] != expectedR || pixels[offset + 1] != expectedG
+          || pixels[offset + 2] != expectedB || pixels[offset + 3] != expectedA) {
           print(`FAIL x=${x} y=${y} expected=${expectedR},${expectedG},${expectedB},${expectedA} got=${pixels[offset]},${pixels[offset + 1]},${pixels[offset + 2]},${pixels[offset + 3]}`);
           return;
         }

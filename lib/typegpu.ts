@@ -46,24 +46,24 @@ function appendBytes(target: u8[], source: u8[]): void {
 }
 
 function textureComponentBytes(format: GPUTextureFormat): u32 {
-  if (format === "rgba8unorm") return 1;
-  if (format === "rgba16float") return 2;
-  if (format === "r32float" || format === "rgba32float") return 4;
+  if (format == "rgba8unorm") return 1;
+  if (format == "rgba16float") return 2;
+  if (format == "r32float" || format == "rgba32float") return 4;
   authorTrap("TX9", "writeTexturePixels", `format=${format} is not supported`);
   return 0;
 }
 
 function textureChannelCount(format: GPUTextureFormat): u32 {
-  return format === "r32float" ? 1 : 4;
+  return format == "r32float" ? 1 : 4;
 }
 
 function appendTextureComponent(bytes: u8[], format: GPUTextureFormat, value: f32): void {
-  if (format === "rgba8unorm") {
+  if (format == "rgba8unorm") {
     const clamped: f32 = Math.min(1.0, Math.max(0.0, value as f64)) as f32;
     bytes.push(Math.floor((clamped * 255.0 + 0.5) as f64) as u8);
     return;
   }
-  if (format === "rgba16float") {
+  if (format == "rgba16float") {
     appendBytes(bytes, Context.bytesOf<FixedArray<f16, 1>>([value as f16]));
     return;
   }
@@ -107,7 +107,7 @@ export function writeTexturePixels(
   height: u32,
 ): void {
   const pixelCount: u32 = width * height;
-  if ((pixels.length as u32) !== pixelCount) {
+  if ((pixels.length as u32) != pixelCount) {
     authorTrap("TX9", "writeTexturePixels", `pixels=${pixels.length} width=${width} height=${height}`);
   }
   const format: GPUTextureFormat = texture.format;
@@ -122,7 +122,7 @@ export function writeTexturePixels(
     while (x < width) {
       const pixel: Vec4f = pixels[(y * width + x) as i32];
       appendTextureComponent(bytes, format, pixel.x);
-      if (channels === 4) {
+      if (channels == 4) {
         appendTextureComponent(bytes, format, pixel.y);
         appendTextureComponent(bytes, format, pixel.z);
         appendTextureComponent(bytes, format, pixel.w);
@@ -162,7 +162,7 @@ export class Texture2d<T> {
   }
 
   load(coords: Vec2i, level: u32): Vec4f {
-    if (level !== 0) {
+    if (level != 0) {
       authorTrap("TX3", "load", `level=${level} is not supported`);
     }
     if (coords.x < 0 || coords.y < 0
@@ -177,10 +177,10 @@ export class Texture2d<T> {
     if (!sampler.isNearest()) {
       authorTrap("TX3", "sampleLevel", "filterMode is not nearest");
     }
-    if (level !== 0.0) {
+    if (level != 0.0) {
       authorTrap("TX3", "sampleLevel", `level=${level} is not supported`);
     }
-    if (this.width === 0 || this.height === 0) {
+    if (this.width == 0 || this.height == 0) {
       return new Vec4f(0.0, 0.0, 0.0, 0.0);
     }
     let x: i32 = Math.floor((uv.x * (this.width as f32)) as f64) as i32;
@@ -217,7 +217,7 @@ export class Sampler {
   }
 
   isNearest(): boolean {
-    return this.filterMode === "nearest";
+    return this.filterMode == "nearest";
   }
 }
 
@@ -227,7 +227,7 @@ export class Sampler {
  * Every other descriptor gives one that traps with TX3 on a sample call.
  */
 export function samplerFromDescriptor(descriptor: GPUSamplerDescriptor): Sampler {
-  if (descriptor.minFilter === "nearest" && descriptor.magFilter === "nearest") {
+  if (descriptor.minFilter == "nearest" && descriptor.magFilter == "nearest") {
     return new Sampler("nearest");
   }
   return new Sampler("non-nearest");
@@ -272,7 +272,7 @@ export class StorageTexture2d<F> {
       return;
     }
     const pixel: i32 = ((coords.y as u32) * this.width + (coords.x as u32)) as i32;
-    if (pixel === this.values.length) {
+    if (pixel == this.values.length) {
       this.values.push(value);
     } else {
       this.values[pixel] = value;
@@ -348,7 +348,7 @@ export class ReadWriteStorageTexture2d<F> {
       return;
     }
     const pixel: i32 = ((coords.y as u32) * this.width + (coords.x as u32)) as i32;
-    if (pixel === this.values.length) {
+    if (pixel == this.values.length) {
       this.values.push(value);
     } else {
       this.values[pixel] = value;
@@ -382,7 +382,7 @@ export class Texture2dArray<T> {
   }
 
   load(coords: Vec2i, layer: i32, level: u32): Vec4f {
-    if (level !== 0) {
+    if (level != 0) {
       authorTrap("TX3", "Texture2dArray.load", `level=${level} is not supported`);
     }
     if (coords.x < 0 || coords.y < 0 || layer < 0
@@ -489,7 +489,7 @@ export class WriteStorageTexture2dArray<F> {
     const pixel: i32 = (
       ((layer as u32) * this.height + (coords.y as u32)) * this.width + (coords.x as u32)
     ) as i32;
-    if (pixel === this.values.length) {
+    if (pixel == this.values.length) {
       this.values.push(value);
     } else {
       this.values[pixel] = value;
@@ -516,12 +516,12 @@ export class Buffer<T> {
   }
 
   write(queue: GPUQueue, elementIndex: u32, bytes: u8[]): void {
-    if ((this.usage & GPUBufferUsage.COPY_DST) === 0) {
+    if ((this.usage & GPUBufferUsage.COPY_DST) == 0) {
       authorTrap("BF10", "Buffer.write", `usage=${this.usage}`);
     }
     const byteLength: u32 = bytes.length as u32;
     const remainder: u32 = byteLength % this.elementSize;
-    if (remainder !== 0) {
+    if (remainder != 0) {
       authorTrap("BF8", "Buffer.write", `byteLength=${byteLength} elementSize=${this.elementSize} remainder=${remainder}`);
     }
     const elementCount: u32 = byteLength / this.elementSize;
@@ -529,7 +529,7 @@ export class Buffer<T> {
       authorTrap("BF8", "Buffer.write", `elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`);
     }
     const byteOffset: u64 = (elementIndex as u64) * (this.elementSize as u64);
-    if (byteOffset % 4 !== 0 || byteLength % 4 !== 0) {
+    if (byteOffset % 4 != 0 || byteLength % 4 != 0) {
       authorTrap("BF2", "Buffer.write", `byteOffset=${byteOffset} byteLength=${byteLength}`);
     }
     queue.writeBuffer(
@@ -540,18 +540,18 @@ export class Buffer<T> {
   }
 
   writeOne(queue: GPUQueue, elementIndex: u32, bytes: u8[]): void {
-    if ((this.usage & GPUBufferUsage.COPY_DST) === 0) {
+    if ((this.usage & GPUBufferUsage.COPY_DST) == 0) {
       authorTrap("BF10", "Buffer.writeOne", `usage=${this.usage}`);
     }
     const byteLength: u32 = bytes.length as u32;
-    if (byteLength !== this.elementSize) {
+    if (byteLength != this.elementSize) {
       authorTrap("BF8", "Buffer.writeOne", `elementIndex=${elementIndex} byteLength=${byteLength} elementSize=${this.elementSize}`);
     }
     if (elementIndex >= this.count) {
       authorTrap("BF8", "Buffer.writeOne", `elementIndex=${elementIndex} elementCount=1 count=${this.count}`);
     }
     const byteOffset: u64 = (elementIndex as u64) * (this.elementSize as u64);
-    if (byteOffset % 4 !== 0 || byteLength % 4 !== 0) {
+    if (byteOffset % 4 != 0 || byteLength % 4 != 0) {
       authorTrap("BF2", "Buffer.writeOne", `byteOffset=${byteOffset} byteLength=${byteLength}`);
     }
     queue.writeBuffer(
@@ -562,7 +562,7 @@ export class Buffer<T> {
   }
 
   patch(queue: GPUQueue, elementIndex: u32, fieldOffset: u32, bytes: u8[]): void {
-    if ((this.usage & GPUBufferUsage.COPY_DST) === 0) {
+    if ((this.usage & GPUBufferUsage.COPY_DST) == 0) {
       authorTrap("BF10", "Buffer.patch", `usage=${this.usage}`);
     }
     const byteLength: u32 = bytes.length as u32;
@@ -573,7 +573,7 @@ export class Buffer<T> {
       authorTrap("EG2", "Buffer.patch", `fieldOffset=${fieldOffset} byteLength=${byteLength} elementSize=${this.elementSize}`);
     }
     const byteOffset: u64 = (elementIndex as u64) * (this.elementSize as u64) + (fieldOffset as u64);
-    if (byteOffset % 4 !== 0 || byteLength % 4 !== 0) {
+    if (byteOffset % 4 != 0 || byteLength % 4 != 0) {
       authorTrap("BF2", "Buffer.patch", `byteOffset=${byteOffset} byteLength=${byteLength}`);
     }
     queue.writeBuffer(
@@ -597,7 +597,7 @@ export class Buffer<T> {
     }
     const byteOffset: u64 = (elementIndex as u64) * (this.elementSize as u64);
     const byteLength: u64 = (elementCount as u64) * (this.elementSize as u64);
-    if (byteOffset % 4 !== 0 || byteLength % 4 !== 0) {
+    if (byteOffset % 4 != 0 || byteLength % 4 != 0) {
       authorTrap("BF8", "Buffer.copyTo", `byteOffset=${byteOffset} byteLength=${byteLength}`);
     }
     encoder.copyBufferToBuffer(
@@ -610,7 +610,7 @@ export class Buffer<T> {
   }
 
   async read(device: GPUDevice, elementIndex: u32, elementCount: u32): Promise<u8[]> {
-    if ((this.usage & GPUBufferUsage.COPY_SRC) === 0) {
+    if ((this.usage & GPUBufferUsage.COPY_SRC) == 0) {
       authorTrap("BF10", "Buffer.read", `usage=${this.usage}`);
     }
     if (elementIndex > this.count || elementCount > this.count - elementIndex) {
@@ -618,7 +618,7 @@ export class Buffer<T> {
     }
     const byteOffset: u64 = (elementIndex as u64) * (this.elementSize as u64);
     const byteLength: u64 = (elementCount as u64) * (this.elementSize as u64);
-    if (byteOffset % 4 !== 0 || byteLength % 4 !== 0) {
+    if (byteOffset % 4 != 0 || byteLength % 4 != 0) {
       authorTrap("BF9", "Buffer.read", `byteOffset=${byteOffset} byteLength=${byteLength}`);
     }
     const staging: Buffer<T> = createBuffer<T>(
@@ -896,7 +896,7 @@ export class WorkgroupVar<T> {
   }
 
   set $(value: T) {
-    if (this.values.length === 0) {
+    if (this.values.length == 0) {
       this.values.push(value);
     } else {
       this.values[0] = value;
@@ -924,7 +924,7 @@ export class WorkgroupArray<T> {
   }
 
   set(index: u32, value: T): void {
-    if (index === (this.values.length as u32)) {
+    if (index == (this.values.length as u32)) {
       this.values.push(value);
     } else {
       this.values[index as i32] = value;
@@ -1326,17 +1326,17 @@ function hostBlendComponent(
   component: GPUBlendComponent,
   channel: string,
 ): f32 {
-  if (component.operation !== "add") {
+  if (component.operation != "add") {
     authorTrap("RN21",
       "hostBlend",
       `${channel} srcFactor=${component.srcFactor} dstFactor=${component.dstFactor} operation=${component.operation}`,
     );
   }
   let result: f32 = 0.0;
-  if (component.srcFactor === "src-alpha"
-    && component.dstFactor === "one-minus-src-alpha") {
+  if (component.srcFactor == "src-alpha"
+    && component.dstFactor == "one-minus-src-alpha") {
     result = source * sourceAlpha + destination * (1.0 - sourceAlpha);
-  } else if (component.srcFactor === "one" && component.dstFactor === "one") {
+  } else if (component.srcFactor == "one" && component.dstFactor == "one") {
     result = source + destination;
   } else {
     authorTrap("RN21",
@@ -1359,7 +1359,7 @@ export function hostBlend(
   destination: Vec4f,
   blend: GPUBlendState | null,
 ): Vec4f {
-  if (blend === null) return source;
+  if (blend == null) return source;
   return new Vec4f(
     hostBlendComponent(source.x, destination.x, source.w, blend.color, "color"),
     hostBlendComponent(source.y, destination.y, source.w, blend.color, "color"),
@@ -1557,7 +1557,7 @@ export class ComputePipeline {
   guardBuffer(group: u32): GPUBuffer | null {
     let index: i32 = 0;
     while (index < this.guardGroups.length) {
-      if (this.guardGroups[index] === group) {
+      if (this.guardGroups[index] == group) {
         return this.guardBuffers[index];
       }
       index = index + 1;
@@ -1573,14 +1573,14 @@ export class ComputePipeline {
     z: u32,
   ): void {
     if (!this.guarded) return;
-    if (this.guardEncoder !== null) {
-      if (this.guardEncoder === encoder) {
+    if (this.guardEncoder != null) {
+      if (this.guardEncoder == encoder) {
         authorTrap("PI15", method, `x=${x} y=${y} z=${z}`);
         return;
       }
     }
     const queue: GPUQueue | null = this.guardQueue;
-    if (queue === null) {
+    if (queue == null) {
       authorTrap("PI15", "ComputePipeline.guard", "queue=missing");
       return;
     }
@@ -1704,7 +1704,7 @@ export class ComputePipeline {
       this.guardBuffers[index].dispose();
       index = index + 1;
     }
-    if (this.guardQueue !== null) {
+    if (this.guardQueue != null) {
       if (this.guardQueueOwned) {
         this.guardQueue.dispose();
       }
@@ -1818,7 +1818,7 @@ export class RenderPipeline {
   }
 
   setIndexBuffer(pass: GPURenderPassEncoder, buffer: GPUBuffer): void {
-    if (this.indexFormat === "undefined") {
+    if (this.indexFormat == "undefined") {
       authorTrap("RN18", "RenderPipeline.setIndexBuffer", "indexFormat=undefined");
       return;
     }
@@ -1844,25 +1844,25 @@ function nativeBindGroupLayoutEntries(
     let binding: i32 = 0;
     while (binding < layouts[group].entries.length) {
       const source: BindGroupLayoutEntrySpec = layouts[group].entries[binding];
-      if (source.kind === "uniform" || source.kind === "guard") {
+      if (source.kind == "uniform" || source.kind == "guard") {
         entries.push({
           binding: source.binding,
           visibility: source.visibility,
           buffer: { type: "uniform", minBindingSize: source.minBindingSize },
         });
-      } else if (source.kind === "read-only-storage") {
+      } else if (source.kind == "read-only-storage") {
         entries.push({
           binding: source.binding,
           visibility: source.visibility,
           buffer: { type: "read-only-storage", minBindingSize: source.minBindingSize },
         });
-      } else if (source.kind === "storage") {
+      } else if (source.kind == "storage") {
         entries.push({
           binding: source.binding,
           visibility: source.visibility,
           buffer: { type: "storage", minBindingSize: source.minBindingSize },
         });
-      } else if (source.kind === "texture") {
+      } else if (source.kind == "texture") {
         entries.push({
           binding: source.binding,
           visibility: source.visibility,
@@ -1872,8 +1872,8 @@ function nativeBindGroupLayoutEntries(
             multisampled: false,
           },
         });
-      } else if (source.kind === "storageTexture") {
-        if (source.format !== undefined) {
+      } else if (source.kind == "storageTexture") {
+        if (source.format != undefined) {
           entries.push({
             binding: source.binding,
             visibility: source.visibility,
@@ -1886,7 +1886,7 @@ function nativeBindGroupLayoutEntries(
         } else {
           authorTrap("TX5", "storageTexture", `binding=${source.binding} has no format`);
         }
-      } else if (source.kind === "sampler" || source.kind === "comparisonSampler") {
+      } else if (source.kind == "sampler" || source.kind == "comparisonSampler") {
         entries.push({
           binding: source.binding,
           visibility: source.visibility,
@@ -2035,7 +2035,7 @@ export function createComputePipeline(
   while (guardGroup < layouts.length) {
     let guardEntry: i32 = 0;
     while (guardEntry < layouts[guardGroup].entries.length) {
-      if (layouts[guardGroup].entries[guardEntry].kind === "guard") {
+      if (layouts[guardGroup].entries[guardEntry].kind == "guard") {
         guardGroups.push(guardGroup as u32);
         guardBuffers.push(device.createBuffer({
           label: "typegpu-dispatch-guard",
@@ -2086,7 +2086,7 @@ export function createComputePipelineHost(
   while (guardGroup < layouts.length) {
     let guardEntry: i32 = 0;
     while (guardEntry < layouts[guardGroup].entries.length) {
-      if (layouts[guardGroup].entries[guardEntry].kind === "guard") {
+      if (layouts[guardGroup].entries[guardEntry].kind == "guard") {
         guardGroups.push(guardGroup as u32);
         guardBuffers.push(device.createBuffer({
           label: "typegpu-dispatch-guard",
@@ -2206,10 +2206,10 @@ function bindGroupEntries(
   let authorCount: i32 = 0;
   let countIndex: i32 = 0;
   while (countIndex < spec.entries.length) {
-    if (spec.entries[countIndex].kind !== "guard") authorCount = authorCount + 1;
+    if (spec.entries[countIndex].kind != "guard") authorCount = authorCount + 1;
     countIndex = countIndex + 1;
   }
-  if (authorCount !== resources.length) {
+  if (authorCount != resources.length) {
     authorTrap("PI9", "createBindGroup", `expected ${authorCount} resources but received ${resources.length}`);
   }
   const entries: GPUBindGroupEntry[] = [];
@@ -2218,8 +2218,8 @@ function bindGroupEntries(
   while (index < spec.entries.length) {
     const specEntry: BindGroupLayoutEntrySpec = spec.entries[index];
     let resource: BindingResource = { buffer: null, textureView: null, sampler: null };
-    if (specEntry.kind === "guard") {
-      if (guardBuffer === null) {
+    if (specEntry.kind == "guard") {
+      if (guardBuffer == null) {
         authorTrap("PI15", "createBindGroup", `binding=${specEntry.binding} has no guard buffer`);
       } else {
         resource = bufferResource(guardBuffer);
@@ -2230,31 +2230,31 @@ function bindGroupEntries(
     }
     let actual: string = "none";
     let fieldCount: u32 = 0;
-    if (resource.buffer !== null) {
+    if (resource.buffer != null) {
       actual = "buffer";
       fieldCount = fieldCount + 1;
     }
-    if (resource.textureView !== null) {
+    if (resource.textureView != null) {
       actual = "texture";
       fieldCount = fieldCount + 1;
     }
-    if (resource.sampler !== null) {
+    if (resource.sampler != null) {
       actual = "sampler";
       fieldCount = fieldCount + 1;
     }
-    if (fieldCount !== 1) {
+    if (fieldCount != 1) {
       authorTrap("TX4", "createBindGroup", `binding=${specEntry.binding} resourceFields=${fieldCount}`);
     }
     let expected: string = "unknown";
-    if (specEntry.kind === "uniform" || specEntry.kind === "read-only-storage"
-      || specEntry.kind === "guard"
-      || specEntry.kind === "storage") expected = "buffer";
-    if (specEntry.kind === "texture" || specEntry.kind === "storageTexture") expected = "texture";
-    if (specEntry.kind === "sampler" || specEntry.kind === "comparisonSampler") expected = "sampler";
-    if (expected === "unknown") {
+    if (specEntry.kind == "uniform" || specEntry.kind == "read-only-storage"
+      || specEntry.kind == "guard"
+      || specEntry.kind == "storage") expected = "buffer";
+    if (specEntry.kind == "texture" || specEntry.kind == "storageTexture") expected = "texture";
+    if (specEntry.kind == "sampler" || specEntry.kind == "comparisonSampler") expected = "sampler";
+    if (expected == "unknown") {
       authorTrap("TX5", "createBindGroup", `binding=${specEntry.binding} has unknown kind=${specEntry.kind}`);
     }
-    if (actual !== expected) {
+    if (actual != expected) {
       authorTrap("TX4", "createBindGroup", `binding=${specEntry.binding} expected=${expected} actual=${actual}`);
     }
     entries.push({

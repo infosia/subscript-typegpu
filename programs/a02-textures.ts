@@ -17,13 +17,13 @@ import {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -122,17 +122,17 @@ export async function main(): Promise<void> {
     textureB.destroy();
     upload.destroy();
     readback.destroy();
-    const texturesCovered: boolean = uploadUsage !== 0
-      && uploadMapState === "mapped"
-      && textureWidth === 1
-      && textureHeight === 1
-      && textureDepth === 1
-      && textureMipLevels === 1
-      && textureSamples === 1
-      && textureDimension === "2d"
-      && textureFormat === "rgba8unorm"
-      && textureUsage !== 0;
-    const queriesCovered: boolean = queryType === "occlusion" && queryCount === 2;
+    const texturesCovered: boolean = uploadUsage != 0
+      && uploadMapState == "mapped"
+      && textureWidth == 1
+      && textureHeight == 1
+      && textureDepth == 1
+      && textureMipLevels == 1
+      && textureSamples == 1
+      && textureDimension == "2d"
+      && textureFormat == "rgba8unorm"
+      && textureUsage != 0;
+    const queriesCovered: boolean = queryType == "occlusion" && queryCount == 2;
     print(texturesCovered ? "textures:covered" : "textures:missing");
     print(queriesCovered ? "queries:covered" : "queries:missing");
   }

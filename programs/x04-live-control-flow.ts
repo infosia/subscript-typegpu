@@ -64,9 +64,9 @@ const controlFlow: ComputePipelineSpec = computePipeline<ControlLayout>(controlF
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) { print("FAIL adapter"); gpu.dispose(); return; }
+  if (adapterResult == null) { print("FAIL adapter"); gpu.dispose(); return; }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
+  if (deviceResult == null) { print("FAIL device"); adapterResult.dispose(); gpu.dispose(); return; }
   {
     using adapter = adapterResult;
     using device = deviceResult;
@@ -94,7 +94,7 @@ export async function main(): Promise<void> {
     device.pushErrorScope("validation");
     using pipeline = createComputePipeline(device, controlFlow_WGSL, controlFlow_ENTRY, [controlFlow_LAYOUT0], [controlFlow_WORKGROUP_X, controlFlow_WORKGROUP_Y, controlFlow_WORKGROUP_Z]);
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -108,7 +108,7 @@ export async function main(): Promise<void> {
     if (!await readback.handle().mapAsync(GPUMapMode.READ, 0, Item_STRIDE as u64)) { print("FAIL map"); return; }
     const result: FixedArray<Item, 1> = Context.fromBytes<FixedArray<Item, 1>>(readBuffer<Item>(readback, 0, 1), 0);
     const expected: f32 = hostLayout.output[0].value;
-    if (result[0].value !== expected) { print(`FAIL expected=${expected} got=${result[0].value}`); return; }
+    if (result[0].value != expected) { print(`FAIL expected=${expected} got=${result[0].value}`); return; }
     readback.handle().unmap();
   }
   gpu.dispose();

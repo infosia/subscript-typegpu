@@ -48,13 +48,13 @@ Each request returns `null` on failure, and the program checks it.
 ```ts program=programs/b04-particles.ts
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -444,7 +444,7 @@ layout constants. A validation error scope surrounds the creation.
       [vecAdd_WORKGROUP_X, vecAdd_WORKGROUP_Y, vecAdd_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print("pipeline:invalid");
       print("FAIL");
       return;
@@ -497,13 +497,13 @@ const workgroupKernel = tgpu.computeFn({
 })((input) => {
   privateOffset.$ += 1;
   sharedValues.$[input.lid] = input.lid + privateOffset.$;
-  if (input.lid === 0) {
+  if (input.lid == 0) {
     std.atomicStore(sharedCounter.$, 0);
   }
   std.workgroupBarrier();
   std.atomicAdd(sharedCounter.$, sharedValues.$[input.lid]);
   std.workgroupBarrier();
-  if (input.lid === 0) {
+  if (input.lid == 0) {
     std.atomicAdd(layout.$.counters[input.wid.x].total, std.atomicLoad(sharedCounter.$));
   }
 });
@@ -521,13 +521,13 @@ const sharedCounter: WorkgroupVar<AtomicU32> = workgroupVar<AtomicU32>();
 function workgroupKernel(res: WorkgroupLayout, ctx: ComputeInvocation): void {
   privateOffset.$ = privateOffset.$ + 1;
   sharedValues[ctx.localIndex] = ctx.localIndex + privateOffset.$;
-  if (ctx.localIndex === 0) {
+  if (ctx.localIndex == 0) {
     sharedCounter.$.store(0);
   }
   workgroupBarrier();
   sharedCounter.$.add(sharedValues[ctx.localIndex]);
   workgroupBarrier();
-  if (ctx.localIndex === 0) {
+  if (ctx.localIndex == 0) {
     res.counters[ctx.workgroupId.x].total.add(sharedCounter.$.load());
   }
 }

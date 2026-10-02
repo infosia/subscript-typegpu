@@ -354,7 +354,7 @@ builds for the whole run belongs here.
 ### The format check comes first
 
 ```ts program=examples/window-triangle/main.ts
-  if (format !== tri_TARGET_FORMAT) {
+  if (format != tri_TARGET_FORMAT) {
     print(`FAIL format expected=${tri_TARGET_FORMAT} actual=${format}`);
     return;
   }
@@ -442,7 +442,7 @@ polls the future and pumps the event queue until the answer arrives. On a device
 the script owns, the same call is an `await`.
 
 ```ts program=examples/window-triangle/main.ts
-  if (validationError !== null) {
+  if (validationError != null) {
     createdPipeline.dispose();
     vertices.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
@@ -490,7 +490,7 @@ command buffer and returns. It never waits and never loops.
   const activeDevice: GPUHostOwnedDevice | null = ownedDevice;
   const activePipeline: RenderPipeline | null = pipeline;
   const activeVertices: GPUBuffer | null = vertexBuffer;
-  if (activeDevice === null) {
+  if (activeDevice == null) {
     return;
   }
 ```
@@ -506,7 +506,7 @@ holds.
 ### One key per frame
 
 ```ts program=examples/window-triangle/main.ts
-  if (key === 32) {
+  if (key == 32) {
     clearIndex = (clearIndex + 1) % 3;
   }
 ```
@@ -530,9 +530,9 @@ nothing here, and the host releases the view and the texture after the call.
   using pass = encoder.beginRenderPass({
     colorAttachments: [{
       view: target,
-      clearValue: clearIndex === 0
+      clearValue: clearIndex == 0
         ? { r: 0.04, g: 0.06, b: 0.12, a: 1.0 }
-        : clearIndex === 1
+        : clearIndex == 1
           ? { r: 0.12, g: 0.04, b: 0.06, a: 1.0 }
           : { r: 0.04, g: 0.12, b: 0.07, a: 1.0 },
       loadOp: "clear",
@@ -578,11 +578,11 @@ presents the surface after `frame` returns.
 
 ```ts program=examples/window-triangle/main.ts
 export function shutdown(): void {
-  if (vertexBuffer !== null) {
+  if (vertexBuffer != null) {
     vertexBuffer.dispose();
     vertexBuffer = null;
   }
-  if (pipeline !== null) {
+  if (pipeline != null) {
     pipeline.dispose();
     pipeline = null;
   }

@@ -116,13 +116,13 @@ export async function main(): Promise<void> {
   // The API layer polls the future itself, so the script never pumps the event loop. A null
   // adapter reports the failure by value, because the layers carry no exceptions.
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     gpu.dispose();
     print("check:prng fail");
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     adapterResult.dispose();
     gpu.dispose();
     print("check:prng fail");
@@ -154,7 +154,7 @@ export async function main(): Promise<void> {
       [randomFill_WORKGROUP_X, randomFill_WORKGROUP_Y, randomFill_WORKGROUP_Z],
     );
     const validationError = await device.popErrorScope();
-    if (validationError === null) {
+    if (validationError == null) {
       // The bind group joins the output buffer to the generated layout. The resource order
       // follows the field order of `RandomLayout`.
       using nativeLayout = pipeline.bindGroupLayout(0);
@@ -179,7 +179,7 @@ export async function main(): Promise<void> {
       // case, so an unexecuted kernel never reads as a passing comparison.
       let allZero: boolean = true;
       for (let index: i32 = 0; index < gpuBytes.length; index += 1) {
-        allZero = allZero && gpuBytes[index] === 0;
+        allZero = allZero && gpuBytes[index] == 0;
       }
       if (allZero) {
         state = "noop";
@@ -199,10 +199,10 @@ export async function main(): Promise<void> {
         const expected: u8[] = hostBytes(hostLayout);
         // The comparison is byte for byte. Both lanes advance the same integer state, so this
         // example needs none of the tolerance the upstream page reports.
-        let equal: boolean = expected.length === gpuBytes.length;
+        let equal: boolean = expected.length == gpuBytes.length;
         let byteIndex: i32 = 0;
         while (equal && byteIndex < expected.length) {
-          equal = expected[byteIndex] === gpuBytes[byteIndex];
+          equal = expected[byteIndex] == gpuBytes[byteIndex];
           byteIndex += 1;
         }
         if (equal) state = "pass";

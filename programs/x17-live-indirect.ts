@@ -77,7 +77,7 @@ class IndirectLayout {
 }
 
 function computeStep(res: IndirectLayout, ctx: ComputeInvocation): void {
-  if (ctx.globalId.x === 0) {
+  if (ctx.globalId.x == 0) {
     res.output[0] = 23;
   }
 }
@@ -127,13 +127,13 @@ function center(x: i32, y: i32): Vec2f {
 
 export async function main(): Promise<void> {
   const adapterResult: GPUAdapter | null = await gpu.requestAdapter();
-  if (adapterResult === null) {
+  if (adapterResult == null) {
     print("FAIL adapter");
     gpu.dispose();
     return;
   }
   const deviceResult: GPUDevice | null = await adapterResult.requestDevice();
-  if (deviceResult === null) {
+  if (deviceResult == null) {
     print("FAIL device");
     adapterResult.dispose();
     gpu.dispose();
@@ -217,7 +217,7 @@ export async function main(): Promise<void> {
       indirectRender,
     );
     const validationError = await device.popErrorScope();
-    if (validationError !== null) {
+    if (validationError != null) {
       print(`FAIL validation ${validationError.message.split("\n")[0]}`);
       return;
     }
@@ -264,7 +264,7 @@ export async function main(): Promise<void> {
       [1, 1, 1],
       indirectCompute_HOST_RUNNABLE,
     );
-    if (gpuValues[0] !== host.output[0]) {
+    if (gpuValues[0] != host.output[0]) {
       print("FAIL compute");
       return;
     }
@@ -282,10 +282,10 @@ export async function main(): Promise<void> {
         const expectedG: u8 = hit ? 153 : 0;
         const expectedB: u8 = hit ? 191 : 0;
         const o = y * 256 + x * 4;
-        if (pixels[o] !== expectedR
-          || pixels[o + 1] !== expectedG
-          || pixels[o + 2] !== expectedB
-          || pixels[o + 3] !== 255) {
+        if (pixels[o] != expectedR
+          || pixels[o + 1] != expectedG
+          || pixels[o + 2] != expectedB
+          || pixels[o + 3] != 255) {
           print(`FAIL pixel ${x},${y}`);
           return;
         }
