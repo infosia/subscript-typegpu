@@ -2009,7 +2009,7 @@ impl<'a> Emitter<'a> {
         let ExprKind::Field { obj, name } = &expr.kind else {
             return None;
         };
-        let ExprKind::Local(param, _) = &obj.kind else {
+        let ExprKind::Local(param, _, _) = &obj.kind else {
             return None;
         };
         let group = *self.layout_params.get(param)?;
@@ -2223,7 +2223,7 @@ impl<'a> Emitter<'a> {
                 "string local or expression in kernel",
                 expr.pos.clone(),
             )),
-            ExprKind::Local(name, _) => Ok(Snippet::atom(self.local_name(name))),
+            ExprKind::Local(name, _, _) => Ok(Snippet::atom(self.local_name(name))),
             ExprKind::Global(symbol) => {
                 let Some(global) = self.globals.get(symbol) else {
                     return Err(generator_diagnostic(
@@ -2317,7 +2317,8 @@ impl<'a> Emitter<'a> {
                 if let Some(binding) = self.binding_ref(expr) {
                     return Ok(Snippet::atom(binding.name));
                 }
-                if matches!(&obj.kind, ExprKind::Local(name, _) if name == &self.invocation_param) {
+                if matches!(&obj.kind, ExprKind::Local(name, _, _) if name == &self.invocation_param)
+                {
                     let builtin = match (self.invocation_kind, name.as_str()) {
                         (InvocationKind::Compute, "globalId") => "globalId",
                         (InvocationKind::Compute, "localId") => "localId",
@@ -3483,7 +3484,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
     fn expression(&self, expr: &Expr) -> UniformityTaint {
         match &expr.kind {
             ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) => UniformityTaint::Uniform,
-            ExprKind::Local(name, _) => self.locals.get(name).cloned().unwrap_or_else(|| {
+            ExprKind::Local(name, _, _) => self.locals.get(name).cloned().unwrap_or_else(|| {
                 UniformityTaint::NonUniform(format!("local or parameter `{name}`"))
             }),
             ExprKind::Global(name) => match self.emitter.globals.get(name) {
@@ -3495,7 +3496,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                     UniformityTaint::NonUniform(format!("global variable `{}`", name.source_name()))
                 }
             },
-            ExprKind::Field { obj, name } if matches!(&obj.kind, ExprKind::Local(param, _) if param == &self.emitter.invocation_param) => {
+            ExprKind::Field { obj, name } if matches!(&obj.kind, ExprKind::Local(param, _, _) if param == &self.emitter.invocation_param) => {
                 UniformityTaint::NonUniform(format!(
                     "builtin `{}.{name}`",
                     self.emitter.invocation_param
@@ -4015,7 +4016,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
 /// Returns the local name at the root of an assignment target, and `None` for every other target.
 fn assigned_local(expr: &Expr) -> Option<&str> {
     match &expr.kind {
-        ExprKind::Local(name, _) => Some(name),
+        ExprKind::Local(name, _, _) => Some(name),
         ExprKind::Field { obj, .. } | ExprKind::Index { obj, .. } => assigned_local(obj),
         _ => None,
     }
@@ -4072,7 +4073,7 @@ fn written_locals(statements: &[Stmt], out: &mut BTreeSet<String>) {
 /// reaches.
 fn assignment_target_taint(validator: &BarrierValidator<'_, '_>, target: &Expr) -> UniformityTaint {
     match &target.kind {
-        ExprKind::Local(_, _) => UniformityTaint::Uniform,
+        ExprKind::Local(_, _, _) => UniformityTaint::Uniform,
         ExprKind::Field { obj, .. } => assignment_target_taint(validator, obj),
         ExprKind::Index { obj, index, .. } => {
             assignment_target_taint(validator, obj).merge(validator.expression(index))

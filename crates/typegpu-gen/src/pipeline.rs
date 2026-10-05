@@ -486,7 +486,7 @@ fn assigns_field(statement: &Stmt, field: &str, parameter: &str) -> bool {
     if !matches!(obj.kind, ExprKind::This) || name != field {
         return false;
     }
-    matches!(&value.kind, ExprKind::Local(local, _) if local == parameter)
+    matches!(&value.kind, ExprKind::Local(local, _, _) if local == parameter)
 }
 
 /// Returns the position of `statement` when the statement carries one.

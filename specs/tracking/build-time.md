@@ -226,3 +226,9 @@ run included the rebuild after the pin change. The growth against
 The `--require-backend` gate: 489.9 s, with the harness at 405.8 s
 and typegpu-gen at 38.3 s. The run included the rebuild after the pin
 change. The growth against `de41409` (389.5 s) is 1.26x.
+
+## Re-pin to `41f593b` (2026-10-06)
+
+The `--require-backend` gate: 472.9 s, with the harness at 389.0 s
+and typegpu-gen at 37.7 s. The run included the rebuild after the pin
+change.

@@ -867,7 +867,7 @@ fn binding_reads_expr(
     out: &mut BTreeSet<(usize, String)>,
 ) {
     if let ExprKind::Field { obj, name } = &expr.kind {
-        if let ExprKind::Local(param, _) = &obj.kind {
+        if let ExprKind::Local(param, _, _) = &obj.kind {
             if let Some(group) = layout_params.get(param) {
                 out.insert((*group, name.clone()));
             }
@@ -1101,7 +1101,7 @@ fn unreached_binding(
 fn binding_key(expr: &Expr, layout_params: &BTreeMap<String, usize>) -> Option<(usize, String)> {
     match &expr.kind {
         ExprKind::Field { obj, name } => {
-            let ExprKind::Local(param, _) = &obj.kind else {
+            let ExprKind::Local(param, _, _) = &obj.kind else {
                 return None;
             };
             Some((*layout_params.get(param)?, name.clone()))

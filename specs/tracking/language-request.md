@@ -415,3 +415,20 @@ range holds §161, a checker performance change. The
 Evidence at `888b68d`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 287 passed, 0 failed, 1 ignored,
 489.9 s wall. No WGSL or `.expected` golden moved.
+
+### Re-pin to `41f593b` (2026-10-06)
+
+The workspace pin moves from `888b68d` to `41f593b`. The subscript
+range holds §162 and §163. The `swc_ecma_parser` fork stays at
+`affcb6e`.
+
+- §162: `hir::ExprKind::Local` gains a third field, the written
+  annotation flag. The ten match sites in `crates/typegpu-gen` bind it
+  as `_`. No behavior changes.
+- §163: a null check of `xs[k]` does not narrow `xs[k]`. No source in
+  this repository relies on that narrowing, and every program checks
+  clean.
+
+Evidence at `41f593b`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 287 passed, 0 failed, 1 ignored,
+472.9 s wall. No WGSL or `.expected` golden moved.
