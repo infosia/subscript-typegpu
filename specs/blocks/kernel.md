@@ -8,7 +8,8 @@ P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
 2026-08-23. Rev 9 (K19 Rev 4 FixedArray constants), 2026-08-24. Rev 10 (K14
 Rev 6 literal suffixes), 2026-08-24. Rev 11 (K14 Rev 6 logic
 parentheses), 2026-08-24. Rev 12 (K5 Rev 1 `using`, absence test),
-2026-08-30. Rev 13 (K14 Rev 7 bitwise parentheses), 2026-09-01. Rev 14 (K14 Rev 8 bitwise pairs), 2026-09-01. Rev 15 (K7 `throw` and `try`, K14 Rev 9 source names), 2026-09-29. Plan §3 D2, D3, D7, D9 and §4
+2026-08-30. Rev 13 (K14 Rev 7 bitwise parentheses), 2026-09-01. Rev 14 (K14 Rev 8 bitwise pairs), 2026-09-01. Rev 15 (K7 `throw` and `try`, K14 Rev 9 source names), 2026-09-29. Rev 16 (K7 updates and
+assignments used as values, `let x: T;`), 2026-10-05. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -63,6 +64,15 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `switch`, `break`, `continue`. A `for...of` over a `FixedArray` is
   emitted as an index loop. Any other statement is a diagnostic.
   `throw` and `try` (subscript §115) are diagnostics under this rule.
+  An assignment, a compound assignment, and an increment or a
+  decrement (`x++`, `++x`, `x--`, `--x`, subscript §150) are legal
+  only as an expression statement, a `for` initializer, or a `for`
+  step. An update emits as a compound assignment, for example
+  `i += 1u` for a `u32` `i++`, because WGSL has no increment
+  expression. An assignment or an
+  update whose value the kernel reads, for example `a[i++] = v`, is a
+  diagnostic under this rule. A `let x: T;` without an initializer
+  (subscript §158) emits a WGSL `var x: T;`.
 - **K8 — `let` and `const` map to `var` and `let`.** A subscript
   `const` binding emits a WGSL `let`. A subscript `let` binding emits
   a WGSL `var`. A value class local is always `var`, because the

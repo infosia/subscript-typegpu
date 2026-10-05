@@ -376,3 +376,32 @@ it. The gate is not affected.
 Evidence at `de41409`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 286 passed, 0 failed, 1 ignored,
 389.5 s wall. No WGSL or `.expected` golden moved.
+
+### Re-pin to `a502cf1`, through `5e708e4` (2026-10-05)
+
+The workspace pin moves from `de41409` to `a502cf1`. The subscript
+range holds §145 through §160. The `swc_ecma_parser` fork stays at
+`affcb6e`. The intermediate pin `5e708e4` (§145 through §159) was
+green but slow, so this commit carries both steps.
+
+- §150: `ExprKind::Assign` gains `update`. The kernel emitter writes
+  an assignment or an update only in statement position. An
+  assignment or an update used as a value is now a K7 diagnostic
+  (`kernel.md` Rev 16). Before the change, `res.output[index++] = v`
+  emitted invalid WGSL with exit 0. The fixtures
+  `k17-postfix-value.ts` and `k17-assignment-value.ts` record that
+  red run and are green now.
+- §158: `ExprKind::Unassigned` is the value of `let x: T;`. The
+  kernel emitter writes `var x: T;`.
+- §155: the checker enforces `private`. The scope lint check for
+  `new UiRenderer` duplicated that rule and is removed. The fixture
+  test now asserts the checker message (`ui.md` Rev 13).
+- §160: checker performance only. No source change.
+
+Evidence at `5e708e4`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 287 passed, 0 failed, 1 ignored,
+1079.8 s wall.
+
+Evidence at `a502cf1`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 287 passed, 0 failed, 1 ignored,
+539.4 s wall. No WGSL or `.expected` golden moved.

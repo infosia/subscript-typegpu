@@ -210,3 +210,13 @@ rows are 225.1 s to 242.8 s, so the growth is about 1.65x, below the
 2x red line. The cause is not measured. The Rust diff of this
 repository adds no test and no program, so the subscript range is
 the suspect.
+
+## Re-pin to `5e708e4` and `a502cf1` (2026-10-05)
+
+The `--require-backend` gate at `5e708e4`: 1079.8 s, with the harness
+`tests/main.rs` at 961.9 s. The previous row at `de41409` is 389.5 s,
+so the growth is 2.8x and red. The subscript checker cost from §156
+was the cause, and subscript §160 removes it. The gate at `a502cf1`:
+539.4 s, with the harness at 443.3 s and typegpu-gen at 51.2 s. The
+run included the rebuild after the pin change. The growth against
+`de41409` is 1.38x, below the 2x red line.

@@ -1027,3 +1027,35 @@ const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "p
     );
     validate(wgsl);
 }
+
+#[test]
+fn k7_local_without_initializer_and_updates_emit_as_statements() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, MutStorage } from "./typegpu";
+@ValueType class Item { value: u32; constructor(value: u32) { this.value = value; } }
+class Layout { output: MutStorage<Item>; constructor(output: MutStorage<Item>) { this.output = output; } }
+function declared(res: Layout, ctx: ComputeInvocation): void {
+  let picked: u32;
+  if (ctx.globalId.x > 2) { picked = 1; } else { picked = 2; }
+  let count: u32 = 0;
+  for (let i: u32 = 0; i < 4; i++) { count++; }
+  --count;
+  res.output[0] = new Item(picked + count);
+}
+
+const declaredPipeline: ComputePipelineSpec = computePipeline<Layout>(declared, { name: "declaredPipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    for expected in [
+        "var picked: u32;",
+        "picked = 1u;",
+        "for (var i = 0u; i < 4u; i += 1u) {",
+        "count += 1u;",
+        "count -= 1u;",
+    ] {
+        assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
+    }
+    validate(wgsl);
+}

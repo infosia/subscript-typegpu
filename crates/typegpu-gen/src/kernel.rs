@@ -2179,8 +2179,9 @@ impl<'a> Emitter<'a> {
     /// # Errors
     ///
     /// An expression outside the set gives a K9 diagnostic. A string and a reference class give a
-    /// K5 diagnostic. A cast outside `f32`, `i32`, and `u32` gives a K12 diagnostic. A whole-value
-    /// write to an atomic gives a K21 diagnostic.
+    /// K5 diagnostic. A cast outside `f32`, `i32`, and `u32` gives a K12 diagnostic. An assignment,
+    /// an increment, or a decrement gives a K7 diagnostic, because it is legal only in statement
+    /// position ([`Self::statement_snippet`]).
     fn snippet(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
         if let ExprKind::Cast(value) = &expr.kind {
             let fround_to_f32 = matches!(
@@ -2286,37 +2287,15 @@ impl<'a> Emitter<'a> {
                     prelude,
                 })
             }
-            ExprKind::Assign { op, target, value } => {
-                if (self.binding_root(target).is_some() || self.global_root(target).is_some())
-                    && type_contains_atomic(self.module, &target.ty, &target.pos)?
-                {
-                    return Err(diagnostic(
-                        "K21",
-                        "an atomic value or schema cannot be written as a whole",
-                        target.pos.clone(),
-                    ));
-                }
-                let target = self.snippet(target)?;
-                let value = self.snippet(value)?;
-                let spelling = match op {
-                    None => "=".to_owned(),
-                    Some(op) => format!(
-                        "{}=",
-                        binop(*op).ok_or_else(|| diagnostic(
-                            "K9",
-                            "assignment operator is outside K9",
-                            expr.pos.clone()
-                        ))?
-                    ),
-                };
-                let mut prelude = target.prelude;
-                prelude.extend(value.prelude);
-                Ok(Snippet {
-                    text: format!("{} {spelling} {}", target.text, value.text),
-                    precedence: 0,
-                    prelude,
-                })
-            }
+            ExprKind::Assign { update, .. } => Err(diagnostic(
+                "K7",
+                if update.is_some() {
+                    "an increment or a decrement is used as a value"
+                } else {
+                    "an assignment is used as a value"
+                },
+                expr.pos.clone(),
+            )),
             ExprKind::Cast(value) => {
                 if let ExprKind::Call {
                     callee: Callee::Math(function),
@@ -2481,6 +2460,53 @@ impl<'a> Emitter<'a> {
                 expr.pos.clone(),
             )),
         }
+    }
+
+    /// Emits one expression in statement position: an expression statement or a `for` step (K7).
+    ///
+    /// An assignment, an increment, and a decrement are legal only here. WGSL has no increment
+    /// expression, so an update emits as a compound assignment.
+    ///
+    /// # Errors
+    ///
+    /// Returns the diagnostics of [`Self::snippet`], and a K21 diagnostic for a whole-value write
+    /// to an atomic.
+    fn statement_snippet(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
+        let ExprKind::Assign {
+            op, target, value, ..
+        } = &expr.kind
+        else {
+            return self.snippet(expr);
+        };
+        if (self.binding_root(target).is_some() || self.global_root(target).is_some())
+            && type_contains_atomic(self.module, &target.ty, &target.pos)?
+        {
+            return Err(diagnostic(
+                "K21",
+                "an atomic value or schema cannot be written as a whole",
+                target.pos.clone(),
+            ));
+        }
+        let target = self.snippet(target)?;
+        let value = self.snippet(value)?;
+        let spelling = match op {
+            None => "=".to_owned(),
+            Some(op) => format!(
+                "{}=",
+                binop(*op).ok_or_else(|| diagnostic(
+                    "K9",
+                    "assignment operator is outside K9",
+                    expr.pos.clone()
+                ))?
+            ),
+        };
+        let mut prelude = target.prelude;
+        prelude.extend(value.prelude);
+        Ok(Snippet {
+            text: format!("{} {spelling} {}", target.text, value.text),
+            precedence: 0,
+            prelude,
+        })
     }
 
     /// Emits one call (K10, K11, K21, PI6, TX3).
@@ -3023,6 +3049,16 @@ impl<'a> Emitter<'a> {
                         pos.clone(),
                     ));
                 }
+                if matches!(init.kind, ExprKind::Unassigned) {
+                    // A WGSL function-scope `var` without an initializer holds the zero value.
+                    let wgsl = wgsl_type(self.module, ty, pos)?;
+                    Self::line(
+                        out,
+                        indent,
+                        &format!("var {}: {wgsl};", self.local_name(name)),
+                    );
+                    return Ok(());
+                }
                 let value = self.snippet(init)?;
                 let _ = wgsl_type(self.module, ty, pos)?;
                 Self::emit_prelude(out, indent, value.prelude);
@@ -3050,7 +3086,7 @@ impl<'a> Emitter<'a> {
                     Self::line(out, indent, &format!("{barrier}();"));
                     return Ok(());
                 }
-                let value = self.snippet(expr)?;
+                let value = self.statement_snippet(expr)?;
                 Self::emit_prelude(out, indent, value.prelude);
                 Self::line(out, indent, &format!("{};", value.text));
             }
@@ -3147,7 +3183,7 @@ impl<'a> Emitter<'a> {
                         )
                     }
                     Some(Stmt::Expr(expr)) => {
-                        let value = self.snippet(expr)?;
+                        let value = self.statement_snippet(expr)?;
                         (value.text, value.prelude)
                     }
                     None => (String::new(), Vec::new()),
@@ -3160,7 +3196,10 @@ impl<'a> Emitter<'a> {
                     }
                 };
                 let cond = cond.as_ref().map(|value| self.snippet(value)).transpose()?;
-                let step = step.as_ref().map(|value| self.snippet(value)).transpose()?;
+                let step = step
+                    .as_ref()
+                    .map(|value| self.statement_snippet(value))
+                    .transpose()?;
                 // A `for` header holds no statements either, so a condition or a step with a
                 // prelude takes the `loop` form. The outer block scopes the initializer.
                 let loop_prelude = cond.as_ref().is_some_and(|value| !value.prelude.is_empty())
@@ -3482,7 +3521,9 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
             ExprKind::Binary { left, right, .. } => {
                 self.expression(left).merge(self.expression(right))
             }
-            ExprKind::Assign { op, target, value } => {
+            ExprKind::Assign {
+                op, target, value, ..
+            } => {
                 let value = self.expression(value);
                 if op.is_some() {
                     self.expression(target).merge(value)
@@ -3546,7 +3587,9 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                 .expression(cond)
                 .merge(self.expression(then))
                 .merge(self.expression(els)),
-            ExprKind::EnumMember { .. } | ExprKind::Zero => UniformityTaint::Uniform,
+            ExprKind::EnumMember { .. } | ExprKind::Zero | ExprKind::Unassigned => {
+                UniformityTaint::Uniform
+            }
             _ => UniformityTaint::NonUniform("expression value".to_owned()),
         }
     }
@@ -3581,7 +3624,10 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
     /// `control` is the taint of the enclosing conditions, so an assignment under a non-uniform
     /// branch taints its target.
     fn collect_assignment(&mut self, expr: &Expr, control: UniformityTaint) {
-        let ExprKind::Assign { op, target, value } = &expr.kind else {
+        let ExprKind::Assign {
+            op, target, value, ..
+        } = &expr.kind
+        else {
             return;
         };
         let mut taint = self.expression(value).merge(control);
