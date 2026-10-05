@@ -220,3 +220,9 @@ was the cause, and subscript §160 removes it. The gate at `a502cf1`:
 539.4 s, with the harness at 443.3 s and typegpu-gen at 51.2 s. The
 run included the rebuild after the pin change. The growth against
 `de41409` is 1.38x, below the 2x red line.
+
+## Re-pin to `888b68d` (2026-10-05)
+
+The `--require-backend` gate: 489.9 s, with the harness at 405.8 s
+and typegpu-gen at 38.3 s. The run included the rebuild after the pin
+change. The growth against `de41409` (389.5 s) is 1.26x.

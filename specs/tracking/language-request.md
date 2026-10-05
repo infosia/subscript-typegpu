@@ -405,3 +405,13 @@ yawgpu library, `gate: green`, 287 passed, 0 failed, 1 ignored,
 Evidence at `a502cf1`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 287 passed, 0 failed, 1 ignored,
 539.4 s wall. No WGSL or `.expected` golden moved.
+
+### Re-pin to `888b68d` (2026-10-05)
+
+The workspace pin moves from `a502cf1` to `888b68d`. The subscript
+range holds §161, a checker performance change. The
+`swc_ecma_parser` fork stays at `affcb6e`. No source change.
+
+Evidence at `888b68d`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 287 passed, 0 failed, 1 ignored,
+489.9 s wall. No WGSL or `.expected` golden moved.
