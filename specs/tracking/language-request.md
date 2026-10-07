@@ -432,3 +432,23 @@ range holds §162 and §163. The `swc_ecma_parser` fork stays at
 Evidence at `41f593b`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 287 passed, 0 failed, 1 ignored,
 472.9 s wall. No WGSL or `.expected` golden moved.
+
+### Re-pin to `e8cf6e0` (2026-10-07)
+
+The workspace pin moves from `41f593b` to `e8cf6e0`. The subscript
+range holds §164 through §175. The `swc_ecma_parser` fork stays at
+`affcb6e`. The workspace compiles without an edit: the new HIR forms
+(`Lambda.is_async`, `TaskGroup`, `AsyncAll`, `ArrayClear`) reach this
+repository only through `..` patterns and `_` arms.
+
+- §167: async functions are first-class values. The checker still
+  rejects an `async` kernel with S100, now as the function type
+  mismatch that PI13 states. The fixture `pi13-async-kernel.ts`
+  asserts the new message.
+- §164, §166, §168 through §175: no source change. No `.expected`
+  golden moved, so the §171 and §172 release changes do not alter
+  program output.
+
+Evidence at `e8cf6e0`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 287 passed, 0 failed, 1 ignored,
+512.2 s wall. No WGSL or `.expected` golden moved.

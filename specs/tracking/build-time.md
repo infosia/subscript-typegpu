@@ -232,3 +232,9 @@ change. The growth against `de41409` (389.5 s) is 1.26x.
 The `--require-backend` gate: 472.9 s, with the harness at 389.0 s
 and typegpu-gen at 37.7 s. The run included the rebuild after the pin
 change.
+
+## Re-pin to `e8cf6e0` (2026-10-07)
+
+The `--require-backend` gate: 512.2 s, with the harness at 442.5 s
+and typegpu-gen at 41.7 s. The previous row is 472.9 s, so the growth
+is 1.08x.
