@@ -588,13 +588,13 @@ fn contains_render_call_stmt(module: &Module, stmt: &Stmt) -> bool {
                     .as_ref()
                     .is_some_and(|value| contains_render_call_expr(module, value))
                 || step
-                    .as_ref()
-                    .is_some_and(|value| contains_render_call_expr(module, value))
+                    .iter()
+                    .any(|stmt| contains_render_call_stmt(module, stmt))
                 || body
                     .iter()
                     .any(|stmt| contains_render_call_stmt(module, stmt))
         }
-        Stmt::ForOf { subject, body, .. } => {
+        Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
             contains_render_call_expr(module, subject)
                 || body
                     .iter()
@@ -607,9 +607,19 @@ fn contains_render_call_stmt(module: &Module, stmt: &Stmt) -> bool {
                     .flat_map(|case| &case.body)
                     .any(|stmt| contains_render_call_stmt(module, stmt))
         }
-        Stmt::Block(body) | Stmt::Using { body, .. } => body
+        Stmt::Block(body) => body
             .iter()
             .any(|stmt| contains_render_call_stmt(module, stmt)),
+        Stmt::Using {
+            body, finalizer, ..
+        } => {
+            body.iter()
+                .any(|stmt| contains_render_call_stmt(module, stmt))
+                || finalizer.as_ref().is_some_and(|body| {
+                    body.iter()
+                        .any(|stmt| contains_render_call_stmt(module, stmt))
+                })
+        }
         Stmt::Try { body, handler, .. } => body
             .iter()
             .chain(handler)
@@ -963,14 +973,14 @@ fn binding_reads_stmt(
             if let Some(cond) = cond {
                 binding_reads_expr(cond, layout_params, out);
             }
-            if let Some(step) = step {
-                binding_reads_expr(step, layout_params, out);
+            for item in step {
+                binding_reads_stmt(item, layout_params, out);
             }
             for item in body {
                 binding_reads_stmt(item, layout_params, out);
             }
         }
-        Stmt::ForOf { subject, body, .. } => {
+        Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
             binding_reads_expr(subject, layout_params, out);
             for item in body {
                 binding_reads_stmt(item, layout_params, out);
@@ -982,9 +992,18 @@ fn binding_reads_stmt(
                 binding_reads_stmt(item, layout_params, out);
             }
         }
-        Stmt::Block(body) | Stmt::Using { body, .. } => {
+        Stmt::Block(body) => {
             for item in body {
                 binding_reads_stmt(item, layout_params, out);
+            }
+        }
+        Stmt::Using {
+            body, finalizer, ..
+        } => {
+            for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                for item in body {
+                    binding_reads_stmt(item, layout_params, out);
+                }
             }
         }
         Stmt::Try { body, handler, .. } => {
@@ -1228,14 +1247,14 @@ fn written_binding_stmt(
             if let Some(value) = cond {
                 written_binding_expr(value, layout_params, out);
             }
-            if let Some(value) = step {
-                written_binding_expr(value, layout_params, out);
+            for item in step {
+                written_binding_stmt(item, layout_params, out);
             }
             for item in body {
                 written_binding_stmt(item, layout_params, out);
             }
         }
-        Stmt::ForOf { subject, body, .. } => {
+        Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
             written_binding_expr(subject, layout_params, out);
             for item in body {
                 written_binding_stmt(item, layout_params, out);
@@ -1247,9 +1266,18 @@ fn written_binding_stmt(
                 written_binding_stmt(item, layout_params, out);
             }
         }
-        Stmt::Block(body) | Stmt::Using { body, .. } => {
+        Stmt::Block(body) => {
             for item in body {
                 written_binding_stmt(item, layout_params, out);
+            }
+        }
+        Stmt::Using {
+            body, finalizer, ..
+        } => {
+            for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                for item in body {
+                    written_binding_stmt(item, layout_params, out);
+                }
             }
         }
         Stmt::Try { body, handler, .. } => {

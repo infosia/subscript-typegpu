@@ -238,3 +238,8 @@ change.
 The `--require-backend` gate: 512.2 s, with the harness at 442.5 s
 and typegpu-gen at 41.7 s. The previous row is 472.9 s, so the growth
 is 1.08x.
+
+## Re-pin to `2867fd1` (2026-10-11)
+
+The `--require-backend` gate: 475.7 s, with the harness at 389.1 s
+and typegpu-gen at 44.6 s. The previous row is 512.2 s.

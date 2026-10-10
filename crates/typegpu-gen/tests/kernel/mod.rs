@@ -1059,3 +1059,106 @@ const declaredPipeline: ComputePipelineSpec = computePipeline<Layout>(declared, 
     }
     validate(wgsl);
 }
+
+#[test]
+fn k7_for_steps_keep_their_hir_and_wgsl_shapes() {
+    use subscript_compiler::{
+        hir::{BinOp, ExprKind, Stmt, UpdateKind},
+        CheckOptions,
+    };
+    let mut updates = Vec::new();
+    for (update, expected_update) in [
+        ("i++", Some(UpdateKind::Postfix)),
+        ("i += 1", None),
+        ("", None),
+    ] {
+        let source = format!(
+            r#"
+import {{ ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline }} from "./typegpu";
+class Layout {{ out: MutStorage<u32>; constructor(out: MutStorage<u32>) {{ this.out = out; }} }}
+function kernel(res: Layout, ctx: ComputeInvocation): void {{
+  for (let i: u32 = 0; i < 2; {update}) {{ res.out[ctx.localIndex] = i; }}
+}}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, {{ name: "pipeline", workgroupSize: [1, 1, 1] }});
+"#
+        );
+        let files = support::source_files(SourceFile::entry("for-step.ts", &source));
+        let module = subscript_compiler::check_program_with(&files, &CheckOptions::default())
+            .expect("check for step");
+        let kernel = module
+            .functions
+            .iter()
+            .find(|function| function.name == "kernel")
+            .expect("kernel");
+        let Stmt::For { step, .. } = &kernel.body[0] else {
+            panic!("expected for loop")
+        };
+        if update.is_empty() {
+            assert!(step.is_empty());
+        } else {
+            let [Stmt::Expr(expr)] = step.as_slice() else {
+                panic!("expected one expression statement")
+            };
+            let ExprKind::Assign { update, op, .. } = &expr.kind else {
+                panic!("expected assignment")
+            };
+            assert_eq!(*update, expected_update);
+            assert_eq!(*op, Some(BinOp::Add));
+        }
+        let wgsl = generate(&source).pipelines[0].1.clone();
+        validate(&wgsl);
+        if update.is_empty() {
+            assert!(wgsl.contains("for (var i = 0u; i < 2u; )"), "{wgsl}");
+        } else {
+            updates.push(wgsl);
+        }
+    }
+    assert_eq!(updates[0], updates[1]);
+}
+
+#[test]
+fn k7_rejects_generator_for_of_before_helper_validation() {
+    use subscript_compiler::{hir::Stmt, CheckOptions};
+    let source = support::read(
+        &support::root().join("crates/typegpu-gen/tests/fixtures/reject/k7-generator-for-of.ts"),
+    );
+    let files = support::source_files(SourceFile::entry("generator-for-of.ts", &source));
+    let module = subscript_compiler::check_program_with(&files, &CheckOptions::default())
+        .expect("check generator loop");
+    let kernel = module
+        .functions
+        .iter()
+        .find(|function| function.name == "kernel")
+        .expect("kernel");
+    assert!(matches!(kernel.body[0], Stmt::GeneratorForOf { .. }));
+    let diagnostic = reject(&source);
+    assert_eq!(
+        diagnostic.message,
+        "K7: statement is outside the current kernel subset (author)"
+    );
+}
+
+#[test]
+fn k7_rejects_a_for_step_with_synthetic_statements() {
+    use subscript_compiler::{hir::Stmt, CheckOptions};
+    let source = support::read(
+        &support::root().join("crates/typegpu-gen/tests/fixtures/reject/k7-for-step-statements.ts"),
+    );
+    let files = support::source_files(SourceFile::entry("for-step-statements.ts", &source));
+    let module = subscript_compiler::check_program_with(&files, &CheckOptions::default())
+        .expect("check compound update");
+    let kernel = module
+        .functions
+        .iter()
+        .find(|function| function.name == "kernel")
+        .expect("kernel");
+    let Stmt::For { step, .. } = &kernel.body[0] else {
+        panic!("expected for loop")
+    };
+    assert!(matches!(step.as_slice(), [Stmt::Let { .. }, Stmt::Expr(_)]));
+    let diagnostic = reject(&source);
+    assert_eq!(
+        diagnostic.message,
+        "K7: a `for` step must be one expression statement (author)"
+    );
+}

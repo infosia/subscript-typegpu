@@ -368,12 +368,10 @@ fn visit_statements(
                 if let Some(cond) = cond {
                     visit_expr(module, cond, diagnostics, location);
                 }
-                if let Some(step) = step {
-                    visit_expr(module, step, diagnostics, location);
-                }
+                visit_statements(module, step, diagnostics, location);
                 visit_statements(module, body, diagnostics, location);
             }
-            Stmt::ForOf { subject, body, .. } => {
+            Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
                 visit_expr(module, subject, diagnostics, location);
                 visit_statements(module, body, diagnostics, location);
             }
@@ -383,8 +381,15 @@ fn visit_statements(
                     visit_statements(module, &case.body, diagnostics, location);
                 }
             }
-            Stmt::Block(body) | Stmt::Using { body, .. } => {
+            Stmt::Block(body) => {
                 visit_statements(module, body, diagnostics, location);
+            }
+            Stmt::Using {
+                body, finalizer, ..
+            } => {
+                for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                    visit_statements(module, body, diagnostics, location);
+                }
             }
             Stmt::Try { body, handler, .. } => {
                 visit_statements(module, body, diagnostics, location);

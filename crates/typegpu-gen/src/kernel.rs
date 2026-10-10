@@ -112,6 +112,7 @@ fn statement_pos(statement: &Stmt) -> Option<&Pos> {
         | Stmt::While { pos, .. }
         | Stmt::For { pos, .. }
         | Stmt::ForOf { pos, .. }
+        | Stmt::GeneratorForOf { pos, .. }
         | Stmt::Switch { pos, .. }
         | Stmt::Throw { pos, .. }
         | Stmt::Try { pos, .. }
@@ -325,14 +326,14 @@ fn global_names_stmt(statement: &Stmt, out: &mut BTreeSet<Symbol>) {
             if let Some(cond) = cond {
                 global_names_expr(cond, out);
             }
-            if let Some(step) = step {
-                global_names_expr(step, out);
+            for item in step {
+                global_names_stmt(item, out);
             }
             for statement in body {
                 global_names_stmt(statement, out);
             }
         }
-        Stmt::ForOf { subject, body, .. } => {
+        Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
             global_names_expr(subject, out);
             for statement in body {
                 global_names_stmt(statement, out);
@@ -349,9 +350,18 @@ fn global_names_stmt(statement: &Stmt, out: &mut BTreeSet<Symbol>) {
                 }
             }
         }
-        Stmt::Block(body) | Stmt::Using { body, .. } => {
+        Stmt::Block(body) => {
             for statement in body {
                 global_names_stmt(statement, out);
+            }
+        }
+        Stmt::Using {
+            body, finalizer, ..
+        } => {
+            for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                for statement in body {
+                    global_names_stmt(statement, out);
+                }
             }
         }
         Stmt::Try { body, handler, .. } => {
@@ -689,13 +699,10 @@ fn statements_block_host(module: &Module, statements: &[Stmt]) -> Result<bool, D
                         .as_ref()
                         .into_iter()
                         .try_any(|value| expression_blocks_host(module, value))?
-                    || step
-                        .as_ref()
-                        .into_iter()
-                        .try_any(|value| expression_blocks_host(module, value))?
+                    || statements_block_host(module, step)?
                     || statements_block_host(module, body)?
             }
-            Stmt::ForOf { subject, body, .. } => {
+            Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
                 expression_blocks_host(module, subject)? || statements_block_host(module, body)?
             }
             Stmt::Switch { disc, cases, .. } => {
@@ -710,7 +717,16 @@ fn statements_block_host(module: &Module, statements: &[Stmt]) -> Result<bool, D
                         })
                     })?
             }
-            Stmt::Block(body) | Stmt::Using { body, .. } => statements_block_host(module, body)?,
+            Stmt::Block(body) => statements_block_host(module, body)?,
+            Stmt::Using {
+                body, finalizer, ..
+            } => {
+                statements_block_host(module, body)?
+                    || finalizer
+                        .as_ref()
+                        .into_iter()
+                        .try_any(|items| statements_block_host(module, items))?
+            }
             Stmt::Try { body, handler, .. } => {
                 statements_block_host(module, body)? || statements_block_host(module, handler)?
             }
@@ -1724,6 +1740,13 @@ fn validate_statement_subset(statements: &[Stmt]) -> Result<(), Diagnostic> {
                     pos.clone(),
                 ));
             }
+            Stmt::GeneratorForOf { pos, .. } => {
+                return Err(diagnostic(
+                    "K7",
+                    "statement is outside the current kernel subset",
+                    pos.clone(),
+                ));
+            }
             Stmt::If { then, els, .. } => {
                 validate_statement_subset(then)?;
                 if let Some(els) = els {
@@ -1738,7 +1761,14 @@ fn validate_statement_subset(statements: &[Stmt]) -> Result<(), Diagnostic> {
                     validate_statement_subset(&case.body)?;
                 }
             }
-            Stmt::Block(body) | Stmt::Using { body, .. } => validate_statement_subset(body)?,
+            Stmt::Block(body) => validate_statement_subset(body)?,
+            Stmt::Using {
+                body, finalizer, ..
+            } => {
+                for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                    validate_statement_subset(body)?;
+                }
+            }
             Stmt::Throw { pos, .. } => {
                 return Err(diagnostic("K7", "`throw` statement in kernel", pos.clone()));
             }
@@ -1779,24 +1809,34 @@ fn local_declarations(statements: &[Stmt], out: &mut Vec<String>) {
             Stmt::While { body, .. } => {
                 local_declarations(body, out);
             }
-            Stmt::ForOf { name, body, .. } => {
+            Stmt::ForOf { name, body, .. } | Stmt::GeneratorForOf { name, body, .. } => {
                 out.push(name.clone());
                 local_declarations(body, out);
             }
-            Stmt::For { init, body, .. } => {
+            Stmt::For {
+                init, step, body, ..
+            } => {
                 if let Some(init) = init {
                     if let Stmt::Let { name, .. } = init.as_ref() {
                         out.push(name.clone());
                     }
                 }
                 local_declarations(body, out);
+                local_declarations(step, out);
             }
             Stmt::Switch { cases, .. } => {
                 for case in cases {
                     local_declarations(&case.body, out);
                 }
             }
-            Stmt::Block(body) | Stmt::Using { body, .. } => local_declarations(body, out),
+            Stmt::Block(body) => local_declarations(body, out),
+            Stmt::Using {
+                body, finalizer, ..
+            } => {
+                for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                    local_declarations(body, out);
+                }
+            }
             Stmt::Try {
                 body,
                 binding,
@@ -3197,10 +3237,17 @@ impl<'a> Emitter<'a> {
                     }
                 };
                 let cond = cond.as_ref().map(|value| self.snippet(value)).transpose()?;
-                let step = step
-                    .as_ref()
-                    .map(|value| self.statement_snippet(value))
-                    .transpose()?;
+                let step = match step.as_slice() {
+                    [] => None,
+                    [Stmt::Expr(value)] => Some(self.statement_snippet(value)?),
+                    _ => {
+                        return Err(diagnostic(
+                            "K7",
+                            "a `for` step must be one expression statement",
+                            pos.clone(),
+                        ))
+                    }
+                };
                 // A `for` header holds no statements either, so a condition or a step with a
                 // prelude takes the `loop` form. The outer block scopes the initializer.
                 let loop_prelude = cond.as_ref().is_some_and(|value| !value.prelude.is_empty())
@@ -3355,7 +3402,7 @@ impl<'a> Emitter<'a> {
                 self.statements(body, indent + 1, out)?;
                 Self::line(out, indent, "}");
             }
-            Stmt::ForOf { pos, .. } => {
+            Stmt::ForOf { pos, .. } | Stmt::GeneratorForOf { pos, .. } => {
                 return Err(diagnostic(
                     "K7",
                     "statement is outside the current kernel subset",
@@ -3682,12 +3729,13 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                     nested_loops + 1,
                     switches,
                 ),
-                Stmt::ForOf { body, .. } => self.loop_exit_taint(
-                    body,
-                    UniformityTaint::NonUniform("`for...of` control".to_owned()),
-                    nested_loops + 1,
-                    switches,
-                ),
+                Stmt::ForOf { body, .. } | Stmt::GeneratorForOf { body, .. } => self
+                    .loop_exit_taint(
+                        body,
+                        UniformityTaint::NonUniform("`for...of` control".to_owned()),
+                        nested_loops + 1,
+                        switches,
+                    ),
                 Stmt::Switch { disc, cases, .. } => {
                     let branch = control.clone().merge(self.expression(disc));
                     cases.iter().fold(UniformityTaint::Uniform, |value, case| {
@@ -3699,9 +3747,16 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                         ))
                     })
                 }
-                Stmt::Block(body) | Stmt::Using { body, .. } => {
+                Stmt::Block(body) => {
                     self.loop_exit_taint(body, control.clone(), nested_loops, switches)
                 }
+                Stmt::Using {
+                    body, finalizer, ..
+                } => self
+                    .loop_exit_taint(body, control.clone(), nested_loops, switches)
+                    .merge(finalizer.as_ref().map_or(UniformityTaint::Uniform, |body| {
+                        self.loop_exit_taint(body, control.clone(), nested_loops, switches)
+                    })),
                 Stmt::Try { body, handler, .. } => self
                     .loop_exit_taint(body, control.clone(), nested_loops, switches)
                     .merge(self.loop_exit_taint(handler, control.clone(), nested_loops, switches)),
@@ -3718,15 +3773,13 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
     ///
     /// A `break` or a `continue` under a non-uniform condition makes every local the loop writes
     /// non-uniform, because the iteration count then differs between invocations (K22).
-    fn taint_loop_writes(&mut self, body: &[Stmt], step: Option<&Expr>, taint: UniformityTaint) {
+    fn taint_loop_writes(&mut self, body: &[Stmt], step: &[Stmt], taint: UniformityTaint) {
         if taint == UniformityTaint::Uniform {
             return;
         }
         let mut written = BTreeSet::new();
         written_locals(body, &mut written);
-        if let Some(step) = step {
-            written_locals_expr(step, &mut written);
-        }
+        written_locals(step, &mut written);
         for name in written {
             let prior = self
                 .locals
@@ -3768,7 +3821,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                     let body_control = control.clone().merge(self.expression(cond));
                     self.collect_statements(body, body_control.clone());
                     let exit = self.loop_exit_taint(body, body_control, 0, 0);
-                    self.taint_loop_writes(body, None, exit);
+                    self.taint_loop_writes(body, &[], exit);
                     if self.locals == before {
                         break;
                     }
@@ -3790,17 +3843,21 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                             .map_or(UniformityTaint::Uniform, |expr| self.expression(expr));
                         let loop_control = control.clone().merge(condition);
                         self.collect_statements(body, loop_control.clone());
-                        if let Some(step) = step {
-                            self.collect_assignment(step, loop_control.clone());
-                        }
+                        self.collect_statements(step, loop_control.clone());
                         let exit = self.loop_exit_taint(body, loop_control, 0, 0);
-                        self.taint_loop_writes(body, step.as_ref(), exit);
+                        self.taint_loop_writes(body, step, exit);
                         if self.locals == before {
                             break;
                         }
                     }
                 }
                 Stmt::ForOf {
+                    name,
+                    subject,
+                    body,
+                    ..
+                }
+                | Stmt::GeneratorForOf {
                     name,
                     subject,
                     body,
@@ -3816,8 +3873,15 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                         self.collect_statements(&case.body, branch.clone());
                     }
                 }
-                Stmt::Block(body) | Stmt::Using { body, .. } => {
+                Stmt::Block(body) => {
                     self.collect_statements(body, control.clone());
+                }
+                Stmt::Using {
+                    body, finalizer, ..
+                } => {
+                    for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                        self.collect_statements(body, control.clone());
+                    }
                 }
                 Stmt::Try { body, handler, .. } => {
                     self.collect_statements(body, control.clone());
@@ -3931,7 +3995,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                     targets.pop();
                     result?;
                 }
-                Stmt::ForOf { body, .. } => {
+                Stmt::ForOf { body, .. } | Stmt::GeneratorForOf { body, .. } => {
                     let loop_control = control
                         .clone()
                         .merge(UniformityTaint::NonUniform("`for...of` control".to_owned()));
@@ -3955,13 +4019,25 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                     }
                     targets.pop();
                 }
-                Stmt::Block(body) | Stmt::Using { body, .. } => {
+                Stmt::Block(body) => {
                     self.validate_statements(
                         body,
                         control.clone(),
                         barrier_scope_allowed,
                         targets,
                     )?;
+                }
+                Stmt::Using {
+                    body, finalizer, ..
+                } => {
+                    for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                        self.validate_statements(
+                            body,
+                            control.clone(),
+                            barrier_scope_allowed,
+                            targets,
+                        )?;
+                    }
                 }
                 Stmt::Try { body, handler, .. } => {
                     for statements in [body, handler] {
@@ -4042,21 +4118,28 @@ fn written_locals(statements: &[Stmt], out: &mut BTreeSet<String>) {
                     written_locals(els, out);
                 }
             }
-            Stmt::While { body, .. } | Stmt::ForOf { body, .. } => {
+            Stmt::While { body, .. }
+            | Stmt::ForOf { body, .. }
+            | Stmt::GeneratorForOf { body, .. } => {
                 written_locals(body, out);
             }
             Stmt::For { step, body, .. } => {
                 written_locals(body, out);
-                if let Some(step) = step {
-                    written_locals_expr(step, out);
-                }
+                written_locals(step, out);
             }
             Stmt::Switch { cases, .. } => {
                 for case in cases {
                     written_locals(&case.body, out);
                 }
             }
-            Stmt::Block(body) | Stmt::Using { body, .. } => written_locals(body, out),
+            Stmt::Block(body) => written_locals(body, out),
+            Stmt::Using {
+                body, finalizer, ..
+            } => {
+                for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                    written_locals(body, out);
+                }
+            }
             Stmt::Try { body, handler, .. } => {
                 written_locals(body, out);
                 written_locals(handler, out);
@@ -4092,13 +4175,22 @@ fn contains_barrier(module: &Module, statements: &[Stmt]) -> bool {
                     .as_ref()
                     .is_some_and(|statements| contains_barrier(module, statements))
         }
-        Stmt::While { body, .. } | Stmt::For { body, .. } | Stmt::ForOf { body, .. } => {
-            contains_barrier(module, body)
-        }
+        Stmt::While { body, .. }
+        | Stmt::For { body, .. }
+        | Stmt::ForOf { body, .. }
+        | Stmt::GeneratorForOf { body, .. } => contains_barrier(module, body),
         Stmt::Switch { cases, .. } => cases
             .iter()
             .any(|case| contains_barrier(module, &case.body)),
-        Stmt::Block(body) | Stmt::Using { body, .. } => contains_barrier(module, body),
+        Stmt::Block(body) => contains_barrier(module, body),
+        Stmt::Using {
+            body, finalizer, ..
+        } => {
+            contains_barrier(module, body)
+                || finalizer
+                    .as_ref()
+                    .is_some_and(|body| contains_barrier(module, body))
+        }
         Stmt::Try { body, handler, .. } => {
             contains_barrier(module, body) || contains_barrier(module, handler)
         }
@@ -4124,14 +4216,25 @@ fn last_barrier_position(module: &Module, statements: &[Stmt]) -> Option<(u32, u
                         .and_then(|statements| last_barrier_position(module, statements)),
                 )
                 .max(),
-            Stmt::While { body, .. } | Stmt::For { body, .. } | Stmt::ForOf { body, .. } => {
-                last_barrier_position(module, body)
-            }
+            Stmt::While { body, .. }
+            | Stmt::For { body, .. }
+            | Stmt::ForOf { body, .. }
+            | Stmt::GeneratorForOf { body, .. } => last_barrier_position(module, body),
             Stmt::Switch { cases, .. } => cases
                 .iter()
                 .filter_map(|case| last_barrier_position(module, &case.body))
                 .max(),
-            Stmt::Block(body) | Stmt::Using { body, .. } => last_barrier_position(module, body),
+            Stmt::Block(body) => last_barrier_position(module, body),
+            Stmt::Using {
+                body, finalizer, ..
+            } => last_barrier_position(module, body)
+                .into_iter()
+                .chain(
+                    finalizer
+                        .as_ref()
+                        .and_then(|body| last_barrier_position(module, body)),
+                )
+                .max(),
             Stmt::Try { body, handler, .. } => last_barrier_position(module, body)
                 .into_iter()
                 .chain(last_barrier_position(module, handler))
@@ -4236,14 +4339,14 @@ fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<Symbol>) {
             if let Some(cond) = cond {
                 called_functions_expr(cond, out);
             }
-            if let Some(step) = step {
-                called_functions_expr(step, out);
+            for item in step {
+                called_functions_stmt(item, out);
             }
             for stmt in body {
                 called_functions_stmt(stmt, out);
             }
         }
-        Stmt::ForOf { subject, body, .. } => {
+        Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
             called_functions_expr(subject, out);
             for stmt in body {
                 called_functions_stmt(stmt, out);
@@ -4255,9 +4358,18 @@ fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<Symbol>) {
                 called_functions_stmt(stmt, out);
             }
         }
-        Stmt::Block(body) | Stmt::Using { body, .. } => {
+        Stmt::Block(body) => {
             for stmt in body {
                 called_functions_stmt(stmt, out);
+            }
+        }
+        Stmt::Using {
+            body, finalizer, ..
+        } => {
+            for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                for stmt in body {
+                    called_functions_stmt(stmt, out);
+                }
             }
         }
         Stmt::Try { body, handler, .. } => {
@@ -4435,14 +4547,17 @@ fn collect_schema_stmt(
             if let Some(cond) = cond {
                 collect_schema_expr(module, cond, seen, out)?;
             }
-            if let Some(step) = step {
-                collect_schema_expr(module, step, seen, out)?;
+            for item in step {
+                collect_schema_stmt(module, item, seen, out)?;
             }
             for stmt in body {
                 collect_schema_stmt(module, stmt, seen, out)?;
             }
         }
         Stmt::ForOf {
+            ty, subject, body, ..
+        }
+        | Stmt::GeneratorForOf {
             ty, subject, body, ..
         } => {
             collect_schema_type(module, ty, seen, out, &subject.pos)?;
@@ -4457,9 +4572,18 @@ fn collect_schema_stmt(
                 collect_schema_stmt(module, stmt, seen, out)?;
             }
         }
-        Stmt::Block(body) | Stmt::Using { body, .. } => {
+        Stmt::Block(body) => {
             for stmt in body {
                 collect_schema_stmt(module, stmt, seen, out)?;
+            }
+        }
+        Stmt::Using {
+            body, finalizer, ..
+        } => {
+            for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                for stmt in body {
+                    collect_schema_stmt(module, stmt, seen, out)?;
+                }
             }
         }
         Stmt::Try { body, handler, .. } => {

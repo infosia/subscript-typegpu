@@ -60,6 +60,7 @@ fn statement_pos(statement: &Stmt) -> Option<&subscript_compiler::Pos> {
         | Stmt::While { pos, .. }
         | Stmt::For { pos, .. }
         | Stmt::ForOf { pos, .. }
+        | Stmt::GeneratorForOf { pos, .. }
         | Stmt::Switch { pos, .. }
         | Stmt::Throw { pos, .. }
         | Stmt::Try { pos, .. }
@@ -375,9 +376,15 @@ fn visit_statements(
                 if let Some(cond) = cond {
                     visit!(cond);
                 }
-                if let Some(step) = step {
-                    visit!(step);
-                }
+                visit_statements(
+                    program,
+                    program_name,
+                    module,
+                    generated,
+                    step,
+                    failures,
+                    simulation_calls,
+                );
                 visit_statements(
                     program,
                     program_name,
@@ -388,7 +395,7 @@ fn visit_statements(
                     simulation_calls,
                 );
             }
-            Stmt::ForOf { subject, body, .. } => {
+            Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
                 visit!(subject);
                 visit_statements(
                     program,
@@ -417,7 +424,7 @@ fn visit_statements(
                     );
                 }
             }
-            Stmt::Block(body) | Stmt::Using { body, .. } => visit_statements(
+            Stmt::Block(body) => visit_statements(
                 program,
                 program_name,
                 module,
@@ -426,6 +433,21 @@ fn visit_statements(
                 failures,
                 simulation_calls,
             ),
+            Stmt::Using {
+                body, finalizer, ..
+            } => {
+                for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                    visit_statements(
+                        program,
+                        program_name,
+                        module,
+                        generated,
+                        body,
+                        failures,
+                        simulation_calls,
+                    );
+                }
+            }
             Stmt::Try { body, handler, .. } => {
                 for statements in [body, handler] {
                     visit_statements(

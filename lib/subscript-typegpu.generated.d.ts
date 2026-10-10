@@ -41,16 +41,61 @@
 // @subscript-c-cenum typedef="SubscriptTypegpuErrorFilter" alias="GPUErrorFilter"
 // @subscript-c-cenum typedef="SubscriptTypegpuDeviceLostReason" alias="GPUDeviceLostReason"
 // @subscript-c-cenum typedef="SubscriptTypegpuFeatureName" alias="GPUFeatureName"
+// @subscript-c-member aggregate="SubscriptTypegpuTextureDescriptor" member="viewFormats" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuBindGroupLayoutDescriptor" member="entries" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuBindGroupDescriptor" member="entries" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuComputeState" member="constants" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuVertexBufferLayout" member="attributes" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuVertexState" member="constants" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuVertexState" member="buffers" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuColorTargetState" member="blend" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuFragmentState" member="constants" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuFragmentState" member="targets" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuRenderPipelineDescriptor" member="depthStencil" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuRenderPipelineDescriptor" member="fragment" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuRenderBundleEncoderDescriptor" member="colorFormats" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuComputePassDescriptor" member="timestampWrites" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuRenderPassDescriptor" member="colorAttachments" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuRenderPassDescriptor" member="depthStencilAttachment" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuRenderPassDescriptor" member="timestampWrites" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuDeviceDescriptor" member="requiredFeatures" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuDeviceDescriptor" member="requiredLimits" const=true
+// @subscript-c-parameter function="subscript_typegpu_adapter_get_limits" parameter="out" const=false
+// @subscript-c-parameter function="subscript_typegpu_adapter_get_info" parameter="out" const=false
+// @subscript-c-parameter function="subscript_typegpu_adapter_request_device_with_descriptor" parameter="descriptor" const=true
 // @subscript-c-string-view function="subscript_typegpu_device_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
+// @subscript-c-parameter function="subscript_typegpu_pop_error_scope_take" parameter="out" const=false
+// @subscript-c-parameter function="subscript_typegpu_device_next_uncaptured_error" parameter="out" const=false
+// @subscript-c-parameter function="subscript_typegpu_device_lost_info" parameter="out" const=false
+// @subscript-c-parameter function="subscript_typegpu_device_get_limits" parameter="out" const=false
+// @subscript-c-parameter function="subscript_typegpu_device_get_adapter_info" parameter="out" const=false
+// @subscript-c-parameter function="subscript_typegpu_device_create_buffer" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_texture" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_sampler" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_bind_group_layout" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_bind_group" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_pipeline_layout" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_shader_module" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_compute_pipeline" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_compute_pipeline_async_begin" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_render_pipeline" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_render_pipeline_async_begin" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_command_encoder" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_render_bundle_encoder" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_device_create_query_set" parameter="descriptor" const=true
 // @subscript-c-scalar-pair function="subscript_typegpu_queue_submit" parameter="commands" element="SubscriptTypegpuCommandBuffer" const=true
 // @subscript-c-scalar-pair function="subscript_typegpu_queue_write_buffer" parameter="data" element="uint8_t" const=true
 // @subscript-c-scalar-pair function="subscript_typegpu_queue_write_buffer_f32" parameter="data" element="float" const=true
 // @subscript-c-scalar-pair function="subscript_typegpu_queue_write_texture" parameter="data" element="uint8_t" const=true
+// @subscript-c-parameter function="subscript_typegpu_queue_write_texture" parameter="dst" const=true
+// @subscript-c-parameter function="subscript_typegpu_queue_write_texture" parameter="layout" const=true
+// @subscript-c-parameter function="subscript_typegpu_queue_write_texture" parameter="extent" const=true
 // @subscript-c-string-view function="subscript_typegpu_queue_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-scalar-pair function="subscript_typegpu_buffer_read_mapped_range" parameter="out" element="uint8_t" const=false
 // @subscript-c-scalar-pair function="subscript_typegpu_buffer_read_mapped_range_f32" parameter="out" element="float" const=false
 // @subscript-c-scalar-pair function="subscript_typegpu_buffer_write_mapped_range" parameter="data" element="uint8_t" const=true
 // @subscript-c-string-view function="subscript_typegpu_buffer_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
+// @subscript-c-parameter function="subscript_typegpu_texture_create_view" parameter="descriptor" const=true
 // @subscript-c-string-view function="subscript_typegpu_texture_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-string-view function="subscript_typegpu_texture_view_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-string-view function="subscript_typegpu_sampler_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
@@ -60,6 +105,18 @@
 // @subscript-c-string-view function="subscript_typegpu_shader_module_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-string-view function="subscript_typegpu_compute_pipeline_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-string-view function="subscript_typegpu_render_pipeline_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
+// @subscript-c-parameter function="subscript_typegpu_command_encoder_finish" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_command_encoder_begin_compute_pass" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_command_encoder_begin_render_pass" parameter="descriptor" const=true
+// @subscript-c-parameter function="subscript_typegpu_command_encoder_copy_buffer_to_texture" parameter="source" const=true
+// @subscript-c-parameter function="subscript_typegpu_command_encoder_copy_buffer_to_texture" parameter="destination" const=true
+// @subscript-c-parameter function="subscript_typegpu_command_encoder_copy_buffer_to_texture" parameter="copySize" const=true
+// @subscript-c-parameter function="subscript_typegpu_command_encoder_copy_texture_to_buffer" parameter="source" const=true
+// @subscript-c-parameter function="subscript_typegpu_command_encoder_copy_texture_to_buffer" parameter="destination" const=true
+// @subscript-c-parameter function="subscript_typegpu_command_encoder_copy_texture_to_buffer" parameter="copySize" const=true
+// @subscript-c-parameter function="subscript_typegpu_command_encoder_copy_texture_to_texture" parameter="source" const=true
+// @subscript-c-parameter function="subscript_typegpu_command_encoder_copy_texture_to_texture" parameter="destination" const=true
+// @subscript-c-parameter function="subscript_typegpu_command_encoder_copy_texture_to_texture" parameter="copySize" const=true
 // @subscript-c-string-view function="subscript_typegpu_command_encoder_insert_debug_marker" parameter="markerLabel" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-string-view function="subscript_typegpu_command_encoder_push_debug_group" parameter="groupLabel" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-string-view function="subscript_typegpu_command_encoder_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
@@ -68,6 +125,7 @@
 // @subscript-c-string-view function="subscript_typegpu_compute_pass_encoder_push_debug_group" parameter="groupLabel" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-string-view function="subscript_typegpu_compute_pass_encoder_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-scalar-pair function="subscript_typegpu_render_pass_encoder_set_bind_group" parameter="dynamicOffsets" element="uint32_t" const=true
+// @subscript-c-parameter function="subscript_typegpu_render_pass_encoder_set_blend_constant" parameter="color" const=true
 // @subscript-c-scalar-pair function="subscript_typegpu_render_pass_encoder_execute_bundles" parameter="bundles" element="SubscriptTypegpuRenderBundle" const=true
 // @subscript-c-string-view function="subscript_typegpu_render_pass_encoder_insert_debug_marker" parameter="markerLabel" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-string-view function="subscript_typegpu_render_pass_encoder_push_debug_group" parameter="groupLabel" aggregate="SubscriptTypegpuStringView"
@@ -76,6 +134,7 @@
 // @subscript-c-scalar-pair function="subscript_typegpu_render_bundle_encoder_set_bind_group" parameter="dynamicOffsets" element="uint32_t" const=true
 // @subscript-c-string-view function="subscript_typegpu_render_bundle_encoder_insert_debug_marker" parameter="markerLabel" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-string-view function="subscript_typegpu_render_bundle_encoder_push_debug_group" parameter="groupLabel" aggregate="SubscriptTypegpuStringView"
+// @subscript-c-parameter function="subscript_typegpu_render_bundle_encoder_finish" parameter="descriptor" const=true
 // @subscript-c-string-view function="subscript_typegpu_render_bundle_encoder_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-string-view function="subscript_typegpu_render_bundle_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"
 // @subscript-c-string-view function="subscript_typegpu_query_set_set_label" parameter="label" aggregate="SubscriptTypegpuStringView"

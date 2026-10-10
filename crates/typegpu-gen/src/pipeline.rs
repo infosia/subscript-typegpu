@@ -499,6 +499,7 @@ fn statement_pos(statement: &Stmt) -> Option<Pos> {
         | Stmt::While { pos, .. }
         | Stmt::For { pos, .. }
         | Stmt::ForOf { pos, .. }
+        | Stmt::GeneratorForOf { pos, .. }
         | Stmt::Switch { pos, .. }
         | Stmt::Throw { pos, .. }
         | Stmt::Try { pos, .. }
@@ -938,12 +939,10 @@ fn stmt_has_compute(module: &Module, stmt: &Stmt) -> bool {
                 || cond
                     .as_ref()
                     .is_some_and(|value| call_in_expr(module, value))
-                || step
-                    .as_ref()
-                    .is_some_and(|value| call_in_expr(module, value))
+                || step.iter().any(|stmt| stmt_has_compute(module, stmt))
                 || body.iter().any(|stmt| stmt_has_compute(module, stmt))
         }
-        Stmt::ForOf { subject, body, .. } => {
+        Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
             call_in_expr(module, subject) || body.iter().any(|stmt| stmt_has_compute(module, stmt))
         }
         Stmt::Switch { disc, cases, .. } => {
@@ -953,9 +952,13 @@ fn stmt_has_compute(module: &Module, stmt: &Stmt) -> bool {
                     .flat_map(|case| &case.body)
                     .any(|stmt| stmt_has_compute(module, stmt))
         }
-        Stmt::Block(body) | Stmt::Using { body, .. } => {
-            body.iter().any(|stmt| stmt_has_compute(module, stmt))
-        }
+        Stmt::Block(body) => body.iter().any(|stmt| stmt_has_compute(module, stmt)),
+        Stmt::Using {
+            body, finalizer, ..
+        } => body
+            .iter()
+            .chain(finalizer.iter().flatten())
+            .any(|stmt| stmt_has_compute(module, stmt)),
         Stmt::Try { body, handler, .. } => body
             .iter()
             .chain(handler)

@@ -9,7 +9,8 @@ P2 contract. Rev 0, 2026-08-22. Rev 1 (K9, K14, K15, K17),
 Rev 6 literal suffixes), 2026-08-24. Rev 11 (K14 Rev 6 logic
 parentheses), 2026-08-24. Rev 12 (K5 Rev 1 `using`, absence test),
 2026-08-30. Rev 13 (K14 Rev 7 bitwise parentheses), 2026-09-01. Rev 14 (K14 Rev 8 bitwise pairs), 2026-09-01. Rev 15 (K7 `throw` and `try`, K14 Rev 9 source names), 2026-09-29. Rev 16 (K7 updates and
-assignments used as values, `let x: T;`), 2026-10-05. Plan §3 D2, D3, D7, D9 and §4
+assignments used as values, `let x: T;`), 2026-10-05. Rev 17 (K7 `for` step shape, generator
+`for...of`), 2026-10-11. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -73,6 +74,10 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   update whose value the kernel reads, for example `a[i++] = v`, is a
   diagnostic under this rule. A `let x: T;` without an initializer
   (subscript §158) emits a WGSL `var x: T;`.
+  A `for` step is one expression statement or empty. A step that the
+  subscript lowering expands to several statements, for example
+  `res.out[k + 0]++`, is a diagnostic under this rule. A `for...of`
+  over a generator (subscript §176) is a diagnostic under this rule.
 - **K8 — `let` and `const` map to `var` and `let`.** A subscript
   `const` binding emits a WGSL `let`. A subscript `let` binding emits
   a WGSL `var`. A value class local is always `var`, because the

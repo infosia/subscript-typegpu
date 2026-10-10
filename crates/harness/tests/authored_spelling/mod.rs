@@ -239,12 +239,10 @@ fn inspect_statements(
                 if let Some(cond) = cond {
                     inspect_expr(module, source, cond, source_name, display_name, failures);
                 }
-                if let Some(step) = step {
-                    inspect_expr(module, source, step, source_name, display_name, failures);
-                }
+                inspect_statements(module, source, step, source_name, display_name, failures);
                 inspect_statements(module, source, body, source_name, display_name, failures);
             }
-            Stmt::ForOf { subject, body, .. } => {
+            Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
                 inspect_expr(module, source, subject, source_name, display_name, failures);
                 inspect_statements(module, source, body, source_name, display_name, failures);
             }
@@ -264,8 +262,15 @@ fn inspect_statements(
                     );
                 }
             }
-            Stmt::Block(body) | Stmt::Using { body, .. } => {
+            Stmt::Block(body) => {
                 inspect_statements(module, source, body, source_name, display_name, failures);
+            }
+            Stmt::Using {
+                body, finalizer, ..
+            } => {
+                for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
+                    inspect_statements(module, source, body, source_name, display_name, failures);
+                }
             }
             Stmt::Try { body, handler, .. } => {
                 inspect_statements(module, source, body, source_name, display_name, failures);

@@ -452,3 +452,32 @@ repository only through `..` patterns and `_` arms.
 Evidence at `e8cf6e0`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 287 passed, 0 failed, 1 ignored,
 512.2 s wall. No WGSL or `.expected` golden moved.
+
+### Re-pin to `2867fd1` (2026-10-11)
+
+The workspace pin moves from `e8cf6e0` to `2867fd1`. The subscript
+range holds §176 through §189. The `swc_ecma_parser` fork stays at
+`affcb6e`. The new crate `subscript-boundary` has no dependency, so
+the `subscript-typegpu-webgpu-gen` closure still excludes
+`subscript-compiler`.
+
+- `Stmt::For.step` is now `Vec<Stmt>`. At the pin, `i++` and `i += 1`
+  lower to one expression statement, and an empty step lowers to an
+  empty list. An update of an indexed target with a computed index,
+  for example `res.out[k + 0]++`, lowers to a `Let` and an expression
+  statement. The kernel emitter accepts an empty step and one
+  expression statement. Any other step is K7 (`kernel.md` Rev 17).
+  The fixture `k7-for-step-statements.ts` records the red run.
+- `Stmt::GeneratorForOf` is new. A kernel rejects it with K7. The
+  fixture `k7-generator-for-of.ts` records the red run. The shell,
+  pipeline, and render scanners and the harness walkers visit its
+  subject and body.
+- `Stmt::Using` gains `finalizer`. The scanners visit it.
+- §179: the bindgen mirror records const members and const
+  parameters. `tools/regen.sh` adds 59 `@subscript-c-member` and
+  `@subscript-c-parameter` lines to
+  `lib/subscript-typegpu.generated.d.ts`.
+
+Evidence at `2867fd1`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 290 passed, 0 failed, 1 ignored,
+475.7 s wall. No WGSL or `.expected` golden moved.
