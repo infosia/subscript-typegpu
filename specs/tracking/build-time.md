@@ -243,3 +243,9 @@ is 1.08x.
 
 The `--require-backend` gate: 475.7 s, with the harness at 389.1 s
 and typegpu-gen at 44.6 s. The previous row is 512.2 s.
+
+## Re-pin to `8d99fe1` (2026-10-19)
+
+The `--require-backend` gate: 353.7 s, with the harness at 293.4 s
+and typegpu-gen at 32.7 s. The previous row is 475.7 s. The first run
+at this pin failed one test after 367.9 s (`language-request.md`).

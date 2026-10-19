@@ -481,3 +481,30 @@ the `subscript-typegpu-webgpu-gen` closure still excludes
 Evidence at `2867fd1`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 290 passed, 0 failed, 1 ignored,
 475.7 s wall. No WGSL or `.expected` golden moved.
+
+### Re-pin to `8d99fe1` (2026-10-19)
+
+The workspace pin moves from `2867fd1` to `8d99fe1`. The subscript
+range holds §190 through §193. The `swc_ecma_parser` fork stays at
+`affcb6e`. No source change.
+
+- §193: `subscript-runtime` pins `icu_normalizer = "=2.2.0"`. The
+  workspace lock held the icu crates at 2.3.0 through `url` and
+  `idna`, so `cargo fetch` failed to resolve. A `cargo update -p`
+  over `subscript-compiler` and the seven `icu_*` crates moves them to
+  2.2.0.
+- §190: the dev tier forks only a single-threaded process. The harness
+  already runs each dev and ship tier in a child process of
+  `subscript-typegpu-harness`, so no test reaches the rule 3 error.
+- §191 and §192: no change here.
+
+Evidence at `8d99fe1`: the first `tools/gate.sh --require-backend`
+run failed one test, 128 passed, 367.9 s. The ship tier of
+`b05-buffer.ts` in
+`differential::every_program_is_deterministic_across_repeated_runs`
+reported `clang: error: no such file or directory:` for
+`target/ship-build/release/libsubscript_typegpu_facade.a`. The archive
+existed after the run. The second run: `gate: green`, 290 passed, 0
+failed, 1 ignored, 353.7 s wall. No WGSL or `.expected` golden moved.
+The cause of the first failure is not measured. Open item: find the
+writer that removes the facade archive while a ship child links it.
