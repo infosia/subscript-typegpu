@@ -508,3 +508,18 @@ existed after the run. The second run: `gate: green`, 290 passed, 0
 failed, 1 ignored, 353.7 s wall. No WGSL or `.expected` golden moved.
 The cause of the first failure is not measured. Open item: find the
 writer that removes the facade archive while a ship child links it.
+
+### Re-pin to `4352687` (2026-10-27)
+
+The workspace pin moves from `8d99fe1` to `4352687`. The subscript
+range holds §194 through §200. The `swc_ecma_parser` fork stays at
+`affcb6e`. No source change.
+
+- §195 and §196: `Type::Nullable` gains an `Absence` field (`Null` or
+  `Undefined`). No match site in this repository names
+  `Type::Nullable`, so the workspace compiles without an edit.
+- §194, §197 through §200: no change here.
+
+Evidence at `4352687`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 290 passed, 0 failed, 1 ignored,
+360.8 s wall. No WGSL or `.expected` golden moved.

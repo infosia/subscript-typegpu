@@ -249,3 +249,8 @@ and typegpu-gen at 44.6 s. The previous row is 512.2 s.
 The `--require-backend` gate: 353.7 s, with the harness at 293.4 s
 and typegpu-gen at 32.7 s. The previous row is 475.7 s. The first run
 at this pin failed one test after 367.9 s (`language-request.md`).
+
+## Re-pin to `4352687` (2026-10-27)
+
+The `--require-backend` gate: 360.8 s, with the harness at 283.8 s
+and typegpu-gen at 32.8 s. The previous row is 353.7 s.
