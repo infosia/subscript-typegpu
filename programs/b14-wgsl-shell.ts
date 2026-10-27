@@ -38,7 +38,7 @@ function addBias(value: u32): u32 {
   return value + 7;
 }
 
-const addBiasShell: WgslShellSpec = wgslShell<(value: u32) => u32>(
+const addBiasShell: WgslShellSpec = wgslShell(
   addBias,
   {
     body: "return value + SHELL_BIAS;",
@@ -46,11 +46,7 @@ const addBiasShell: WgslShellSpec = wgslShell<(value: u32) => u32>(
 );
 
 class ShellLayout {
-  output: MutStorage<u32>;
-
-  constructor(output: MutStorage<u32>) {
-    this.output = output;
-  }
+  constructor(public output: MutStorage<u32>) {}
 }
 
 function shellKernel(res: ShellLayout, ctx: ComputeInvocation): void {
@@ -59,7 +55,7 @@ function shellKernel(res: ShellLayout, ctx: ComputeInvocation): void {
   }
 }
 
-const shellPipeline: ComputePipelineSpec = computePipeline<ShellLayout>(
+const shellPipeline: ComputePipelineSpec = computePipeline(
   shellKernel,
   {
     name: "shellPipeline",
@@ -117,8 +113,8 @@ export async function main(): Promise<void> {
     pipeline.dispatch(encoder, [bindGroup], 1, 1, 1);
     using command = encoder.finishDefault();
     device.queue.submit([command]);
-    const host = new ShellLayout(new MutStorage<u32>([0]));
-    simulateCompute<ShellLayout>(
+    const host = new ShellLayout(new MutStorage([0]));
+    simulateCompute(
       shellKernel,
       host,
       shellPipeline,

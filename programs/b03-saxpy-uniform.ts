@@ -30,34 +30,16 @@ import {
 
 @ValueType
 class Item {
-  value: f32;
-
-  constructor(value: f32) {
-    this.value = value;
-  }
+  constructor(public value: f32) {}
 }
 
 @ValueType
 class SaxpyParams {
-  a: f32;
-  count: u32;
-
-  constructor(a: f32, count: u32) {
-    this.a = a;
-    this.count = count;
-  }
+  constructor(public a: f32, public count: u32) {}
 }
 
 class SaxpyLayout {
-  params: Uniform<SaxpyParams>;
-  x: Storage<Item>;
-  y: MutStorage<Item>;
-
-  constructor(params: Uniform<SaxpyParams>, x: Storage<Item>, y: MutStorage<Item>) {
-    this.params = params;
-    this.x = x;
-    this.y = y;
-  }
+  constructor(public params: Uniform<SaxpyParams>, public x: Storage<Item>, public y: MutStorage<Item>) {}
 }
 
 function saxpyKernel(res: SaxpyLayout, ctx: ComputeInvocation): void {
@@ -70,7 +52,7 @@ function saxpyKernel(res: SaxpyLayout, ctx: ComputeInvocation): void {
   }
 }
 
-const saxpy: ComputePipelineSpec = computePipeline<SaxpyLayout>(saxpyKernel, {
+const saxpy: ComputePipelineSpec = computePipeline(saxpyKernel, {
   name: "saxpy",
   workgroupSize: [64, 1, 1],
 });
@@ -130,11 +112,11 @@ export async function main(): Promise<void> {
     using command = encoder.finishDefault();
     device.queue.submit([command]);
     const hostLayout = new SaxpyLayout(
-      new Uniform<SaxpyParams>(new SaxpyParams(2.0, 2)),
-      new Storage<Item>([new Item(3.0), new Item(4.0)]),
-      new MutStorage<Item>([new Item(1.0), new Item(2.0)]),
+      new Uniform(new SaxpyParams(2.0, 2)),
+      new Storage([new Item(3.0), new Item(4.0)]),
+      new MutStorage([new Item(1.0), new Item(2.0)]),
     );
-    simulateCompute<SaxpyLayout>(
+    simulateCompute(
       saxpyKernel,
       hostLayout,
       saxpy,

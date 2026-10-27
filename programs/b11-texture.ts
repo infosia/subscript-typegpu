@@ -43,33 +43,15 @@ import {
 
 @ValueType
 class SampleParams {
-  width: u32;
-  height: u32;
-
-  constructor(width: u32, height: u32) {
-    this.width = width;
-    this.height = height;
-  }
+  constructor(public width: u32, public height: u32) {}
 }
 
 class TextureLayout {
-  source: Texture2d<f32>;
-  nearest: Sampler;
-  target: StorageTexture2d<Rgba8unorm>;
-
-  constructor(source: Texture2d<f32>, nearest: Sampler, target: StorageTexture2d<Rgba8unorm>) {
-    this.source = source;
-    this.nearest = nearest;
-    this.target = target;
-  }
+  constructor(public source: Texture2d<f32>, public nearest: Sampler, public target: StorageTexture2d<Rgba8unorm>) {}
 }
 
 class ParamsLayout {
-  params: Uniform<SampleParams>;
-
-  constructor(params: Uniform<SampleParams>) {
-    this.params = params;
-  }
+  constructor(public params: Uniform<SampleParams>) {}
 }
 
 function textureKernel(
@@ -89,7 +71,7 @@ function textureKernel(
   textures.target.store(coords, loaded.add(sampled).scale(0.5));
 }
 
-const texturePass: ComputePipelineSpec = computePipeline2<TextureLayout, ParamsLayout>(
+const texturePass: ComputePipelineSpec = computePipeline2(
   textureKernel,
   { name: "texturePass", workgroupSize: [4, 4, 1] },
 );
@@ -159,8 +141,8 @@ export async function main(): Promise<void> {
       samplerFromDescriptor(nearestDescriptor),
       new StorageTexture2d<Rgba8unorm>(hostTargetPixels, 1, 1),
     );
-    const hostParams = new ParamsLayout(new Uniform<SampleParams>(new SampleParams(1, 1)));
-    simulateCompute2<TextureLayout, ParamsLayout>(
+    const hostParams = new ParamsLayout(new Uniform(new SampleParams(1, 1)));
+    simulateCompute2(
       textureKernel,
       hostTextures,
       hostParams,

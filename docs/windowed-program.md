@@ -246,7 +246,7 @@ to completion and returns.
 Look at the declaration that ties the two kernels together.
 
 ```ts program=examples/window-triangle/main.ts
-const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, {
+const tri: RenderPipelineSpec = renderPipeline(vert, frag, {
   format: "bgra8unorm",
 });
 ```
@@ -262,11 +262,7 @@ The schema and the two kernels are ordinary subscript.
 ```ts program=examples/window-triangle/main.ts
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 ```
 
@@ -578,14 +574,10 @@ presents the surface after `frame` returns.
 
 ```ts program=examples/window-triangle/main.ts
 export function shutdown(): void {
-  if (vertexBuffer != null) {
-    vertexBuffer.dispose();
-    vertexBuffer = null;
-  }
-  if (pipeline != null) {
-    pipeline.dispose();
-    pipeline = null;
-  }
+  vertexBuffer?.dispose();
+  vertexBuffer = null;
+  pipeline?.dispose();
+  pipeline = null;
   ownedDevice = null;
 }
 ```

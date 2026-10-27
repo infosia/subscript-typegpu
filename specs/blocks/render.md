@@ -1,7 +1,7 @@
 # Block: render (RN-rules)
 
 P3 contract. Rev 0, 2026-08-22. Rev 3 (RN18–RN19 index format,
-cull), 2026-08-23. Rev 4 (RN20 strip), 2026-08-24. Rev 5 (RN21 blending), 2026-08-24. Plan §8 P3 governs this block.
+cull), 2026-08-23. Rev 4 (RN20 strip), 2026-08-24. Rev 5 (RN21 blending), 2026-08-24. Rev 6 (RN1, RN2 inferred type arguments), 2026-10-27. Plan §8 P3 governs this block.
 Kernels are `kernel.md` (K-rules) and apply to vertex and fragment
 kernels. Pipelines are `pipeline.md` (PI-rules) where this block
 does not say otherwise. Schemas are `schema.md`.
@@ -11,7 +11,7 @@ does not say otherwise. Schemas are `schema.md`.
 - **RN1 — A render pipeline is a module-level `const`.** The
   generator recognizes the declaration functions by declaring file
   (`typegpu.ts`) and name, never by name alone.
-  `const tri = renderPipeline<Vertex, Varyings>(vert, frag,
+  `const tri = renderPipeline(vert, frag,
   { format: "rgba8unorm" });`. `renderPipeline` is a library generic
   function with a real body that returns a `RenderPipelineSpec` (the
   target format, the primitive topology, the cull mode). The
@@ -26,7 +26,8 @@ does not say otherwise. Schemas are `schema.md`.
   `renderPipelineInstanced`. The fragment kernel is `(input:
   Varyings, ctx: FragmentInvocation): Vec4f`, with the same layout
   class first under `renderPipelineL`. The generator checks the
-  types against the declaration's type arguments (PI2).
+  types against the declaration's type arguments (PI2). The script
+  can omit them, and the checker infers them from the kernels.
 - **RN3 — Builtins.** Rev 1, 2026-08-23. `VertexInvocation {
   vertexIndex: u32; instanceIndex: u32 }` emits `@builtin(vertex_index)`
   and `@builtin(instance_index)` for the fields the kernel reads.

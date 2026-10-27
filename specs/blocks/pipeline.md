@@ -3,14 +3,15 @@
 P2 contract. Rev 0, 2026-08-22. Rev 5 (PI15–PI18 guarded dispatch,
 indirect), 2026-08-23. Rev 6 (PI15 Rev 1, PI18 Rev 1), 2026-08-23. Rev 7 (PI15 Rev 2
 wrapper identity), 2026-08-24. Rev 8 (PI3 Rev 1, the layout
-constructor), 2026-09-12. Plan §3 D1, D3, D10 and §4 govern
+constructor), 2026-09-12. Rev 9 (PI2 Rev 1 inferred type arguments,
+PI3 Rev 2 parameter properties), 2026-10-27. Plan §3 D1, D3, D10 and §4 govern
 this block. Kernels are `kernel.md`. The runtime classes live in
 `lib/typegpu.ts`.
 
 ## The declaration
 
 - **PI1 — A pipeline is a module-level `const`.**
-  `const stepPipeline = computePipeline<StepLayout>(step,
+  `const stepPipeline = computePipeline(step,
   { workgroupSize: [64, 1, 1] });`. `computePipeline` is a library
   generic function in `lib/typegpu.ts`, with a real body that returns
   a `ComputePipelineSpec` (the kernel name and the workgroup size).
@@ -30,6 +31,8 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   function argument typed by a function type (RC-2 closed). The
   generator reads the layout classes from the kernel's parameter
   types and checks that each equals the declaration's type argument.
+  Rev 1, 2026-10-27: the script can omit the type arguments, and the
+  checker infers them from the kernel (subscript §149).
 - **PI3 — A layout class is a plain class of binding fields.** Every
   field is a binding wrapper (PI5, TX1). Binding index is
   declaration order from 0. The class is not `@ValueType` and not
@@ -41,7 +44,9 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   reads the field list and never reads the constructor. A
   constructor of any other form, a method, an index signature, or
   an accessor is a PI3 diagnostic that names the class and the
-  first departure. The GPU lane never constructs a layout class.
+  first departure. Rev 2, 2026-10-27: a constructor parameter
+  property (subscript §198) declares its field and the assignment,
+  so `constructor(public a: Uniform<A>) {}` is the same form. The GPU lane never constructs a layout class.
   The CPU lane constructs one with `new L(...)` and passes it to
   `simulateCompute` (CL1). *(Rev 0 spelled every field `name!:
   Wrapper<T>` with no constructor, and the CPU lane assigned the

@@ -21,14 +21,14 @@ is illustrative. This repository does not run it.
 | Language | JavaScript or TypeScript | [subscript](https://github.com/infosia/subscript) |
 | Schema | `d.struct({ ... })`, a run-time object | `@ValueType class`, a compile-time declaration |
 | Layout | computed at run time, `d.sizeOf(T)` | computed by the generator, `T_SIZE` and `T_STRIDE` constants |
-| Kernel | a function with `'use gpu'` | a plain function named by `computePipeline<L>(fn, spec)` |
+| Kernel | a function with `'use gpu'` | a plain function named by `computePipeline(fn, spec)` |
 | WGSL | generated at run time from a compacted AST | generated before the program runs — one readable `.wgsl` file per pipeline |
 | Bindings | `tgpu.bindGroupLayout({ ... })`, access by `layout.$.name` | a layout class with buffer, texture, and sampler binding fields |
 | Buffer data | JavaScript objects, converted by TypeGPU | `Context.bytesOf<T>(value)`, the bytes of the value |
 | Async | `Promise` | `await` over host-stepped futures |
 | Lifetime | garbage collection and `root.destroy()` | `using` and `dispose()` |
 | Errors | exceptions | `null` and `false` returns, error scopes, and traps that name a rule |
-| CPU execution | call the function | `simulateCompute<L>(fn, resources, spec, workgroups, HOST_RUNNABLE)` |
+| CPU execution | call the function | `simulateCompute(fn, resources, spec, workgroups, HOST_RUNNABLE)` |
 | Execution targets | a browser or a WebGPU runtime for JavaScript | a JIT tier and a C tier, over a webgpu.h library chosen at run time |
 
 ## Initialization
@@ -84,19 +84,13 @@ const Particle = d.struct({
 ```
 
 subscript-typegpu declares a schema as a class with the `@ValueType`
-decorator. The fields carry subscript types. The constructor is
-ordinary code.
+decorator. The fields carry subscript types. The constructor parameter
+properties declare and initialize the fields.
 
 ```ts program=programs/b04-particles.ts
 @ValueType
 class Particle {
-  pos: Vec3f;
-  vel: Vec3f;
-
-  constructor(pos: Vec3f, vel: Vec3f) {
-    this.pos = pos;
-    this.vel = vel;
-  }
+  constructor(public pos: Vec3f, public vel: Vec3f) {}
 }
 ```
 
@@ -223,7 +217,7 @@ buffer.
     );
     if (!mapped) { print("FAIL map"); return; }
     const result: ReductionCounter = Context.fromBytes<ReductionCounter>(
-      readBuffer<ReductionCounter>(readback, 0, 1),
+      readBuffer(readback, 0, 1),
       0,
     );
 ```
@@ -256,21 +250,13 @@ const saxpyLayout = tgpu.bindGroupLayout({
 ```
 
 subscript-typegpu declares a layout as a class. Each field is a binding
-wrapper. The binding index follows the field order. The constructor takes
-one value per field, in the same order. A kernel receives the layout as
-its first parameter.
+wrapper. The binding index follows the field order. The constructor
+parameter properties declare the fields in binding order. A kernel receives
+the layout as its first parameter.
 
 ```ts program=programs/b03-saxpy-uniform.ts
 class SaxpyLayout {
-  params: Uniform<SaxpyParams>;
-  x: Storage<Item>;
-  y: MutStorage<Item>;
-
-  constructor(params: Uniform<SaxpyParams>, x: Storage<Item>, y: MutStorage<Item>) {
-    this.params = params;
-    this.x = x;
-    this.y = y;
-  }
+  constructor(public params: Uniform<SaxpyParams>, public x: Storage<Item>, public y: MutStorage<Item>) {}
 }
 ```
 
@@ -286,7 +272,8 @@ Differences:
   writes `layout.$.params` and `layout.$.items[i]`.
 - A layout class is a parameter. A kernel with two layout parameters
   uses two bind groups, group 0 and group 1, in parameter order.
-  `b11-texture` declares `computePipeline2<TextureLayout, ParamsLayout>`.
+  `b11-texture` declares `computePipeline2`, which infers both layout types
+  from `textureKernel`.
 - The generator emits `<name>_LAYOUT0` with the binding entries and a
   typed factory `create<Name>BindGroup0(device, pipeline, resources)`.
 - TypeGPU's fixed bindings (`root.createUniform`, `root.createMutable`)
@@ -326,7 +313,7 @@ const particleKernel = tgpu.computeFn({
 
 A subscript-typegpu kernel is a plain function. Its parameters are the
 layout classes and one `ComputeInvocation`. A module-level
-`computePipeline<L>(fn, spec)` declaration names it as a kernel.
+`computePipeline(fn, spec)` declaration names it as a kernel.
 
 ```ts program=programs/b04-particles.ts
 function integrate(particle: Particle, dt: f32): Particle {
@@ -346,7 +333,7 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
   }
 }
 
-const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
+const particles: ComputePipelineSpec = computePipeline(particleKernel, {
   name: "particles",
   workgroupSize: [64, 1, 1],
 });
@@ -519,7 +506,7 @@ const sharedValues: WorkgroupArray<u32> = workgroupArray<u32>(4);
 const sharedCounter: WorkgroupVar<AtomicU32> = workgroupVar<AtomicU32>();
 
 function workgroupKernel(res: WorkgroupLayout, ctx: ComputeInvocation): void {
-  privateOffset.$ = privateOffset.$ + 1;
+  privateOffset.$ += 1;
   sharedValues[ctx.localIndex] = ctx.localIndex + privateOffset.$;
   if (ctx.localIndex == 0) {
     sharedCounter.$.store(0);
@@ -571,15 +558,7 @@ stores are methods on the field.
 
 ```ts program=programs/b11-texture.ts
 class TextureLayout {
-  source: Texture2d<f32>;
-  nearest: Sampler;
-  target: StorageTexture2d<Rgba8unorm>;
-
-  constructor(source: Texture2d<f32>, nearest: Sampler, target: StorageTexture2d<Rgba8unorm>) {
-    this.source = source;
-    this.nearest = nearest;
-    this.target = target;
-  }
+  constructor(public source: Texture2d<f32>, public nearest: Sampler, public target: StorageTexture2d<Rgba8unorm>) {}
 }
 ```
 
@@ -655,7 +634,7 @@ function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(input.color.x, input.color.y, input.color.z, FRAGMENT_ALPHA);
 }
 
-const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, {
+const tri: RenderPipelineSpec = renderPipeline(vert, frag, {
   format: "rgba8unorm",
 });
 ```
@@ -699,16 +678,16 @@ const moved = integrate(particle, 0.5);
 ```
 
 A subscript-typegpu kernel is also a subscript function.
-`simulateCompute<L>` calls it once per invocation with a host layout
+`simulateCompute` calls it once per invocation with a host layout
 instance and a `ComputeInvocation`.
 
 ```ts program=programs/b02-vecadd.ts
     const hostLayout = new VecAddLayout(
-      new Storage<Item>([new Item(1.0), new Item(2.0), new Item(3.0)]),
-      new Storage<Item>([new Item(4.0), new Item(5.0), new Item(6.0)]),
-      new MutStorage<Item>([new Item(0.0), new Item(0.0), new Item(0.0)]),
+      new Storage([new Item(1.0), new Item(2.0), new Item(3.0)]),
+      new Storage([new Item(4.0), new Item(5.0), new Item(6.0)]),
+      new MutStorage([new Item(0.0), new Item(0.0), new Item(0.0)]),
     );
-    simulateCompute<VecAddLayout>(
+    simulateCompute(
       vecAddKernel,
       hostLayout,
       vecAdd,
@@ -781,7 +760,7 @@ function addBias(value: u32): u32 {
   return value + 7;
 }
 
-const addBiasShell: WgslShellSpec = wgslShell<(value: u32) => u32>(
+const addBiasShell: WgslShellSpec = wgslShell(
   addBias,
   {
     body: "return value + SHELL_BIAS;",

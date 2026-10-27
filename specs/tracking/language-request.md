@@ -556,3 +556,24 @@ the trailing fallback after an exhaustive enum switch in
 Evidence: `tools/gate.sh --require-backend` with the yawgpu library,
 `gate: green`, 292 passed, 0 failed, 1 ignored, 355.6 s wall. No WGSL
 or `.expected` golden moved.
+
+### The docs use the current forms (2026-10-27)
+
+The owner asked that the code in `docs/` use the current language
+forms. The docs quote ten programs and `examples/window-triangle`
+byte for byte (EG9), so those sources changed with the docs:
+`b02`, `b03`, `b04`, `b06`, `b10`, `b11`, `b12`, `b14`, `b22`, `x08`.
+The forms are parameter properties (§198), inferred type arguments
+(§149, §197), `?.` call statements (§82.3), and compound assignment
+(§82.1). `README.md` follows the quotes. `pipeline.md` PI1, PI2
+Rev 1, and PI3 Rev 2, and `render.md` RN1 and RN2, state the
+inferred type arguments and the parameter property form.
+
+`x08-live-reduction.ts` keeps `stride = stride / 2`, because
+`stride /= 2` moves its WGSL golden. The other programs, the other
+examples, and `lib/` keep their forms.
+
+Evidence: `tools/gate.sh --require-backend` with the yawgpu library,
+`gate: green`, 292 passed, 0 failed, 1 ignored, 337.0 s wall. No WGSL
+or `.expected` golden moved. `tools/window.sh
+examples/window-triangle/main.ts --frames 30`: exit 0, no `FAIL`.

@@ -10,13 +10,7 @@ import { Particle_STRIDE } from "./b12-readback.typegpu";
 
 @ValueType
 class Particle {
-  mass: f32;
-  pos: Vec3f;
-
-  constructor(mass: f32, pos: Vec3f) {
-    this.mass = mass;
-    this.pos = pos;
-  }
+  constructor(public mass: f32, public pos: Vec3f) {}
 }
 
 function equalParticle(left: Particle, right: Particle): boolean {
@@ -65,7 +59,7 @@ export async function main(): Promise<void> {
         print(`FAIL particle ${index}`);
         return;
       }
-      index = index + 1;
+      index += 1;
     }
     print("roundtrip:match");
     const oneBytes: u8[] = await buffer.readOne(device, 2);

@@ -33,22 +33,14 @@ import {
 // `Vertex_STRIDE`, the byte distance between two vertices.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The record that travels from the vertex stage to the fragment stage. The `position`
 // field carries the clip-space position builtin.
 @ValueType
 class Varyings {
-  position: Vec4f;
-
-  constructor(position: Vec4f) {
-    this.position = position;
-  }
+  constructor(public position: Vec4f) {}
 }
 
 // The vertex kernel. It raises the two-dimensional position into clip space. A w of 1.0
@@ -65,7 +57,7 @@ function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
 
 // The declaration pairs the two kernels and fixes the target format. The generator reads
 // it and emits the WGSL and the constants of `main.typegpu` before the program runs.
-const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, {
+const tri: RenderPipelineSpec = renderPipeline(vert, frag, {
   format: "bgra8unorm",
 });
 
@@ -205,13 +197,9 @@ export function frame(
 // The host calls this one time before it releases the device. TypeGPU frees the same kind of
 // resource through `root.destroy`, and this layer disposes each handle by name.
 export function shutdown(): void {
-  if (vertexBuffer != null) {
-    vertexBuffer.dispose();
-    vertexBuffer = null;
-  }
-  if (pipeline != null) {
-    pipeline.dispose();
-    pipeline = null;
-  }
+  vertexBuffer?.dispose();
+  vertexBuffer = null;
+  pipeline?.dispose();
+  pipeline = null;
   ownedDevice = null;
 }

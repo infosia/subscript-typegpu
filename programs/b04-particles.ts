@@ -31,34 +31,16 @@ import {
 
 @ValueType
 class Particle {
-  pos: Vec3f;
-  vel: Vec3f;
-
-  constructor(pos: Vec3f, vel: Vec3f) {
-    this.pos = pos;
-    this.vel = vel;
-  }
+  constructor(public pos: Vec3f, public vel: Vec3f) {}
 }
 
 @ValueType
 class SimParams {
-  dt: f32;
-  count: u32;
-
-  constructor(dt: f32, count: u32) {
-    this.dt = dt;
-    this.count = count;
-  }
+  constructor(public dt: f32, public count: u32) {}
 }
 
 class ParticleLayout {
-  params: Uniform<SimParams>;
-  particles: MutStorage<Particle>;
-
-  constructor(params: Uniform<SimParams>, particles: MutStorage<Particle>) {
-    this.params = params;
-    this.particles = particles;
-  }
+  constructor(public params: Uniform<SimParams>, public particles: MutStorage<Particle>) {}
 }
 
 function integrate(particle: Particle, dt: f32): Particle {
@@ -78,7 +60,7 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
   }
 }
 
-const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
+const particles: ComputePipelineSpec = computePipeline(particleKernel, {
   name: "particles",
   workgroupSize: [64, 1, 1],
 });
@@ -135,12 +117,12 @@ export async function main(): Promise<void> {
     using command = encoder.finishDefault();
     device.queue.submit([command]);
     const hostLayout = new ParticleLayout(
-      new Uniform<SimParams>(new SimParams(2.0, 1)),
-      new MutStorage<Particle>([
+      new Uniform(new SimParams(2.0, 1)),
+      new MutStorage([
         new Particle(new Vec3f(1.0, 2.0, 3.0), new Vec3f(0.5, 0.0, 0.0)),
       ]),
     );
-    simulateCompute<ParticleLayout>(
+    simulateCompute(
       particleKernel,
       hostLayout,
       particles,

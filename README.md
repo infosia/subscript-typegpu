@@ -44,7 +44,7 @@ function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
   res.state[0] = state;
 }
 
-const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
+const firstProgram: ComputePipelineSpec = computePipeline(
   incrementCounter,
   {
     name: "firstProgram",
@@ -61,23 +61,13 @@ for the same two roles.
 ```ts program=programs/b22-first-program.ts
 @ValueType
 class State {
-  counter: u32;
-  incrementBy: u32;
-
-  constructor(counter: u32, incrementBy: u32) {
-    this.counter = counter;
-    this.incrementBy = incrementBy;
-  }
+  constructor(public counter: u32, public incrementBy: u32) {}
 }
 ```
 
 ```ts program=programs/b22-first-program.ts
 class CounterLayout {
-  state: MutStorage<State>;
-
-  constructor(state: MutStorage<State>) {
-    this.state = state;
-  }
+  constructor(public state: MutStorage<State>) {}
 }
 ```
 
@@ -106,7 +96,7 @@ with identical results.
 | Schema | `d.struct({ ... })`, a run-time value | `@ValueType class`, a declaration |
 | Memory layout | computed at run time | computed ahead of time, importable as constants |
 | WGSL | generated at run time from a compacted AST | generated ahead of time — the emitted WGSL sits next to your program as a readable file |
-| Kernel marker | `'use gpu'` directive and a build plugin | `computePipeline<L>(fn, spec)` declaration |
+| Kernel marker | `'use gpu'` directive and a build plugin | `computePipeline(fn, spec)` declaration |
 | Buffer data | JavaScript values converted by the library | `Context.bytesOf<T>(value)`, the bytes of the value |
 | Lifetime | garbage collection | `using` and `dispose()` |
 | Errors | exceptions | `null` and `false` returns, error scopes, and traps that name a rule |

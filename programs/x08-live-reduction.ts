@@ -34,24 +34,16 @@ import {
 
 @ValueType
 class ReductionValue {
-  value: f32;
-  constructor(value: f32) { this.value = value; }
+  constructor(public value: f32) {}
 }
 
 @ValueType
 class ReductionCounter {
-  total: AtomicU32;
-  constructor(total: AtomicU32) { this.total = total; }
+  constructor(public total: AtomicU32) {}
 }
 
 class ReductionLayout {
-  input: Storage<ReductionValue>;
-  output: MutStorage<ReductionCounter>;
-
-  constructor(input: Storage<ReductionValue>, output: MutStorage<ReductionCounter>) {
-    this.input = input;
-    this.output = output;
-  }
+  constructor(public input: Storage<ReductionValue>, public output: MutStorage<ReductionCounter>) {}
 }
 
 const partials: WorkgroupArray<f32> = workgroupArray<f32>(256);
@@ -64,7 +56,7 @@ function reductionKernel(res: ReductionLayout, ctx: ComputeInvocation): void {
   let stride: u32 = 128;
   while (stride > 0) {
     if (local < stride) {
-      partials[local] = partials[local] + partials[local + stride];
+      partials[local] += partials[local + stride];
     }
     workgroupBarrier();
     stride = stride / 2;
@@ -74,7 +66,7 @@ function reductionKernel(res: ReductionLayout, ctx: ComputeInvocation): void {
   }
 }
 
-const reduction: ComputePipelineSpec = computePipeline<ReductionLayout>(reductionKernel, {
+const reduction: ComputePipelineSpec = computePipeline(reductionKernel, {
   name: "reduction",
   workgroupSize: [256, 1, 1],
 });
@@ -170,7 +162,7 @@ export async function main(): Promise<void> {
     );
     if (!mapped) { print("FAIL map"); return; }
     const result: ReductionCounter = Context.fromBytes<ReductionCounter>(
-      readBuffer<ReductionCounter>(readback, 0, 1),
+      readBuffer(readback, 0, 1),
       0,
     );
     print("readback:mapped");

@@ -25,7 +25,7 @@ function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
   res.state[0] = state;
 }
 
-const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
+const firstProgram: ComputePipelineSpec = computePipeline(
   incrementCounter,
   {
     name: "firstProgram",
@@ -50,23 +50,13 @@ class names the bindings of one bind group.
 ```ts program=programs/b22-first-program.ts
 @ValueType
 class State {
-  counter: u32;
-  incrementBy: u32;
-
-  constructor(counter: u32, incrementBy: u32) {
-    this.counter = counter;
-    this.incrementBy = incrementBy;
-  }
+  constructor(public counter: u32, public incrementBy: u32) {}
 }
 ```
 
 ```ts program=programs/b22-first-program.ts
 class CounterLayout {
-  state: MutStorage<State>;
-
-  constructor(state: MutStorage<State>) {
-    this.state = state;
-  }
+  constructor(public state: MutStorage<State>) {}
 }
 ```
 
@@ -187,7 +177,7 @@ function badKernel(res: CounterLayout, ctx: ComputeInvocation): void {
   res.state[0] = new State(counter, 1);
 }
 
-const badProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
+const badProgram: ComputePipelineSpec = computePipeline(
   badKernel,
   { name: "badProgram", workgroupSize: [1, 1, 1] },
 );
@@ -206,8 +196,8 @@ host-side bindings, one invocation at a time, so the arithmetic is
 proven without a device.
 
 ```ts program=programs/b22-first-program.ts
-    const hostLayout = new CounterLayout(new MutStorage<State>([new State(0, 10)]));
-    simulateCompute<CounterLayout>(
+    const hostLayout = new CounterLayout(new MutStorage([new State(0, 10)]));
+    simulateCompute(
       incrementCounter,
       hostLayout,
       firstProgram,
@@ -217,7 +207,7 @@ proven without a device.
     const hostState: State = hostLayout.state[0];
     hostState.incrementBy = 25;
     hostLayout.state[0] = hostState;
-    simulateCompute<CounterLayout>(
+    simulateCompute(
       incrementCounter,
       hostLayout,
       firstProgram,

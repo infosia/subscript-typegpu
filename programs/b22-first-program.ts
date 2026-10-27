@@ -36,21 +36,11 @@ import {
 
 @ValueType
 class State {
-  counter: u32;
-  incrementBy: u32;
-
-  constructor(counter: u32, incrementBy: u32) {
-    this.counter = counter;
-    this.incrementBy = incrementBy;
-  }
+  constructor(public counter: u32, public incrementBy: u32) {}
 }
 
 class CounterLayout {
-  state: MutStorage<State>;
-
-  constructor(state: MutStorage<State>) {
-    this.state = state;
-  }
+  constructor(public state: MutStorage<State>) {}
 }
 
 function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
@@ -59,7 +49,7 @@ function incrementCounter(res: CounterLayout, ctx: ComputeInvocation): void {
   res.state[0] = state;
 }
 
-const firstProgram: ComputePipelineSpec = computePipeline<CounterLayout>(
+const firstProgram: ComputePipelineSpec = computePipeline(
   incrementCounter,
   {
     name: "firstProgram",
@@ -148,8 +138,8 @@ export async function main(): Promise<void> {
     const readback: State = Context.fromBytes<State>(readbackBytes, 0);
     print(`readback:counter=${readback.counter} incrementBy=${readback.incrementBy}`);
 
-    const hostLayout = new CounterLayout(new MutStorage<State>([new State(0, 10)]));
-    simulateCompute<CounterLayout>(
+    const hostLayout = new CounterLayout(new MutStorage([new State(0, 10)]));
+    simulateCompute(
       incrementCounter,
       hostLayout,
       firstProgram,
@@ -159,7 +149,7 @@ export async function main(): Promise<void> {
     const hostState: State = hostLayout.state[0];
     hostState.incrementBy = 25;
     hostLayout.state[0] = hostState;
-    simulateCompute<CounterLayout>(
+    simulateCompute(
       incrementCounter,
       hostLayout,
       firstProgram,

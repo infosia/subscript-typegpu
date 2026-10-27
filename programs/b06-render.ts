@@ -31,24 +31,12 @@ import {
 
 @ValueType
 class Vertex {
-  position: Vec2f;
-  color: Vec3f;
-
-  constructor(position: Vec2f, color: Vec3f) {
-    this.position = position;
-    this.color = color;
-  }
+  constructor(public position: Vec2f, public color: Vec3f) {}
 }
 
 @ValueType
 class Varyings {
-  position: Vec4f;
-  color: Vec3f;
-
-  constructor(position: Vec4f, color: Vec3f) {
-    this.position = position;
-    this.color = color;
-  }
+  constructor(public position: Vec4f, public color: Vec3f) {}
 }
 
 const FRAGMENT_ALPHA: f32 = 1.0;
@@ -64,7 +52,7 @@ function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(input.color.x, input.color.y, input.color.z, FRAGMENT_ALPHA);
 }
 
-const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, {
+const tri: RenderPipelineSpec = renderPipeline(vert, frag, {
   format: "rgba8unorm",
 });
 

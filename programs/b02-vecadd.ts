@@ -34,23 +34,11 @@ import {
 
 @ValueType
 class Item {
-  value: f32;
-
-  constructor(value: f32) {
-    this.value = value;
-  }
+  constructor(public value: f32) {}
 }
 
 class VecAddLayout {
-  a: Storage<Item>;
-  b: Storage<Item>;
-  out: MutStorage<Item>;
-
-  constructor(a: Storage<Item>, b: Storage<Item>, out: MutStorage<Item>) {
-    this.a = a;
-    this.b = b;
-    this.out = out;
-  }
+  constructor(public a: Storage<Item>, public b: Storage<Item>, public out: MutStorage<Item>) {}
 }
 
 function vecAddKernel(res: VecAddLayout, ctx: ComputeInvocation): void {
@@ -63,7 +51,7 @@ function vecAddKernel(res: VecAddLayout, ctx: ComputeInvocation): void {
   }
 }
 
-const vecAdd: ComputePipelineSpec = computePipeline<VecAddLayout>(vecAddKernel, {
+const vecAdd: ComputePipelineSpec = computePipeline(vecAddKernel, {
   name: "vecAdd",
   workgroupSize: [64, 1, 1],
 });
@@ -123,11 +111,11 @@ export async function main(): Promise<void> {
     using command = encoder.finishDefault();
     device.queue.submit([command]);
     const hostLayout = new VecAddLayout(
-      new Storage<Item>([new Item(1.0), new Item(2.0), new Item(3.0)]),
-      new Storage<Item>([new Item(4.0), new Item(5.0), new Item(6.0)]),
-      new MutStorage<Item>([new Item(0.0), new Item(0.0), new Item(0.0)]),
+      new Storage([new Item(1.0), new Item(2.0), new Item(3.0)]),
+      new Storage([new Item(4.0), new Item(5.0), new Item(6.0)]),
+      new MutStorage([new Item(0.0), new Item(0.0), new Item(0.0)]),
     );
-    simulateCompute<VecAddLayout>(
+    simulateCompute(
       vecAddKernel,
       hostLayout,
       vecAdd,

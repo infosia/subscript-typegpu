@@ -33,16 +33,11 @@ import {
 
 @ValueType
 class WorkCounter {
-  total: AtomicU32;
-  constructor(total: AtomicU32) { this.total = total; }
+  constructor(public total: AtomicU32) {}
 }
 
 class WorkgroupLayout {
-  counters: MutStorage<WorkCounter>;
-
-  constructor(counters: MutStorage<WorkCounter>) {
-    this.counters = counters;
-  }
+  constructor(public counters: MutStorage<WorkCounter>) {}
 }
 
 const privateOffset: PrivateVar<u32> = privateVar<u32>(3);
@@ -50,7 +45,7 @@ const sharedValues: WorkgroupArray<u32> = workgroupArray<u32>(4);
 const sharedCounter: WorkgroupVar<AtomicU32> = workgroupVar<AtomicU32>();
 
 function workgroupKernel(res: WorkgroupLayout, ctx: ComputeInvocation): void {
-  privateOffset.$ = privateOffset.$ + 1;
+  privateOffset.$ += 1;
   sharedValues[ctx.localIndex] = ctx.localIndex + privateOffset.$;
   if (ctx.localIndex == 0) {
     sharedCounter.$.store(0);
@@ -63,7 +58,7 @@ function workgroupKernel(res: WorkgroupLayout, ctx: ComputeInvocation): void {
   }
 }
 
-const workgroup: ComputePipelineSpec = computePipeline<WorkgroupLayout>(workgroupKernel, {
+const workgroup: ComputePipelineSpec = computePipeline(workgroupKernel, {
   name: "workgroup",
   workgroupSize: [4, 1, 1],
 });

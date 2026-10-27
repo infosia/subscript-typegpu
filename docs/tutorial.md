@@ -9,13 +9,7 @@ This tutorial follows `programs/b04-particles.ts`. The program defines host data
 ```ts program=programs/b04-particles.ts
 @ValueType
 class Particle {
-  pos: Vec3f;
-  vel: Vec3f;
-
-  constructor(pos: Vec3f, vel: Vec3f) {
-    this.pos = pos;
-    this.vel = vel;
-  }
+  constructor(public pos: Vec3f, public vel: Vec3f) {}
 }
 ```
 
@@ -24,13 +18,7 @@ class Particle {
 ```ts program=programs/b04-particles.ts
 @ValueType
 class SimParams {
-  dt: f32;
-  count: u32;
-
-  constructor(dt: f32, count: u32) {
-    this.dt = dt;
-    this.count = count;
-  }
+  constructor(public dt: f32, public count: u32) {}
 }
 ```
 
@@ -41,13 +29,7 @@ Its constructor takes one binding per field, in declaration order.
 
 ```ts program=programs/b04-particles.ts
 class ParticleLayout {
-  params: Uniform<SimParams>;
-  particles: MutStorage<Particle>;
-
-  constructor(params: Uniform<SimParams>, particles: MutStorage<Particle>) {
-    this.params = params;
-    this.particles = particles;
-  }
+  constructor(public params: Uniform<SimParams>, public particles: MutStorage<Particle>) {}
 }
 ```
 
@@ -85,7 +67,7 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
 The declaration connects the layout type, the kernel function, and the workgroup size.
 
 ```ts program=programs/b04-particles.ts
-const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
+const particles: ComputePipelineSpec = computePipeline(particleKernel, {
   name: "particles",
   workgroupSize: [64, 1, 1],
 });
