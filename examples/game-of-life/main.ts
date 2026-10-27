@@ -43,7 +43,6 @@ import {
   GPUTexture,
   GPUTextureUsage,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   EditParams_SIZE,
@@ -357,7 +356,7 @@ export function init(
   }
   // The wrapper adapts the host handles to the API layer. It carries no `dispose`, because
   // the host owns the device.
-  const hostDevice = hostOwnedGPUDevice(instance, device);
+  const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // The vertex buffer holds the four corners of the strip. Vertex_STRIDE keeps the size right
   // when the schema changes.
   const vertices = hostDevice.createBuffer({

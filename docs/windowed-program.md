@@ -368,7 +368,7 @@ return, before the script creates any resource.
 ### The device arrives borrowed
 
 ```ts program=examples/window-triangle/main.ts
-  const deviceWrapper: GPUHostOwnedDevice = hostOwnedGPUDevice(instance, device);
+  const deviceWrapper: GPUHostOwnedDevice = GPUHostOwnedDevice.create(instance, device);
 ```
 
 `GPUHostOwnedDevice` is a distinct class from `GPUDevice`. It carries the same

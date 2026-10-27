@@ -37,7 +37,6 @@ import {
   GPUBufferUsage,
   GPUHostOwnedDevice,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   BrushParams_SIZE,
@@ -396,7 +395,7 @@ export function init(
   }
   // The host owns the device and the instance. The wrapper carries no `dispose`, so this example
   // never releases what it did not create.
-  const hostDevice = hostOwnedGPUDevice(instance, device);
+  const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // The four strip corners in clip space, in the order the triangle-strip topology needs.
   const vertexValues: FixedArray<Vertex, 4> = [
     new Vertex(new Vec2f(-1.0, -1.0)),

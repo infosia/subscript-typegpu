@@ -53,7 +53,7 @@ pub struct GeneratedApi {
     pub wrapper_constructs: usize,
     /// Facade-owned result classes emitted from F11 fill records.
     pub result_constructs: usize,
-    /// Named policy notes for namespace-to-singleton reshapes.
+    /// Named policy notes for namespaces that become classes of static constants.
     pub namespace_reshape_notes: Vec<String>,
     /// Selected optional-without-default Q32 dictionary members whose
     /// absence lowers to a boundary-only Undefined sentinel.
@@ -280,7 +280,7 @@ struct NestedBoundaryPlan {
 }
 
 #[derive(Clone, Debug)]
-/// One IDL namespace, emitted as a singleton object of flag constants.
+/// One IDL namespace, emitted as a class of `static readonly` flag constants.
 struct NamespacePlan {
     name: String,
     value_type: String,
@@ -3206,9 +3206,8 @@ fn unclaimed_dictionary_field(
 
 /// Builds one namespace plan per selected IDL namespace.
 ///
-/// subscript has no user-defined namespace and no static field, so the flag constants become a
-/// singleton object. The value type comes from the mirror alias that the
-/// `[[namespace_mappings]]` row names.
+/// subscript has no user-defined namespace, so each namespace becomes a class of `static readonly` constants.
+/// The value type comes from the mirror alias that the `[[namespace_mappings]]` row names.
 fn build_namespaces(
     mirror: &MirrorModel,
     policy: &ApiSection,
@@ -6411,22 +6410,16 @@ fn render_descriptor_helpers(out: &mut String, descriptors: &[DescriptorPlan]) {
     }
 }
 
-/// Renders one IDL namespace as a singleton class with one field per flag constant.
+/// Renders one IDL namespace as a class of static constants.
 fn render_namespace(out: &mut String, namespace: &NamespacePlan) {
-    out.push_str(&format!("class {}Namespace {{\n", namespace.name));
-    for (name, _) in &namespace.constants {
-        out.push_str(&format!("  {name}: {};\n", namespace.value_type));
-    }
-    out.push_str("\n  constructor() {\n");
+    out.push_str(&format!("export class {} {{\n", namespace.name));
     for (name, value) in &namespace.constants {
-        out.push_str(&format!("    this.{name} = 0x{value:04X};\n"));
+        out.push_str(&format!(
+            "  static readonly {name}: {} = 0x{value:04X};\n",
+            namespace.value_type
+        ));
     }
-    out.push_str("  }\n");
     out.push_str("}\n\n");
-    out.push_str(&format!(
-        "export const {0}: {0}Namespace = new {0}Namespace();\n\n",
-        namespace.name
-    ));
 }
 
 /// Renders one public class, and the host-owned wrapper beside it when the seam applies (J13).
@@ -6438,13 +6431,6 @@ fn render_interface(
     render_interface_class(out, interface, needs, false)?;
     if interface.host_owned {
         render_interface_class(out, interface, needs, true)?;
-        out.push_str(&format!(
-            "export function hostOwned{}(instance: SubscriptTypegpuInstance, {}: SubscriptTypegpu{}): GPUHostOwnedDevice {{\n  return new GPUHostOwnedDevice(instance, {});\n}}\n\n",
-            interface.name,
-            interface.raw_field,
-            interface.boundary,
-            interface.raw_field,
-        ));
     }
     Ok(())
 }
@@ -6510,7 +6496,8 @@ fn render_interface_class(
         ));
     }
     out.push_str(&format!(
-        "  constructor({}) {{\n",
+        "  {}constructor({}) {{\n",
+        if host_owned { "private " } else { "" },
         constructor_params.join(", ")
     ));
     if interface.needs_instance {
@@ -6545,6 +6532,12 @@ fn render_interface_class(
         }
     }
     out.push_str("  }\n\n");
+    if host_owned {
+        out.push_str(&format!(
+            "  /** Creates a wrapper for a host-owned device. */\n  static create(instance: SubscriptTypegpuInstance, {0}: SubscriptTypegpu{1}): GPUHostOwnedDevice {{\n    return new GPUHostOwnedDevice(instance, {0});\n  }}\n\n",
+            interface.raw_field, interface.boundary,
+        ));
+    }
 
     for method in &interface.methods {
         if host_owned && matches!(method, MethodPlan::Operation { name, .. } if name == "destroy") {

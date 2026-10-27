@@ -137,6 +137,43 @@ fn webgpu_api_is_current() {
 }
 
 #[test]
+fn webgpu_namespaces_are_static_constants() {
+    let regeneration = regeneration();
+    if regeneration.libclang_pending {
+        crate::support::pend_libclang();
+        return;
+    }
+    let api = read(&regeneration.scratch.0.join("lib/webgpu.ts"));
+    let idl = subscript_typegpu_webgpu_gen::extract_gpuweb_idl(&read(
+        &repository_root().join("third_party/gpuweb/spec/index.bs"),
+    ))
+    .expect("pinned IDL parses");
+    for namespace in [
+        "GPUBufferUsage",
+        "GPUMapMode",
+        "GPUTextureUsage",
+        "GPUShaderStage",
+        "GPUColorWrite",
+    ] {
+        let mut expected = format!("export class {namespace} {{\n");
+        for constant in idl
+            .namespace_constants
+            .iter()
+            .filter(|constant| constant.namespace == namespace)
+        {
+            expected.push_str(&format!(
+                "  static readonly {}: u64 = 0x{:04X};\n",
+                constant.name, constant.value
+            ));
+        }
+        expected.push_str("}\n");
+        assert!(api.contains(&expected), "namespace differs: {namespace}");
+        assert!(!api.contains(&format!("{namespace}Namespace")));
+        assert!(!api.contains(&format!("export const {namespace}:")));
+    }
+}
+
+#[test]
 fn ambient_mirror_is_raw_bindgen_output() {
     let header = read(&repository_root().join("crates/facade/subscript-typegpu.h"));
     let Some(mirror) = crate::support::bind_header(&header) else {

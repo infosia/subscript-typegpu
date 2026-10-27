@@ -31,7 +31,6 @@ import {
   GPUBufferUsage,
   GPUHostOwnedDevice,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   Boid_STRIDE,
@@ -230,7 +229,7 @@ export function init(
   }
   // The wrapper adapts the host handles to the API layer. It carries no `dispose`, because
   // the host owns the device.
-  const hostDevice = hostOwnedGPUDevice(instance, device);
+  const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // One narrow triangle points along +y in local space. The vertex stage turns it onto the
   // velocity of each boid.
   const vertexValues: FixedArray<Vertex, 3> = [

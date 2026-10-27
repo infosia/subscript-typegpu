@@ -20,7 +20,6 @@ import {
   GPUBufferUsage,
   GPUHostOwnedDevice,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   Vertex_STRIDE,
@@ -104,7 +103,7 @@ export function init(
   }
   // The host owns the device and the instance. The wrapper adds the API-layer surface and
   // disposes neither.
-  const hostDevice = hostOwnedGPUDevice(instance, device);
+  const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // One oversized triangle. The two coordinates of 3.0 fall outside the clip volume, so the
   // visible part covers the whole surface with three vertices instead of six.
   const values: FixedArray<Vertex, 3> = [

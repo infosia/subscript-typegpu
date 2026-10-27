@@ -364,18 +364,16 @@ pub(crate) fn type_uses_f16(module: &Module, ty: &Type, pos: &Pos) -> Result<boo
 /// Reads one string-valued member of a `RenderPipelineSpec` literal (RN12).
 ///
 /// A member reaches the HIR as a string literal, an enum member, or an integer over a string
-/// alias, so all three forms resolve to the same text. `required` decides whether an unset member
-/// is a diagnostic or gives `default`.
+/// alias, so all three forms resolve to the same text. An unset optional member gives `default`.
 ///
 /// # Errors
 ///
-/// Returns an RN1 diagnostic in four cases. The options are not a descriptor literal. The class
-/// holds no such member. A required member is unset. The value is not a literal.
+/// Returns an RN1 diagnostic for nonliteral options or values.
+/// Returns a K15 diagnostic for an absent library member or an unset required format.
 fn descriptor_string(
     module: &Module,
     expr: &Expr,
     field_name: &str,
-    required: bool,
     default: &str,
 ) -> Result<String, Diagnostic> {
     let ExprKind::DescriptorLit { .. } = &expr.kind else {
@@ -386,9 +384,8 @@ fn descriptor_string(
         ));
     };
     let Some(field) = crate::descriptor_field(module, expr, field_name)? else {
-        return Err(diagnostic(
-            "RN1",
-            format!("render options have no `{field_name}` member"),
+        return Err(generator_diagnostic(
+            format!("library RenderPipelineSpec lost its {field_name} field"),
             expr.pos.clone(),
         ));
     };
@@ -428,12 +425,11 @@ fn descriptor_string(
                     )
                 })
         }
-        None if !required => Ok(default.to_owned()),
-        None => Err(diagnostic(
-            "RN1",
-            format!("render options omit `{field_name}`"),
+        None if field_name == "format" => Err(generator_diagnostic(
+            "library RenderPipelineSpec has no format value",
             expr.pos.clone(),
         )),
+        None => Ok(default.to_owned()),
         Some(value) => Err(diagnostic(
             "RN1",
             format!("render option `{field_name}` must be a string literal"),
@@ -799,14 +795,13 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             continue;
         }
         let Some(options) = args.get(2) else {
-            diagnostics.push(diagnostic(
-                "RN1",
-                "render declaration omits options",
+            diagnostics.push(generator_diagnostic(
+                "render declaration lost its options argument",
                 global.pos.clone(),
             ));
             continue;
         };
-        let target_format = match descriptor_string(module, options, "format", true, "") {
+        let target_format = match descriptor_string(module, options, "format", "") {
             Ok(value) => value,
             Err(error) => {
                 diagnostics.push(error);
@@ -827,7 +822,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             ("cullMode", "none"),
             ("frontFace", "ccw"),
         ] {
-            if let Err(error) = descriptor_string(module, options, field, false, default) {
+            if let Err(error) = descriptor_string(module, options, field, default) {
                 diagnostics.push(error);
             }
         }

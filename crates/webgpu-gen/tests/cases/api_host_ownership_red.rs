@@ -35,7 +35,7 @@ fn red(policy: &str, expected: &str) {
 }
 
 fn constructor_row() -> &'static str {
-    "[[api.deviations]]\nmember = \"GPUDevice.@constructor\"\npattern = \"host-owned-wrapper\"\nreason = \"JavaScript exposes no GPUDevice constructor. Static methods are unavailable, so this API keeps a public owning constructor that accepts private raw-handle fields, acquires and caches one queue reference through subscript_typegpu_device_get_queue, and is paired with hostOwnedGPUDevice, whose GPUHostOwnedDevice wraps a host-owned device, exposes the same creation methods but neither dispose nor destroy, and returns a new owned queue wrapper from each queue call\"\n\n"
+    "[[api.deviations]]\nmember = \"GPUDevice.@constructor\"\npattern = \"host-owned-wrapper\"\nreason = \"JavaScript exposes no GPUDevice constructor. This API keeps a public owning constructor that accepts private raw-handle fields. It acquires and caches one queue reference through subscript_typegpu_device_get_queue. GPUHostOwnedDevice.create returns GPUHostOwnedDevice, which wraps a host-owned device and exposes the same creation methods but neither dispose nor destroy. Each queue call returns a new owned queue wrapper.\"\n\n"
 }
 
 #[test]

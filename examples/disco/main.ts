@@ -27,7 +27,6 @@ import {
   GPUBufferUsage,
   GPUHostOwnedDevice,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   FrameData_SIZE,
@@ -282,7 +281,7 @@ export function init(
   }
   // The wrapper adapts the host handles to the API layer. It carries no `dispose`, because
   // the host owns the device.
-  const hostDevice = hostOwnedGPUDevice(instance, device);
+  const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // The vertex buffer holds the three corners of the fullscreen triangle. Vertex_STRIDE keeps
   // the size right when the schema changes.
   const vertices = hostDevice.createBuffer({

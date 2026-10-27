@@ -695,8 +695,8 @@ fn literal_u32(expr: &Expr) -> Option<u32> {
 ///
 /// # Errors
 ///
-/// Returns a PI1 diagnostic in three cases. The options are not a descriptor literal. The member
-/// is absent, or it is not an array of three integer literals. An axis is zero.
+/// Returns a PI1 diagnostic for nonliteral options or dimensions, or a zero dimension.
+/// Returns a K15 diagnostic for an invalid library field or array length.
 fn workgroup(module: &Module, expr: &Expr) -> Result<[u32; 3], Diagnostic> {
     let ExprKind::DescriptorLit { .. } = &expr.kind else {
         return Err(diagnostic(
@@ -706,16 +706,14 @@ fn workgroup(module: &Module, expr: &Expr) -> Result<[u32; 3], Diagnostic> {
         ));
     };
     let Some(field) = crate::descriptor_field(module, expr, "workgroupSize")? else {
-        return Err(diagnostic(
-            "PI1",
-            "pipeline options omit workgroupSize",
+        return Err(generator_diagnostic(
+            "library ComputePipelineSpec lost its workgroupSize field",
             expr.pos.clone(),
         ));
     };
     let Some(value) = field else {
-        return Err(diagnostic(
-            "PI1",
-            "pipeline workgroup size is not literal",
+        return Err(generator_diagnostic(
+            "library ComputePipelineSpec has no workgroupSize value",
             expr.pos.clone(),
         ));
     };
@@ -727,9 +725,8 @@ fn workgroup(module: &Module, expr: &Expr) -> Result<[u32; 3], Diagnostic> {
         ));
     };
     let [x_value, y_value, z_value] = values.as_slice() else {
-        return Err(diagnostic(
-            "PI1",
-            "pipeline workgroup size requires three literals",
+        return Err(generator_diagnostic(
+            "library ComputePipelineSpec workgroupSize has an invalid array length",
             value.pos.clone(),
         ));
     };
@@ -1076,9 +1073,8 @@ pub(crate) fn discover(
             continue;
         }
         let Some(options) = args.get(1) else {
-            diagnostics.push(diagnostic(
-                "PI1",
-                "pipeline declaration omits options",
+            diagnostics.push(generator_diagnostic(
+                "pipeline declaration lost its options argument",
                 global.init.pos.clone(),
             ));
             continue;

@@ -1040,7 +1040,7 @@ interfaces = ["GPU", "GPUAdapter", "GPUDevice", "GPUBuffer", "GPUQueue", "GPUTex
 dictionaries = ["GPUBufferDescriptor", "GPUTextureDescriptor", "GPUTextureViewDescriptor", "GPUSamplerDescriptor", "GPUExtent3DDict", "GPUOrigin3DDict", "GPUTexelCopyTextureInfo", "GPUTexelCopyBufferLayout", "GPUBufferBindingLayout", "GPUSamplerBindingLayout", "GPUTextureBindingLayout", "GPUStorageTextureBindingLayout", "GPUBindGroupLayoutEntry", "GPUBindGroupLayoutDescriptor", "GPUBindGroupEntry", "GPUBindGroupDescriptor", "GPUBufferBinding", "GPUPipelineLayoutDescriptor", "GPUShaderModuleDescriptor", "GPUProgrammableStage", "GPUComputePipelineDescriptor", "GPUVertexAttribute", "GPUVertexBufferLayout", "GPUVertexState", "GPUPrimitiveState", "GPUStencilFaceState", "GPUDepthStencilState", "GPUMultisampleState", "GPUBlendComponent", "GPUBlendState", "GPUColorTargetState", "GPUFragmentState", "GPURenderPipelineDescriptor", "GPUCommandEncoderDescriptor", "GPURenderBundleEncoderDescriptor", "GPUQuerySetDescriptor", "GPUCommandBufferDescriptor", "GPUComputePassTimestampWrites", "GPURenderPassTimestampWrites", "GPUComputePassDescriptor", "GPUColorDict", "GPURenderPassColorAttachment", "GPURenderPassDepthStencilAttachment", "GPURenderPassDescriptor", "GPUTexelCopyBufferInfo", "GPURenderBundleDescriptor", "GPUQueueDescriptor", "GPUDeviceDescriptor"]
 namespaces = ["GPUBufferUsage", "GPUMapMode", "GPUTextureUsage", "GPUShaderStage", "GPUColorWrite"]
 enums = ["GPUBufferMapState", "GPUTextureFormat", "GPUTextureDimension", "GPUTextureViewDimension", "GPUTextureAspect", "GPUAddressMode", "GPUFilterMode", "GPUMipmapFilterMode", "GPUCompareFunction", "GPUBufferBindingType", "GPUSamplerBindingType", "GPUTextureSampleType", "GPUStorageTextureAccess", "GPUVertexFormat", "GPUVertexStepMode", "GPUPrimitiveTopology", "GPUIndexFormat", "GPUFrontFace", "GPUCullMode", "GPUBlendFactor", "GPUBlendOperation", "GPUStencilOperation", "GPULoadOp", "GPUStoreOp", "GPUQueryType", "GPUErrorFilter", "GPUDeviceLostReason", "GPUFeatureName"]
-namespace_reason = "static fields and user-defined namespaces are unavailable, so WebIDL namespaces become numeric singleton objects"
+namespace_reason = "subscript has no user-defined namespace, so each WebIDL namespace becomes a class of static readonly constants"
 singleton_interface = "GPU"
 singleton_name = "gpu"
 singleton_boundary = "Instance"
@@ -2140,7 +2140,7 @@ pattern = "dictionary-field"
 [[api.deviations]]
 member = "GPUDevice.@constructor"
 pattern = "host-owned-wrapper"
-reason = "JavaScript exposes no GPUDevice constructor. Static methods are unavailable, so this API keeps a public owning constructor that accepts private raw-handle fields, acquires and caches one queue reference through subscript_typegpu_device_get_queue, and is paired with hostOwnedGPUDevice, whose GPUHostOwnedDevice wraps a host-owned device, exposes the same creation methods but neither dispose nor destroy, and returns a new owned queue wrapper from each queue call"
+reason = "JavaScript exposes no GPUDevice constructor. This API keeps a public owning constructor that accepts private raw-handle fields. It acquires and caches one queue reference through subscript_typegpu_device_get_queue. GPUHostOwnedDevice.create returns GPUHostOwnedDevice, which wraps a host-owned device and exposes the same creation methods but neither dispose nor destroy. Each queue call returns a new owned queue wrapper."
 
 [[api.generate]]
 member = "GPUDevice.queue"

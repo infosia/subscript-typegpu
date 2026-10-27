@@ -6,7 +6,8 @@ review), 2026-08-23. Rev 2 (W8, W13 after the first `--frames` run),
 (W2 Rev 2, W3 Rev 1 pointer input), 2026-08-24. Rev 5 (W2 Rev 3, W3
 Rev 2, W13 Rev 2 optional input entries), 2026-09-05. Rev 6 (W3 Rev 3, W13
 Rev 3 from the U3 review), 2026-09-05. Rev 7 (W5 Rev 1, W9 Rev 2 from the
-comment pass), 2026-09-07. Plan §8 P9 and
+comment pass), 2026-09-07. Rev 8 (W2 Rev 4: the static factory
+`GPUHostOwnedDevice.create`), 2026-10-27. Plan §8 P9 and
 §8 U3 govern this block. The
 facade side is `facade.md` L14 and `facade-generator.md` F23. The
 script side is the API layer (`api-layer.md`) and the TypeGPU layer.
@@ -35,7 +36,7 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   alias in `lib/wire-enum-aliases.generated.d.ts`, and the host
   passes the configured format's wire value (Rev 1: no second
   alias).
-  The script wraps the device with `hostOwnedGPUDevice(instance,
+  The script wraps the device with `GPUHostOwnedDevice.create(instance,
   device)` (a `GPUHostOwnedDevice` has neither `dispose` nor
   `destroy`) and the view with `new GPUTextureView(view)` and
   disposes neither. The host owns both. A harness test checks the

@@ -41,7 +41,6 @@ import {
   GPUBufferUsage,
   GPUHostOwnedDevice,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   BitonicSortPass_SIZE,
@@ -194,7 +193,7 @@ export function init(
     return;
   }
   // The host owns the device and the queue. This wrapper borrows both and never destroys them.
-  const hostDevice = hostOwnedGPUDevice(instance, device);
+  const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // One storage buffer of 4096 u32 keys. Both passes bind it, and no readback exists,
   // so the buffer carries no COPY_SRC.
   const values = hostDevice.createBuffer({

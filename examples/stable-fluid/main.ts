@@ -52,7 +52,6 @@ import {
   GPUTexture,
   GPUTextureUsage,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   BrushParams_SIZE,
@@ -960,7 +959,7 @@ export function init(
   }
   // The window host owns the device. The wrapper adds the API-layer methods and has neither
   // `dispose` nor `destroy`.
-  const hostDevice = hostOwnedGPUDevice(instance, device);
+  const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // One oversized triangle covers the screen. `Vertex_STRIDE` comes from the generator, so
   // the size never restates the layout.
   const vertices = hostDevice.createBuffer({

@@ -47,6 +47,15 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
     )
 }
 
+/// Builds a diagnostic that names the generator as its source (K15).
+fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
+    Diagnostic::new(
+        RuleCode::S100,
+        format!("K15: {} (generator)", message.into()),
+        pos,
+    )
+}
+
 /// Reports whether `name` calls the library function `expected` that `typegpu.ts` declares.
 ///
 /// The generator recognizes a declaration function by declaring file and name, never by name alone
@@ -68,9 +77,8 @@ fn library_call(module: &Module, name: &Symbol, expected: &str) -> bool {
 ///
 /// # Errors
 ///
-/// Returns a K29 diagnostic when `expr` is not a descriptor literal, when the literal leaves
-/// `body` unset, or when `body` is not a string literal. The emitter inserts the text unchanged,
-/// so a computed body has no meaning.
+/// Returns a K29 diagnostic for nonliteral options or body text.
+/// Returns a K15 diagnostic for an absent library body field or value.
 fn descriptor_body(module: &Module, expr: &Expr) -> Result<String, Diagnostic> {
     let ExprKind::DescriptorLit { .. } = &expr.kind else {
         return Err(diagnostic(
@@ -80,9 +88,8 @@ fn descriptor_body(module: &Module, expr: &Expr) -> Result<String, Diagnostic> {
         ));
     };
     let Some(field) = crate::descriptor_field(module, expr, "body")? else {
-        return Err(diagnostic(
-            "K29",
-            "WgslShellSpec has no body field",
+        return Err(generator_diagnostic(
+            "library WgslShellSpec lost its body field",
             expr.pos.clone(),
         ));
     };
@@ -96,9 +103,8 @@ fn descriptor_body(module: &Module, expr: &Expr) -> Result<String, Diagnostic> {
             "WGSL shell body must be a string literal",
             value.pos.clone(),
         )),
-        None => Err(diagnostic(
-            "K29",
-            "WGSL shell options omit body",
+        None => Err(generator_diagnostic(
+            "library WgslShellSpec has no body value",
             expr.pos.clone(),
         )),
     }
@@ -491,9 +497,8 @@ pub(crate) fn discover(module: &Module) -> Result<ShellProgram, Vec<Diagnostic>>
             continue;
         };
         let Some(options) = args.get(1) else {
-            diagnostics.push(diagnostic(
-                "K29",
-                "WGSL shell declaration omits options",
+            diagnostics.push(generator_diagnostic(
+                "WGSL shell declaration lost its options argument",
                 global.init.pos.clone(),
             ));
             continue;

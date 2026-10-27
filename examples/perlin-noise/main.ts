@@ -30,7 +30,6 @@ import {
   GPUBufferUsage,
   GPUHostOwnedDevice,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   FrameData_SIZE,
@@ -159,7 +158,7 @@ export function init(
   }
   // The host owns the device and the instance. The wrapper adds the API-layer surface and
   // disposes neither.
-  const hostDevice = hostOwnedGPUDevice(instance, device);
+  const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // `Vertex_STRIDE` is a generated constant, so the size needs no hand arithmetic. VERTEX
   // admits the vertex buffer slot, and COPY_DST admits the queue write.
   const vertices = hostDevice.createBuffer({

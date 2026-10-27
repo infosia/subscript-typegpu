@@ -58,7 +58,7 @@ pub(crate) struct ApiSection {
     pub interfaces: Vec<String>,
     /// IDL dictionaries emitted as Q33 descriptors, in output order.
     pub dictionaries: Vec<String>,
-    /// Pre-pass namespaces emitted as numeric singleton objects.
+    /// Pre-pass namespaces emitted as classes of `static readonly` constants.
     pub namespaces: Vec<String>,
     /// Explicit IDL namespace to facade flag-alias joins when the names differ.
     #[serde(default)]
@@ -66,8 +66,7 @@ pub(crate) struct ApiSection {
     /// WebIDL string enums emitted as Q32 literal-union aliases.
     #[serde(default)]
     pub enums: Vec<String>,
-    /// Reason for reshaping selected WebIDL namespaces to numeric singleton
-    /// objects instead of JavaScript namespace objects.
+    /// Reason that each selected WebIDL namespace becomes a class of static constants.
     pub namespace_reason: String,
     /// Explicit clearances for selected interfaces whose inherited surface is
     /// outside this API slice.

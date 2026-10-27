@@ -27,7 +27,7 @@
 // - GPU.requestAdapter: the facade exports only subscript_typegpu_instance_request_adapter(instance) and no options-bearing entry point, so this API drops the IDL options argument and polls the facade future explicitly
 // - GPUAdapter.requestDevice: GPUDeviceDescriptor is lowered through the facade's WithDescriptor route and requiredFeatures entries are passed without filtering, so an unsupported feature fails the request rather than being dropped. JavaScript rejects requestDevice with a DOMException on failure, while this API resolves null without an error reason or message
 // - GPUDeviceDescriptor.requiredLimits: WebIDL accepts an open record<DOMString, GPUSize64>, while this API uses a fixed-key GPURequiredLimits descriptor for the 32 fields exposed by the facade (29 u32 and 3 u64), so arbitrary keys, the four compatibility-only limits, and values above u32 for narrowed fields are unavailable. Public zero is reserved for omission and cannot request a real zero-valued limit, lowering u32 omission to WGPU_LIMIT_U32_UNDEFINED and leaving the three u64 fields for the facade's F13 zero-to-undefined rule
-// - GPUDevice.@constructor: JavaScript exposes no GPUDevice constructor. Static methods are unavailable, so this API keeps a public owning constructor that accepts private raw-handle fields, acquires and caches one queue reference through subscript_typegpu_device_get_queue, and is paired with hostOwnedGPUDevice, whose GPUHostOwnedDevice wraps a host-owned device, exposes the same creation methods but neither dispose nor destroy, and returns a new owned queue wrapper from each queue call
+// - GPUDevice.@constructor: JavaScript exposes no GPUDevice constructor. This API keeps a public owning constructor that accepts private raw-handle fields. It acquires and caches one queue reference through subscript_typegpu_device_get_queue. GPUHostOwnedDevice.create returns GPUHostOwnedDevice, which wraps a host-owned device and exposes the same creation methods but neither dispose nor destroy. Each queue call returns a new owned queue wrapper.
 // - GPUBuffer.mapAsync: the facade accepts explicit offset and size values and exposes mapping completion as Promise<boolean> while encapsulating future polling
 // - GPUBuffer.getMappedRange: ArrayBuffer and raw pointers are unavailable, so readMappedRange(offset, size) and writeMappedRange(offset, data) require explicit ranges. Failed reads return an empty u8[] indistinguishable from zero-size success
 // - GPUBuffer.readMappedRangeF32: the IDL spells this element type as Float32Array inside BufferSource, and subscript has no typed-array view. Offset counts bytes and count counts elements
@@ -107,11 +107,11 @@
 // - GPURenderBundle.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
 // - GPUQuerySet.label: the facade exposes no label getter, and subscript R37 rejects an isolated write accessor, so no accessor pair is possible and label(value) stays write-only
 // - GPUError.message: GPUValidationError, GPUOutOfMemoryError, and GPUInternalError are flattened into GPUError(type, message). Callers retain a string type but lose subclass constructors and err instanceof GPUValidationError-style checks
-// - GPUBufferUsage: static fields and user-defined namespaces are unavailable, so WebIDL namespaces become numeric singleton objects
-// - GPUMapMode: static fields and user-defined namespaces are unavailable, so WebIDL namespaces become numeric singleton objects
-// - GPUTextureUsage: static fields and user-defined namespaces are unavailable, so WebIDL namespaces become numeric singleton objects
-// - GPUShaderStage: static fields and user-defined namespaces are unavailable, so WebIDL namespaces become numeric singleton objects
-// - GPUColorWrite: static fields and user-defined namespaces are unavailable, so WebIDL namespaces become numeric singleton objects
+// - GPUBufferUsage: subscript has no user-defined namespace, so each WebIDL namespace becomes a class of static readonly constants
+// - GPUMapMode: subscript has no user-defined namespace, so each WebIDL namespace becomes a class of static readonly constants
+// - GPUTextureUsage: subscript has no user-defined namespace, so each WebIDL namespace becomes a class of static readonly constants
+// - GPUShaderStage: subscript has no user-defined namespace, so each WebIDL namespace becomes a class of static readonly constants
+// - GPUColorWrite: subscript has no user-defined namespace, so each WebIDL namespace becomes a class of static readonly constants
 // - GPUExtent3D: the WebIDL dictionary-or-sequence union is represented by its dictionary branch because subscript cannot express that union
 // - GPUOrigin3D: the WebIDL dictionary-or-sequence union is represented by its dictionary branch because subscript cannot express that union
 // - GPUColor: GPUColor is a dictionary-or-sequence union. This API keeps the dictionary branch, so JavaScript's [r, g, b, a] sequence spelling is unavailable
@@ -1522,97 +1522,46 @@ function toSubscriptTypegpuDeviceDescriptor(value: GPUDeviceDescriptor): Subscri
   );
 }
 
-class GPUBufferUsageNamespace {
-  MAP_READ: u64;
-  MAP_WRITE: u64;
-  COPY_SRC: u64;
-  COPY_DST: u64;
-  INDEX: u64;
-  VERTEX: u64;
-  UNIFORM: u64;
-  STORAGE: u64;
-  INDIRECT: u64;
-  QUERY_RESOLVE: u64;
-
-  constructor() {
-    this.MAP_READ = 0x0001;
-    this.MAP_WRITE = 0x0002;
-    this.COPY_SRC = 0x0004;
-    this.COPY_DST = 0x0008;
-    this.INDEX = 0x0010;
-    this.VERTEX = 0x0020;
-    this.UNIFORM = 0x0040;
-    this.STORAGE = 0x0080;
-    this.INDIRECT = 0x0100;
-    this.QUERY_RESOLVE = 0x0200;
-  }
+export class GPUBufferUsage {
+  static readonly MAP_READ: u64 = 0x0001;
+  static readonly MAP_WRITE: u64 = 0x0002;
+  static readonly COPY_SRC: u64 = 0x0004;
+  static readonly COPY_DST: u64 = 0x0008;
+  static readonly INDEX: u64 = 0x0010;
+  static readonly VERTEX: u64 = 0x0020;
+  static readonly UNIFORM: u64 = 0x0040;
+  static readonly STORAGE: u64 = 0x0080;
+  static readonly INDIRECT: u64 = 0x0100;
+  static readonly QUERY_RESOLVE: u64 = 0x0200;
 }
 
-export const GPUBufferUsage: GPUBufferUsageNamespace = new GPUBufferUsageNamespace();
-
-class GPUMapModeNamespace {
-  READ: u64;
-  WRITE: u64;
-
-  constructor() {
-    this.READ = 0x0001;
-    this.WRITE = 0x0002;
-  }
+export class GPUMapMode {
+  static readonly READ: u64 = 0x0001;
+  static readonly WRITE: u64 = 0x0002;
 }
 
-export const GPUMapMode: GPUMapModeNamespace = new GPUMapModeNamespace();
-
-class GPUTextureUsageNamespace {
-  COPY_SRC: u64;
-  COPY_DST: u64;
-  TEXTURE_BINDING: u64;
-  STORAGE_BINDING: u64;
-  RENDER_ATTACHMENT: u64;
-  TRANSIENT_ATTACHMENT: u64;
-
-  constructor() {
-    this.COPY_SRC = 0x0001;
-    this.COPY_DST = 0x0002;
-    this.TEXTURE_BINDING = 0x0004;
-    this.STORAGE_BINDING = 0x0008;
-    this.RENDER_ATTACHMENT = 0x0010;
-    this.TRANSIENT_ATTACHMENT = 0x0020;
-  }
+export class GPUTextureUsage {
+  static readonly COPY_SRC: u64 = 0x0001;
+  static readonly COPY_DST: u64 = 0x0002;
+  static readonly TEXTURE_BINDING: u64 = 0x0004;
+  static readonly STORAGE_BINDING: u64 = 0x0008;
+  static readonly RENDER_ATTACHMENT: u64 = 0x0010;
+  static readonly TRANSIENT_ATTACHMENT: u64 = 0x0020;
 }
 
-export const GPUTextureUsage: GPUTextureUsageNamespace = new GPUTextureUsageNamespace();
-
-class GPUShaderStageNamespace {
-  VERTEX: u64;
-  FRAGMENT: u64;
-  COMPUTE: u64;
-
-  constructor() {
-    this.VERTEX = 0x0001;
-    this.FRAGMENT = 0x0002;
-    this.COMPUTE = 0x0004;
-  }
+export class GPUShaderStage {
+  static readonly VERTEX: u64 = 0x0001;
+  static readonly FRAGMENT: u64 = 0x0002;
+  static readonly COMPUTE: u64 = 0x0004;
 }
 
-export const GPUShaderStage: GPUShaderStageNamespace = new GPUShaderStageNamespace();
-
-class GPUColorWriteNamespace {
-  RED: u64;
-  GREEN: u64;
-  BLUE: u64;
-  ALPHA: u64;
-  ALL: u64;
-
-  constructor() {
-    this.RED = 0x0001;
-    this.GREEN = 0x0002;
-    this.BLUE = 0x0004;
-    this.ALPHA = 0x0008;
-    this.ALL = 0x000F;
-  }
+export class GPUColorWrite {
+  static readonly RED: u64 = 0x0001;
+  static readonly GREEN: u64 = 0x0002;
+  static readonly BLUE: u64 = 0x0004;
+  static readonly ALPHA: u64 = 0x0008;
+  static readonly ALL: u64 = 0x000F;
 }
-
-export const GPUColorWrite: GPUColorWriteNamespace = new GPUColorWriteNamespace();
 
 // TypeScript reads Q33 optional fields as `T | undefined`, while subscript
 // applies descriptor defaults before reads; default parameters bridge both.
@@ -2252,9 +2201,14 @@ export class GPUHostOwnedDevice {
   private instance: SubscriptTypegpuInstance;
   private device: SubscriptTypegpuDevice;
 
-  constructor(instance: SubscriptTypegpuInstance, device: SubscriptTypegpuDevice) {
+  private constructor(instance: SubscriptTypegpuInstance, device: SubscriptTypegpuDevice) {
     this.instance = instance;
     this.device = device;
+  }
+
+  /** Creates a wrapper for a host-owned device. */
+  static create(instance: SubscriptTypegpuInstance, device: SubscriptTypegpuDevice): GPUHostOwnedDevice {
+    return new GPUHostOwnedDevice(instance, device);
   }
 
   hasFeature(name: GPUFeatureName): boolean {
@@ -2417,10 +2371,6 @@ export class GPUHostOwnedDevice {
     subscript_typegpu_device_set_label(this.device, value);
   }
 
-}
-
-export function hostOwnedGPUDevice(instance: SubscriptTypegpuInstance, device: SubscriptTypegpuDevice): GPUHostOwnedDevice {
-  return new GPUHostOwnedDevice(instance, device);
 }
 
 export class GPUBuffer {

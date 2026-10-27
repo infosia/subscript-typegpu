@@ -20,7 +20,6 @@ import {
   GPUBufferUsage,
   GPUHostOwnedDevice,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   Vertex_STRIDE,
@@ -103,7 +102,7 @@ export function init(
   }
   // The host owns the device and the instance. The wrapper adds the API-layer surface and
   // disposes neither.
-  const hostDevice = hostOwnedGPUDevice(instance, device);
+  const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // Three clip-space corners. The vertex index the kernel reads follows this order.
   const values: FixedArray<Vertex, 3> = [
     new Vertex(new Vec2f(-0.72, -0.58)),

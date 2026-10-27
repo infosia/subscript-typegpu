@@ -9,7 +9,7 @@ import {
   UI_BLEND, UI_OPT_EXPANDED, UI_RES_SUBMIT, UI_COLOR_TEXT, UI_OPT_ALIGN_CENTER,
 } from "./typegpu-ui";
 import { RenderPipelineSpec, renderPipelineL } from "./typegpu";
-import { GPUHostOwnedDevice, GPUTextureView, hostOwnedGPUDevice } from "./webgpu";
+import { GPUHostOwnedDevice, GPUTextureView } from "./webgpu";
 import {
   uiPipeline_WGSL, uiPipeline_VERTEX_ENTRY, uiPipeline_FRAGMENT_ENTRY,
   uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, uiPipeline_TARGET_FORMAT,
@@ -199,7 +199,7 @@ export function init(
   }
   // The host owns the device and the instance. The wrapper adds the API-layer surface and
   // disposes neither.
-  const deviceWrapper: GPUHostOwnedDevice = hostOwnedGPUDevice(instance, device);
+  const deviceWrapper: GPUHostOwnedDevice = GPUHostOwnedDevice.create(instance, device);
   // The facts carry everything the generator produced for the pipeline. The renderer builds
   // the pipeline, the glyph atlas, and its buffers from them, and it owns each one.
   const facts: UiPipelineFacts = new UiPipelineFacts(

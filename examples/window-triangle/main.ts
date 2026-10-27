@@ -19,7 +19,6 @@ import {
   GPUBufferUsage,
   GPUHostOwnedDevice,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   tri_FRAGMENT_ENTRY,
@@ -90,7 +89,7 @@ export function init(
   }
   // The host owns the device and the instance. The wrapper adds the API-layer surface and
   // disposes neither.
-  const deviceWrapper: GPUHostOwnedDevice = hostOwnedGPUDevice(instance, device);
+  const deviceWrapper: GPUHostOwnedDevice = GPUHostOwnedDevice.create(instance, device);
   // Three clip-space corners. The example writes them one time, because the geometry never
   // changes.
   const values: FixedArray<Vertex, 3> = [

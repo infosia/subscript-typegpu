@@ -117,7 +117,7 @@ fn owned_device_queue_survives_guarded_pipeline_disposal() {
     let program = directory.join("queue-ownership.ts");
     let source = r#"
 import { BindGroupLayoutSpec, createComputePipeline, createBufferHost } from "./typegpu";
-import { GPUBufferUsage, GPUDevice, GPUShaderStage, hostOwnedGPUDevice } from "./webgpu";
+import { GPUBufferUsage, GPUDevice, GPUShaderStage, GPUHostOwnedDevice } from "./webgpu";
 export function main(): void {
   const device = new GPUDevice(test_instance(), test_device());
   const target = device.createBuffer({ size: 4, usage: GPUBufferUsage.COPY_DST });
@@ -134,7 +134,7 @@ export function main(): void {
   pipeline.dispose();
   device.queue.writeBuffer(target, 0, [1, 0, 0, 0]);
   print(`writes=${test_queue_writes()}`);
-  const host = hostOwnedGPUDevice(test_instance(), test_device());
+  const host = GPUHostOwnedDevice.create(test_instance(), test_device());
   using buffer = createBufferHost<u32>(host, 4, 2, GPUBufferUsage.COPY_DST, "host-buffer");
   buffer.write(device.queue, 1, [2, 0, 0, 0]);
   print(`host=${buffer.elementSize},${buffer.count},${buffer.usage},writes=${test_queue_writes()}`);
@@ -530,5 +530,17 @@ export function main(): void {
     assert_eq!(
         result.stdout,
         b"rgba8unorm,triangle-list,none,ccw\nbgra8unorm,line-list\nrgba16float,back,cw\n"
+    );
+}
+
+#[test]
+fn direct_host_owned_device_construction_is_a_private_constructor_error() {
+    let program =
+        root().join("crates/harness/tests/fixtures/runtime/host-owned-device-constructor.ts");
+    let error = subscript_typegpu_harness::program_files(&program)
+        .expect_err("direct construction must fail");
+    assert!(
+        error.contains("constructor is private in class `GPUHostOwnedDevice`"),
+        "{error}"
     );
 }

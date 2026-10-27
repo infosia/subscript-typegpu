@@ -50,7 +50,6 @@ import {
   GPUTexture,
   GPUTextureUsage,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   SeedParams_SIZE,
@@ -432,7 +431,7 @@ export function init(
   }
   // The host owns the device and the instance. The wrapper carries no `dispose`, so this example
   // never releases what it did not create.
-  const hostDevice = hostOwnedGPUDevice(instance, device);
+  const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // Buffer sizes come from the generated stride and size constants, never from a hand count.
   const vertices = hostDevice.createBuffer({
     label: "voronoi-vertices",

@@ -25,7 +25,6 @@ import {
   GPUBufferUsage,
   GPUHostOwnedDevice,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   FrameData_SIZE,
@@ -182,7 +181,7 @@ export function init(
     return;
   }
   // The host owns the device and the queue. This wrapper borrows both and never destroys them.
-  const hostDevice = hostOwnedGPUDevice(instance, device);
+  const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // One oversized triangle covers the whole surface. The parts outside the viewport clip
   // away, so this example needs no quad and no index buffer.
   const values: FixedArray<Vertex, 3> = [

@@ -30,7 +30,6 @@ import {
   GPUBufferUsage,
   GPUHostOwnedDevice,
   GPUTextureView,
-  hostOwnedGPUDevice,
 } from "./webgpu";
 import {
   Particle_STRIDE,
@@ -196,7 +195,7 @@ export function init(
     return;
   }
   // The host owns the device and the queue. This wrapper borrows both and never destroys them.
-  const hostDevice = hostOwnedGPUDevice(instance, device);
+  const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // Four strip vertices form one card, and each Particle supplies one instance record.
   // This port retains a typed vertex buffer for the upstream strip corners.
   const vertices: FixedArray<Vertex, 4> = [

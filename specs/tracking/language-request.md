@@ -523,3 +523,36 @@ range holds §194 through §200. The `swc_ecma_parser` fork stays at
 Evidence at `4352687`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 290 passed, 0 failed, 1 ignored,
 360.8 s wall. No WGSL or `.expected` golden moved.
+
+### Redundant code after the language changes (2026-10-27)
+
+Two read-only surveys at pin `4352687` listed code whose reason is
+gone. The owner chose three items.
+
+- Generator checks that the checker makes unreachable: the omitted
+  options argument (PI1, RN1, K29), a `workgroupSize` literal of the
+  wrong length or unset, an unset shell `body`, and an unset render
+  `format`. The checker rejects each case first
+  (`check_argument_count`, `FixedArrayLiteralLength`, the required
+  `!` member check). Each arm is now a K15 internal diagnostic. The
+  `required` parameter of `descriptor_string` is removed.
+- R39.8 closed: the five WebIDL namespaces are classes of
+  `static readonly` constants (§71), and the singleton objects are
+  removed. Read sites keep the spelling `GPUBufferUsage.STORAGE`.
+- `hostOwnedGPUDevice` becomes the static factory
+  `GPUHostOwnedDevice.create`, and the constructor is private
+  (`window.md` W2 Rev 4). The fixture
+  `crates/harness/tests/fixtures/runtime/host-owned-device-constructor.ts`
+  shows that a direct `new` fails with the checker's private
+  constructor diagnostic.
+
+Open candidates from the surveys, not scheduled: parameter
+properties (§198) for 310 constructors, inferred type arguments
+(§149, §197) at about 250 call sites, `?.` calls (§82.3) at about 100
+`dispose` sites, compound assignment (§82.1) at about 90 sites, and
+the trailing fallback after an exhaustive enum switch in
+`crates/webgpu-gen/src/api.rs` (§200, unprobed).
+
+Evidence: `tools/gate.sh --require-backend` with the yawgpu library,
+`gate: green`, 292 passed, 0 failed, 1 ignored, 355.6 s wall. No WGSL
+or `.expected` golden moved.
