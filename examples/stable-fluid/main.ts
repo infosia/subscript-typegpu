@@ -189,205 +189,112 @@ const RENDER_GROUP_IMAGE_B: i32 = 5;
 // attribute layout and the `Vertex_STRIDE` byte stride from this class.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The brush state of one frame: the pointer cell, the movement since the last frame in
 // cells, and 1.0 while a button is down.
 @ValueType
 class BrushParams {
-  point: Vec2f;
-  delta: Vec2f;
-  active: f32;
-
-  constructor(point: Vec2f, delta: Vec2f, active: f32) {
-    this.point = point;
-    this.delta = delta;
-    this.active = active;
-  }
+  constructor(public point: Vec2f, public delta: Vec2f, public active: f32) {}
 }
 
 // The vertex output. The `Vec4f` field named `position` becomes the WGSL builtin position,
 // and every other field becomes an interpolated location.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The layout classes replace TypeGPU's run-time bind group layout objects. The field
 // order is the binding order, and the generator emits one `_LAYOUT0` spec per class.
 class BrushLayout {
-  force: StorageTexture2d<Rgba16float>;
-  addedInk: StorageTexture2d<Rgba16float>;
-  params: Uniform<BrushParams>;
-
   constructor(
-    force: StorageTexture2d<Rgba16float>,
-    addedInk: StorageTexture2d<Rgba16float>,
-    params: Uniform<BrushParams>,
-  ) {
-    this.force = force;
-    this.addedInk = addedInk;
-    this.params = params;
-  }
+    public force: StorageTexture2d<Rgba16float>,
+    public addedInk: StorageTexture2d<Rgba16float>,
+    public params: Uniform<BrushParams>,
+  ) {}
 }
 
 // The ink pass and the force pass share one layout. Each reads a field and an addition and
 // writes the sum to a third texture.
 class AddLayout {
-  source: Texture2d<f32>;
-  addition: Texture2d<f32>;
-  target: StorageTexture2d<Rgba16float>;
-
   constructor(
-    source: Texture2d<f32>,
-    addition: Texture2d<f32>,
-    target: StorageTexture2d<Rgba16float>,
-  ) {
-    this.source = source;
-    this.addition = addition;
-    this.target = target;
-  }
+    public source: Texture2d<f32>,
+    public addition: Texture2d<f32>,
+    public target: StorageTexture2d<Rgba16float>,
+  ) {}
 }
 
 // The velocity advection writes its result twice: to the next velocity, and to the fixed
 // right-hand side of the viscosity solve.
 class VelocityAdvectionLayout {
-  quantity: Texture2d<f32>;
-  velocity: Texture2d<f32>;
-  linear: Sampler;
-  target: StorageTexture2d<Rgba16float>;
-  viscosityRhs: StorageTexture2d<Rgba16float>;
-
   constructor(
-    quantity: Texture2d<f32>,
-    velocity: Texture2d<f32>,
-    linear: Sampler,
-    target: StorageTexture2d<Rgba16float>,
-    viscosityRhs: StorageTexture2d<Rgba16float>,
-  ) {
-    this.quantity = quantity;
-    this.velocity = velocity;
-    this.linear = linear;
-    this.target = target;
-    this.viscosityRhs = viscosityRhs;
-  }
+    public quantity: Texture2d<f32>,
+    public velocity: Texture2d<f32>,
+    public linear: Sampler,
+    public target: StorageTexture2d<Rgba16float>,
+    public viscosityRhs: StorageTexture2d<Rgba16float>,
+  ) {}
 }
 
 class AdvectionLayout {
-  quantity: Texture2d<f32>;
-  velocity: Texture2d<f32>;
-  linear: Sampler;
-  target: StorageTexture2d<Rgba16float>;
-
   constructor(
-    quantity: Texture2d<f32>,
-    velocity: Texture2d<f32>,
-    linear: Sampler,
-    target: StorageTexture2d<Rgba16float>,
-  ) {
-    this.quantity = quantity;
-    this.velocity = velocity;
-    this.linear = linear;
-    this.target = target;
-  }
+    public quantity: Texture2d<f32>,
+    public velocity: Texture2d<f32>,
+    public linear: Sampler,
+    public target: StorageTexture2d<Rgba16float>,
+  ) {}
 }
 
 // `rhs` holds the advected velocity and stays fixed through the ten Jacobi steps.
 class ViscosityLayout {
-  rhs: Texture2d<f32>;
-  source: Texture2d<f32>;
-  target: StorageTexture2d<Rgba16float>;
-
-  constructor(rhs: Texture2d<f32>, source: Texture2d<f32>, target: StorageTexture2d<Rgba16float>) {
-    this.rhs = rhs;
-    this.source = source;
-    this.target = target;
-  }
+  constructor(
+    public rhs: Texture2d<f32>,
+    public source: Texture2d<f32>,
+    public target: StorageTexture2d<Rgba16float>,
+  ) {}
 }
 
 class DivergenceLayout {
-  velocity: Texture2d<f32>;
-  target: StorageTexture2d<Rgba16float>;
-
-  constructor(velocity: Texture2d<f32>, target: StorageTexture2d<Rgba16float>) {
-    this.velocity = velocity;
-    this.target = target;
-  }
+  constructor(
+    public velocity: Texture2d<f32>,
+    public target: StorageTexture2d<Rgba16float>,
+  ) {}
 }
 
 class ClearLayout {
-  target: StorageTexture2d<Rgba16float>;
-
-  constructor(target: StorageTexture2d<Rgba16float>) {
-    this.target = target;
-  }
+  constructor(public target: StorageTexture2d<Rgba16float>) {}
 }
 
 class PressureLayout {
-  pressure: Texture2d<f32>;
-  divergence: Texture2d<f32>;
-  target: StorageTexture2d<Rgba16float>;
-
   constructor(
-    pressure: Texture2d<f32>,
-    divergence: Texture2d<f32>,
-    target: StorageTexture2d<Rgba16float>,
-  ) {
-    this.pressure = pressure;
-    this.divergence = divergence;
-    this.target = target;
-  }
+    public pressure: Texture2d<f32>,
+    public divergence: Texture2d<f32>,
+    public target: StorageTexture2d<Rgba16float>,
+  ) {}
 }
 
 class GradientLayout {
-  velocity: Texture2d<f32>;
-  pressure: Texture2d<f32>;
-  target: StorageTexture2d<Rgba16float>;
-
   constructor(
-    velocity: Texture2d<f32>,
-    pressure: Texture2d<f32>,
-    target: StorageTexture2d<Rgba16float>,
-  ) {
-    this.velocity = velocity;
-    this.pressure = pressure;
-    this.target = target;
-  }
+    public velocity: Texture2d<f32>,
+    public pressure: Texture2d<f32>,
+    public target: StorageTexture2d<Rgba16float>,
+  ) {}
 }
 
 // The ink view and the velocity view read one texture each, so one layout class serves both
 // render pipelines.
 class FieldRenderLayout {
-  field: Texture2d<f32>;
-  linear: Sampler;
-
-  constructor(field: Texture2d<f32>, linear: Sampler) {
-    this.field = field;
-    this.linear = linear;
-  }
+  constructor(public field: Texture2d<f32>, public linear: Sampler) {}
 }
 
 class ImageRenderLayout {
-  ink: Texture2d<f32>;
-  background: Texture2d<f32>;
-  linear: Sampler;
-
-  constructor(ink: Texture2d<f32>, background: Texture2d<f32>, linear: Sampler) {
-    this.ink = ink;
-    this.background = background;
-    this.linear = linear;
-  }
+  constructor(
+    public ink: Texture2d<f32>,
+    public background: Texture2d<f32>,
+    public linear: Sampler,
+  ) {}
 }
 
 // A neighbor read clamps at the border. That clamp is the boundary condition of this solver.
@@ -680,113 +587,79 @@ function imageFragment(
 // The thirteen declarations are the generator's input. It walks the typed program before the
 // run and emits `main.typegpu.ts`: the WGSL text, the entry names, and the layout specs.
 // TypeGPU resolves the same shaders from the kernel functions at run time.
-const brushSplat: ComputePipelineSpec = computePipeline<BrushLayout>(
+const brushSplat: ComputePipelineSpec = computePipeline(
   brushSplatKernel,
   { name: "brushSplat", workgroupSize: [16, 16, 1] },
 );
 
-const inkAdd: ComputePipelineSpec = computePipeline<AddLayout>(
+const inkAdd: ComputePipelineSpec = computePipeline(
   inkAddKernel,
   { name: "inkAdd", workgroupSize: [16, 16, 1] },
 );
 
-const forceAdd: ComputePipelineSpec = computePipeline<AddLayout>(
+const forceAdd: ComputePipelineSpec = computePipeline(
   forceAddKernel,
   { name: "forceAdd", workgroupSize: [16, 16, 1] },
 );
 
-const advectVelocity: ComputePipelineSpec = computePipeline<VelocityAdvectionLayout>(
+const advectVelocity: ComputePipelineSpec = computePipeline(
   advectVelocityKernel,
   { name: "advectVelocity", workgroupSize: [16, 16, 1] },
 );
 
-const viscosityJacobi: ComputePipelineSpec = computePipeline<ViscosityLayout>(
+const viscosityJacobi: ComputePipelineSpec = computePipeline(
   viscosityJacobiKernel,
   { name: "viscosityJacobi", workgroupSize: [16, 16, 1] },
 );
 
-const divergence: ComputePipelineSpec = computePipeline<DivergenceLayout>(
+const divergence: ComputePipelineSpec = computePipeline(
   divergenceKernel,
   { name: "divergence", workgroupSize: [16, 16, 1] },
 );
 
-const clearPressure: ComputePipelineSpec = computePipeline<ClearLayout>(
+const clearPressure: ComputePipelineSpec = computePipeline(
   clearPressureKernel,
   { name: "clearPressure", workgroupSize: [16, 16, 1] },
 );
 
-const pressureJacobi: ComputePipelineSpec = computePipeline<PressureLayout>(
+const pressureJacobi: ComputePipelineSpec = computePipeline(
   pressureJacobiKernel,
   { name: "pressureJacobi", workgroupSize: [16, 16, 1] },
 );
 
-const gradientSubtract: ComputePipelineSpec = computePipeline<GradientLayout>(
+const gradientSubtract: ComputePipelineSpec = computePipeline(
   gradientSubtractKernel,
   { name: "gradientSubtract", workgroupSize: [16, 16, 1] },
 );
 
-const advectInk: ComputePipelineSpec = computePipeline<AdvectionLayout>(
+const advectInk: ComputePipelineSpec = computePipeline(
   advectInkKernel,
   { name: "advectInk", workgroupSize: [16, 16, 1] },
 );
 
 // The three render pipelines share the vertex entry and differ in the fragment entry.
 // `renderPipelineL` adds the layout class, so both stages read the same bindings.
-const inkRender: RenderPipelineSpec = renderPipelineL<
-  FieldRenderLayout,
-  Vertex,
-  Varyings
->(fieldVertex, inkFragment, { format: "bgra8unorm" });
+const inkRender: RenderPipelineSpec = renderPipelineL(fieldVertex, inkFragment, { format: "bgra8unorm" });
 
-const velocityRender: RenderPipelineSpec = renderPipelineL<
-  FieldRenderLayout,
-  Vertex,
-  Varyings
->(fieldVertex, velocityFragment, { format: "bgra8unorm" });
+const velocityRender: RenderPipelineSpec = renderPipelineL(fieldVertex, velocityFragment, { format: "bgra8unorm" });
 
-const imageRender: RenderPipelineSpec = renderPipelineL<
-  ImageRenderLayout,
-  Vertex,
-  Varyings
->(imageVertex, imageFragment, { format: "bgra8unorm" });
+const imageRender: RenderPipelineSpec = renderPipelineL(imageVertex, imageFragment, { format: "bgra8unorm" });
 
 // One object holds every handle a frame needs. Scripts own their handles, so `shutdown`
 // releases each one. TypeGPU leaves that to garbage collection and `root.destroy`.
 class StableFluidState {
-  device: GPUHostOwnedDevice;
-  compute: ComputePipeline[];
-  render: RenderPipeline[];
-  groups: GPUBindGroup[];
-  renderGroups: GPUBindGroup[];
-  vertices: GPUBuffer;
-  brushParams: GPUBuffer;
-  textures: GPUTexture[];
-  views: GPUTextureView[];
-  linearSampler: GPUSampler;
-
   constructor(
-    device: GPUHostOwnedDevice,
-    compute: ComputePipeline[],
-    render: RenderPipeline[],
-    groups: GPUBindGroup[],
-    renderGroups: GPUBindGroup[],
-    vertices: GPUBuffer,
-    brushParams: GPUBuffer,
-    textures: GPUTexture[],
-    views: GPUTextureView[],
-    linearSampler: GPUSampler,
-  ) {
-    this.device = device;
-    this.compute = compute;
-    this.render = render;
-    this.groups = groups;
-    this.renderGroups = renderGroups;
-    this.vertices = vertices;
-    this.brushParams = brushParams;
-    this.textures = textures;
-    this.views = views;
-    this.linearSampler = linearSampler;
-  }
+    public device: GPUHostOwnedDevice,
+    public compute: ComputePipeline[],
+    public render: RenderPipeline[],
+    public groups: GPUBindGroup[],
+    public renderGroups: GPUBindGroup[],
+    public vertices: GPUBuffer,
+    public brushParams: GPUBuffer,
+    public textures: GPUTexture[],
+    public views: GPUTextureView[],
+    public linearSampler: GPUSampler,
+  ) {}
 }
 
 // `init` fills this binding and `frame` reads it. A failed `init` leaves it `null`, because

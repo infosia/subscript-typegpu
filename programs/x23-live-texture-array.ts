@@ -51,16 +51,7 @@ const LAYERS: u32 = 2;
 const PIXEL_COUNT: u32 = WIDTH * HEIGHT;
 
 class ArrayPingPongLayout {
-  source: ReadStorageTexture2dArray<Rgba16float>;
-  target: WriteStorageTexture2dArray<Rgba16float>;
-
-  constructor(
-    source: ReadStorageTexture2dArray<Rgba16float>,
-    target: WriteStorageTexture2dArray<Rgba16float>,
-  ) {
-    this.source = source;
-    this.target = target;
-  }
+  constructor(public source: ReadStorageTexture2dArray<Rgba16float>, public target: WriteStorageTexture2dArray<Rgba16float>) {}
 }
 
 function arrayPingPongKernel(res: ArrayPingPongLayout, ctx: ComputeInvocation): void {
@@ -77,19 +68,13 @@ function arrayPingPongKernel(res: ArrayPingPongLayout, ctx: ComputeInvocation): 
   res.target.store(coords, layer, current.add(paired.scale(pairScale)).add(coordinateStep));
 }
 
-const arrayPingPong: ComputePipelineSpec = computePipeline<ArrayPingPongLayout>(
+const arrayPingPong: ComputePipelineSpec = computePipeline(
   arrayPingPongKernel,
   { name: "arrayPingPong", workgroupSize: [2, 2, 1] },
 );
 
 class LayerReadbackLayout {
-  source: Texture2d<f32>;
-  output: MutStorage<Vec4f>;
-
-  constructor(source: Texture2d<f32>, output: MutStorage<Vec4f>) {
-    this.source = source;
-    this.output = output;
-  }
+  constructor(public source: Texture2d<f32>, public output: MutStorage<Vec4f>) {}
 }
 
 function layerReadbackKernel(res: LayerReadbackLayout, ctx: ComputeInvocation): void {
@@ -99,7 +84,7 @@ function layerReadbackKernel(res: LayerReadbackLayout, ctx: ComputeInvocation): 
   res.output[index] = res.source.load(coords, 0);
 }
 
-const layerReadback: ComputePipelineSpec = computePipeline<LayerReadbackLayout>(
+const layerReadback: ComputePipelineSpec = computePipeline(
   layerReadbackKernel,
   { name: "layerReadback", workgroupSize: [2, 2, 1] },
 );
@@ -310,7 +295,7 @@ export async function main(): Promise<void> {
       new ReadStorageTexture2dArray<Rgba16float>(hostA, WIDTH, HEIGHT, LAYERS),
       new WriteStorageTexture2dArray<Rgba16float>(hostB, WIDTH, HEIGHT, LAYERS),
     );
-    simulateComputeThreads<ArrayPingPongLayout>(
+    simulateComputeThreads(
       arrayPingPongKernel,
       hostAB,
       arrayPingPong,
@@ -323,7 +308,7 @@ export async function main(): Promise<void> {
       new ReadStorageTexture2dArray<Rgba16float>(hostB, WIDTH, HEIGHT, LAYERS),
       new WriteStorageTexture2dArray<Rgba16float>(hostA, WIDTH, HEIGHT, LAYERS),
     );
-    simulateComputeThreads<ArrayPingPongLayout>(
+    simulateComputeThreads(
       arrayPingPongKernel,
       hostBA,
       arrayPingPong,

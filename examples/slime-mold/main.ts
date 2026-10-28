@@ -85,78 +85,45 @@ const TAU: f32 = 6.2831855;
 // One corner of the render strip. The generator derives `Vertex_STRIDE` from this class.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // One agent. The position counts trail cells, the heading counts radians, and `randomState`
 // carries the PRNG state forward. TypeGPU stores position and angle and reseeds from the index.
 @ValueType
 class Agent {
-  position: Vec2f;
-  heading: f32;
-  randomState: u32;
-
-  constructor(position: Vec2f, heading: f32, randomState: u32) {
-    this.position = position;
-    this.heading = heading;
-    this.randomState = randomState;
-  }
+  constructor(public position: Vec2f, public heading: f32, public randomState: u32) {}
 }
 
 // The vertex output. `position` is clip space and `uv` runs 0 to 1 across the surface.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The move layout binds the agents, the trail they sense, and the trail they mark. A deposit
 // reads and then writes the same cell, so the target binding is read-write.
 // The two textures swap roles every frame, so one layout serves both directions.
 class SlimeMoveLayout {
-  agents: MutStorage<Agent>;
-  sense: ReadStorageTexture2d<R32float>;
-  trail: ReadWriteStorageTexture2d<R32float>;
-
   constructor(
-    agents: MutStorage<Agent>,
-    sense: ReadStorageTexture2d<R32float>,
-    trail: ReadWriteStorageTexture2d<R32float>,
-  ) {
-    this.agents = agents;
-    this.sense = sense;
-    this.trail = trail;
-  }
+    public agents: MutStorage<Agent>,
+    public sense: ReadStorageTexture2d<R32float>,
+    public trail: ReadWriteStorageTexture2d<R32float>,
+  ) {}
 }
 
 // The diffuse layout reads one trail and writes the other, so no invocation reads a cell that
 // another invocation already changed.
 class SlimeDiffuseLayout {
-  source: ReadStorageTexture2d<R32float>;
-  target: StorageTexture2d<R32float>;
-
-  constructor(source: ReadStorageTexture2d<R32float>, target: StorageTexture2d<R32float>) {
-    this.source = source;
-    this.target = target;
-  }
+  constructor(
+    public source: ReadStorageTexture2d<R32float>,
+    public target: StorageTexture2d<R32float>,
+  ) {}
 }
 
 // The render layout reads one trail. Two bind groups on it select the texture the frame shows.
 class SlimeRenderLayout {
-  trail: ReadStorageTexture2d<R32float>;
-
-  constructor(trail: ReadStorageTexture2d<R32float>) {
-    this.trail = trail;
-  }
+  constructor(public trail: ReadStorageTexture2d<R32float>) {}
 }
 
 // The trail is a torus. A coordinate one step outside the grid returns on the opposite edge.
@@ -296,21 +263,17 @@ function slimeFragment(
 // The three declarations name the kernel, the layout type, and the workgroup size. The generator
 // reads them ahead of the run and emits the WGSL, the entry names, and the layout facts.
 // TypeGPU builds the same WGSL at run time from the kernel function.
-const slimeMove: ComputePipelineSpec = computePipeline<SlimeMoveLayout>(
+const slimeMove: ComputePipelineSpec = computePipeline(
   moveAgents,
   { name: "slimeMove", workgroupSize: [64, 1, 1] },
 );
 
-const slimeDiffuse: ComputePipelineSpec = computePipeline<SlimeDiffuseLayout>(
+const slimeDiffuse: ComputePipelineSpec = computePipeline(
   diffuseTrail,
   { name: "slimeDiffuse", workgroupSize: [8, 8, 1] },
 );
 
-const slimeRender: RenderPipelineSpec = renderPipelineL<
-  SlimeRenderLayout,
-  Vertex,
-  Varyings
->(slimeVertex, slimeFragment, {
+const slimeRender: RenderPipelineSpec = renderPipelineL(slimeVertex, slimeFragment, {
   format: "bgra8unorm",
   topology: "triangle-strip",
 });
@@ -319,58 +282,24 @@ const slimeRender: RenderPipelineSpec = renderPipelineL<
 // separate entries, so the handles outlive each call and `shutdown` owns their release.
 // TypeGPU frees the same resources through garbage collection and `root.destroy()`.
 class SlimeState {
-  device: GPUHostOwnedDevice;
-  move: ComputePipeline;
-  diffuse: ComputePipeline;
-  render: RenderPipeline;
-  moveAB: GPUBindGroup;
-  moveBA: GPUBindGroup;
-  diffuseAB: GPUBindGroup;
-  diffuseBA: GPUBindGroup;
-  renderA: GPUBindGroup;
-  renderB: GPUBindGroup;
-  vertices: GPUBuffer;
-  agents: GPUBuffer;
-  trailA: GPUTexture;
-  trailB: GPUTexture;
-  viewA: GPUTextureView;
-  viewB: GPUTextureView;
-
   constructor(
-    device: GPUHostOwnedDevice,
-    move: ComputePipeline,
-    diffuse: ComputePipeline,
-    render: RenderPipeline,
-    moveAB: GPUBindGroup,
-    moveBA: GPUBindGroup,
-    diffuseAB: GPUBindGroup,
-    diffuseBA: GPUBindGroup,
-    renderA: GPUBindGroup,
-    renderB: GPUBindGroup,
-    vertices: GPUBuffer,
-    agents: GPUBuffer,
-    trailA: GPUTexture,
-    trailB: GPUTexture,
-    viewA: GPUTextureView,
-    viewB: GPUTextureView,
-  ) {
-    this.device = device;
-    this.move = move;
-    this.diffuse = diffuse;
-    this.render = render;
-    this.moveAB = moveAB;
-    this.moveBA = moveBA;
-    this.diffuseAB = diffuseAB;
-    this.diffuseBA = diffuseBA;
-    this.renderA = renderA;
-    this.renderB = renderB;
-    this.vertices = vertices;
-    this.agents = agents;
-    this.trailA = trailA;
-    this.trailB = trailB;
-    this.viewA = viewA;
-    this.viewB = viewB;
-  }
+    public device: GPUHostOwnedDevice,
+    public move: ComputePipeline,
+    public diffuse: ComputePipeline,
+    public render: RenderPipeline,
+    public moveAB: GPUBindGroup,
+    public moveBA: GPUBindGroup,
+    public diffuseAB: GPUBindGroup,
+    public diffuseBA: GPUBindGroup,
+    public renderA: GPUBindGroup,
+    public renderB: GPUBindGroup,
+    public vertices: GPUBuffer,
+    public agents: GPUBuffer,
+    public trailA: GPUTexture,
+    public trailB: GPUTexture,
+    public viewA: GPUTextureView,
+    public viewB: GPUTextureView,
+  ) {}
 }
 
 let activeState: SlimeState | null = null;

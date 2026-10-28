@@ -39,34 +39,16 @@ import {
 
 @ValueType
 class Item {
-  value: f32;
-
-  constructor(value: f32) {
-    this.value = value;
-  }
+  constructor(public value: f32) {}
 }
 
 @ValueType
 class SaxpyParams {
-  a: f32;
-  count: u32;
-
-  constructor(a: f32, count: u32) {
-    this.a = a;
-    this.count = count;
-  }
+  constructor(public a: f32, public count: u32) {}
 }
 
 class SaxpyLayout {
-  params: Uniform<SaxpyParams>;
-  x: Storage<Item>;
-  y: MutStorage<Item>;
-
-  constructor(params: Uniform<SaxpyParams>, x: Storage<Item>, y: MutStorage<Item>) {
-    this.params = params;
-    this.x = x;
-    this.y = y;
-  }
+  constructor(public params: Uniform<SaxpyParams>, public x: Storage<Item>, public y: MutStorage<Item>) {}
 }
 
 function saxpyKernel(res: SaxpyLayout, ctx: ComputeInvocation): void {
@@ -79,7 +61,7 @@ function saxpyKernel(res: SaxpyLayout, ctx: ComputeInvocation): void {
   }
 }
 
-const saxpy: ComputePipelineSpec = computePipeline<SaxpyLayout>(saxpyKernel, {
+const saxpy: ComputePipelineSpec = computePipeline(saxpyKernel, {
   name: "saxpy",
   workgroupSize: [64, 1, 1],
 });
@@ -139,14 +121,14 @@ export async function main(): Promise<void> {
       yValues[index] = new Item(yValue);
       hostX.push(new Item(xValue));
       hostY.push(new Item(yValue));
-      index = index + 1;
+      index += 1;
     }
     const hostLayout = new SaxpyLayout(
-      new Uniform<SaxpyParams>(new SaxpyParams(aValue, count)),
-      new Storage<Item>(hostX),
-      new MutStorage<Item>(hostY),
+      new Uniform(new SaxpyParams(aValue, count)),
+      new Storage(hostX),
+      new MutStorage(hostY),
     );
-    simulateComputeThreads<SaxpyLayout>(
+    simulateComputeThreads(
       saxpyKernel,
       hostLayout,
       saxpy,
@@ -220,7 +202,7 @@ export async function main(): Promise<void> {
       return;
     }
     const result: FixedArray<Item, 64> = Context.fromBytes<FixedArray<Item, 64>>(
-      readBuffer<Item>(readback, 0, count),
+      readBuffer(readback, 0, count),
       0,
     );
     print("readback:mapped");
@@ -231,7 +213,7 @@ export async function main(): Promise<void> {
         print(`FAIL ${index} expected=${expected} got=${result[index].value}`);
         return;
       }
-      index = index + 1;
+      index += 1;
     }
     readback.handle().unmap();
   }

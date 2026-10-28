@@ -61,21 +61,7 @@ import {
 
 @ValueType
 class VectorInput {
-  floatA: Vec4f;
-  floatB: Vec4f;
-  signedA: Vec4i;
-  signedB: Vec4i;
-  unsignedA: Vec4u;
-  unsignedB: Vec4u;
-
-  constructor(floatA: Vec4f, floatB: Vec4f, signedA: Vec4i, signedB: Vec4i, unsignedA: Vec4u, unsignedB: Vec4u) {
-    this.floatA = floatA;
-    this.floatB = floatB;
-    this.signedA = signedA;
-    this.signedB = signedB;
-    this.unsignedA = unsignedA;
-    this.unsignedB = unsignedB;
-  }
+  constructor(public floatA: Vec4f, public floatB: Vec4f, public signedA: Vec4i, public signedB: Vec4i, public unsignedA: Vec4u, public unsignedB: Vec4u) {}
 }
 
 @ValueType
@@ -136,13 +122,7 @@ class VectorOutput {
 }
 
 class VectorLayout {
-  input: Storage<VectorInput>;
-  output: MutStorage<VectorOutput>;
-
-  constructor(input: Storage<VectorInput>, output: MutStorage<VectorOutput>) {
-    this.input = input;
-    this.output = output;
-  }
+  constructor(public input: Storage<VectorInput>, public output: MutStorage<VectorOutput>) {}
 }
 
 function coverFloat2(a: Vec2f, b: Vec2f, low: Vec2f, high: Vec2f): Vec2f {
@@ -374,7 +354,7 @@ function vectorKernel(res: VectorLayout, ctx: ComputeInvocation): void {
   res.output[0] = output;
 }
 
-const vectorBuiltins: ComputePipelineSpec = computePipeline<VectorLayout>(
+const vectorBuiltins: ComputePipelineSpec = computePipeline(
   vectorKernel,
   { name: "vectorBuiltins", workgroupSize: [1, 1, 1] },
 );
@@ -501,10 +481,10 @@ export async function main(): Promise<void> {
     const gpuBytes: u8[] = await output.read(device, 0, 1);
     const gpuOutput: VectorOutput = Context.fromBytes<VectorOutput>(gpuBytes, 0);
     const hostLayout = new VectorLayout(
-      new Storage<VectorInput>([source]),
-      new MutStorage<VectorOutput>([new VectorOutput()]),
+      new Storage([source]),
+      new MutStorage([new VectorOutput()]),
     );
-    simulateComputeThreads<VectorLayout>(vectorKernel, hostLayout, vectorBuiltins, 1, 1, 1, vectorBuiltins_HOST_RUNNABLE);
+    simulateComputeThreads(vectorKernel, hostLayout, vectorBuiltins, 1, 1, 1, vectorBuiltins_HOST_RUNNABLE);
     const hostOutput = hostLayout.output[0];
     if (!exactOutput(gpuOutput, hostOutput)) {
       print("FAIL exact");

@@ -30,18 +30,14 @@ import {
 } from "./x16-live-guarded.typegpu";
 
 class GuardedLayout {
-  output: MutStorage<u32>;
-
-  constructor(output: MutStorage<u32>) {
-    this.output = output;
-  }
+  constructor(public output: MutStorage<u32>) {}
 }
 
 function guardedKernel(res: GuardedLayout, ctx: ComputeInvocation): void {
   res.output[ctx.globalId.x] = ctx.globalId.x + 100;
 }
 
-const guardedPipeline: ComputePipelineSpec = computePipeline<GuardedLayout>(
+const guardedPipeline: ComputePipelineSpec = computePipeline(
   guardedKernel,
   {
     name: "guardedPipeline",

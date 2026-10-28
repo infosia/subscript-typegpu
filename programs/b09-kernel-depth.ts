@@ -28,16 +28,11 @@ import {
 
 @ValueType
 class DepthItem {
-  value: u32;
-  constructor(value: u32) { this.value = value; }
+  constructor(public value: u32) {}
 }
 
 class DepthLayout {
-  output: MutStorage<DepthItem>;
-
-  constructor(output: MutStorage<DepthItem>) {
-    this.output = output;
-  }
+  constructor(public output: MutStorage<DepthItem>) {}
 }
 
 const ITERATIONS: u32 = 4;
@@ -59,7 +54,7 @@ function depthKernel(res: DepthLayout, ctx: ComputeInvocation): void {
   res.output[ctx.globalId.x] = new DepthItem(value);
 }
 
-const kernelDepth: ComputePipelineSpec = computePipeline<DepthLayout>(depthKernel, {
+const kernelDepth: ComputePipelineSpec = computePipeline(depthKernel, {
   name: "kernelDepth",
   workgroupSize: [8, 1, 1],
 });
@@ -104,8 +99,8 @@ export async function main(): Promise<void> {
       hostValues.push(new DepthItem(0));
       hostIndex += 1;
     }
-    const hostLayout = new DepthLayout(new MutStorage<DepthItem>(hostValues));
-    simulateCompute<DepthLayout>(
+    const hostLayout = new DepthLayout(new MutStorage(hostValues));
+    simulateCompute(
       depthKernel,
       hostLayout,
       kernelDepth,

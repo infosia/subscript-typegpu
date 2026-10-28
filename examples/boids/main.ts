@@ -59,49 +59,27 @@ const MAX_SPEED: f32 = 0.018;
 // never counts bytes.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The instance record. One buffer serves the kernel as storage and the draw as an instance
 // vertex buffer. No copy moves the state between the two passes.
 @ValueType
 class Boid {
-  position: Vec2f;
-  velocity: Vec2f;
-
-  constructor(position: Vec2f, velocity: Vec2f) {
-    this.position = position;
-    this.velocity = velocity;
-  }
+  constructor(public position: Vec2f, public velocity: Vec2f) {}
 }
 
 // The inter-stage record. The field named `position` becomes the clip-space builtin, and
 // `color` becomes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  color: Vec4f;
-
-  constructor(position: Vec4f, color: Vec4f) {
-    this.position = position;
-    this.color = color;
-  }
+  constructor(public position: Vec4f, public color: Vec4f) {}
 }
 
 // The compute bind group. `Storage` is read-only and `MutStorage` is read-write, so the
 // types state that one dispatch never writes the buffer it reads.
 class BoidLayout {
-  previous: Storage<Boid>;
-  next: MutStorage<Boid>;
-
-  constructor(previous: Storage<Boid>, next: MutStorage<Boid>) {
-    this.previous = previous;
-    this.next = next;
-  }
+  constructor(public previous: Storage<Boid>, public next: MutStorage<Boid>) {}
 }
 
 // Each invocation reads the complete previous flock and writes one next-state record.
@@ -188,7 +166,7 @@ function boidFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
 
 // `guarded: true` makes the kernel skip an invocation past the end of the flock. A workgroup
 // of 64 over 96 boids starts 128 invocations, and 32 of them do no work.
-const boidUpdate: ComputePipelineSpec = computePipeline<BoidLayout>(updateBoids, {
+const boidUpdate: ComputePipelineSpec = computePipeline(updateBoids, {
   name: "boidUpdate",
   workgroupSize: [64, 1, 1],
   guarded: true,
@@ -196,11 +174,7 @@ const boidUpdate: ComputePipelineSpec = computePipeline<BoidLayout>(updateBoids,
 
 // The instanced form takes a vertex schema and an instance schema. It needs no bind group,
 // because the boid state arrives through vertex buffer slot 1.
-const boidRender: RenderPipelineSpec = renderPipelineInstanced<
-  Vertex,
-  Boid,
-  Varyings
->(boidVertex, boidFragment, { format: "bgra8unorm" });
+const boidRender: RenderPipelineSpec = renderPipelineInstanced(boidVertex, boidFragment, { format: "bgra8unorm" });
 
 // The host calls `init`, `frame`, and `shutdown` separately, so every handle that outlives
 // `init` lives in module state. A `using` declaration disposes a handle too early here.
@@ -414,13 +388,13 @@ export function frame(
 // The host calls `shutdown` once, before it releases the device. The bind groups go first,
 // because they name the other handles.
 export function shutdown(): void {
-  if (activeGroupBA != null) activeGroupBA.dispose();
-  if (activeGroupAB != null) activeGroupAB.dispose();
-  if (activeBoidsB != null) activeBoidsB.dispose();
-  if (activeBoidsA != null) activeBoidsA.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activeRender != null) activeRender.dispose();
-  if (activeCompute != null) activeCompute.dispose();
+  activeGroupBA?.dispose();
+  activeGroupAB?.dispose();
+  activeBoidsB?.dispose();
+  activeBoidsA?.dispose();
+  activeVertices?.dispose();
+  activeRender?.dispose();
+  activeCompute?.dispose();
   // The null assignments make a second `shutdown` call safe.
   activeGroupBA = null;
   activeGroupAB = null;

@@ -37,15 +37,7 @@ import {
 } from "./x10-live-texture.typegpu";
 
 class TextureCopyLayout {
-  source: Texture2d<f32>;
-  nearest: Sampler;
-  target: StorageTexture2d<Rgba8unorm>;
-
-  constructor(source: Texture2d<f32>, nearest: Sampler, target: StorageTexture2d<Rgba8unorm>) {
-    this.source = source;
-    this.nearest = nearest;
-    this.target = target;
-  }
+  constructor(public source: Texture2d<f32>, public nearest: Sampler, public target: StorageTexture2d<Rgba8unorm>) {}
 }
 
 function textureCopyKernel(res: TextureCopyLayout, ctx: ComputeInvocation): void {
@@ -58,7 +50,7 @@ function textureCopyKernel(res: TextureCopyLayout, ctx: ComputeInvocation): void
   res.target.store(new Vec2i(ctx.globalId.x as i32, ctx.globalId.y as i32), color);
 }
 
-const textureCopy: ComputePipelineSpec = computePipeline<TextureCopyLayout>(
+const textureCopy: ComputePipelineSpec = computePipeline(
   textureCopyKernel,
   { name: "textureCopy", workgroupSize: [4, 4, 1] },
 );
@@ -74,9 +66,9 @@ function checkerBytes(): u8[] {
       values.push(value);
       values.push(value);
       values.push(255);
-      x = x + 1;
+      x += 1;
     }
-    y = y + 1;
+    y += 1;
   }
   return values;
 }
@@ -89,9 +81,9 @@ function checkerPixels(): Vec4f[] {
     while (x < 4) {
       const value: f32 = ((x + y) % 2 == 0) ? 1.0 : 0.0;
       pixels.push(new Vec4f(value, value, value, 1.0));
-      x = x + 1;
+      x += 1;
     }
-    y = y + 1;
+    y += 1;
   }
   return pixels;
 }
@@ -187,9 +179,9 @@ export async function main(): Promise<void> {
           print(`FAIL x=${x} y=${y} expected=${expectedR},${expectedG},${expectedB},${expectedA} got=${pixels[offset]},${pixels[offset + 1]},${pixels[offset + 2]},${pixels[offset + 3]}`);
           return;
         }
-        x = x + 1;
+        x += 1;
       }
-      y = y + 1;
+      y += 1;
     }
     readback.unmap();
   }

@@ -58,21 +58,7 @@ import {
 
 @ValueType
 class VectorInput {
-  floatA: Vec4f;
-  floatB: Vec4f;
-  signedA: Vec4i;
-  signedB: Vec4i;
-  unsignedA: Vec4u;
-  unsignedB: Vec4u;
-
-  constructor(floatA: Vec4f, floatB: Vec4f, signedA: Vec4i, signedB: Vec4i, unsignedA: Vec4u, unsignedB: Vec4u) {
-    this.floatA = floatA;
-    this.floatB = floatB;
-    this.signedA = signedA;
-    this.signedB = signedB;
-    this.unsignedA = unsignedA;
-    this.unsignedB = unsignedB;
-  }
+  constructor(public floatA: Vec4f, public floatB: Vec4f, public signedA: Vec4i, public signedB: Vec4i, public unsignedA: Vec4u, public unsignedB: Vec4u) {}
 }
 
 @ValueType
@@ -133,13 +119,7 @@ class VectorOutput {
 }
 
 class VectorLayout {
-  input: Storage<VectorInput>;
-  output: MutStorage<VectorOutput>;
-
-  constructor(input: Storage<VectorInput>, output: MutStorage<VectorOutput>) {
-    this.input = input;
-    this.output = output;
-  }
+  constructor(public input: Storage<VectorInput>, public output: MutStorage<VectorOutput>) {}
 }
 
 function coverFloat2(a: Vec2f, b: Vec2f, low: Vec2f, high: Vec2f): Vec2f {
@@ -403,7 +383,7 @@ function vectorKernel(res: VectorLayout, ctx: ComputeInvocation): void {
   res.output[0] = output;
 }
 
-const vectorBuiltins: ComputePipelineSpec = computePipeline<VectorLayout>(
+const vectorBuiltins: ComputePipelineSpec = computePipeline(
   vectorKernel,
   { name: "vectorBuiltins", workgroupSize: [1, 1, 1] },
 );
@@ -450,10 +430,10 @@ export async function main(): Promise<void> {
     device.queue.submit([command]);
 
     const hostLayout = new VectorLayout(
-      new Storage<VectorInput>([source]),
-      new MutStorage<VectorOutput>([new VectorOutput()]),
+      new Storage([source]),
+      new MutStorage([new VectorOutput()]),
     );
-    simulateCompute<VectorLayout>(vectorKernel, hostLayout, vectorBuiltins, [1, 1, 1], vectorBuiltins_HOST_RUNNABLE);
+    simulateCompute(vectorKernel, hostLayout, vectorBuiltins, [1, 1, 1], vectorBuiltins_HOST_RUNNABLE);
     const host = hostLayout.output[0];
     print(`host:k25-float=${host.exactFloat.x},${host.exactFloat.y},${host.exactFloat.z},${host.exactFloat.w},${host.transFloat.x},${host.transFloat.y},${host.transFloat.z},${host.transFloat.w};k25-integer=${host.signedValue.x},${host.signedValue.y},${host.signedValue.z},${host.signedValue.w},${host.unsignedValue.x},${host.unsignedValue.y},${host.unsignedValue.z},${host.unsignedValue.w};k26=${host.comparisonBits.x},${host.comparisonBits.y},${host.comparisonBits.z},${host.comparisonBits.w},${host.selectedValue.x},${host.selectedValue.y},${host.selectedValue.z},${host.selectedValue.w};k27-swizzles=${host.swizzleFloat.x},${host.swizzleFloat.y},${host.swizzleFloat.z},${host.swizzleFloat.w},${host.swizzleSigned.x},${host.swizzleSigned.y},${host.swizzleSigned.z},${host.swizzleSigned.w},${host.swizzleUnsigned.x},${host.swizzleUnsigned.y},${host.swizzleUnsigned.z},${host.swizzleUnsigned.w};k27-factories=${host.factoryFloat.x},${host.factoryFloat.y},${host.factoryFloat.z},${host.factoryFloat.w},${host.factorySigned.x},${host.factorySigned.y},${host.factorySigned.z},${host.factorySigned.w},${host.factoryUnsigned.x},${host.factoryUnsigned.y},${host.factoryUnsigned.z},${host.factoryUnsigned.w};width2=${host.width2Float.x},${host.width2Float.y},${host.width2Signed.x},${host.width2Signed.y},${host.width2Unsigned.x},${host.width2Unsigned.y};width3=${host.width3Float.x},${host.width3Float.y},${host.width3Float.z},${host.width3Signed.x},${host.width3Signed.y},${host.width3Signed.z},${host.width3Unsigned.x},${host.width3Unsigned.y},${host.width3Unsigned.z};step=${host.orderStep.x},${host.orderStep.y},${host.orderStep.z},${host.orderStep.w};smoothstep=${host.orderSmoothstep.x},${host.orderSmoothstep.y},${host.orderSmoothstep.z},${host.orderSmoothstep.w};mix=${host.orderMix.x},${host.orderMix.y},${host.orderMix.z},${host.orderMix.w};clamp=${host.orderClamp.x},${host.orderClamp.y},${host.orderClamp.z},${host.orderClamp.w};refract=${host.orderRefract.x},${host.orderRefract.y},${host.orderRefract.z},${host.orderRefract.w};faceForward=${host.orderFaceForward.x},${host.orderFaceForward.y},${host.orderFaceForward.z},${host.orderFaceForward.w};select=${host.orderSelect.x},${host.orderSelect.y},${host.orderSelect.z},${host.orderSelect.w}`);
     print(`vectorBuiltins_WGSL_LINES=${vectorBuiltins_WGSL.split("\n").length}`);

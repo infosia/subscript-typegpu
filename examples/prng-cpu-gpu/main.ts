@@ -47,23 +47,13 @@ const ROUND_COUNT: u32 = 5;
 // comparison covers both, so a state divergence cannot hide behind an equal value.
 @ValueType
 class RandomValue {
-  state: u32;
-  value: f32;
-
-  constructor(state: u32, value: f32) {
-    this.state = state;
-    this.value = value;
-  }
+  constructor(public state: u32, public value: f32) {}
 }
 
 // The single mutable storage binding. TypeGPU allocates the same buffer with
 // `root.createMutable`, and the generator emits `randomFill_LAYOUT0` from this class.
 class RandomLayout {
-  output: MutStorage<RandomValue>;
-
-  constructor(output: MutStorage<RandomValue>) {
-    this.output = output;
-  }
+  constructor(public output: MutStorage<RandomValue>) {}
 }
 
 // One thread per sample. Each thread seeds from its own index and advances the
@@ -83,7 +73,7 @@ function randomKernel(res: RandomLayout, ctx: ComputeInvocation): void {
 
 // The declaration names the pipeline and fixes the workgroup size at 32 threads. The
 // generator reads it and emits the WGSL and the constants of `main.typegpu`.
-const randomFill: ComputePipelineSpec = computePipeline<RandomLayout>(randomKernel, {
+const randomFill: ComputePipelineSpec = computePipeline(randomKernel, {
   name: "randomFill",
   workgroupSize: [32, 1, 1],
 });
@@ -95,7 +85,7 @@ function makeHostLayout(): RandomLayout {
   for (let index: u32 = 0; index < SAMPLE_COUNT; index += 1) {
     values.push(new RandomValue(0, 0.0));
   }
-  const layout = new RandomLayout(new MutStorage<RandomValue>(values));
+  const layout = new RandomLayout(new MutStorage(values));
   return layout;
 }
 
@@ -187,7 +177,7 @@ export async function main(): Promise<void> {
         // The host lane runs the same kernel over host storage. The thread count matches the
         // dispatch, so the example holds no second implementation of the generator.
         const hostLayout: RandomLayout = makeHostLayout();
-        simulateComputeThreads<RandomLayout>(
+        simulateComputeThreads(
           randomKernel,
           hostLayout,
           randomFill,

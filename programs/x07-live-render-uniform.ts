@@ -39,48 +39,26 @@ import {
 
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 @ValueType
 class Offset {
-  value: Vec4f;
-
-  constructor(value: Vec4f) {
-    this.value = value;
-  }
+  constructor(public value: Vec4f) {}
 }
 
 @ValueType
 class Tint {
-  value: Vec4f;
-
-  constructor(value: Vec4f) {
-    this.value = value;
-  }
+  constructor(public value: Vec4f) {}
 }
 
 @ValueType
 class Varyings {
-  position: Vec4f;
-
-  constructor(position: Vec4f) {
-    this.position = position;
-  }
+  constructor(public position: Vec4f) {}
 }
 
 class RenderLayout {
-  params: Uniform<Offset>;
-  tint: Storage<Tint>;
-
-  constructor(params: Uniform<Offset>, tint: Storage<Tint>) {
-    this.params = params;
-    this.tint = tint;
-  }
+  constructor(public params: Uniform<Offset>, public tint: Storage<Tint>) {}
 }
 
 function vert(res: RenderLayout, value: Vertex, ctx: VertexInvocation): Varyings {
@@ -100,7 +78,7 @@ function frag(res: RenderLayout, input: Varyings, ctx: FragmentInvocation): Vec4
   return color.value;
 }
 
-const shifted: RenderPipelineSpec = renderPipelineL<RenderLayout, Vertex, Varyings>(
+const shifted: RenderPipelineSpec = renderPipelineL(
   vert,
   frag,
   { format: "rgba8unorm" },
@@ -138,9 +116,9 @@ function noCenterOnEdge(a: Vec2f, b: Vec2f, c: Vec2f): boolean {
         || edge(c, a, point) == 0.0) {
         return false;
       }
-      x = x + 1;
+      x += 1;
     }
-    y = y + 1;
+    y += 1;
   }
   return true;
 }
@@ -290,9 +268,9 @@ export async function main(): Promise<void> {
           );
           return;
         }
-        x = x + 1;
+        x += 1;
       }
-      y = y + 1;
+      y += 1;
     }
     readback.unmap();
   }

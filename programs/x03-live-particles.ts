@@ -39,34 +39,16 @@ import {
 
 @ValueType
 class Particle {
-  pos: Vec3f;
-  vel: Vec3f;
-
-  constructor(pos: Vec3f, vel: Vec3f) {
-    this.pos = pos;
-    this.vel = vel;
-  }
+  constructor(public pos: Vec3f, public vel: Vec3f) {}
 }
 
 @ValueType
 class SimParams {
-  dt: f32;
-  count: u32;
-
-  constructor(dt: f32, count: u32) {
-    this.dt = dt;
-    this.count = count;
-  }
+  constructor(public dt: f32, public count: u32) {}
 }
 
 class ParticleLayout {
-  params: Uniform<SimParams>;
-  particles: MutStorage<Particle>;
-
-  constructor(params: Uniform<SimParams>, particles: MutStorage<Particle>) {
-    this.params = params;
-    this.particles = particles;
-  }
+  constructor(public params: Uniform<SimParams>, public particles: MutStorage<Particle>) {}
 }
 
 function integrate(particle: Particle, dt: f32): Particle {
@@ -86,7 +68,7 @@ function particleKernel(res: ParticleLayout, ctx: ComputeInvocation): void {
   }
 }
 
-const particles: ComputePipelineSpec = computePipeline<ParticleLayout>(particleKernel, {
+const particles: ComputePipelineSpec = computePipeline(particleKernel, {
   name: "particles",
   workgroupSize: [64, 1, 1],
 });
@@ -147,15 +129,15 @@ export async function main(): Promise<void> {
       );
       particleValues[index] = particle;
       hostParticles.push(particle);
-      index = index + 1;
+      index += 1;
     }
     const hostLayout = new ParticleLayout(
-      new Uniform<SimParams>(new SimParams(dt, count)),
-      new MutStorage<Particle>(hostParticles),
+      new Uniform(new SimParams(dt, count)),
+      new MutStorage(hostParticles),
     );
     let step: u32 = 0;
     while (step < steps) {
-      simulateComputeThreads<ParticleLayout>(
+      simulateComputeThreads(
         particleKernel,
         hostLayout,
         particles,
@@ -164,7 +146,7 @@ export async function main(): Promise<void> {
         1,
         particles_HOST_RUNNABLE,
       );
-      step = step + 1;
+      step += 1;
     }
     using params: Buffer<SimParams> = createBuffer<SimParams>(
       device,
@@ -219,7 +201,7 @@ export async function main(): Promise<void> {
     step = 0;
     while (step < steps) {
       pipeline.dispatchThreads(encoder, [bindGroup], count, 1, 1);
-      step = step + 1;
+      step += 1;
     }
     particlesBuffer.copyTo(encoder, readback, 0, count);
     using command = encoder.finishDefault();
@@ -231,7 +213,7 @@ export async function main(): Promise<void> {
       return;
     }
     const result: FixedArray<Particle, 64> = Context.fromBytes<FixedArray<Particle, 64>>(
-      readBuffer<Particle>(readback, 0, count),
+      readBuffer(readback, 0, count),
       0,
     );
     print("readback:mapped");
@@ -241,7 +223,7 @@ export async function main(): Promise<void> {
         print(`FAIL ${index}`);
         return;
       }
-      index = index + 1;
+      index += 1;
     }
     readback.handle().unmap();
   }

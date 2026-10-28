@@ -30,16 +30,11 @@ import {
 
 @ValueType
 class SwitchValue {
-  value: u32;
-  constructor(value: u32) { this.value = value; }
+  constructor(public value: u32) {}
 }
 
 class SwitchLayout {
-  output: MutStorage<SwitchValue>;
-
-  constructor(output: MutStorage<SwitchValue>) {
-    this.output = output;
-  }
+  constructor(public output: MutStorage<SwitchValue>) {}
 }
 
 function liveSwitchKernel(res: SwitchLayout, ctx: ComputeInvocation): void {
@@ -59,7 +54,7 @@ function liveSwitchKernel(res: SwitchLayout, ctx: ComputeInvocation): void {
   res.output[ctx.globalId.x] = new SwitchValue(value);
 }
 
-const liveSwitch: ComputePipelineSpec = computePipeline<SwitchLayout>(liveSwitchKernel, {
+const liveSwitch: ComputePipelineSpec = computePipeline(liveSwitchKernel, {
   name: "liveSwitch",
   workgroupSize: [16, 1, 1],
 });
@@ -81,8 +76,8 @@ export async function main(): Promise<void> {
       hostValues.push(new SwitchValue(0));
       index += 1;
     }
-    const hostLayout = new SwitchLayout(new MutStorage<SwitchValue>(hostValues));
-    simulateComputeThreads<SwitchLayout>(
+    const hostLayout = new SwitchLayout(new MutStorage(hostValues));
+    simulateComputeThreads(
       liveSwitchKernel,
       hostLayout,
       liveSwitch,
@@ -134,7 +129,7 @@ export async function main(): Promise<void> {
     );
     if (!mapped) { print("FAIL map"); return; }
     const result: FixedArray<SwitchValue, 16> = Context.fromBytes<FixedArray<SwitchValue, 16>>(
-      readBuffer<SwitchValue>(readback, 0, count),
+      readBuffer(readback, 0, count),
       0,
     );
     print("readback:mapped");

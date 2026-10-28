@@ -48,49 +48,27 @@ import {
 // TypeGPU takes the same triangle from a shared vertex helper.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // hue is an angle in radians. alpha is the gamut clip strength. pointer is the probe
 // position in the 0 to 1 surface range. TypeGPU drives all three from HTML controls.
 @ValueType
 class OklabUniforms {
-  hue: f32;
-  alpha: f32;
-  pointer: Vec2f;
-
-  constructor(hue: f32, alpha: f32, pointer: Vec2f) {
-    this.hue = hue;
-    this.alpha = alpha;
-    this.pointer = pointer;
-  }
+  constructor(public hue: f32, public alpha: f32, public pointer: Vec2f) {}
 }
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and uv becomes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // A bind group layout is a class here, not a runtime object. Field order fixes the
 // binding numbers, and the generator emits the WGSL declaration and oklab_LAYOUT0.
 class OklabLayout {
-  uniforms: Uniform<OklabUniforms>;
-
-  constructor(uniforms: Uniform<OklabUniforms>) {
-    this.uniforms = uniforms;
-  }
+  constructor(public uniforms: Uniform<OklabUniforms>) {}
 }
 
 // A small alpha keeps the adaptive clip near the original lightness. TypeGPU offers the
@@ -154,7 +132,7 @@ function oklabFragment(
 // The declaration ties the layout class, the two kernels, and the target format together.
 // The generator reads it at compile time and emits oklab_WGSL into ./main.typegpu.
 // TypeGPU rebuilds its pipeline whenever a control picks another clip or pattern.
-const oklab: RenderPipelineSpec = renderPipelineL<OklabLayout, Vertex, Varyings>(
+const oklab: RenderPipelineSpec = renderPipelineL(
   oklabVertex,
   oklabFragment,
   { format: "bgra8unorm" },
@@ -331,10 +309,10 @@ export function frame(
 // The host calls shutdown once. The script frees every GPU handle by hand, because this
 // library keeps no finalizer and no reference count for scripts.
 export function shutdown(): void {
-  if (activeGroup != null) activeGroup.dispose();
-  if (activeUniforms != null) activeUniforms.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activePipeline != null) activePipeline.dispose();
+  activeGroup?.dispose();
+  activeUniforms?.dispose();
+  activeVertices?.dispose();
+  activePipeline?.dispose();
   activeUniforms = null;
   activeVertices = null;
   activePipeline = null;

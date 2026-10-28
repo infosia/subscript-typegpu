@@ -49,21 +49,13 @@ import {
 // number of invocations that ran.
 @ValueType
 class Counter {
-  value: AtomicU32;
-
-  constructor(value: AtomicU32) {
-    this.value = value;
-  }
+  constructor(public value: AtomicU32) {}
 }
 
 // TypeGPU's `createGuardedComputePipeline` allocates the mutable and the layout on
 // its own. This port declares the binding, and the generator emits `count1d_LAYOUT0`.
 class CounterLayout {
-  counter: MutStorage<Counter>;
-
-  constructor(counter: MutStorage<Counter>) {
-    this.counter = counter;
-  }
+  constructor(public counter: MutStorage<Counter>) {}
 }
 
 // The kernel body of all three pipelines. The body reads no global id, so the generated
@@ -80,7 +72,7 @@ const DISPATCH_3D: FixedArray<u32, 3> = [5, 3, 3];
 
 // `guarded: true` makes the generator wrap the kernel body in a global-id bounds
 // check. TypeGPU adds the same check inside `createGuardedComputePipeline`.
-const count1d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
+const count1d: ComputePipelineSpec = computePipeline(countKernel, {
   name: "count1d",
   workgroupSize: [8, 1, 1],
   guarded: true,
@@ -88,13 +80,13 @@ const count1d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel,
 
 // The three declarations differ only in the workgroup shape, so one kernel body exercises
 // the guard on one axis, on two axes, and on three.
-const count2d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
+const count2d: ComputePipelineSpec = computePipeline(countKernel, {
   name: "count2d",
   workgroupSize: [4, 4, 1],
   guarded: true,
 });
 
-const count3d: ComputePipelineSpec = computePipeline<CounterLayout>(countKernel, {
+const count3d: ComputePipelineSpec = computePipeline(countKernel, {
   name: "count3d",
   workgroupSize: [4, 2, 2],
   guarded: true,

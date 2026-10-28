@@ -122,204 +122,119 @@ const DISPLAY_SDF: u32 = 2;
 // attribute layout and the `Vertex_STRIDE` byte stride from this class.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // One stroke segment per frame: the previous point, the current point, and the edit mode.
 // Both points are in scene units of [0, 1].
 @ValueType
 class BrushParams {
-  previous: Vec2f;
-  current: Vec2f;
-  mode: u32;
-
-  constructor(previous: Vec2f, current: Vec2f, mode: u32) {
-    this.previous = previous;
-    this.current = current;
-    this.mode = mode;
-  }
+  constructor(public previous: Vec2f, public current: Vec2f, public mode: u32) {}
 }
 
 // The jump-flood offset in pixels. Each step owns a buffer with a constant value, so the
 // nine dispatches differ only by their bind group.
 @ValueType
 class StepParams {
-  offset: i32;
-
-  constructor(offset: i32) {
-    this.offset = offset;
-  }
+  constructor(public offset: i32) {}
 }
 
 // The per-layer uniform. `init` writes one buffer per layer once, so the five cascade
 // dispatches of a frame differ only by their bind group.
 @ValueType
 class CascadeParams {
-  layer: u32;
-  probes: u32;
-  cascadeCount: u32;
-  baseProbes: u32;
-
-  constructor(layer: u32, probes: u32, cascadeCount: u32, baseProbes: u32) {
-    this.layer = layer;
-    this.probes = probes;
-    this.cascadeCount = cascadeCount;
-    this.baseProbes = baseProbes;
-  }
+  constructor(
+    public layer: u32,
+    public probes: u32,
+    public cascadeCount: u32,
+    public baseProbes: u32,
+  ) {}
 }
 
 // The display mode. Two buffers hold the two values, so a key press selects a bind group
 // and writes no uniform.
 @ValueType
 class RenderParams {
-  mode: u32;
-
-  constructor(mode: u32) {
-    this.mode = mode;
-  }
+  constructor(public mode: u32) {}
 }
 
 // The vertex output. The `Vec4f` field named `position` becomes the WGSL builtin position,
 // and every other field becomes an interpolated location.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The layout classes replace TypeGPU's run-time bind group layout objects. The field
 // order is the binding order, and the generator emits one `_LAYOUT0` spec per class.
 class SceneEditLayout {
-  scene: StorageTexture2d<Rgba16float>;
-  brush: Uniform<BrushParams>;
-
-  constructor(scene: StorageTexture2d<Rgba16float>, brush: Uniform<BrushParams>) {
-    this.scene = scene;
-    this.brush = brush;
-  }
+  constructor(
+    public scene: StorageTexture2d<Rgba16float>,
+    public brush: Uniform<BrushParams>,
+  ) {}
 }
 
 // The flood passes bind both payload layers as one 2D-array texture. Layer 0 holds the seed
 // color and layer 1 holds the seed position.
 class FloodSeedLayout {
-  scene: Texture2d<f32>;
-  target: WriteStorageTexture2dArray<Rgba16float>;
-
-  constructor(scene: Texture2d<f32>, target: WriteStorageTexture2dArray<Rgba16float>) {
-    this.scene = scene;
-    this.target = target;
-  }
+  constructor(
+    public scene: Texture2d<f32>,
+    public target: WriteStorageTexture2dArray<Rgba16float>,
+  ) {}
 }
 
 // A step reads one payload texture and writes the other, because one dispatch cannot read
 // and write the same texture.
 class FloodStepLayout {
-  source: ReadStorageTexture2dArray<Rgba16float>;
-  target: WriteStorageTexture2dArray<Rgba16float>;
-  params: Uniform<StepParams>;
-
   constructor(
-    source: ReadStorageTexture2dArray<Rgba16float>,
-    target: WriteStorageTexture2dArray<Rgba16float>,
-    params: Uniform<StepParams>,
-  ) {
-    this.source = source;
-    this.target = target;
-    this.params = params;
-  }
+    public source: ReadStorageTexture2dArray<Rgba16float>,
+    public target: WriteStorageTexture2dArray<Rgba16float>,
+    public params: Uniform<StepParams>,
+  ) {}
 }
 
 // The derive pass turns the flood payload into the two textures the light passes read: a
 // signed distance and an emissive color.
 class FloodDeriveLayout {
-  payload: ReadStorageTexture2dArray<Rgba16float>;
-  scene: Texture2d<f32>;
-  sdf: StorageTexture2d<Rgba16float>;
-  colors: StorageTexture2d<Rgba16float>;
-
   constructor(
-    payload: ReadStorageTexture2dArray<Rgba16float>,
-    scene: Texture2d<f32>,
-    sdf: StorageTexture2d<Rgba16float>,
-    colors: StorageTexture2d<Rgba16float>,
-  ) {
-    this.payload = payload;
-    this.scene = scene;
-    this.sdf = sdf;
-    this.colors = colors;
-  }
+    public payload: ReadStorageTexture2dArray<Rgba16float>,
+    public scene: Texture2d<f32>,
+    public sdf: StorageTexture2d<Rgba16float>,
+    public colors: StorageTexture2d<Rgba16float>,
+  ) {}
 }
 
 // `upper` reads the layer above and `target` writes this layer. `sdf` and `colors` replace
 // the analytic scene function of the first cascade example.
 class CascadeLayout {
-  upper: Texture2d<f32>;
-  sdf: Texture2d<f32>;
-  colors: Texture2d<f32>;
-  linear: Sampler;
-  target: StorageTexture2d<Rgba16float>;
-  params: Uniform<CascadeParams>;
-
   constructor(
-    upper: Texture2d<f32>,
-    sdf: Texture2d<f32>,
-    colors: Texture2d<f32>,
-    linear: Sampler,
-    target: StorageTexture2d<Rgba16float>,
-    params: Uniform<CascadeParams>,
-  ) {
-    this.upper = upper;
-    this.sdf = sdf;
-    this.colors = colors;
-    this.linear = linear;
-    this.target = target;
-    this.params = params;
-  }
+    public upper: Texture2d<f32>,
+    public sdf: Texture2d<f32>,
+    public colors: Texture2d<f32>,
+    public linear: Sampler,
+    public target: StorageTexture2d<Rgba16float>,
+    public params: Uniform<CascadeParams>,
+  ) {}
 }
 
 // The gather reads cascade 0 through the sampler and writes the light field.
 class FieldLayout {
-  cascade0: Texture2d<f32>;
-  linear: Sampler;
-  target: StorageTexture2d<Rgba16float>;
-
-  constructor(cascade0: Texture2d<f32>, linear: Sampler, target: StorageTexture2d<Rgba16float>) {
-    this.cascade0 = cascade0;
-    this.linear = linear;
-    this.target = target;
-  }
+  constructor(
+    public cascade0: Texture2d<f32>,
+    public linear: Sampler,
+    public target: StorageTexture2d<Rgba16float>,
+  ) {}
 }
 
 // One layout class serves both render stages, and the mode uniform selects the view.
 class RenderLayout {
-  field: Texture2d<f32>;
-  sdf: Texture2d<f32>;
-  colors: Texture2d<f32>;
-  linear: Sampler;
-  params: Uniform<RenderParams>;
-
   constructor(
-    field: Texture2d<f32>,
-    sdf: Texture2d<f32>,
-    colors: Texture2d<f32>,
-    linear: Sampler,
-    params: Uniform<RenderParams>,
-  ) {
-    this.field = field;
-    this.sdf = sdf;
-    this.colors = colors;
-    this.linear = linear;
-    this.params = params;
-  }
+    public field: Texture2d<f32>,
+    public sdf: Texture2d<f32>,
+    public colors: Texture2d<f32>,
+    public linear: Sampler,
+    public params: Uniform<RenderParams>,
+  ) {}
 }
 
 // The edit pass only writes touched cells, so a stroke accumulates in one scene texture.
@@ -702,43 +617,39 @@ function drawingFragment(
 // The seven declarations are the generator's input. It walks the typed program before the
 // run and emits `main.typegpu.ts`: the WGSL text, the entry names, and the layout specs.
 // TypeGPU resolves the same shaders from the kernel functions at run time.
-const sceneEdit: ComputePipelineSpec = computePipeline<SceneEditLayout>(
+const sceneEdit: ComputePipelineSpec = computePipeline(
   sceneEditKernel,
   { name: "sceneEdit", workgroupSize: [8, 8, 1] },
 );
 
-const floodSeed: ComputePipelineSpec = computePipeline<FloodSeedLayout>(
+const floodSeed: ComputePipelineSpec = computePipeline(
   floodSeedKernel,
   { name: "floodSeed", workgroupSize: [8, 8, 1] },
 );
 
-const floodStep: ComputePipelineSpec = computePipeline<FloodStepLayout>(
+const floodStep: ComputePipelineSpec = computePipeline(
   floodStepKernel,
   { name: "floodStep", workgroupSize: [8, 8, 1] },
 );
 
-const floodDerive: ComputePipelineSpec = computePipeline<FloodDeriveLayout>(
+const floodDerive: ComputePipelineSpec = computePipeline(
   floodDeriveKernel,
   { name: "floodDerive", workgroupSize: [8, 8, 1] },
 );
 
-const cascadePass: ComputePipelineSpec = computePipeline<CascadeLayout>(
+const cascadePass: ComputePipelineSpec = computePipeline(
   cascadeKernel,
   { name: "cascadePass", workgroupSize: [16, 16, 1] },
 );
 
-const fieldBuild: ComputePipelineSpec = computePipeline<FieldLayout>(fieldKernel, {
+const fieldBuild: ComputePipelineSpec = computePipeline(fieldKernel, {
   name: "fieldBuild",
   workgroupSize: [16, 16, 1],
 });
 
 // `renderPipelineL` adds the layout class, so both stages read `RenderLayout`. The target
 // format belongs to the declaration, and `init` checks the surface format against it.
-const radianceDrawingRender: RenderPipelineSpec = renderPipelineL<
-  RenderLayout,
-  Vertex,
-  Varyings
->(drawingVertex, drawingFragment, { format: "bgra8unorm" });
+const radianceDrawingRender: RenderPipelineSpec = renderPipelineL(drawingVertex, drawingFragment, { format: "bgra8unorm" });
 
 // One object holds every handle a frame needs. Scripts own their handles, so `shutdown`
 // releases each one. TypeGPU leaves that to garbage collection and `root.destroy`.

@@ -34,24 +34,14 @@ import {
 // `Vertex_STRIDE`, the byte distance between two vertices.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The record that travels from the vertex stage to the fragment stage. The `position`
 // field carries the clip-space position builtin, and `color` takes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  color: Vec3f;
-
-  constructor(position: Vec4f, color: Vec3f) {
-    this.position = position;
-    this.color = color;
-  }
+  constructor(public position: Vec4f, public color: Vec3f) {}
 }
 
 // TypeGPU reads three positions from a constant array and mixes two colors over
@@ -77,7 +67,7 @@ function triangleFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
 
 // The declaration pairs the two entry points and fixes the target format. The
 // generator walks it and emits the WGSL and the constants of `main.typegpu`.
-const triangle: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const triangle: RenderPipelineSpec = renderPipeline(
   triangleVertex,
   triangleFragment,
   { format: "bgra8unorm" },
@@ -209,13 +199,9 @@ export function frame(
 // The host calls this one time before it releases the device. TypeGPU frees the same kind of
 // resource through `root.destroy`, and this layer disposes each handle by name.
 export function shutdown(): void {
-  if (activeVertices != null) {
-    activeVertices.dispose();
-    activeVertices = null;
-  }
-  if (activePipeline != null) {
-    activePipeline.dispose();
-    activePipeline = null;
-  }
+  activeVertices?.dispose();
+  activeVertices = null;
+  activePipeline?.dispose();
+  activePipeline = null;
   activeDevice = null;
 }

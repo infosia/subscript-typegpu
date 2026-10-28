@@ -34,26 +34,14 @@ import {
 // `Vertex_STRIDE`, the byte distance between two vertices.
 @ValueType
 class Vertex {
-  position: Vec2f;
-  color: Vec4f;
-
-  constructor(position: Vec2f, color: Vec4f) {
-    this.position = position;
-    this.color = color;
-  }
+  constructor(public position: Vec2f, public color: Vec4f) {}
 }
 
 // The record that travels from the vertex stage to the fragment stage. The `position`
 // field carries the clip-space position builtin, and `color` takes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  color: Vec4f;
-
-  constructor(position: Vec4f, color: Vec4f) {
-    this.position = position;
-    this.color = color;
-  }
+  constructor(public position: Vec4f, public color: Vec4f) {}
 }
 
 // TypeGPU keeps the four positions inside the shader and streams only the colors.
@@ -73,7 +61,7 @@ function squareFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
 
 // The index format belongs to the declaration. TypeGPU attaches the index buffer to
 // the pipeline with `withIndexBuffer` instead.
-const square: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const square: RenderPipelineSpec = renderPipeline(
   squareVertex,
   squareFragment,
   { format: "bgra8unorm", indexFormat: "uint16" },
@@ -225,17 +213,11 @@ export function frame(
 // The host calls this one time before it releases the device. TypeGPU frees the same kind of
 // resource through `root.destroy`, and this layer disposes each handle by name.
 export function shutdown(): void {
-  if (activeIndices != null) {
-    activeIndices.dispose();
-    activeIndices = null;
-  }
-  if (activeVertices != null) {
-    activeVertices.dispose();
-    activeVertices = null;
-  }
-  if (activePipeline != null) {
-    activePipeline.dispose();
-    activePipeline = null;
-  }
+  activeIndices?.dispose();
+  activeIndices = null;
+  activeVertices?.dispose();
+  activeVertices = null;
+  activePipeline?.dispose();
+  activePipeline = null;
   activeDevice = null;
 }

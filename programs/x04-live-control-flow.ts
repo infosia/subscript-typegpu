@@ -31,18 +31,11 @@ import {
 
 @ValueType
 class Item {
-  value: f32;
-  constructor(value: f32) { this.value = value; }
+  constructor(public value: f32) {}
 }
 
 class ControlLayout {
-  input: Storage<Item>;
-  output: MutStorage<Item>;
-
-  constructor(input: Storage<Item>, output: MutStorage<Item>) {
-    this.input = input;
-    this.output = output;
-  }
+  constructor(public input: Storage<Item>, public output: MutStorage<Item>) {}
 }
 
 function controlFlowKernel(res: ControlLayout, ctx: ComputeInvocation): void {
@@ -57,7 +50,7 @@ function controlFlowKernel(res: ControlLayout, ctx: ComputeInvocation): void {
   res.output[0] = new Item(total);
 }
 
-const controlFlow: ComputePipelineSpec = computePipeline<ControlLayout>(controlFlowKernel, {
+const controlFlow: ComputePipelineSpec = computePipeline(controlFlowKernel, {
   name: "controlFlow",
   workgroupSize: [1, 1, 1],
 });
@@ -72,12 +65,12 @@ export async function main(): Promise<void> {
     using device = deviceResult;
     const inputValues: FixedArray<Item, 4> = [new Item(-1.0), new Item(1.0), new Item(3.0), new Item(4.0)];
     const hostLayout = new ControlLayout(
-      new Storage<Item>([
+      new Storage([
         new Item(-1.0), new Item(1.0), new Item(3.0), new Item(4.0),
       ]),
-      new MutStorage<Item>([new Item(0.0)]),
+      new MutStorage([new Item(0.0)]),
     );
-    simulateComputeThreads<ControlLayout>(
+    simulateComputeThreads(
       controlFlowKernel,
       hostLayout,
       controlFlow,
@@ -106,7 +99,7 @@ export async function main(): Promise<void> {
     using command = encoder.finishDefault();
     queue.submit([command]);
     if (!await readback.handle().mapAsync(GPUMapMode.READ, 0, Item_STRIDE as u64)) { print("FAIL map"); return; }
-    const result: FixedArray<Item, 1> = Context.fromBytes<FixedArray<Item, 1>>(readBuffer<Item>(readback, 0, 1), 0);
+    const result: FixedArray<Item, 1> = Context.fromBytes<FixedArray<Item, 1>>(readBuffer(readback, 0, 1), 0);
     const expected: f32 = hostLayout.output[0].value;
     if (result[0].value != expected) { print(`FAIL expected=${expected} got=${result[0].value}`); return; }
     readback.handle().unmap();

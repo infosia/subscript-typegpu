@@ -46,45 +46,27 @@ import {
 // `Vertex_STRIDE`, the byte distance between two vertices.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The uniform record. `time` counts seconds, and the generator emits `FrameData_SIZE`
 // for the buffer.
 @ValueType
 class FrameData {
-  time: f32;
-
-  constructor(time: f32) {
-    this.time = time;
-  }
+  constructor(public time: f32) {}
 }
 
 // The record that travels from the vertex stage to the fragment stage. The `position`
 // field carries the clip-space position builtin, and `uv` takes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The bind group of the pipeline: one uniform buffer. TypeGPU declares the same binding
 // with `root.createUniform`, and the generator emits `noise_LAYOUT0` from this class.
 class NoiseLayout {
-  frame: Uniform<FrameData>;
-
-  constructor(frame: Uniform<FrameData>) {
-    this.frame = frame;
-  }
+  constructor(public frame: Uniform<FrameData>) {}
 }
 
 // GRID is the noise cells across the surface, DEPTH is the loop period in seconds, and
@@ -130,7 +112,7 @@ function noiseFragment(
 
 // The declaration pairs the two kernels with the layout class, so both stages reach the
 // uniform. The generator reads it and emits the WGSL, the layout, and the vertex layout.
-const noise: RenderPipelineSpec = renderPipelineL<NoiseLayout, Vertex, Varyings>(
+const noise: RenderPipelineSpec = renderPipelineL(
   noiseVertex,
   noiseFragment,
   { format: "bgra8unorm" },
@@ -289,10 +271,10 @@ export function frame(
 // The host calls this one time before it releases the device. TypeGPU frees the same kind of
 // resource through `root.destroy`, and this layer disposes each handle by name.
 export function shutdown(): void {
-  if (activeGroup != null) activeGroup.dispose();
-  if (activeFrameBuffer != null) activeFrameBuffer.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activePipeline != null) activePipeline.dispose();
+  activeGroup?.dispose();
+  activeFrameBuffer?.dispose();
+  activeVertices?.dispose();
+  activePipeline?.dispose();
   activeFrameBuffer = null;
   activeVertices = null;
   activePipeline = null;

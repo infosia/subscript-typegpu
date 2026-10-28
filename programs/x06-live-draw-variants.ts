@@ -34,33 +34,17 @@ import {
 
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 @ValueType
 class Instance {
-  offset: Vec2f;
-  color: Vec3f;
-
-  constructor(offset: Vec2f, color: Vec3f) {
-    this.offset = offset;
-    this.color = color;
-  }
+  constructor(public offset: Vec2f, public color: Vec3f) {}
 }
 
 @ValueType
 class Varyings {
-  position: Vec4f;
-  color: Vec3f;
-
-  constructor(position: Vec4f, color: Vec3f) {
-    this.position = position;
-    this.color = color;
-  }
+  constructor(public position: Vec4f, public color: Vec3f) {}
 }
 
 function quadVert(value: Vertex, instance: Instance, ctx: VertexInvocation): Varyings {
@@ -79,7 +63,7 @@ function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(input.color.x, input.color.y, input.color.z, 1.0);
 }
 
-const quad: RenderPipelineSpec = renderPipelineInstanced<Vertex, Instance, Varyings>(
+const quad: RenderPipelineSpec = renderPipelineInstanced(
   quadVert,
   frag,
   { format: "rgba8unorm" },
@@ -121,9 +105,9 @@ function noCenterOnEdge(a: Vec2f, b: Vec2f, c: Vec2f): boolean {
         || edge(c, a, point) == 0.0) {
         return false;
       }
-      x = x + 1;
+      x += 1;
     }
-    y = y + 1;
+    y += 1;
   }
   return true;
 }
@@ -188,7 +172,7 @@ export async function main(): Promise<void> {
         print(`FAIL pixel center on instance ${instanceIndex} edge`);
         return;
       }
-      instanceIndex = instanceIndex + 1;
+      instanceIndex += 1;
     }
     using vertices: Buffer<Vertex> = createBuffer<Vertex>(
       device,
@@ -310,7 +294,7 @@ export async function main(): Promise<void> {
               expectedB = 255;
             }
           }
-          instanceIndex = instanceIndex + 1;
+          instanceIndex += 1;
         }
         const offset: i32 = y * 256 + x * 4;
         if (pixels[offset] != expectedR
@@ -322,9 +306,9 @@ export async function main(): Promise<void> {
           );
           return;
         }
-        x = x + 1;
+        x += 1;
       }
-      y = y + 1;
+      y += 1;
     }
     readback.unmap();
   }

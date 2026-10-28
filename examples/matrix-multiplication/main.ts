@@ -40,27 +40,17 @@ import {
 // six-by-six maximum and drives the live size from sliders.
 @ValueType
 class Matrix {
-  size: Vec2u;
-  body: FixedArray<f32, 16>;
-
-  constructor(size: Vec2u, body: FixedArray<f32, 16>) {
-    this.size = size;
-    this.body = body;
-  }
+  constructor(public size: Vec2u, public body: FixedArray<f32, 16>) {}
 }
 
 // TypeGPU declares the same three bindings with a bind group layout. A resources
 // class names them here, and the generator emits `multiply_LAYOUT0` from it.
 class MatrixLayout {
-  left: Storage<Matrix>;
-  right: Storage<Matrix>;
-  product: MutStorage<Matrix>;
-
-  constructor(left: Storage<Matrix>, right: Storage<Matrix>, product: MutStorage<Matrix>) {
-    this.left = left;
-    this.right = right;
-    this.product = product;
-  }
+  constructor(
+    public left: Storage<Matrix>,
+    public right: Storage<Matrix>,
+    public product: MutStorage<Matrix>,
+  ) {}
 }
 
 // TypeGPU writes this kernel as a WGSL template and resolves it at run time.
@@ -80,7 +70,7 @@ function multiplyKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
   }
 }
 
-const multiply: ComputePipelineSpec = computePipeline<MatrixLayout>(
+const multiply: ComputePipelineSpec = computePipeline(
   multiplyKernel,
   {
     name: "multiply",
@@ -233,13 +223,13 @@ export async function main(): Promise<void> {
       // The host lane holds the same three bindings in wrapper types, so one kernel body
       // serves both lanes.
       const host = new MatrixLayout(
-        new Storage<Matrix>([leftValue]),
-        new Storage<Matrix>([rightValue]),
-        new MutStorage<Matrix>([zeroMatrix()]),
+        new Storage([leftValue]),
+        new Storage([rightValue]),
+        new MutStorage([zeroMatrix()]),
       );
       // The host lane runs the same kernel over host storage, so the example holds no
       // second formula. TypeGPU's example prints the GPU result to the page.
-      simulateComputeThreads<MatrixLayout>(
+      simulateComputeThreads(
         multiplyKernel,
         host,
         multiply,

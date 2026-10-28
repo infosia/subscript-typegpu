@@ -37,20 +37,12 @@ const SIZE: i32 = 16;
 
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 @ValueType
 class Varyings {
-  position: Vec4f;
-
-  constructor(position: Vec4f) {
-    this.position = position;
-  }
+  constructor(public position: Vec4f) {}
 }
 
 function vertexStep(value: Vertex, ctx: VertexInvocation): Varyings {
@@ -61,7 +53,7 @@ function fragmentStep(value: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(0.25, 0.6, 0.75, 1.0);
 }
 
-const stripLive: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const stripLive: RenderPipelineSpec = renderPipeline(
   vertexStep,
   fragmentStep,
   {

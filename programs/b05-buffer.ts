@@ -16,13 +16,7 @@ import { Particle_OFFSET_vel, Particle_STRIDE } from "./b05-buffer.typegpu";
 
 @ValueType
 class Particle {
-  pos: Vec3f;
-  vel: Vec3f;
-
-  constructor(pos: Vec3f, vel: Vec3f) {
-    this.pos = pos;
-    this.vel = vel;
-  }
+  constructor(public pos: Vec3f, public vel: Vec3f) {}
 }
 
 function equalParticle(left: Particle, right: Particle): boolean {
@@ -99,7 +93,7 @@ export async function main(): Promise<void> {
     let index: i32 = 0;
     while (index < 4) {
       const value: Particle = Context.fromBytes<Particle>(
-        readOne<Particle>(readback, index as u32),
+        readOne(readback, index as u32),
         0,
       );
       if (!equalParticle(value, particles[index])) {
@@ -109,7 +103,7 @@ export async function main(): Promise<void> {
       print(
         `particle${index}=${value.pos.x},${value.pos.y},${value.pos.z},${value.vel.x},${value.vel.y},${value.vel.z}`,
       );
-      index = index + 1;
+      index += 1;
     }
     print("roundtrip:match");
     readback.handle().unmap();

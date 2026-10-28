@@ -81,7 +81,7 @@ export async function main(): Promise<void> {
       if (mismatch == -1 && observed[index] != written[index]) {
         mismatch = index;
       }
-      index = index + 1;
+      index += 1;
     }
     if (mismatch == -1 && observed.length != written.length) {
       mismatch = index;

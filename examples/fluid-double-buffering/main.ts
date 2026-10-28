@@ -63,75 +63,43 @@ const CELL_COUNT: u32 = GRID_SIZE * GRID_SIZE;
 // the vertex buffer layout follows the field order.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // One grid cell. The velocity counts cells per step and the density is a unitless amount near
 // 0 to 1. TypeGPU packs the same three values into one `vec4f` and leaves the fourth free.
 @ValueType
 class FluidCell {
-  velocity: Vec2f;
-  density: f32;
-
-  constructor(velocity: Vec2f, density: f32) {
-    this.velocity = velocity;
-    this.density = density;
-  }
+  constructor(public velocity: Vec2f, public density: f32) {}
 }
 
 // The obstacle center on the normalized X axis, where -1 is the left edge and 1 the right edge.
 // TypeGPU carries four integer obstacle boxes and moves them from slider callbacks.
 @ValueType
 class FluidParams {
-  obstacleX: f32;
-
-  constructor(obstacleX: f32) {
-    this.obstacleX = obstacleX;
-  }
+  constructor(public obstacleX: f32) {}
 }
 
 // The vertex output. `position` is clip space and `uv` runs 0 to 1 across the surface.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The compute layout. All three passes share it, so one class names the source cells, the target
 // cells, and the obstacle uniform. TypeGPU binds the same two roles through slots per pipeline.
 class FluidLayout {
-  source: Storage<FluidCell>;
-  target: MutStorage<FluidCell>;
-  params: Uniform<FluidParams>;
-
   constructor(
-    source: Storage<FluidCell>,
-    target: MutStorage<FluidCell>,
-    params: Uniform<FluidParams>,
-  ) {
-    this.source = source;
-    this.target = target;
-    this.params = params;
-  }
+    public source: Storage<FluidCell>,
+    public target: MutStorage<FluidCell>,
+    public params: Uniform<FluidParams>,
+  ) {}
 }
 
 // The render pass reads one grid, so its layout carries a single read-only binding. Two bind
 // groups on this layout then select cells A or cells B without a second pipeline.
 class FluidRenderLayout {
-  cells: Storage<FluidCell>;
-
-  constructor(cells: Storage<FluidCell>) {
-    this.cells = cells;
-  }
+  constructor(public cells: Storage<FluidCell>) {}
 }
 
 function isValidFlowOut(x: i32, y: i32, params: FluidParams): boolean {
@@ -316,28 +284,24 @@ function fluidFragment(
 // The four declarations name the kernel, the layout type, and the workgroup size. The generator
 // reads them ahead of the run and emits the WGSL, the entry names, and the layout facts.
 // TypeGPU builds the same WGSL at run time from the kernel function.
-const flow: ComputePipelineSpec = computePipeline<FluidLayout>(flowKernel, {
+const flow: ComputePipelineSpec = computePipeline(flowKernel, {
   name: "flow",
   workgroupSize: [8, 8, 1],
 });
 
-const evaporate: ComputePipelineSpec = computePipeline<FluidLayout>(evaporateKernel, {
+const evaporate: ComputePipelineSpec = computePipeline(evaporateKernel, {
   name: "evaporate",
   workgroupSize: [8, 8, 1],
 });
 
-const obstacle: ComputePipelineSpec = computePipeline<FluidLayout>(obstacleKernel, {
+const obstacle: ComputePipelineSpec = computePipeline(obstacleKernel, {
   name: "obstacle",
   workgroupSize: [8, 8, 1],
 });
 
 // The render declaration fixes the color target format and the strip topology. `init` compares
 // the same format constant against the surface format the host reports.
-const fluidRender: RenderPipelineSpec = renderPipelineL<
-  FluidRenderLayout,
-  Vertex,
-  Varyings
->(fluidVertex, fluidFragment, {
+const fluidRender: RenderPipelineSpec = renderPipelineL(fluidVertex, fluidFragment, {
   format: "bgra8unorm",
   topology: "triangle-strip",
 });
@@ -679,22 +643,22 @@ export function frame(
 // creation order, so a bind group never outlives the buffers it names.
 // TypeGPU releases the same resources with one `root.destroy()` call.
 export function shutdown(): void {
-  if (activeRenderB != null) activeRenderB.dispose();
-  if (activeRenderA != null) activeRenderA.dispose();
-  if (activeObstacleBA != null) activeObstacleBA.dispose();
-  if (activeObstacleAB != null) activeObstacleAB.dispose();
-  if (activeEvaporateBA != null) activeEvaporateBA.dispose();
-  if (activeEvaporateAB != null) activeEvaporateAB.dispose();
-  if (activeFlowBA != null) activeFlowBA.dispose();
-  if (activeFlowAB != null) activeFlowAB.dispose();
-  if (activeParams != null) activeParams.dispose();
-  if (activeCellsB != null) activeCellsB.dispose();
-  if (activeCellsA != null) activeCellsA.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activeRender != null) activeRender.dispose();
-  if (activeObstacle != null) activeObstacle.dispose();
-  if (activeEvaporate != null) activeEvaporate.dispose();
-  if (activeFlow != null) activeFlow.dispose();
+  activeRenderB?.dispose();
+  activeRenderA?.dispose();
+  activeObstacleBA?.dispose();
+  activeObstacleAB?.dispose();
+  activeEvaporateBA?.dispose();
+  activeEvaporateAB?.dispose();
+  activeFlowBA?.dispose();
+  activeFlowAB?.dispose();
+  activeParams?.dispose();
+  activeCellsB?.dispose();
+  activeCellsA?.dispose();
+  activeVertices?.dispose();
+  activeRender?.dispose();
+  activeObstacle?.dispose();
+  activeEvaporate?.dispose();
+  activeFlow?.dispose();
   // The cleared state leaves no released handle reachable from module scope.
   activeRenderB = null;
   activeRenderA = null;

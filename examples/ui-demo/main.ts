@@ -17,7 +17,7 @@ import {
 
 // The program declares the pipeline that draws the UI. The generator emits its
 // WGSL and layout facts beside this file, and the renderer receives them.
-const uiPipeline: RenderPipelineSpec = renderPipelineL<UiRenderLayout, UiVertex, UiVarying>(
+const uiPipeline: RenderPipelineSpec = renderPipelineL(
   uiVertex, uiFragment, { format: "bgra8unorm", indexFormat: "uint16", blend: UI_BLEND },
 );
 
@@ -30,9 +30,9 @@ const green: UiState<f32> = new UiState<f32>(95);
 const blue: UiState<f32> = new UiState<f32>(100);
 // Widget state crosses in holders. microui passes a pointer to the value.
 const checks: UiState<boolean>[] = [
-  new UiState<boolean>(true), new UiState<boolean>(false), new UiState<boolean>(true),
+  new UiState(true), new UiState(false), new UiState(true),
 ];
-const input: UiState<string> = new UiState<string>("");
+const input: UiState<string> = new UiState("");
 let logText: string = "";
 let logUpdated: boolean = false;
 let wheelX: f32 = 0;
@@ -282,9 +282,7 @@ export function frame(
 // The host calls this one time before it releases the device. `dispose` releases the
 // pipeline, the atlas, and the buffers, and the host owns the device the wrapper held.
 export function shutdown(): void {
-  if (renderer != null) {
-    renderer.dispose();
-    renderer = null;
-  }
+  renderer?.dispose();
+  renderer = null;
   ownedDevice = null;
 }

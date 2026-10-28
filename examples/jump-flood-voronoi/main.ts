@@ -80,86 +80,51 @@ const START_OFFSET: u32 = 256;
 // corners from the vertex index and binds no vertex buffer.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The reseed counter. A new value changes the seed of every cell, so one key press draws a new
 // pattern. TypeGPU reseeds from the clock instead.
 @ValueType
 class SeedParams {
-  reseed: u32;
-
-  constructor(reseed: u32) {
-    this.reseed = reseed;
-  }
+  constructor(public reseed: u32) {}
 }
 
 // The jump distance of the current step, in cells. The frame writes it before each dispatch.
 @ValueType
 class StepParams {
-  offset: i32;
-
-  constructor(offset: i32) {
-    this.offset = offset;
-  }
+  constructor(public offset: i32) {}
 }
 
 // The vertex output. `position` is clip space and `uv` runs 0 to 1 across the surface.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The seed layout writes both layers of one texture. Layer 0 carries the color, and layer 1
 // carries the seed coordinate as a 0 to 1 pair.
 class SeedLayout {
-  target: WriteStorageTexture2dArray<Rgba16float>;
-  params: Uniform<SeedParams>;
-
-  constructor(target: WriteStorageTexture2dArray<Rgba16float>, params: Uniform<SeedParams>) {
-    this.target = target;
-    this.params = params;
-  }
+  constructor(
+    public target: WriteStorageTexture2dArray<Rgba16float>,
+    public params: Uniform<SeedParams>,
+  ) {}
 }
 
 // The step layout reads one texture and writes the other, so no invocation reads a cell that
 // another invocation already changed.
 class StepLayout {
-  source: ReadStorageTexture2dArray<Rgba16float>;
-  target: WriteStorageTexture2dArray<Rgba16float>;
-  params: Uniform<StepParams>;
-
   constructor(
-    source: ReadStorageTexture2dArray<Rgba16float>,
-    target: WriteStorageTexture2dArray<Rgba16float>,
-    params: Uniform<StepParams>,
-  ) {
-    this.source = source;
-    this.target = target;
-    this.params = params;
-  }
+    public source: ReadStorageTexture2dArray<Rgba16float>,
+    public target: WriteStorageTexture2dArray<Rgba16float>,
+    public params: Uniform<StepParams>,
+  ) {}
 }
 
 // The render layout takes a sampled view of layer 0 and a linear sampler. A storage binding
 // takes no sampler, so the display path needs a second view of the same texture.
 class VoronoiRenderLayout {
-  colors: Texture2d<f32>;
-  linear: Sampler;
-
-  constructor(colors: Texture2d<f32>, linear: Sampler) {
-    this.colors = colors;
-    this.linear = linear;
-  }
+  constructor(public colors: Texture2d<f32>, public linear: Sampler) {}
 }
 
 // These are the four committed upstream palette literals. The random variation below
@@ -352,63 +317,35 @@ function voronoiFragment(
 // The three declarations name the kernel, the layout type, and the workgroup size. The generator
 // reads them ahead of the run and emits the WGSL, the entry names, and the layout facts.
 // TypeGPU builds the same WGSL at run time from the kernel function.
-const seedVoronoi: ComputePipelineSpec = computePipeline<SeedLayout>(seedKernel, {
+const seedVoronoi: ComputePipelineSpec = computePipeline(seedKernel, {
   name: "seedVoronoi",
   workgroupSize: [8, 8, 1],
 });
 
-const jumpFloodStep: ComputePipelineSpec = computePipeline<StepLayout>(stepKernel, {
+const jumpFloodStep: ComputePipelineSpec = computePipeline(stepKernel, {
   name: "jumpFloodStep",
   workgroupSize: [8, 8, 1],
 });
 
-const voronoiRender: RenderPipelineSpec = renderPipelineL<
-  VoronoiRenderLayout,
-  Vertex,
-  Varyings
->(voronoiVertex, voronoiFragment, { format: "bgra8unorm" });
+const voronoiRender: RenderPipelineSpec = renderPipelineL(voronoiVertex, voronoiFragment, { format: "bgra8unorm" });
 
 // One holder for everything `init` creates. `compute` holds the seed pipeline and then the step
 // pipeline. `computeGroups` holds seed A, seed B, step A to B, and step B to A.
 // TypeGPU frees the same resources through garbage collection and `root.destroy()`.
 class VoronoiState {
-  device: GPUHostOwnedDevice;
-  compute: ComputePipeline[];
-  render: RenderPipeline;
-  computeGroups: GPUBindGroup[];
-  renderGroups: GPUBindGroup[];
-  vertices: GPUBuffer;
-  seedParams: GPUBuffer;
-  stepParams: GPUBuffer;
-  textures: GPUTexture[];
-  views: GPUTextureView[];
-  linearSampler: GPUSampler;
-
   constructor(
-    device: GPUHostOwnedDevice,
-    compute: ComputePipeline[],
-    render: RenderPipeline,
-    computeGroups: GPUBindGroup[],
-    renderGroups: GPUBindGroup[],
-    vertices: GPUBuffer,
-    seedParams: GPUBuffer,
-    stepParams: GPUBuffer,
-    textures: GPUTexture[],
-    views: GPUTextureView[],
-    linearSampler: GPUSampler,
-  ) {
-    this.device = device;
-    this.compute = compute;
-    this.render = render;
-    this.computeGroups = computeGroups;
-    this.renderGroups = renderGroups;
-    this.vertices = vertices;
-    this.seedParams = seedParams;
-    this.stepParams = stepParams;
-    this.textures = textures;
-    this.views = views;
-    this.linearSampler = linearSampler;
-  }
+    public device: GPUHostOwnedDevice,
+    public compute: ComputePipeline[],
+    public render: RenderPipeline,
+    public computeGroups: GPUBindGroup[],
+    public renderGroups: GPUBindGroup[],
+    public vertices: GPUBuffer,
+    public seedParams: GPUBuffer,
+    public stepParams: GPUBuffer,
+    public textures: GPUTexture[],
+    public views: GPUTextureView[],
+    public linearSampler: GPUSampler,
+  ) {}
 }
 
 // `currentIsA` names the texture that holds the newest result. `jumpOffset` counts down to

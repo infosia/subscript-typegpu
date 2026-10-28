@@ -16,9 +16,9 @@ export function main(): void {
   verifyWidgets();
   verifyContainers();
   const ui: UiContext = new UiContext();
-  const checked: UiState<boolean> = new UiState<boolean>(true);
-  const slider: UiState<f32> = new UiState<f32>(10);
-  const text: UiState<string> = new UiState<string>("");
+  const checked: UiState<boolean> = new UiState(true);
+  const slider: UiState<f32> = new UiState(10);
+  const text: UiState<string> = new UiState("");
   const widths: i32[] = [-1];
   const window: UiRect = new UiRect(10, 10, 300, 400);
   for (let frame: i32 = 1; frame <= 16; frame += 1) {
@@ -89,7 +89,7 @@ function verifyCore(): void {
   for (let i: i32 = 0; i < alpha.length; i += 1) checksum = (checksum ^ (alpha[i] as u32)) * 16777619;
   check(checksum == 4088512439, "atlas checksum");
   const context: UiContext = new UiContext();
-  const holder: UiState<i32> = new UiState<i32>(7);
+  const holder: UiState<i32> = new UiState(7);
   holder.value += 1;
   check(holder.value == 8, "holder");
   const style: UiStyle = context.style;
@@ -231,9 +231,9 @@ function verifyWidgets(): void {
   check(uiNumberText(1.125) == "1.13" && uiNumberText(-1.125) == "-1.13"
     && uiNumberText(-0.004) == "-0.00", "number format");
   const ui: UiContext = new UiContext();
-  const value: UiState<f32> = new UiState<f32>(1);
-  const checked: UiState<boolean> = new UiState<boolean>(false);
-  const input: UiState<string> = new UiState<string>("AB");
+  const value: UiState<f32> = new UiState(1);
+  const checked: UiState<boolean> = new UiState(false);
+  const input: UiState<string> = new UiState("AB");
   const root: UiRoot = new UiRoot(1, new UiRect(0, 0, 200, 200), 1);
   ui.inputMouseMove(10, 10);
   ui.begin(); ui.beginRoot(root); ui.endRoot(); ui.end();

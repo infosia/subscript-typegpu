@@ -33,20 +33,12 @@ import {
 
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 @ValueType
 class Varyings {
-  position: Vec4f;
-
-  constructor(position: Vec4f) {
-    this.position = position;
-  }
+  constructor(public position: Vec4f) {}
 }
 
 function vertexStep(value: Vertex, ctx: VertexInvocation): Varyings {
@@ -59,7 +51,7 @@ function fragmentStep(value: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(1.0, 1.0, 1.0, 1.0);
 }
 
-const culled: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const culled: RenderPipelineSpec = renderPipeline(
   vertexStep,
   fragmentStep,
   {

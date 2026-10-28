@@ -55,47 +55,27 @@ import {
 // never counts bytes.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The per-frame uniform. `time` carries seconds derived from the frame count, and
 // `resolution` carries the surface size in pixels.
 @ValueType
 class FrameData {
-  time: f32;
-  resolution: Vec2f;
-
-  constructor(time: f32, resolution: Vec2f) {
-    this.time = time;
-    this.resolution = resolution;
-  }
+  constructor(public time: f32, public resolution: Vec2f) {}
 }
 
 // The inter-stage record. The field named `position` becomes the clip-space builtin, and
 // `uv` becomes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The bind group layout. The three patterns declare the same layout, so one uniform buffer
 // and one bind group serve all three pipelines.
 class DiscoLayout {
-  frame: Uniform<FrameData>;
-
-  constructor(frame: Uniform<FrameData>) {
-    this.frame = frame;
-  }
+  constructor(public frame: Uniform<FrameData>) {}
 }
 
 // The cosine palette maps one scalar to a color. The 6.28318 factor turns the argument into
@@ -232,19 +212,19 @@ function kaleidoscopeFragment(
 
 // Three declarations share one vertex stage and one layout class. The generator emits one
 // WGSL module per declaration, each with its own entry names and constants.
-const rings: RenderPipelineSpec = renderPipelineL<DiscoLayout, Vertex, Varyings>(
+const rings: RenderPipelineSpec = renderPipelineL(
   discoVertex,
   ringsFragment,
   { format: "bgra8unorm" },
 );
 
-const swirl: RenderPipelineSpec = renderPipelineL<DiscoLayout, Vertex, Varyings>(
+const swirl: RenderPipelineSpec = renderPipelineL(
   discoVertex,
   swirlFragment,
   { format: "bgra8unorm" },
 );
 
-const kaleidoscope: RenderPipelineSpec = renderPipelineL<DiscoLayout, Vertex, Varyings>(
+const kaleidoscope: RenderPipelineSpec = renderPipelineL(
   discoVertex,
   kaleidoscopeFragment,
   { format: "bgra8unorm" },
@@ -455,12 +435,12 @@ export function frame(
 // The host calls `shutdown` once, before it releases the device. The bind group goes first,
 // because it names the other handles.
 export function shutdown(): void {
-  if (activeGroup != null) activeGroup.dispose();
-  if (activeFrameBuffer != null) activeFrameBuffer.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activeKaleidoscope != null) activeKaleidoscope.dispose();
-  if (activeSwirl != null) activeSwirl.dispose();
-  if (activeRings != null) activeRings.dispose();
+  activeGroup?.dispose();
+  activeFrameBuffer?.dispose();
+  activeVertices?.dispose();
+  activeKaleidoscope?.dispose();
+  activeSwirl?.dispose();
+  activeRings?.dispose();
   // The null assignments make a second `shutdown` call safe.
   activeFrameBuffer = null;
   activeVertices = null;

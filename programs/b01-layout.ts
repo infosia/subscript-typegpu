@@ -103,22 +103,12 @@ class Mixed {
 
 @ValueType
 class Grid {
-  cells: FixedArray<Particle, 4>;
-  extent: Vec4u;
-
-  constructor(cells: FixedArray<Particle, 4>, extent: Vec4u) {
-    this.cells = cells;
-    this.extent = extent;
-  }
+  constructor(public cells: FixedArray<Particle, 4>, public extent: Vec4u) {}
 }
 
 @ValueType
 class MatrixHolder {
-  value: Mat3x3f;
-
-  constructor(value: Mat3x3f) {
-    this.value = value;
-  }
+  constructor(public value: Mat3x3f) {}
 }
 
 @ValueType
@@ -128,17 +118,7 @@ class Half {
 
 @ValueType
 class FloatVectors {
-  v2: Vec2f;
-  v3: Vec3f;
-  v4: Vec4f;
-  triples: FixedArray<Vec3f, 4>;
-
-  constructor(v2: Vec2f, v3: Vec3f, v4: Vec4f, triples: FixedArray<Vec3f, 4>) {
-    this.v2 = v2;
-    this.v3 = v3;
-    this.v4 = v4;
-    this.triples = triples;
-  }
+  constructor(public v2: Vec2f, public v3: Vec3f, public v4: Vec4f, public triples: FixedArray<Vec3f, 4>) {}
 }
 
 @ValueType
@@ -157,21 +137,7 @@ class UnsignedVectors {
 
 @ValueType
 class HalfMatrices {
-  h2: Vec2h;
-  h3: Vec3h;
-  h4: Vec4h;
-  m2: Mat2x2f;
-  m3: Mat3x3f;
-  m4: Mat4x4f;
-
-  constructor(h2: Vec2h, h3: Vec3h, h4: Vec4h, m2: Mat2x2f, m3: Mat3x3f, m4: Mat4x4f) {
-    this.h2 = h2;
-    this.h3 = h3;
-    this.h4 = h4;
-    this.m2 = m2;
-    this.m3 = m3;
-    this.m4 = m4;
-  }
+  constructor(public h2: Vec2h, public h3: Vec3h, public h4: Vec4h, public m2: Mat2x2f, public m3: Mat3x3f, public m4: Mat4x4f) {}
 }
 
 function retainSchemaTypes(

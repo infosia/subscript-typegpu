@@ -52,28 +52,16 @@ import {
 
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 @ValueType
 class Varyings {
-  position: Vec4f;
-
-  constructor(position: Vec4f) {
-    this.position = position;
-  }
+  constructor(public position: Vec4f) {}
 }
 
 class IndirectLayout {
-  output: MutStorage<u32>;
-
-  constructor(output: MutStorage<u32>) {
-    this.output = output;
-  }
+  constructor(public output: MutStorage<u32>) {}
 }
 
 function computeStep(res: IndirectLayout, ctx: ComputeInvocation): void {
@@ -92,7 +80,7 @@ function fragmentStep(value: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(0.25, 0.6, 0.75, 1.0);
 }
 
-const indirectCompute: ComputePipelineSpec = computePipeline<IndirectLayout>(
+const indirectCompute: ComputePipelineSpec = computePipeline(
   computeStep,
   {
     name: "indirectCompute",
@@ -100,7 +88,7 @@ const indirectCompute: ComputePipelineSpec = computePipeline<IndirectLayout>(
   },
 );
 
-const indirectRender: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(
+const indirectRender: RenderPipelineSpec = renderPipeline(
   vertexStep,
   fragmentStep,
   { format: "rgba8unorm" },
@@ -256,8 +244,8 @@ export async function main(): Promise<void> {
       outputBytes,
       0,
     );
-    const host = new IndirectLayout(new MutStorage<u32>([0]));
-    simulateCompute<IndirectLayout>(
+    const host = new IndirectLayout(new MutStorage([0]));
+    simulateCompute(
       computeStep,
       host,
       indirectCompute,

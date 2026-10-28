@@ -50,27 +50,17 @@ import {
 // uniform and grows its element array, because its sliders change the matrix size.
 @ValueType
 class Matrix {
-  size: Vec2u;
-  body: FixedArray<f32, 16>;
-
-  constructor(size: Vec2u, body: FixedArray<f32, 16>) {
-    this.size = size;
-    this.body = body;
-  }
+  constructor(public size: Vec2u, public body: FixedArray<f32, 16>) {}
 }
 
 // A bind group layout is a class here, not a runtime object. Field order fixes the binding
 // numbers, and both kernels take the same class, so both bind groups share one shape.
 class MatrixLayout {
-  left: Storage<Matrix>;
-  right: Storage<Matrix>;
-  product: MutStorage<Matrix>;
-
-  constructor(left: Storage<Matrix>, right: Storage<Matrix>, product: MutStorage<Matrix>) {
-    this.left = left;
-    this.right = right;
-    this.product = product;
-  }
+  constructor(
+    public left: Storage<Matrix>,
+    public right: Storage<Matrix>,
+    public product: MutStorage<Matrix>,
+  ) {}
 }
 
 // One invocation computes the whole product with three nested loops.
@@ -119,14 +109,14 @@ function tiledKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
 
 // The declaration names the kernel and the workgroup size. A size of one thread suits a
 // kernel that already loops over every cell.
-const naive: ComputePipelineSpec = computePipeline<MatrixLayout>(naiveKernel, {
+const naive: ComputePipelineSpec = computePipeline(naiveKernel, {
   name: "naive",
   workgroupSize: [1, 1, 1],
 });
 
 // The workgroup size belongs to the declaration. The generator writes it into the
 // WGSL and into `tiled_WORKGROUP_X`, which the pipeline below reads.
-const tiled: ComputePipelineSpec = computePipeline<MatrixLayout>(tiledKernel, {
+const tiled: ComputePipelineSpec = computePipeline(tiledKernel, {
   name: "tiled",
   workgroupSize: [4, 4, 1],
 });
@@ -302,13 +292,13 @@ export async function main(): Promise<void> {
       // The binding wrappers carry real bodies over plain arrays, so the same kernel source runs
       // on the host. TypeGPU keeps a separate function for its host result.
       const host = new MatrixLayout(
-        new Storage<Matrix>([leftValue]),
-        new Storage<Matrix>([rightValue]),
-        new MutStorage<Matrix>([zeroMatrix()]),
+        new Storage([leftValue]),
+        new Storage([rightValue]),
+        new MutStorage([zeroMatrix()]),
       );
       // The naive kernel runs on the host and gives the oracle for both GPU results. The
       // tiled kernel reaches a barrier, so it has no host lane.
-      simulateComputeThreads<MatrixLayout>(
+      simulateComputeThreads(
         naiveKernel,
         host,
         naive,

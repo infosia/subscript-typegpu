@@ -577,3 +577,29 @@ Evidence: `tools/gate.sh --require-backend` with the yawgpu library,
 `gate: green`, 292 passed, 0 failed, 1 ignored, 337.0 s wall. No WGSL
 or `.expected` golden moved. `tools/window.sh
 examples/window-triangle/main.ts --frames 30`: exit 0, no `FAIL`.
+
+### The remaining programs and examples use the current forms (2026-10-28)
+
+The owner asked that the other programs and examples follow the docs.
+Forty of the remaining 44 programs and all 31 remaining examples
+changed: 221 constructors use parameter properties, 182 sites drop an
+inferred type argument, 112 sites use `?.` calls, and 36 sites use
+compound assignment. `lib/` keeps its forms.
+
+Sites that keep the old form: a type argument that no argument fixes
+(`createBuffer<T>`, `Context.bytesOf`, `fromBytes`, `bytesInto`,
+`workgroupArray<f32>`, texture construction, `UiState<f32>` with a
+literal), `params.value = params.value + 7` in
+`x12-live-uniform-reread.ts` (its WGSL golden moves), the checksum
+expressions in `b23` and `b24` (operator order), `boids`
+`velocity * MAX_SPEED / speed` (float order), and constructors that
+also initialize other state.
+
+Evidence: `tools/gate.sh --require-backend` with the yawgpu library,
+`gate: green`, 292 passed, 0 failed, 1 ignored, 332.6 s wall. No WGSL
+or `.expected` golden moved. `tools/window.sh <example> --frames 30`
+on the Metal backend: exit 0 with no `FAIL` for the 27 window
+examples. The five examples with `main` and no `frame` entry
+(`dispatch`, `matrix-multiplication`, `matrix-next`, `prefix-scan`,
+`prng-cpu-gpu`) exit 1 under the window host, which needs the frame
+entries.

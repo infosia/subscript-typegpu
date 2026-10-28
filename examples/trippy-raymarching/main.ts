@@ -43,49 +43,27 @@ import {
 // never counts bytes.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The per-frame uniform. `time` carries seconds derived from the frame count, and `pointer`
 // carries the surface position in [-1, 1] per axis.
 @ValueType
 class FrameData {
-  time: f32;
-  aspect: f32;
-  pointer: Vec2f;
-
-  constructor(time: f32, aspect: f32, pointer: Vec2f) {
-    this.time = time;
-    this.aspect = aspect;
-    this.pointer = pointer;
-  }
+  constructor(public time: f32, public aspect: f32, public pointer: Vec2f) {}
 }
 
 // The inter-stage record. The field named `position` becomes the clip-space builtin, and
 // `uv` becomes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The bind group layout. TypeGPU splits time, aspect, mouse, and the slider parameters into
 // four uniforms. One record replaces them here, because the parameters are constants.
 class TrippyLayout {
-  frame: Uniform<FrameData>;
-
-  constructor(frame: Uniform<FrameData>) {
-    this.frame = frame;
-  }
+  constructor(public frame: Uniform<FrameData>) {}
 }
 
 // These constants hold the upstream slider defaults. MAX_STEPS bounds the march per pixel,
@@ -225,7 +203,7 @@ function trippyFragment(
 
 // The pipeline declaration joins the layout class, the vertex schema, and the varyings.
 // `subscript-typegpu-gen` emits the WGSL for both stages before the run.
-const trippy: RenderPipelineSpec = renderPipelineL<TrippyLayout, Vertex, Varyings>(
+const trippy: RenderPipelineSpec = renderPipelineL(
   trippyVertex,
   trippyFragment,
   { format: "bgra8unorm" },
@@ -407,10 +385,10 @@ export function frame(
 // The host calls `shutdown` once, before it releases the device. The bind group goes first,
 // because it names the other handles.
 export function shutdown(): void {
-  if (activeGroup != null) activeGroup.dispose();
-  if (activeFrameBuffer != null) activeFrameBuffer.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activePipeline != null) activePipeline.dispose();
+  activeGroup?.dispose();
+  activeFrameBuffer?.dispose();
+  activeVertices?.dispose();
+  activePipeline?.dispose();
   // The null assignments make a second `shutdown` call safe.
   activeFrameBuffer = null;
   activeVertices = null;

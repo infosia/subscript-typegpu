@@ -65,51 +65,31 @@ const CLOUD_TIME_PERIOD: u32 = 4096;
 // never counts bytes.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The per-frame uniform. `time` carries the wrapped frame count, not seconds. `aspect`
 // carries the surface width divided by the surface height.
 @ValueType
 class CloudFrame {
-  time: f32;
-  aspect: f32;
-
-  constructor(time: f32, aspect: f32) {
-    this.time = time;
-    this.aspect = aspect;
-  }
+  constructor(public time: f32, public aspect: f32) {}
 }
 
 // The inter-stage record. The field named `position` becomes the clip-space builtin, and
 // `uv` becomes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The bind group layout. TypeGPU builds a layout object at run time. Here the layout is a
 // class, and the field order fixes binding 0, 1, and 2 of group 0.
 class CloudLayout {
-  noise: Texture2d<f32>;
-  linear: Sampler;
-  frame: Uniform<CloudFrame>;
-
-  constructor(noise: Texture2d<f32>, linear: Sampler, frame: Uniform<CloudFrame>) {
-    this.noise = noise;
-    this.linear = linear;
-    this.frame = frame;
-  }
+  constructor(
+    public noise: Texture2d<f32>,
+    public linear: Sampler,
+    public frame: Uniform<CloudFrame>,
+  ) {}
 }
 
 // TypeGPU draws one full-screen triangle and picks its three corners from the vertex index.
@@ -168,11 +148,7 @@ function cloudFragment(
 
 // The pipeline declaration joins the layout class, the vertex schema, and the varyings.
 // `subscript-typegpu-gen` reads it and emits the WGSL before the run, so no shader text is built here.
-const clouds: RenderPipelineSpec = renderPipelineL<
-  CloudLayout,
-  Vertex,
-  Varyings
->(cloudVertex, cloudFragment, { format: "bgra8unorm" });
+const clouds: RenderPipelineSpec = renderPipelineL(cloudVertex, cloudFragment, { format: "bgra8unorm" });
 
 // The noise is generated, never fetched. The blend across the 4-unit domain makes the
 // texture wrap, so the repeat address mode shows no seam.
@@ -396,13 +372,13 @@ export function frame(
 // The host calls `shutdown` once, before it releases the device. The bind group goes first,
 // because it names the other handles.
 export function shutdown(): void {
-  if (activeGroup != null) activeGroup.dispose();
-  if (activeSampler != null) activeSampler.dispose();
-  if (activeNoiseView != null) activeNoiseView.dispose();
-  if (activeNoiseTexture != null) activeNoiseTexture.dispose();
-  if (activeFrameBuffer != null) activeFrameBuffer.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activePipeline != null) activePipeline.dispose();
+  activeGroup?.dispose();
+  activeSampler?.dispose();
+  activeNoiseView?.dispose();
+  activeNoiseTexture?.dispose();
+  activeFrameBuffer?.dispose();
+  activeVertices?.dispose();
+  activePipeline?.dispose();
   // The null assignments make a second `shutdown` call safe.
   activeGroup = null;
   activeSampler = null;

@@ -96,95 +96,55 @@ const SURFACE_EDGE: f32 = 0.002;
 // attribute layout and the `Vertex_STRIDE` byte stride from this class.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // A scene body. `emissiveColor` is the radiance a ray takes at a hit, so a black body
 // blocks light and adds none.
 @ValueType
 class DiskData {
-  pos: Vec2f;
-  radius: f32;
-  emissiveColor: Vec3f;
-
-  constructor(pos: Vec2f, radius: f32, emissiveColor: Vec3f) {
-    this.pos = pos;
-    this.radius = radius;
-    this.emissiveColor = emissiveColor;
-  }
+  constructor(public pos: Vec2f, public radius: f32, public emissiveColor: Vec3f) {}
 }
 
 @ValueType
 class BoxData {
-  pos: Vec2f;
-  size: Vec2f;
-  emissiveColor: Vec3f;
-
-  constructor(pos: Vec2f, size: Vec2f, emissiveColor: Vec3f) {
-    this.pos = pos;
-    this.size = size;
-    this.emissiveColor = emissiveColor;
-  }
+  constructor(public pos: Vec2f, public size: Vec2f, public emissiveColor: Vec3f) {}
 }
 
 // The complete scene travels in one uniform buffer. `FixedArray` has a compile-time length,
 // so the counts 4 and 2 belong to the layout and no run-time array exists.
 @ValueType
 class Scene {
-  disks: FixedArray<DiskData, 4>;
-  boxes: FixedArray<BoxData, 2>;
-
-  constructor(disks: FixedArray<DiskData, 4>, boxes: FixedArray<BoxData, 2>) {
-    this.disks = disks;
-    this.boxes = boxes;
-  }
+  constructor(
+    public disks: FixedArray<DiskData, 4>,
+    public boxes: FixedArray<BoxData, 2>,
+  ) {}
 }
 
 // The per-layer uniform. `init` writes one buffer per layer once, so the six dispatches of
 // a frame differ only by their bind group.
 @ValueType
 class CascadeParams {
-  layer: u32;
-  probes: u32;
-  cascadeCount: u32;
-  baseProbes: u32;
-
-  constructor(layer: u32, probes: u32, cascadeCount: u32, baseProbes: u32) {
-    this.layer = layer;
-    this.probes = probes;
-    this.cascadeCount = cascadeCount;
-    this.baseProbes = baseProbes;
-  }
+  constructor(
+    public layer: u32,
+    public probes: u32,
+    public cascadeCount: u32,
+    public baseProbes: u32,
+  ) {}
 }
 
 // The vertex output. The `Vec4f` field named `position` becomes the WGSL builtin position,
 // and every other field becomes an interpolated location.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // One scene query returns a distance and a color together, so the ray march reads both
 // results from one call.
 @ValueType
 class SceneHit {
-  dist: f32;
-  color: Vec3f;
-
-  constructor(dist: f32, color: Vec3f) {
-    this.dist = dist;
-    this.color = color;
-  }
+  constructor(public dist: f32, public color: Vec3f) {}
 }
 
 // The layout classes replace TypeGPU's run-time bind group layout objects. The field
@@ -192,52 +152,33 @@ class SceneHit {
 class CascadeLayout {
   // `upper` reads the layer above and `target` writes this layer. The two always name views
   // of different textures, because one dispatch cannot sample what it stores.
-  upper: Texture2d<f32>;
-  linear: Sampler;
-  target: StorageTexture2d<Rgba16float>;
-  scene: Uniform<Scene>;
-  params: Uniform<CascadeParams>;
 
   constructor(
-    upper: Texture2d<f32>,
-    linear: Sampler,
-    target: StorageTexture2d<Rgba16float>,
-    scene: Uniform<Scene>,
-    params: Uniform<CascadeParams>,
-  ) {
-    this.upper = upper;
-    this.linear = linear;
-    this.target = target;
-    this.scene = scene;
-    this.params = params;
-  }
+    public upper: Texture2d<f32>,
+    public linear: Sampler,
+    public target: StorageTexture2d<Rgba16float>,
+    public scene: Uniform<Scene>,
+    public params: Uniform<CascadeParams>,
+  ) {}
 }
 
 // The gather reads cascade 0 through the sampler and writes the output field.
 class FieldLayout {
-  cascade0: Texture2d<f32>;
-  linear: Sampler;
-  target: StorageTexture2d<Rgba16float>;
-
-  constructor(cascade0: Texture2d<f32>, linear: Sampler, target: StorageTexture2d<Rgba16float>) {
-    this.cascade0 = cascade0;
-    this.linear = linear;
-    this.target = target;
-  }
+  constructor(
+    public cascade0: Texture2d<f32>,
+    public linear: Sampler,
+    public target: StorageTexture2d<Rgba16float>,
+  ) {}
 }
 
 // One layout class serves both render stages. `renderPipelineL` gives the vertex entry and
 // the fragment entry the same bindings.
 class RenderLayout {
-  field: Texture2d<f32>;
-  linear: Sampler;
-  scene: Uniform<Scene>;
-
-  constructor(field: Texture2d<f32>, linear: Sampler, scene: Uniform<Scene>) {
-    this.field = field;
-    this.linear = linear;
-    this.scene = scene;
-  }
+  constructor(
+    public field: Texture2d<f32>,
+    public linear: Sampler,
+    public scene: Uniform<Scene>,
+  ) {}
 }
 
 // Returns the nearest body and its color. The kernels and the host call this same function,
@@ -438,23 +379,19 @@ function radianceFragment(
 // The three declarations are the generator's input. It walks the typed program before the
 // run and emits `main.typegpu.ts`: the WGSL text, the entry names, and the layout specs.
 // TypeGPU resolves the same shader from the kernel function at run time.
-const cascadePass: ComputePipelineSpec = computePipeline<CascadeLayout>(
+const cascadePass: ComputePipelineSpec = computePipeline(
   cascadeKernel,
   { name: "cascadePass", workgroupSize: [16, 16, 1] },
 );
 
-const fieldBuild: ComputePipelineSpec = computePipeline<FieldLayout>(fieldKernel, {
+const fieldBuild: ComputePipelineSpec = computePipeline(fieldKernel, {
   name: "fieldBuild",
   workgroupSize: [16, 16, 1],
 });
 
 // `renderPipelineL` adds the layout class, so both stages read `RenderLayout`. The target
 // format belongs to the declaration, and `init` checks the surface format against it.
-const radianceRender: RenderPipelineSpec = renderPipelineL<
-  RenderLayout,
-  Vertex,
-  Varyings
->(radianceVertex, radianceFragment, { format: "bgra8unorm" });
+const radianceRender: RenderPipelineSpec = renderPipelineL(radianceVertex, radianceFragment, { format: "bgra8unorm" });
 
 // Three emissive disks light the scene. One black disk and two black boxes occlude it.
 // Positions and sizes are in field units of [0, 1].

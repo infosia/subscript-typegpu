@@ -43,13 +43,7 @@ const HEIGHT: u32 = 4;
 const PIXEL_COUNT: u32 = WIDTH * HEIGHT;
 
 class BlurLayout {
-  source: ReadStorageTexture2d<R32float>;
-  target: StorageTexture2d<R32float>;
-
-  constructor(source: ReadStorageTexture2d<R32float>, target: StorageTexture2d<R32float>) {
-    this.source = source;
-    this.target = target;
-  }
+  constructor(public source: ReadStorageTexture2d<R32float>, public target: StorageTexture2d<R32float>) {}
 }
 
 function blurKernel(res: BlurLayout, ctx: ComputeInvocation): void {
@@ -73,7 +67,7 @@ function blurKernel(res: BlurLayout, ctx: ComputeInvocation): void {
   res.target.store(new Vec2i(x, y), new Vec4f(value, 0.0, 0.0, 1.0));
 }
 
-const blurPass: ComputePipelineSpec = computePipeline<BlurLayout>(
+const blurPass: ComputePipelineSpec = computePipeline(
   blurKernel,
   { name: "blurPass", workgroupSize: [4, 4, 1] },
 );
@@ -196,7 +190,7 @@ export async function main(): Promise<void> {
       new ReadStorageTexture2d<R32float>(hostA, WIDTH, HEIGHT),
       new StorageTexture2d<R32float>(hostB, WIDTH, HEIGHT),
     );
-    simulateComputeThreads<BlurLayout>(
+    simulateComputeThreads(
       blurKernel,
       hostAB,
       blurPass,
@@ -209,7 +203,7 @@ export async function main(): Promise<void> {
       new ReadStorageTexture2d<R32float>(hostB, WIDTH, HEIGHT),
       new StorageTexture2d<R32float>(hostA, WIDTH, HEIGHT),
     );
-    simulateComputeThreads<BlurLayout>(
+    simulateComputeThreads(
       blurKernel,
       hostBA,
       blurPass,

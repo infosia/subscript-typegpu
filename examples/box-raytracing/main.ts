@@ -61,88 +61,46 @@ const MATERIAL_DENSITY: f32 = 2.0;
 // never counts bytes.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // One cell of the flattened grid. A schema holds no `boolean`, because WGSL `bool` is not
 // host-shareable, so `isActive` is a `u32`.
 @ValueType
 class BoxCell {
-  isActive: u32;
-  albedo: Vec3f;
-
-  constructor(isActive: u32, albedo: Vec3f) {
-    this.isActive = isActive;
-    this.albedo = albedo;
-  }
+  constructor(public isActive: u32, public albedo: Vec3f) {}
 }
 
 // The camera uniform. The host computes the basis vectors, so the fragment needs no matrix.
 // Upstream sends an inverse view matrix from `mat4.aim` instead.
 @ValueType
 class Camera {
-  canvasDims: Vec2f;
-  origin: Vec3f;
-  right: Vec3f;
-  up: Vec3f;
-  forward: Vec3f;
-
   constructor(
-    canvasDims: Vec2f,
-    origin: Vec3f,
-    right: Vec3f,
-    up: Vec3f,
-    forward: Vec3f,
-  ) {
-    this.canvasDims = canvasDims;
-    this.origin = origin;
-    this.right = right;
-    this.up = up;
-    this.forward = forward;
-  }
+    public canvasDims: Vec2f,
+    public origin: Vec3f,
+    public right: Vec3f,
+    public up: Vec3f,
+    public forward: Vec3f,
+  ) {}
 }
 
 // The inter-stage record. The field named `position` becomes the clip-space builtin, and
 // `uv` becomes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The slab test returns three values at once. `hit` is a `u32` for the same reason as
 // `isActive`.
 @ValueType
 class Intersection {
-  hit: u32;
-  tMin: f32;
-  tMax: f32;
-
-  constructor(hit: u32, tMin: f32, tMax: f32) {
-    this.hit = hit;
-    this.tMin = tMin;
-    this.tMax = tMax;
-  }
+  constructor(public hit: u32, public tMin: f32, public tMax: f32) {}
 }
 
 // The bind group layout. `Storage` is read-only, which matches a grid that no pass writes.
 class BoxLayout {
-  cells: Storage<BoxCell>;
-  camera: Uniform<Camera>;
-
-  constructor(cells: Storage<BoxCell>, camera: Uniform<Camera>) {
-    this.cells = cells;
-    this.camera = camera;
-  }
+  constructor(public cells: Storage<BoxCell>, public camera: Uniform<Camera>) {}
 }
 
 function scalarMin(a: f32, b: f32): f32 {
@@ -288,7 +246,7 @@ function boxFragment(
 
 // The declaration carries the blend state. `one` and `one-minus-src-alpha` compose the
 // premultiplied color the fragment returns over the cleared background.
-const boxes: RenderPipelineSpec = renderPipelineL<BoxLayout, Vertex, Varyings>(
+const boxes: RenderPipelineSpec = renderPipelineL(
   boxVertex,
   boxFragment,
   {
@@ -522,11 +480,11 @@ export function frame(
 // The host calls `shutdown` once, before it releases the device. The bind group goes first,
 // because it names the other handles.
 export function shutdown(): void {
-  if (activeGroup != null) activeGroup.dispose();
-  if (activeCamera != null) activeCamera.dispose();
-  if (activeCells != null) activeCells.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activePipeline != null) activePipeline.dispose();
+  activeGroup?.dispose();
+  activeCamera?.dispose();
+  activeCells?.dispose();
+  activeVertices?.dispose();
+  activePipeline?.dispose();
   // The null assignments make a second `shutdown` call safe.
   activeCamera = null;
   activeCells = null;

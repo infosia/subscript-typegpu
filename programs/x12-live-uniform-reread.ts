@@ -30,32 +30,16 @@ import {
 
 @ValueType
 class Params {
-  value: u32;
-
-  constructor(value: u32) {
-    this.value = value;
-  }
+  constructor(public value: u32) {}
 }
 
 @ValueType
 class ShadowResult {
-  local: u32;
-  reread: u32;
-
-  constructor(local: u32, reread: u32) {
-    this.local = local;
-    this.reread = reread;
-  }
+  constructor(public local: u32, public reread: u32) {}
 }
 
 class ShadowLayout {
-  params: Uniform<Params>;
-  output: MutStorage<ShadowResult>;
-
-  constructor(params: Uniform<Params>, output: MutStorage<ShadowResult>) {
-    this.params = params;
-    this.output = output;
-  }
+  constructor(public params: Uniform<Params>, public output: MutStorage<ShadowResult>) {}
 }
 
 function shadowKernel(res: ShadowLayout, ctx: ComputeInvocation): void {
@@ -65,7 +49,7 @@ function shadowKernel(res: ShadowLayout, ctx: ComputeInvocation): void {
   res.output[0] = new ShadowResult(params.value, reread.value);
 }
 
-const uniformReread: ComputePipelineSpec = computePipeline<ShadowLayout>(shadowKernel, {
+const uniformReread: ComputePipelineSpec = computePipeline(shadowKernel, {
   name: "uniformReread",
   workgroupSize: [1, 1, 1],
 });
@@ -132,7 +116,7 @@ export async function main(): Promise<void> {
       return;
     }
     const result: FixedArray<ShadowResult, 1> = Context.fromBytes<FixedArray<ShadowResult, 1>>(
-      readBuffer<ShadowResult>(readback, 0, 1),
+      readBuffer(readback, 0, 1),
       0,
     );
     print("readback:mapped");

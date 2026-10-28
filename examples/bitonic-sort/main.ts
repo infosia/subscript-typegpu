@@ -65,34 +65,20 @@ const COMPARATOR_COUNT: u32 = VALUE_COUNT / 2;
 // TypeGPU takes the same triangle from a shared vertex helper.
 @ValueType
 class FullscreenVertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and uv becomes location 0.
 @ValueType
 class DisplayVaryings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The display binds the same buffer as read-only storage. The sort kernel binds it as
 // mutable storage through its own layout, so the two passes never share a bind group.
 class BitonicDisplayResources {
-  values: Storage<u32>;
-
-  constructor(values: Storage<u32>) {
-    this.values = values;
-  }
+  constructor(public values: Storage<u32>) {}
 }
 
 // The vertex stage widens the corner to clip space and maps it from the -1 to 1 range
@@ -126,20 +112,14 @@ function displayFragment(
 
 // The kernel and its layout come from the sort library, so this example declares only the
 // pipeline. 2048 comparators divide by 256 exactly, so the dispatch needs no guard.
-const bitonicStepPipeline: ComputePipelineSpec = computePipeline<
-  BitonicSortResources
->(bitonicSortStep, {
+const bitonicStepPipeline: ComputePipelineSpec = computePipeline(bitonicSortStep, {
   name: "bitonicStepPipeline",
   workgroupSize: [256, 1, 1],
 });
 
 // The declaration ties the layout class, the two kernels, and the target format together.
 // The generator reads it at compile time and emits bitonicDisplay_WGSL into ./main.typegpu.
-const bitonicDisplay: RenderPipelineSpec = renderPipelineL<
-  BitonicDisplayResources,
-  FullscreenVertex,
-  DisplayVaryings
->(displayVertex, displayFragment, { format: "bgra8unorm" });
+const bitonicDisplay: RenderPipelineSpec = renderPipelineL(displayVertex, displayFragment, { format: "bgra8unorm" });
 
 // The window host calls init, frame, and shutdown as separate entry points, so the handles
 // and the sort progress live in module state. The script owns each handle.
@@ -378,13 +358,13 @@ export function frame(
 // The host calls shutdown once. The script frees every GPU handle by hand, because this
 // library keeps no finalizer and no reference count for scripts.
 export function shutdown(): void {
-  if (activeRenderGroup != null) activeRenderGroup.dispose();
-  if (activeComputeGroup != null) activeComputeGroup.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activePass != null) activePass.dispose();
-  if (activeValues != null) activeValues.dispose();
-  if (activeRenderPipeline != null) activeRenderPipeline.dispose();
-  if (activeComputePipeline != null) activeComputePipeline.dispose();
+  activeRenderGroup?.dispose();
+  activeComputeGroup?.dispose();
+  activeVertices?.dispose();
+  activePass?.dispose();
+  activeValues?.dispose();
+  activeRenderPipeline?.dispose();
+  activeComputePipeline?.dispose();
   activeRenderGroup = null;
   activeComputeGroup = null;
   activeVertices = null;

@@ -115,9 +115,9 @@ function cleanupReadback(): void {
   activeReadback = null;
   activeDevice = null;
   activeAdapter = null;
-  if (readback != null) readback.dispose();
-  if (device != null) device.dispose();
-  if (adapter != null) adapter.dispose();
+  readback?.dispose();
+  device?.dispose();
+  adapter?.dispose();
   gpu.dispose();
   if (mapPassed) print("PASS");
 }

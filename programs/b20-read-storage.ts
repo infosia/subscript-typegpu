@@ -39,13 +39,7 @@ const WIDTH: u32 = 2;
 const HEIGHT: u32 = 2;
 
 class ReadStorageLayout {
-  source: ReadStorageTexture2d<R32float>;
-  target: ReadWriteStorageTexture2d<R32float>;
-
-  constructor(source: ReadStorageTexture2d<R32float>, target: ReadWriteStorageTexture2d<R32float>) {
-    this.source = source;
-    this.target = target;
-  }
+  constructor(public source: ReadStorageTexture2d<R32float>, public target: ReadWriteStorageTexture2d<R32float>) {}
 }
 
 function readStorageKernel(res: ReadStorageLayout, ctx: ComputeInvocation): void {
@@ -57,7 +51,7 @@ function readStorageKernel(res: ReadStorageLayout, ctx: ComputeInvocation): void
   res.target.store(coords, source.add(target));
 }
 
-const readStorage: ComputePipelineSpec = computePipeline<ReadStorageLayout>(
+const readStorage: ComputePipelineSpec = computePipeline(
   readStorageKernel,
   { name: "readStorage", workgroupSize: [2, 2, 1] },
 );
@@ -142,7 +136,7 @@ export async function main(): Promise<void> {
       new ReadStorageTexture2d<R32float>(hostSource, WIDTH, HEIGHT),
       new ReadWriteStorageTexture2d<R32float>(hostTarget, WIDTH, HEIGHT),
     );
-    simulateComputeThreads<ReadStorageLayout>(
+    simulateComputeThreads(
       readStorageKernel,
       host,
       readStorage,

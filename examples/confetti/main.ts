@@ -53,51 +53,32 @@ const PARTICLE_COUNT: u32 = 64;
 // The four corners form a triangle strip, and every instance reuses the same four.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // One instance record. One buffer holds them all. The update kernel binds it as mutable
 // storage, and the draw reads it as the instance stream, so no copy moves between passes.
 @ValueType
 class Particle {
-  position: Vec2f;
-  velocity: Vec2f;
-  color: Vec4f;
-  angle: f32;
-
-  constructor(position: Vec2f, velocity: Vec2f, color: Vec4f, angle: f32) {
-    this.position = position;
-    this.velocity = velocity;
-    this.color = color;
-    this.angle = angle;
-  }
+  constructor(
+    public position: Vec2f,
+    public velocity: Vec2f,
+    public color: Vec4f,
+    public angle: f32,
+  ) {}
 }
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and color becomes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  color: Vec4f;
-
-  constructor(position: Vec4f, color: Vec4f) {
-    this.position = position;
-    this.color = color;
-  }
+  constructor(public position: Vec4f, public color: Vec4f) {}
 }
 
 // A bind group layout is a class here, not a runtime object. Only the update kernel binds
 // the particles. The draw reaches the same buffer through a vertex slot instead.
 class ParticleLayout {
-  particles: MutStorage<Particle>;
-
-  constructor(particles: MutStorage<Particle>) {
-    this.particles = particles;
-  }
+  constructor(public particles: MutStorage<Particle>) {}
 }
 
 // One storage buffer becomes the instance stream after this pass completes.
@@ -156,7 +137,7 @@ function confettiFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
 // TypeGPU uses a guarded pipeline. This port keeps the guard and dispatches the exact
 // particle thread count through `dispatchThreads`. The generator wraps the body in a
 // bounds test against a hidden uniform, which `dispatchThreads` writes before the pass.
-const confettiUpdate: ComputePipelineSpec = computePipeline<ParticleLayout>(
+const confettiUpdate: ComputePipelineSpec = computePipeline(
   updateParticles,
   { name: "confettiUpdate", workgroupSize: [64, 1, 1], guarded: true },
 );
@@ -164,11 +145,7 @@ const confettiUpdate: ComputePipelineSpec = computePipeline<ParticleLayout>(
 // The instanced declaration takes the vertex schema first and the instance schema second.
 // Slot 0 steps per vertex and slot 1 steps per instance. The strip draws one card in four
 // vertices, so the draw below needs no index buffer.
-const confettiRender: RenderPipelineSpec = renderPipelineInstanced<
-  Vertex,
-  Particle,
-  Varyings
->(confettiVertex, confettiFragment, {
+const confettiRender: RenderPipelineSpec = renderPipelineInstanced(confettiVertex, confettiFragment, {
   format: "bgra8unorm",
   topology: "triangle-strip",
 });
@@ -356,11 +333,11 @@ export function frame(
 // The host calls shutdown once. The script frees every GPU handle by hand, because this
 // library keeps no finalizer and no reference count for scripts.
 export function shutdown(): void {
-  if (activeGroup != null) activeGroup.dispose();
-  if (activeParticles != null) activeParticles.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activeRender != null) activeRender.dispose();
-  if (activeCompute != null) activeCompute.dispose();
+  activeGroup?.dispose();
+  activeParticles?.dispose();
+  activeVertices?.dispose();
+  activeRender?.dispose();
+  activeCompute?.dispose();
   activeGroup = null;
   activeParticles = null;
   activeVertices = null;

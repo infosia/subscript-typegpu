@@ -46,47 +46,27 @@ import {
 // corners from a constant array. This port sends them through a vertex buffer.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The only uniform. time is in seconds and aspect is the window width over its height.
 // TypeGPU keeps one uniform per value and adds a tile density slider this port drops.
 @ValueType
 class FrameData {
-  time: f32;
-  aspect: f32;
-
-  constructor(time: f32, aspect: f32) {
-    this.time = time;
-    this.aspect = aspect;
-  }
+  constructor(public time: f32, public aspect: f32) {}
 }
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and uv becomes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // A bind group layout is a class here, not a runtime object. Field order fixes the
 // binding numbers, and the generator emits the WGSL declaration and caustic_LAYOUT0.
 class CausticLayout {
-  frame: Uniform<FrameData>;
-
-  constructor(frame: Uniform<FrameData>) {
-    this.frame = frame;
-  }
+  constructor(public frame: Uniform<FrameData>) {}
 }
 
 // Four octaves of absolute noise build a ridged field. One minus that field, cubed,
@@ -150,7 +130,7 @@ function causticFragment(
 // The declaration ties the layout class, the two kernels, and the target format together.
 // The generator reads it at compile time and emits caustic_WGSL into ./main.typegpu.
 // TypeGPU builds the equivalent shader at run time from the same functions.
-const caustic: RenderPipelineSpec = renderPipelineL<CausticLayout, Vertex, Varyings>(
+const caustic: RenderPipelineSpec = renderPipelineL(
   causticVertex,
   causticFragment,
   { format: "bgra8unorm" },
@@ -314,10 +294,10 @@ export function frame(
 // The host calls shutdown once. The script frees every GPU handle by hand, because this
 // library keeps no finalizer and no reference count for scripts.
 export function shutdown(): void {
-  if (activeGroup != null) activeGroup.dispose();
-  if (activeFrameBuffer != null) activeFrameBuffer.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activePipeline != null) activePipeline.dispose();
+  activeGroup?.dispose();
+  activeFrameBuffer?.dispose();
+  activeVertices?.dispose();
+  activePipeline?.dispose();
   activeFrameBuffer = null;
   activeVertices = null;
   activePipeline = null;

@@ -46,13 +46,7 @@ import {
 // This port sends them through a vertex buffer, so the generator fixes the stride.
 @ValueType
 class Vertex {
-  position: Vec2f;
-  uv: Vec2f;
-
-  constructor(position: Vec2f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec2f, public uv: Vec2f) {}
 }
 
 @ValueType
@@ -70,23 +64,13 @@ class FrameData {
 // The field named position becomes the clip position, and uv becomes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // A bind group layout is a class here, not a runtime object. Field order fixes the
 // binding numbers, and the generator emits the WGSL declaration and smoke_LAYOUT0.
 class SmokeLayout {
-  frame: Uniform<FrameData>;
-
-  constructor(frame: Uniform<FrameData>) {
-    this.frame = frame;
-  }
+  constructor(public frame: Uniform<FrameData>) {}
 }
 
 // Four octaves of noise drift across the surface. The third noise axis carries the
@@ -138,7 +122,7 @@ function smokeFragment(
 // The declaration ties the layout class, the two kernels, and the target format together.
 // The generator reads it at compile time and emits smoke_WGSL into ./main.typegpu.
 // TypeGPU builds the equivalent shader at run time from the same functions.
-const smoke: RenderPipelineSpec = renderPipelineL<SmokeLayout, Vertex, Varyings>(
+const smoke: RenderPipelineSpec = renderPipelineL(
   smokeVertex,
   smokeFragment,
   { format: "bgra8unorm" },
@@ -300,10 +284,10 @@ export function frame(
 // The host calls shutdown once. The script frees every GPU handle by hand, because this
 // library keeps no finalizer and no reference count for scripts.
 export function shutdown(): void {
-  if (activeGroup != null) activeGroup.dispose();
-  if (activeFrameBuffer != null) activeFrameBuffer.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activePipeline != null) activePipeline.dispose();
+  activeGroup?.dispose();
+  activeFrameBuffer?.dispose();
+  activeVertices?.dispose();
+  activePipeline?.dispose();
   activeFrameBuffer = null;
   activeVertices = null;
   activePipeline = null;

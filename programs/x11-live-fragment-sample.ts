@@ -40,34 +40,16 @@ import {
 
 @ValueType
 class FragmentVertex {
-  position: Vec2f;
-  uv: Vec2f;
-
-  constructor(position: Vec2f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec2f, public uv: Vec2f) {}
 }
 
 @ValueType
 class FragmentVarying {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 class FragmentTextureLayout {
-  source: Texture2d<f32>;
-  nearest: Sampler;
-
-  constructor(source: Texture2d<f32>, nearest: Sampler) {
-    this.source = source;
-    this.nearest = nearest;
-  }
+  constructor(public source: Texture2d<f32>, public nearest: Sampler) {}
 }
 
 function fragmentVertex(
@@ -86,11 +68,7 @@ function fragmentColor(
   return res.source.sample(res.nearest, input.uv);
 }
 
-const fragmentSample: RenderPipelineSpec = renderPipelineL<
-  FragmentTextureLayout,
-  FragmentVertex,
-  FragmentVarying
->(fragmentVertex, fragmentColor, { format: "rgba8unorm" });
+const fragmentSample: RenderPipelineSpec = renderPipelineL(fragmentVertex, fragmentColor, { format: "rgba8unorm" });
 
 function checkerBytes(): u8[] {
   const values: u8[] = [];
@@ -100,9 +78,9 @@ function checkerBytes(): u8[] {
     while (x < 4) {
       const value: u8 = ((x + y) % 2 == 0) ? 255 : 0;
       values.push(value); values.push(value); values.push(value); values.push(255);
-      x = x + 1;
+      x += 1;
     }
-    y = y + 1;
+    y += 1;
   }
   return values;
 }
@@ -115,9 +93,9 @@ function checkerPixels(): Vec4f[] {
     while (x < 4) {
       const value: f32 = ((x + y) % 2 == 0) ? 1.0 : 0.0;
       pixels.push(new Vec4f(value, value, value, 1.0));
-      x = x + 1;
+      x += 1;
     }
-    y = y + 1;
+    y += 1;
   }
   return pixels;
 }
@@ -228,9 +206,9 @@ export async function main(): Promise<void> {
           print(`FAIL x=${x} y=${y} expected=${expectedValue} got=${pixels[offset]},${pixels[offset + 1]},${pixels[offset + 2]},${pixels[offset + 3]}`);
           return;
         }
-        x = x + 1;
+        x += 1;
       }
-      y = y + 1;
+      y += 1;
     }
     readback.unmap();
   }

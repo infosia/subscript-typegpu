@@ -37,23 +37,11 @@ import {
 
 @ValueType
 class Item {
-  value: f32;
-
-  constructor(value: f32) {
-    this.value = value;
-  }
+  constructor(public value: f32) {}
 }
 
 class VecAddLayout {
-  a: Storage<Item>;
-  b: Storage<Item>;
-  out: MutStorage<Item>;
-
-  constructor(a: Storage<Item>, b: Storage<Item>, out: MutStorage<Item>) {
-    this.a = a;
-    this.b = b;
-    this.out = out;
-  }
+  constructor(public a: Storage<Item>, public b: Storage<Item>, public out: MutStorage<Item>) {}
 }
 
 function vecAddKernel(res: VecAddLayout, ctx: ComputeInvocation): void {
@@ -65,7 +53,7 @@ function vecAddKernel(res: VecAddLayout, ctx: ComputeInvocation): void {
   }
 }
 
-const vecAdd: ComputePipelineSpec = computePipeline<VecAddLayout>(vecAddKernel, {
+const vecAdd: ComputePipelineSpec = computePipeline(vecAddKernel, {
   name: "vecAdd",
   workgroupSize: [64, 1, 1],
 });
@@ -126,14 +114,14 @@ export async function main(): Promise<void> {
       hostA.push(new Item(aValue));
       hostB.push(new Item(bValue));
       hostOut.push(new Item(0.0));
-      index = index + 1;
+      index += 1;
     }
     const hostLayout = new VecAddLayout(
-      new Storage<Item>(hostA),
-      new Storage<Item>(hostB),
-      new MutStorage<Item>(hostOut),
+      new Storage(hostA),
+      new Storage(hostB),
+      new MutStorage(hostOut),
     );
-    simulateComputeThreads<VecAddLayout>(
+    simulateComputeThreads(
       vecAddKernel,
       hostLayout,
       vecAdd,
@@ -206,7 +194,7 @@ export async function main(): Promise<void> {
       return;
     }
     const result: FixedArray<Item, 64> = Context.fromBytes<FixedArray<Item, 64>>(
-      readBuffer<Item>(readback, 0, count),
+      readBuffer(readback, 0, count),
       0,
     );
     print("readback:mapped");
@@ -217,7 +205,7 @@ export async function main(): Promise<void> {
         print(`FAIL ${index} expected=${expected} got=${result[index].value}`);
         return;
       }
-      index = index + 1;
+      index += 1;
     }
     readback.handle().unmap();
   }

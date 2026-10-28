@@ -79,11 +79,7 @@ const BRUSH_WALL: u32 = 2;
 // One corner of the render strip. The generator derives `Vertex_STRIDE` from this class.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The same cell buffer carries three declarations. `WaterCell` is the atomic `u32` the brush
@@ -91,103 +87,58 @@ class Vertex {
 // Each layout picks the declaration its pass needs, and the bytes never change shape.
 @ValueType
 class WaterCell {
-  level: AtomicU32;
-
-  constructor(level: AtomicU32) {
-    this.level = level;
-  }
+  constructor(public level: AtomicU32) {}
 }
 
 @ValueType
 class WaterLevel {
-  level: u32;
-
-  constructor(level: u32) {
-    this.level = level;
-  }
+  constructor(public level: u32) {}
 }
 
 @ValueType
 class WaterDelta {
-  level: AtomicI32;
-
-  constructor(level: AtomicI32) {
-    this.level = level;
-  }
+  constructor(public level: AtomicI32) {}
 }
 
 // The brush segment in cell coordinates, with the mode and an active flag. One frame writes it
 // once. TypeGPU passes a radius and a cell kind and erases from the right mouse button.
 @ValueType
 class BrushParams {
-  previous: Vec2f;
-  current: Vec2f;
-  mode: u32;
-  active: u32;
-
-  constructor(previous: Vec2f, current: Vec2f, mode: u32, active: u32) {
-    this.previous = previous;
-    this.current = current;
-    this.mode = mode;
-    this.active = active;
-  }
+  constructor(
+    public previous: Vec2f,
+    public current: Vec2f,
+    public mode: u32,
+    public active: u32,
+  ) {}
 }
 
 // The vertex output. `position` is clip space and `uv` runs 0 to 1 across the surface.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The flow layout reads the current levels and accumulates signed changes into the next buffer.
 // No pass writes the source, so a plain read never sees a partial update.
 class AtomicFluidLayout {
-  current: Storage<WaterLevel>;
-  next: MutStorage<WaterDelta>;
-
-  constructor(current: Storage<WaterLevel>, next: MutStorage<WaterDelta>) {
-    this.current = current;
-    this.next = next;
-  }
+  constructor(public current: Storage<WaterLevel>, public next: MutStorage<WaterDelta>) {}
 }
 
 // The finalize layout binds the same pair. Its pass turns the accumulated changes into levels.
 class AtomicFinalizeLayout {
-  current: Storage<WaterLevel>;
-  next: MutStorage<WaterDelta>;
-
-  constructor(current: Storage<WaterLevel>, next: MutStorage<WaterDelta>) {
-    this.current = current;
-    this.next = next;
-  }
+  constructor(public current: Storage<WaterLevel>, public next: MutStorage<WaterDelta>) {}
 }
 
 // The brush layout writes the new state directly, so a stroke lands on the buffer the frame
 // displays.
 class AtomicBrushLayout {
-  cells: MutStorage<WaterCell>;
-  brush: Uniform<BrushParams>;
-
-  constructor(cells: MutStorage<WaterCell>, brush: Uniform<BrushParams>) {
-    this.cells = cells;
-    this.brush = brush;
-  }
+  constructor(public cells: MutStorage<WaterCell>, public brush: Uniform<BrushParams>) {}
 }
 
 // The render layout binds the cells as mutable storage, because an atomic load needs that
 // access.
 class AtomicFluidRenderLayout {
-  cells: MutStorage<WaterCell>;
-
-  constructor(cells: MutStorage<WaterCell>) {
-    this.cells = cells;
-  }
+  constructor(public cells: MutStorage<WaterCell>) {}
 }
 
 function minU32(left: u32, right: u32): u32 {
@@ -333,26 +284,22 @@ function atomicFluidFragment(
 // The four declarations name the kernel, the layout type, and the workgroup size. The generator
 // reads them ahead of the run and emits the WGSL, the entry names, and the layout facts.
 // TypeGPU builds the same WGSL at run time from the kernel function.
-const atomicFlow: ComputePipelineSpec = computePipeline<AtomicFluidLayout>(
+const atomicFlow: ComputePipelineSpec = computePipeline(
   atomicFlowKernel,
   { name: "atomicFlow", workgroupSize: [8, 8, 1] },
 );
 
-const atomicFinalize: ComputePipelineSpec = computePipeline<AtomicFinalizeLayout>(
+const atomicFinalize: ComputePipelineSpec = computePipeline(
   atomicFinalizeKernel,
   { name: "atomicFinalize", workgroupSize: [8, 8, 1] },
 );
 
-const atomicBrush: ComputePipelineSpec = computePipeline<AtomicBrushLayout>(
+const atomicBrush: ComputePipelineSpec = computePipeline(
   atomicBrushKernel,
   { name: "atomicBrush", workgroupSize: [8, 8, 1] },
 );
 
-const atomicFluidRender: RenderPipelineSpec = renderPipelineL<
-  AtomicFluidRenderLayout,
-  Vertex,
-  Varyings
->(atomicFluidVertex, atomicFluidFragment, {
+const atomicFluidRender: RenderPipelineSpec = renderPipelineL(atomicFluidVertex, atomicFluidFragment, {
   format: "bgra8unorm",
   topology: "triangle-strip",
 });
@@ -741,22 +688,22 @@ export function frame(
 // creation order, so a bind group never outlives the buffers it names.
 // TypeGPU releases the same resources with one `root.destroy()` call.
 export function shutdown(): void {
-  if (activeRenderGroupB != null) activeRenderGroupB.dispose();
-  if (activeRenderGroupA != null) activeRenderGroupA.dispose();
-  if (activeBrushGroupB != null) activeBrushGroupB.dispose();
-  if (activeBrushGroupA != null) activeBrushGroupA.dispose();
-  if (activeFinalizeGroupBA != null) activeFinalizeGroupBA.dispose();
-  if (activeFinalizeGroupAB != null) activeFinalizeGroupAB.dispose();
-  if (activeFlowGroupBA != null) activeFlowGroupBA.dispose();
-  if (activeFlowGroupAB != null) activeFlowGroupAB.dispose();
-  if (activeBrush != null) activeBrush.dispose();
-  if (activeCellsB != null) activeCellsB.dispose();
-  if (activeCellsA != null) activeCellsA.dispose();
-  if (activeVertices != null) activeVertices.dispose();
-  if (activeRender != null) activeRender.dispose();
-  if (activeBrushPipeline != null) activeBrushPipeline.dispose();
-  if (activeFinalize != null) activeFinalize.dispose();
-  if (activeFlow != null) activeFlow.dispose();
+  activeRenderGroupB?.dispose();
+  activeRenderGroupA?.dispose();
+  activeBrushGroupB?.dispose();
+  activeBrushGroupA?.dispose();
+  activeFinalizeGroupBA?.dispose();
+  activeFinalizeGroupAB?.dispose();
+  activeFlowGroupBA?.dispose();
+  activeFlowGroupAB?.dispose();
+  activeBrush?.dispose();
+  activeCellsB?.dispose();
+  activeCellsA?.dispose();
+  activeVertices?.dispose();
+  activeRender?.dispose();
+  activeBrushPipeline?.dispose();
+  activeFinalize?.dispose();
+  activeFlow?.dispose();
   // The cleared state leaves no released handle reachable from module scope.
   activeRenderGroupB = null;
   activeRenderGroupA = null;

@@ -41,48 +41,28 @@ import {
 // TypeGPU reads the same three corners from a constant array inside its vertex stage.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The only uniform. time is in seconds and aspect is the window width over its height.
 // The other six values of the upstream struct are constants in the shell body below.
 @ValueType
 class FrameData {
-  time: f32;
-  aspect: f32;
-
-  constructor(time: f32, aspect: f32) {
-    this.time = time;
-    this.aspect = aspect;
-  }
+  constructor(public time: f32, public aspect: f32) {}
 }
 
 // The vertex stage returns this record and the fragment stage receives it.
 // The field named position becomes the clip position, and uv becomes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // TypeGPU declares an eight-field `Params` struct and creates the uniform at run time.
 // This port sends time and the aspect ratio only. A bind group layout is a class here,
 // and field order fixes the binding numbers.
 class TunnelLayout {
-  frame: Uniform<FrameData>;
-
-  constructor(frame: Uniform<FrameData>) {
-    this.frame = frame;
-  }
+  constructor(public frame: Uniform<FrameData>) {}
 }
 
 // A shell function has two bodies. This subscript body is the host implementation,
@@ -113,7 +93,7 @@ function tunnelBands(point: Vec2f, time: f32): Vec3f {
 
 // K11 maps no `atan2`, so the ring angle needs a WGSL shell. TypeGPU marches a 3D
 // ray instead. This shell accumulates twelve polar rings and tone-maps with `tanh`.
-const tunnelBandsGpu: WgslShellSpec = wgslShell<(point: Vec2f, time: f32) => Vec3f>(
+const tunnelBandsGpu: WgslShellSpec = wgslShell(
   tunnelBands,
   {
     body: "let radius = length(point); let angle = atan2(point.y, point.x); var color = vec3f(0.0); for (var layer = 0u; layer < 12u; layer = layer + 1u) { let depth = f32(layer) * 0.21 + time * 0.35; let ring = 0.045 / (abs(sin(radius * 11.0 - depth * 3.0)) + 0.07); let spoke = 0.35 + 0.65 * cos(angle * 7.0 + depth * 2.0); let visibleSpoke = max(spoke, 0.0); let fade = 1.0 / (1.0 + f32(layer) * 0.32); color = color + vec3f(0.22, 0.05, 0.48) * ring * visibleSpoke * fade; } return tanh(color * 2.0);",
@@ -153,7 +133,7 @@ function tunnelFragment(
 
 // The declaration ties the layout class, the two kernels, and the target format together.
 // The generator reads it at compile time and emits tunnel_WGSL into ./main.typegpu.
-const tunnel: RenderPipelineSpec = renderPipelineL<TunnelLayout, Vertex, Varyings>(
+const tunnel: RenderPipelineSpec = renderPipelineL(
   tunnelVertex,
   tunnelFragment,
   { format: "bgra8unorm" },
@@ -330,21 +310,13 @@ export function frame(
 // The host calls shutdown once. The script frees every GPU handle by hand, because this
 // library keeps no finalizer and no reference count for scripts.
 export function shutdown(): void {
-  if (activeGroup != null) {
-    activeGroup.dispose();
-    activeGroup = null;
-  }
-  if (activeFrameBuffer != null) {
-    activeFrameBuffer.dispose();
-    activeFrameBuffer = null;
-  }
-  if (activeVertices != null) {
-    activeVertices.dispose();
-    activeVertices = null;
-  }
-  if (activePipeline != null) {
-    activePipeline.dispose();
-    activePipeline = null;
-  }
+  activeGroup?.dispose();
+  activeGroup = null;
+  activeFrameBuffer?.dispose();
+  activeFrameBuffer = null;
+  activeVertices?.dispose();
+  activeVertices = null;
+  activePipeline?.dispose();
+  activePipeline = null;
   activeDevice = null;
 }

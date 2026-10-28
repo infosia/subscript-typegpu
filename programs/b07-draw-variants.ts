@@ -40,33 +40,17 @@ import {
 
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 @ValueType
 class Instance {
-  offset: Vec2f;
-  color: Vec3f;
-
-  constructor(offset: Vec2f, color: Vec3f) {
-    this.offset = offset;
-    this.color = color;
-  }
+  constructor(public offset: Vec2f, public color: Vec3f) {}
 }
 
 @ValueType
 class Varyings {
-  position: Vec4f;
-  color: Vec3f;
-
-  constructor(position: Vec4f, color: Vec3f) {
-    this.position = position;
-    this.color = color;
-  }
+  constructor(public position: Vec4f, public color: Vec3f) {}
 }
 
 function quadVert(value: Vertex, instance: Instance, ctx: VertexInvocation): Varyings {
@@ -92,13 +76,13 @@ function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
   return new Vec4f(input.color.x, input.color.y, input.color.z, 1.0);
 }
 
-const quad: RenderPipelineSpec = renderPipelineInstanced<Vertex, Instance, Varyings>(
+const quad: RenderPipelineSpec = renderPipelineInstanced(
   quadVert,
   frag,
   { format: "rgba8unorm", indexFormat: "uint16" },
 );
 
-const tri: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(triVert, frag, {
+const tri: RenderPipelineSpec = renderPipeline(triVert, frag, {
   format: "rgba8unorm",
 });
 

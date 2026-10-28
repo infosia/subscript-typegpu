@@ -87,7 +87,7 @@ export async function main(): Promise<void> {
       return;
     }
     const values: FixedArray<u64, 2> = Context.fromBytes<FixedArray<u64, 2>>(
-      readOne<FixedArray<u64, 2>>(readback, 0),
+      readOne(readback, 0),
       0,
     );
     readback.handle().unmap();

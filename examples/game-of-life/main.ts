@@ -73,70 +73,44 @@ const EDIT_DRAW: u32 = 2;
 // never counts bytes.
 @ValueType
 class Vertex {
-  position: Vec2f;
-
-  constructor(position: Vec2f) {
-    this.position = position;
-  }
+  constructor(public position: Vec2f) {}
 }
 
 // The edit uniform. `point` is in cell coordinates, not pixels, and `mode` carries one of
 // the three EDIT_ constants.
 @ValueType
 class EditParams {
-  point: Vec2f;
-  mode: u32;
-
-  constructor(point: Vec2f, mode: u32) {
-    this.point = point;
-    this.mode = mode;
-  }
+  constructor(public point: Vec2f, public mode: u32) {}
 }
 
 // The inter-stage record. The field named `position` becomes the clip-space builtin, and
 // `uv` becomes location 0.
 @ValueType
 class Varyings {
-  position: Vec4f;
-  uv: Vec2f;
-
-  constructor(position: Vec4f, uv: Vec2f) {
-    this.position = position;
-    this.uv = uv;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f) {}
 }
 
 // The step bind group. `ReadStorageTexture2d` is read-only and `StorageTexture2d` is
 // write-only, so the types state that one dispatch never writes the texture it reads.
 class LifeStepLayout {
-  generation: ReadStorageTexture2d<R32float>;
-  next: StorageTexture2d<R32float>;
-
-  constructor(generation: ReadStorageTexture2d<R32float>, next: StorageTexture2d<R32float>) {
-    this.generation = generation;
-    this.next = next;
-  }
+  constructor(
+    public generation: ReadStorageTexture2d<R32float>,
+    public next: StorageTexture2d<R32float>,
+  ) {}
 }
 
 // The edit bind group. `ReadWriteStorageTexture2d` reads and writes one texture, because the
 // brush changes cells in place.
 class LifeEditLayout {
-  generation: ReadWriteStorageTexture2d<R32float>;
-  edit: Uniform<EditParams>;
-
-  constructor(generation: ReadWriteStorageTexture2d<R32float>, edit: Uniform<EditParams>) {
-    this.generation = generation;
-    this.edit = edit;
-  }
+  constructor(
+    public generation: ReadWriteStorageTexture2d<R32float>,
+    public edit: Uniform<EditParams>,
+  ) {}
 }
 
 // The render bind group. The fragment loads a texel directly, so the pass needs no sampler.
 class LifeRenderLayout {
-  generation: ReadStorageTexture2d<R32float>;
-
-  constructor(generation: ReadStorageTexture2d<R32float>) {
-    this.generation = generation;
-  }
+  constructor(public generation: ReadStorageTexture2d<R32float>) {}
 }
 
 // One invocation counts the eight neighbors and writes the next state of one cell.
@@ -226,25 +200,21 @@ function lifeFragment(
 
 // The workgroup is 8 by 8, so one workgroup covers 64 cells. 128 divides by 8, and no
 // invocation falls outside the grid.
-const lifeStep: ComputePipelineSpec = computePipeline<LifeStepLayout>(
+const lifeStep: ComputePipelineSpec = computePipeline(
   lifeStepKernel,
   { name: "lifeStep", workgroupSize: [8, 8, 1] },
 );
 
 // The edit kernel covers the whole grid with the same workgroup size, so one dispatch count
 // serves both compute pipelines.
-const lifeEdit: ComputePipelineSpec = computePipeline<LifeEditLayout>(
+const lifeEdit: ComputePipelineSpec = computePipeline(
   lifeEditKernel,
   { name: "lifeEdit", workgroupSize: [8, 8, 1] },
 );
 
 // The topology is a triangle strip, so four vertices make two triangles. TypeGPU draws its
 // display pass from a fullscreen triangle instead.
-const lifeRender: RenderPipelineSpec = renderPipelineL<
-  LifeRenderLayout,
-  Vertex,
-  Varyings
->(lifeVertex, lifeFragment, {
+const lifeRender: RenderPipelineSpec = renderPipelineL(lifeVertex, lifeFragment, {
   format: "bgra8unorm",
   topology: "triangle-strip",
 });
@@ -252,58 +222,24 @@ const lifeRender: RenderPipelineSpec = renderPipelineL<
 // One record holds every handle that outlives `init`. TypeGPU keeps the same handles in a
 // closure, and `frame` here needs one null check instead of fourteen.
 class LifeState {
-  device: GPUHostOwnedDevice;
-  step: ComputePipeline;
-  edit: ComputePipeline;
-  render: RenderPipeline;
-  stepAB: GPUBindGroup;
-  stepBA: GPUBindGroup;
-  editA: GPUBindGroup;
-  editB: GPUBindGroup;
-  renderA: GPUBindGroup;
-  renderB: GPUBindGroup;
-  vertices: GPUBuffer;
-  editParams: GPUBuffer;
-  generationA: GPUTexture;
-  generationB: GPUTexture;
-  viewA: GPUTextureView;
-  viewB: GPUTextureView;
-
   constructor(
-    device: GPUHostOwnedDevice,
-    step: ComputePipeline,
-    edit: ComputePipeline,
-    render: RenderPipeline,
-    stepAB: GPUBindGroup,
-    stepBA: GPUBindGroup,
-    editA: GPUBindGroup,
-    editB: GPUBindGroup,
-    renderA: GPUBindGroup,
-    renderB: GPUBindGroup,
-    vertices: GPUBuffer,
-    editParams: GPUBuffer,
-    generationA: GPUTexture,
-    generationB: GPUTexture,
-    viewA: GPUTextureView,
-    viewB: GPUTextureView,
-  ) {
-    this.device = device;
-    this.step = step;
-    this.edit = edit;
-    this.render = render;
-    this.stepAB = stepAB;
-    this.stepBA = stepBA;
-    this.editA = editA;
-    this.editB = editB;
-    this.renderA = renderA;
-    this.renderB = renderB;
-    this.vertices = vertices;
-    this.editParams = editParams;
-    this.generationA = generationA;
-    this.generationB = generationB;
-    this.viewA = viewA;
-    this.viewB = viewB;
-  }
+    public device: GPUHostOwnedDevice,
+    public step: ComputePipeline,
+    public edit: ComputePipeline,
+    public render: RenderPipeline,
+    public stepAB: GPUBindGroup,
+    public stepBA: GPUBindGroup,
+    public editA: GPUBindGroup,
+    public editB: GPUBindGroup,
+    public renderA: GPUBindGroup,
+    public renderB: GPUBindGroup,
+    public vertices: GPUBuffer,
+    public editParams: GPUBuffer,
+    public generationA: GPUTexture,
+    public generationB: GPUTexture,
+    public viewA: GPUTextureView,
+    public viewB: GPUTextureView,
+  ) {}
 }
 
 let activeState: LifeState | null = null;
