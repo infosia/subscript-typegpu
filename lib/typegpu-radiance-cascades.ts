@@ -8,15 +8,7 @@ import {
 // 0, `cascadeDim` is the texture width, and `cascadeCount` is the layer count.
 @ValueType
 export class CascadeDimensions {
-  cascadeProbes: u32;
-  cascadeDim: u32;
-  cascadeCount: u32;
-
-  constructor(cascadeProbes: u32, cascadeDim: u32, cascadeCount: u32) {
-    this.cascadeProbes = cascadeProbes;
-    this.cascadeDim = cascadeDim;
-    this.cascadeCount = cascadeCount;
-  }
+  constructor(public cascadeProbes: u32, public cascadeDim: u32, public cascadeCount: u32) {}
 }
 
 // The host sizing keeps the nearest power of two explicit. This avoids a dependency on

@@ -25,25 +25,13 @@ function sortTrap(method: string, values: string): void {
 // and `jShift` is the base-2 logarithm of the compare stride.
 @ValueType
 export class BitonicSortPass {
-  k: u32;
-  jShift: u32;
-
-  constructor(k: u32, jShift: u32) {
-    this.k = k;
-    this.jShift = jShift;
-  }
+  constructor(public k: u32, public jShift: u32) {}
 }
 
 // The layout `bitonicSortStep` reads. `values` holds a power-of-two count of `u32` keys, and
 // `pass` carries the parameters of the current step.
 export class BitonicSortResources {
-  values: MutStorage<u32>;
-  pass: Uniform<BitonicSortPass>;
-
-  constructor(values: MutStorage<u32>, pass: Uniform<BitonicSortPass>) {
-    this.values = values;
-    this.pass = pass;
-  }
+  constructor(public values: MutStorage<u32>, public pass: Uniform<BitonicSortPass>) {}
 }
 
 function bitonicSortStride(jShift: u32): u32 {
@@ -127,25 +115,13 @@ export function bitonicSortStep(
 // The layout `prefixScanBlockF32` reads. `values` holds the padded input, and `sums` receives
 // one block total for each workgroup.
 export class PrefixScanBlockResources {
-  values: MutStorage<f32>;
-  sums: MutStorage<f32>;
-
-  constructor(values: MutStorage<f32>, sums: MutStorage<f32>) {
-    this.values = values;
-    this.sums = sums;
-  }
+  constructor(public values: MutStorage<f32>, public sums: MutStorage<f32>) {}
 }
 
 // The layout `prefixScanApplyF32` reads. `offsets` holds the scanned block sums, one for each
 // workgroup.
 export class PrefixScanApplyResources {
-  values: MutStorage<f32>;
-  offsets: Storage<f32>;
-
-  constructor(values: MutStorage<f32>, offsets: Storage<f32>) {
-    this.values = values;
-    this.offsets = offsets;
-  }
+  constructor(public values: MutStorage<f32>, public offsets: Storage<f32>) {}
 }
 
 const prefixScanShared: WorkgroupArray<f32> = workgroupArray<f32>(256);
@@ -166,7 +142,7 @@ export function prefixScanBlockF32(
     if (lane < active) {
       const right: u32 = (lane + 1) * offset * 2 - 1;
       const left: u32 = right - offset;
-      prefixScanShared[right] = prefixScanShared[right] + prefixScanShared[left];
+      prefixScanShared[right] += prefixScanShared[left];
     }
     offset *= 2;
     workgroupBarrier();
@@ -187,7 +163,7 @@ export function prefixScanBlockF32(
       const left: u32 = right - offset;
       const leftValue: f32 = prefixScanShared[left];
       prefixScanShared[left] = prefixScanShared[right];
-      prefixScanShared[right] = prefixScanShared[right] + leftValue;
+      prefixScanShared[right] += leftValue;
     }
     active *= 2;
     workgroupBarrier();
@@ -214,13 +190,7 @@ function requirePrefixScanLength(length: u32): void {
 // and `blockCount` counts them.
 @ValueType
 export class PrefixScanPlanF32 {
-  paddedLength: u32;
-  blockCount: u32;
-
-  constructor(paddedLength: u32, blockCount: u32) {
-    this.paddedLength = paddedLength;
-    this.blockCount = blockCount;
-  }
+  constructor(public paddedLength: u32, public blockCount: u32) {}
 }
 
 // Returns the plan for `length` values. SORT1 traps at zero and above 65536 values, because the
@@ -256,7 +226,7 @@ function prefixScanBlockHostF32(values: f32[], start: u32): f32 {
     while (lane < active) {
       const right: u32 = start + (lane + 1) * offset * 2 - 1;
       const left: u32 = right - offset;
-      values[right as i32] = values[right as i32] + values[left as i32];
+      values[right as i32] += values[left as i32];
       lane += 1;
     }
     offset *= 2;
@@ -273,7 +243,7 @@ function prefixScanBlockHostF32(values: f32[], start: u32): f32 {
       const left: u32 = right - offset;
       const leftValue: f32 = values[left as i32];
       values[left as i32] = values[right as i32];
-      values[right as i32] = values[right as i32] + leftValue;
+      values[right as i32] += leftValue;
       lane += 1;
     }
     active *= 2;
@@ -305,7 +275,7 @@ export function prefixScanHostF32(input: f32[]): f32[] {
     index = 0;
     while (index < SORT_WORKGROUP_SIZE) {
       const valueIndex: u32 = block * SORT_WORKGROUP_SIZE + index;
-      values[valueIndex as i32] = values[valueIndex as i32] + sums[block as i32];
+      values[valueIndex as i32] += sums[block as i32];
       index += 1;
     }
     block += 1;

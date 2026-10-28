@@ -158,13 +158,7 @@
 export type GPUErrorType = "validation" | "out-of-memory" | "internal" | "unknown";
 
 export class GPUError {
-  readonly type: GPUErrorType;
-  readonly message: string;
-
-  constructor(type: GPUErrorType, message: string) {
-    this.type = type;
-    this.message = message;
-  }
+  constructor(readonly type: GPUErrorType, readonly message: string) {}
 }
 
 function fromSubscriptTypegpuErrorRecord(value: SubscriptTypegpuErrorRecord): GPUError | null {
@@ -197,13 +191,7 @@ function fromSubscriptTypegpuErrorRecord(value: SubscriptTypegpuErrorRecord): GP
 }
 
 export class GPUDeviceLostInfo {
-  readonly reason: GPUDeviceLostReason;
-  readonly message: string;
-
-  constructor(reason: GPUDeviceLostReason, message: string) {
-    this.reason = reason;
-    this.message = message;
-  }
+  constructor(readonly reason: GPUDeviceLostReason, readonly message: string) {}
 }
 
 function fromSubscriptTypegpuLostRecord(value: SubscriptTypegpuLostRecord): GPUDeviceLostInfo {
@@ -214,73 +202,7 @@ function fromSubscriptTypegpuLostRecord(value: SubscriptTypegpuLostRecord): GPUD
 }
 
 export class GPUSupportedLimits {
-  readonly maxTextureDimension1D: u32;
-  readonly maxTextureDimension2D: u32;
-  readonly maxTextureDimension3D: u32;
-  readonly maxTextureArrayLayers: u32;
-  readonly maxBindGroups: u32;
-  readonly maxBindGroupsPlusVertexBuffers: u32;
-  readonly maxBindingsPerBindGroup: u32;
-  readonly maxDynamicUniformBuffersPerPipelineLayout: u32;
-  readonly maxDynamicStorageBuffersPerPipelineLayout: u32;
-  readonly maxSampledTexturesPerShaderStage: u32;
-  readonly maxSamplersPerShaderStage: u32;
-  readonly maxStorageBuffersPerShaderStage: u32;
-  readonly maxStorageTexturesPerShaderStage: u32;
-  readonly maxUniformBuffersPerShaderStage: u32;
-  readonly maxUniformBufferBindingSize: u64;
-  readonly maxStorageBufferBindingSize: u64;
-  readonly minUniformBufferOffsetAlignment: u32;
-  readonly minStorageBufferOffsetAlignment: u32;
-  readonly maxVertexBuffers: u32;
-  readonly maxBufferSize: u64;
-  readonly maxVertexAttributes: u32;
-  readonly maxVertexBufferArrayStride: u32;
-  readonly maxInterStageShaderVariables: u32;
-  readonly maxColorAttachments: u32;
-  readonly maxColorAttachmentBytesPerSample: u32;
-  readonly maxComputeWorkgroupStorageSize: u32;
-  readonly maxComputeInvocationsPerWorkgroup: u32;
-  readonly maxComputeWorkgroupSizeX: u32;
-  readonly maxComputeWorkgroupSizeY: u32;
-  readonly maxComputeWorkgroupSizeZ: u32;
-  readonly maxComputeWorkgroupsPerDimension: u32;
-  readonly maxImmediateSize: u32;
-
-  constructor(maxTextureDimension1D: u32, maxTextureDimension2D: u32, maxTextureDimension3D: u32, maxTextureArrayLayers: u32, maxBindGroups: u32, maxBindGroupsPlusVertexBuffers: u32, maxBindingsPerBindGroup: u32, maxDynamicUniformBuffersPerPipelineLayout: u32, maxDynamicStorageBuffersPerPipelineLayout: u32, maxSampledTexturesPerShaderStage: u32, maxSamplersPerShaderStage: u32, maxStorageBuffersPerShaderStage: u32, maxStorageTexturesPerShaderStage: u32, maxUniformBuffersPerShaderStage: u32, maxUniformBufferBindingSize: u64, maxStorageBufferBindingSize: u64, minUniformBufferOffsetAlignment: u32, minStorageBufferOffsetAlignment: u32, maxVertexBuffers: u32, maxBufferSize: u64, maxVertexAttributes: u32, maxVertexBufferArrayStride: u32, maxInterStageShaderVariables: u32, maxColorAttachments: u32, maxColorAttachmentBytesPerSample: u32, maxComputeWorkgroupStorageSize: u32, maxComputeInvocationsPerWorkgroup: u32, maxComputeWorkgroupSizeX: u32, maxComputeWorkgroupSizeY: u32, maxComputeWorkgroupSizeZ: u32, maxComputeWorkgroupsPerDimension: u32, maxImmediateSize: u32) {
-    this.maxTextureDimension1D = maxTextureDimension1D;
-    this.maxTextureDimension2D = maxTextureDimension2D;
-    this.maxTextureDimension3D = maxTextureDimension3D;
-    this.maxTextureArrayLayers = maxTextureArrayLayers;
-    this.maxBindGroups = maxBindGroups;
-    this.maxBindGroupsPlusVertexBuffers = maxBindGroupsPlusVertexBuffers;
-    this.maxBindingsPerBindGroup = maxBindingsPerBindGroup;
-    this.maxDynamicUniformBuffersPerPipelineLayout = maxDynamicUniformBuffersPerPipelineLayout;
-    this.maxDynamicStorageBuffersPerPipelineLayout = maxDynamicStorageBuffersPerPipelineLayout;
-    this.maxSampledTexturesPerShaderStage = maxSampledTexturesPerShaderStage;
-    this.maxSamplersPerShaderStage = maxSamplersPerShaderStage;
-    this.maxStorageBuffersPerShaderStage = maxStorageBuffersPerShaderStage;
-    this.maxStorageTexturesPerShaderStage = maxStorageTexturesPerShaderStage;
-    this.maxUniformBuffersPerShaderStage = maxUniformBuffersPerShaderStage;
-    this.maxUniformBufferBindingSize = maxUniformBufferBindingSize;
-    this.maxStorageBufferBindingSize = maxStorageBufferBindingSize;
-    this.minUniformBufferOffsetAlignment = minUniformBufferOffsetAlignment;
-    this.minStorageBufferOffsetAlignment = minStorageBufferOffsetAlignment;
-    this.maxVertexBuffers = maxVertexBuffers;
-    this.maxBufferSize = maxBufferSize;
-    this.maxVertexAttributes = maxVertexAttributes;
-    this.maxVertexBufferArrayStride = maxVertexBufferArrayStride;
-    this.maxInterStageShaderVariables = maxInterStageShaderVariables;
-    this.maxColorAttachments = maxColorAttachments;
-    this.maxColorAttachmentBytesPerSample = maxColorAttachmentBytesPerSample;
-    this.maxComputeWorkgroupStorageSize = maxComputeWorkgroupStorageSize;
-    this.maxComputeInvocationsPerWorkgroup = maxComputeInvocationsPerWorkgroup;
-    this.maxComputeWorkgroupSizeX = maxComputeWorkgroupSizeX;
-    this.maxComputeWorkgroupSizeY = maxComputeWorkgroupSizeY;
-    this.maxComputeWorkgroupSizeZ = maxComputeWorkgroupSizeZ;
-    this.maxComputeWorkgroupsPerDimension = maxComputeWorkgroupsPerDimension;
-    this.maxImmediateSize = maxImmediateSize;
-  }
+  constructor(readonly maxTextureDimension1D: u32, readonly maxTextureDimension2D: u32, readonly maxTextureDimension3D: u32, readonly maxTextureArrayLayers: u32, readonly maxBindGroups: u32, readonly maxBindGroupsPlusVertexBuffers: u32, readonly maxBindingsPerBindGroup: u32, readonly maxDynamicUniformBuffersPerPipelineLayout: u32, readonly maxDynamicStorageBuffersPerPipelineLayout: u32, readonly maxSampledTexturesPerShaderStage: u32, readonly maxSamplersPerShaderStage: u32, readonly maxStorageBuffersPerShaderStage: u32, readonly maxStorageTexturesPerShaderStage: u32, readonly maxUniformBuffersPerShaderStage: u32, readonly maxUniformBufferBindingSize: u64, readonly maxStorageBufferBindingSize: u64, readonly minUniformBufferOffsetAlignment: u32, readonly minStorageBufferOffsetAlignment: u32, readonly maxVertexBuffers: u32, readonly maxBufferSize: u64, readonly maxVertexAttributes: u32, readonly maxVertexBufferArrayStride: u32, readonly maxInterStageShaderVariables: u32, readonly maxColorAttachments: u32, readonly maxColorAttachmentBytesPerSample: u32, readonly maxComputeWorkgroupStorageSize: u32, readonly maxComputeInvocationsPerWorkgroup: u32, readonly maxComputeWorkgroupSizeX: u32, readonly maxComputeWorkgroupSizeY: u32, readonly maxComputeWorkgroupSizeZ: u32, readonly maxComputeWorkgroupsPerDimension: u32, readonly maxImmediateSize: u32) {}
 }
 
 function fromSubscriptTypegpuLimits(value: SubscriptTypegpuLimits): GPUSupportedLimits {
@@ -321,17 +243,7 @@ function fromSubscriptTypegpuLimits(value: SubscriptTypegpuLimits): GPUSupported
 }
 
 export class GPUAdapterInfo {
-  readonly vendor: string;
-  readonly architecture: string;
-  readonly device: string;
-  readonly description: string;
-
-  constructor(vendor: string, architecture: string, device: string, description: string) {
-    this.vendor = vendor;
-    this.architecture = architecture;
-    this.device = device;
-    this.description = description;
-  }
+  constructor(readonly vendor: string, readonly architecture: string, readonly device: string, readonly description: string) {}
 }
 
 function fromSubscriptTypegpuAdapterInfo(value: SubscriptTypegpuAdapterInfo): GPUAdapterInfo {
@@ -880,7 +792,7 @@ function toSubscriptTypegpuBindGroupLayoutEntryArray(values: GPUBindGroupLayoutE
   let index: i32 = 0;
   while (index < values.length) {
     lowered.push(toSubscriptTypegpuBindGroupLayoutEntry(values[index]));
-    index = index + 1;
+    index += 1;
   }
   return lowered;
 }
@@ -911,7 +823,7 @@ function toSubscriptTypegpuBindGroupEntryArray(values: GPUBindGroupEntry[]): Sub
   let index: i32 = 0;
   while (index < values.length) {
     lowered.push(toSubscriptTypegpuBindGroupEntry(values[index]));
-    index = index + 1;
+    index += 1;
   }
   return lowered;
 }
@@ -921,7 +833,7 @@ function toSubscriptTypegpuBindGroupLayoutArray(values: GPUBindGroupLayout[]): S
   let index: i32 = 0;
   while (index < values.length) {
     lowered.push(values[index].bindGroupLayout);
-    index = index + 1;
+    index += 1;
   }
   return lowered;
 }
@@ -935,7 +847,7 @@ function toSubscriptTypegpuConstantEntryArray(values: GPUPipelineConstantEntry[]
   let index: i32 = 0;
   while (index < values.length) {
     lowered.push(toSubscriptTypegpuConstantEntry(values[index]));
-    index = index + 1;
+    index += 1;
   }
   return lowered;
 }
@@ -952,7 +864,7 @@ function toSubscriptTypegpuVertexAttributeArray(values: GPUVertexAttribute[]): S
   let index: i32 = 0;
   while (index < values.length) {
     lowered.push(toSubscriptTypegpuVertexAttribute(values[index]));
-    index = index + 1;
+    index += 1;
   }
   return lowered;
 }
@@ -962,7 +874,7 @@ function toSubscriptTypegpuVertexBufferLayoutArray(values: GPUVertexBufferLayout
   let index: i32 = 0;
   while (index < values.length) {
     lowered.push(toSubscriptTypegpuVertexBufferLayout(values[index]));
-    index = index + 1;
+    index += 1;
   }
   return lowered;
 }
@@ -979,7 +891,7 @@ function toSubscriptTypegpuColorTargetStateArray(values: GPUColorTargetState[]):
   let index: i32 = 0;
   while (index < values.length) {
     lowered.push(toSubscriptTypegpuColorTargetState(values[index]));
-    index = index + 1;
+    index += 1;
   }
   return lowered;
 }
@@ -989,7 +901,7 @@ function toSubscriptTypegpuRenderPassColorAttachmentArray(values: GPURenderPassC
   let index: i32 = 0;
   while (index < values.length) {
     lowered.push(toSubscriptTypegpuRenderPassColorAttachment(values[index]));
-    index = index + 1;
+    index += 1;
   }
   return lowered;
 }
@@ -1006,7 +918,7 @@ function toSubscriptTypegpuCommandBufferArray(values: GPUCommandBuffer[]): Subsc
   let index: i32 = 0;
   while (index < values.length) {
     lowered.push(values[index].commandBuffer);
-    index = index + 1;
+    index += 1;
   }
   return lowered;
 }
@@ -1023,7 +935,7 @@ function toSubscriptTypegpuRenderBundleArray(values: GPURenderBundle[]): Subscri
   let index: i32 = 0;
   while (index < values.length) {
     lowered.push(values[index].renderBundle);
-    index = index + 1;
+    index += 1;
   }
   return lowered;
 }
@@ -1922,11 +1834,8 @@ function defaultDefaultQueue(value: GPUQueueDescriptor = {}): GPUQueueDescriptor
 }
 
 export class GPU {
-  instance: SubscriptTypegpuInstance;
 
-  constructor(instance: SubscriptTypegpuInstance) {
-    this.instance = instance;
-  }
+  constructor(public instance: SubscriptTypegpuInstance) {}
 
   async requestAdapter(): Promise<GPUAdapter | null> {
     const future: SubscriptTypegpuFutureId = subscript_typegpu_instance_request_adapter(this.instance);
@@ -1955,13 +1864,8 @@ export class GPU {
 }
 
 export class GPUAdapter {
-  instance: SubscriptTypegpuInstance;
-  adapter: SubscriptTypegpuAdapter;
 
-  constructor(instance: SubscriptTypegpuInstance, adapter: SubscriptTypegpuAdapter) {
-    this.instance = instance;
-    this.adapter = adapter;
-  }
+  constructor(public instance: SubscriptTypegpuInstance, public adapter: SubscriptTypegpuAdapter) {}
 
   hasFeature(name: GPUFeatureName): boolean {
     return subscript_typegpu_adapter_has_feature(this.adapter, name);
@@ -2198,13 +2102,8 @@ export class GPUDevice {
 }
 
 export class GPUHostOwnedDevice {
-  private instance: SubscriptTypegpuInstance;
-  private device: SubscriptTypegpuDevice;
 
-  private constructor(instance: SubscriptTypegpuInstance, device: SubscriptTypegpuDevice) {
-    this.instance = instance;
-    this.device = device;
-  }
+  private constructor(private instance: SubscriptTypegpuInstance, private device: SubscriptTypegpuDevice) {}
 
   /** Creates a wrapper for a host-owned device. */
   static create(instance: SubscriptTypegpuInstance, device: SubscriptTypegpuDevice): GPUHostOwnedDevice {
@@ -2374,13 +2273,8 @@ export class GPUHostOwnedDevice {
 }
 
 export class GPUBuffer {
-  instance: SubscriptTypegpuInstance;
-  buffer: SubscriptTypegpuBuffer;
 
-  constructor(instance: SubscriptTypegpuInstance, buffer: SubscriptTypegpuBuffer) {
-    this.instance = instance;
-    this.buffer = buffer;
-  }
+  constructor(public instance: SubscriptTypegpuInstance, public buffer: SubscriptTypegpuBuffer) {}
 
   get size(): u64 {
     return subscript_typegpu_buffer_get_size(this.buffer);
@@ -2413,7 +2307,7 @@ export class GPUBuffer {
     let index: u64 = 0;
     while (index < size) {
       bytes.push(0);
-      index = index + 1;
+      index += 1;
     }
     if (subscript_typegpu_buffer_read_mapped_range(this.buffer, offset, bytes) != 1) {
       return [];
@@ -2431,7 +2325,7 @@ export class GPUBuffer {
     let index: u64 = 0;
     while (index < count) {
       values.push(0);
-      index = index + 1;
+      index += 1;
     }
     if (subscript_typegpu_buffer_read_mapped_range_f32(this.buffer, offset, values) != 1) {
       return [];
@@ -2519,11 +2413,8 @@ export class GPUQueue {
 }
 
 export class GPUTexture {
-  texture: SubscriptTypegpuTexture;
 
-  constructor(texture: SubscriptTypegpuTexture) {
-    this.texture = texture;
-  }
+  constructor(public texture: SubscriptTypegpuTexture) {}
 
   createView(descriptor: GPUTextureViewDescriptor | null = null): GPUTextureView {
     if (descriptor == null) {
@@ -2582,11 +2473,8 @@ export class GPUTexture {
 }
 
 export class GPUTextureView {
-  textureView: SubscriptTypegpuTextureView;
 
-  constructor(textureView: SubscriptTypegpuTextureView) {
-    this.textureView = textureView;
-  }
+  constructor(public textureView: SubscriptTypegpuTextureView) {}
 
   label(value: string): void {
     subscript_typegpu_texture_view_set_label(this.textureView, value);
@@ -2602,11 +2490,8 @@ export class GPUTextureView {
 }
 
 export class GPUSampler {
-  sampler: SubscriptTypegpuSampler;
 
-  constructor(sampler: SubscriptTypegpuSampler) {
-    this.sampler = sampler;
-  }
+  constructor(public sampler: SubscriptTypegpuSampler) {}
 
   label(value: string): void {
     subscript_typegpu_sampler_set_label(this.sampler, value);
@@ -2622,11 +2507,8 @@ export class GPUSampler {
 }
 
 export class GPUBindGroupLayout {
-  bindGroupLayout: SubscriptTypegpuBindGroupLayout;
 
-  constructor(bindGroupLayout: SubscriptTypegpuBindGroupLayout) {
-    this.bindGroupLayout = bindGroupLayout;
-  }
+  constructor(public bindGroupLayout: SubscriptTypegpuBindGroupLayout) {}
 
   label(value: string): void {
     subscript_typegpu_bind_group_layout_set_label(this.bindGroupLayout, value);
@@ -2642,11 +2524,8 @@ export class GPUBindGroupLayout {
 }
 
 export class GPUBindGroup {
-  bindGroup: SubscriptTypegpuBindGroup;
 
-  constructor(bindGroup: SubscriptTypegpuBindGroup) {
-    this.bindGroup = bindGroup;
-  }
+  constructor(public bindGroup: SubscriptTypegpuBindGroup) {}
 
   label(value: string): void {
     subscript_typegpu_bind_group_set_label(this.bindGroup, value);
@@ -2662,11 +2541,8 @@ export class GPUBindGroup {
 }
 
 export class GPUPipelineLayout {
-  pipelineLayout: SubscriptTypegpuPipelineLayout;
 
-  constructor(pipelineLayout: SubscriptTypegpuPipelineLayout) {
-    this.pipelineLayout = pipelineLayout;
-  }
+  constructor(public pipelineLayout: SubscriptTypegpuPipelineLayout) {}
 
   label(value: string): void {
     subscript_typegpu_pipeline_layout_set_label(this.pipelineLayout, value);
@@ -2682,11 +2558,8 @@ export class GPUPipelineLayout {
 }
 
 export class GPUShaderModule {
-  shaderModule: SubscriptTypegpuShaderModule;
 
-  constructor(shaderModule: SubscriptTypegpuShaderModule) {
-    this.shaderModule = shaderModule;
-  }
+  constructor(public shaderModule: SubscriptTypegpuShaderModule) {}
 
   label(value: string): void {
     subscript_typegpu_shader_module_set_label(this.shaderModule, value);
@@ -2702,11 +2575,8 @@ export class GPUShaderModule {
 }
 
 export class GPUComputePipeline {
-  computePipeline: SubscriptTypegpuComputePipeline;
 
-  constructor(computePipeline: SubscriptTypegpuComputePipeline) {
-    this.computePipeline = computePipeline;
-  }
+  constructor(public computePipeline: SubscriptTypegpuComputePipeline) {}
 
   label(value: string): void {
     subscript_typegpu_compute_pipeline_set_label(this.computePipeline, value);
@@ -2726,11 +2596,8 @@ export class GPUComputePipeline {
 }
 
 export class GPURenderPipeline {
-  renderPipeline: SubscriptTypegpuRenderPipeline;
 
-  constructor(renderPipeline: SubscriptTypegpuRenderPipeline) {
-    this.renderPipeline = renderPipeline;
-  }
+  constructor(public renderPipeline: SubscriptTypegpuRenderPipeline) {}
 
   label(value: string): void {
     subscript_typegpu_render_pipeline_set_label(this.renderPipeline, value);
@@ -2750,11 +2617,8 @@ export class GPURenderPipeline {
 }
 
 export class GPUCommandEncoder {
-  commandEncoder: SubscriptTypegpuCommandEncoder;
 
-  constructor(commandEncoder: SubscriptTypegpuCommandEncoder) {
-    this.commandEncoder = commandEncoder;
-  }
+  constructor(public commandEncoder: SubscriptTypegpuCommandEncoder) {}
 
   beginRenderPass(descriptor: GPURenderPassDescriptor): GPURenderPassEncoder {
     return new GPURenderPassEncoder(subscript_typegpu_command_encoder_begin_render_pass(this.commandEncoder, toSubscriptTypegpuRenderPassDescriptor(descriptor)));
@@ -2832,11 +2696,8 @@ export class GPUCommandEncoder {
 }
 
 export class GPUComputePassEncoder {
-  computePassEncoder: SubscriptTypegpuComputePassEncoder;
 
-  constructor(computePassEncoder: SubscriptTypegpuComputePassEncoder) {
-    this.computePassEncoder = computePassEncoder;
-  }
+  constructor(public computePassEncoder: SubscriptTypegpuComputePassEncoder) {}
 
   setPipeline(pipeline: GPUComputePipeline): void {
     subscript_typegpu_compute_pass_encoder_set_pipeline(this.computePassEncoder, pipeline.computePipeline);
@@ -2884,11 +2745,8 @@ export class GPUComputePassEncoder {
 }
 
 export class GPURenderPassEncoder {
-  renderPassEncoder: SubscriptTypegpuRenderPassEncoder;
 
-  constructor(renderPassEncoder: SubscriptTypegpuRenderPassEncoder) {
-    this.renderPassEncoder = renderPassEncoder;
-  }
+  constructor(public renderPassEncoder: SubscriptTypegpuRenderPassEncoder) {}
 
   setViewport(x: f32, y: f32, width: f32, height: f32, minDepth: f32, maxDepth: f32): void {
     subscript_typegpu_render_pass_encoder_set_viewport(this.renderPassEncoder, x, y, width, height, minDepth, maxDepth);
@@ -2980,11 +2838,8 @@ export class GPURenderPassEncoder {
 }
 
 export class GPUCommandBuffer {
-  commandBuffer: SubscriptTypegpuCommandBuffer;
 
-  constructor(commandBuffer: SubscriptTypegpuCommandBuffer) {
-    this.commandBuffer = commandBuffer;
-  }
+  constructor(public commandBuffer: SubscriptTypegpuCommandBuffer) {}
 
   label(value: string): void {
     subscript_typegpu_command_buffer_set_label(this.commandBuffer, value);
@@ -3000,11 +2855,8 @@ export class GPUCommandBuffer {
 }
 
 export class GPURenderBundleEncoder {
-  renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder;
 
-  constructor(renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder) {
-    this.renderBundleEncoder = renderBundleEncoder;
-  }
+  constructor(public renderBundleEncoder: SubscriptTypegpuRenderBundleEncoder) {}
 
   finish(descriptor: GPURenderBundleDescriptor | null = null): GPURenderBundle {
     if (descriptor == null) {
@@ -3075,11 +2927,8 @@ export class GPURenderBundleEncoder {
 }
 
 export class GPURenderBundle {
-  renderBundle: SubscriptTypegpuRenderBundle;
 
-  constructor(renderBundle: SubscriptTypegpuRenderBundle) {
-    this.renderBundle = renderBundle;
-  }
+  constructor(public renderBundle: SubscriptTypegpuRenderBundle) {}
 
   label(value: string): void {
     subscript_typegpu_render_bundle_set_label(this.renderBundle, value);
@@ -3095,11 +2944,8 @@ export class GPURenderBundle {
 }
 
 export class GPUQuerySet {
-  querySet: SubscriptTypegpuQuerySet;
 
-  constructor(querySet: SubscriptTypegpuQuerySet) {
-    this.querySet = querySet;
-  }
+  constructor(public querySet: SubscriptTypegpuQuerySet) {}
 
   destroy(): void {
     subscript_typegpu_query_set_destroy(this.querySet);

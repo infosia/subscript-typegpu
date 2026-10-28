@@ -5737,23 +5737,16 @@ fn render_result_record(out: &mut String, record: &ResultRecordPlan) -> Result<(
         ));
     }
     out.push_str(&format!("export class {} {{\n", record.name));
-    for field in &record.fields {
-        out.push_str(&format!("  readonly {}: {};\n", field.name, field.ty));
-    }
-    out.push_str("\n  constructor(");
+    out.push_str("  constructor(");
     out.push_str(
         &record
             .fields
             .iter()
-            .map(|field| format!("{}: {}", field.name, field.ty))
+            .map(|field| format!("readonly {}: {}", field.name, field.ty))
             .collect::<Vec<_>>()
             .join(", "),
     );
-    out.push_str(") {\n");
-    for field in &record.fields {
-        out.push_str(&format!("    this.{0} = {0};\n", field.name));
-    }
-    out.push_str("  }\n}\n\n");
+    out.push_str(") {}\n}\n\n");
 
     out.push_str(&format!(
         "function from{}(value: {}): {}{} {{\n",
@@ -5865,7 +5858,7 @@ fn render_method_param_helpers(
             } => {
                 if emitted.insert(format!("handle-array:{boundary_name}")) {
                     out.push_str(&format!(
-                        "function to{boundary_name}Array(values: {api_name}[]): {boundary_name}[] {{\n  const lowered: {boundary_name}[] = [];\n  let index: i32 = 0;\n  while (index < values.length) {{\n    lowered.push(values[index].{raw_field});\n    index = index + 1;\n  }}\n  return lowered;\n}}\n\n"
+                        "function to{boundary_name}Array(values: {api_name}[]): {boundary_name}[] {{\n  const lowered: {boundary_name}[] = [];\n  let index: i32 = 0;\n  while (index < values.length) {{\n    lowered.push(values[index].{raw_field});\n    index += 1;\n  }}\n  return lowered;\n}}\n\n"
                     ));
                 }
             }
@@ -6361,7 +6354,7 @@ fn render_descriptor_helpers(out: &mut String, descriptors: &[DescriptorPlan]) {
                         .map(|candidate| candidate.name.as_str())
                         .unwrap_or_default();
                     out.push_str(&format!(
-                        "function to{boundary_name}Array(values: {api_name}[]): {boundary_name}[] {{\n  const lowered: {boundary_name}[] = [];\n  let index: i32 = 0;\n  while (index < values.length) {{\n    lowered.push(to{boundary_name}(values[index]));\n    index = index + 1;\n  }}\n  return lowered;\n}}\n\n"
+                        "function to{boundary_name}Array(values: {api_name}[]): {boundary_name}[] {{\n  const lowered: {boundary_name}[] = [];\n  let index: i32 = 0;\n  while (index < values.length) {{\n    lowered.push(to{boundary_name}(values[index]));\n    index += 1;\n  }}\n  return lowered;\n}}\n\n"
                     ));
                 }
                 DescriptorFieldConversion::RecordEntries {
@@ -6369,7 +6362,7 @@ fn render_descriptor_helpers(out: &mut String, descriptors: &[DescriptorPlan]) {
                     boundary_name,
                 } if emitted.insert(format!("record-entry:{boundary_name}")) => {
                     out.push_str(&format!(
-                        "function to{boundary_name}(value: {api_name}): {boundary_name} {{\n  return new {boundary_name}(value.key, value.value);\n}}\n\nfunction to{boundary_name}Array(values: {api_name}[]): {boundary_name}[] {{\n  const lowered: {boundary_name}[] = [];\n  let index: i32 = 0;\n  while (index < values.length) {{\n    lowered.push(to{boundary_name}(values[index]));\n    index = index + 1;\n  }}\n  return lowered;\n}}\n\n"
+                        "function to{boundary_name}(value: {api_name}): {boundary_name} {{\n  return new {boundary_name}(value.key, value.value);\n}}\n\nfunction to{boundary_name}Array(values: {api_name}[]): {boundary_name}[] {{\n  const lowered: {boundary_name}[] = [];\n  let index: i32 = 0;\n  while (index < values.length) {{\n    lowered.push(to{boundary_name}(values[index]));\n    index += 1;\n  }}\n  return lowered;\n}}\n\n"
                     ));
                 }
                 DescriptorFieldConversion::HandleArray {
@@ -6378,7 +6371,7 @@ fn render_descriptor_helpers(out: &mut String, descriptors: &[DescriptorPlan]) {
                     raw_field,
                 } if emitted.insert(format!("handle-array:{boundary_name}")) => {
                     out.push_str(&format!(
-                        "function to{boundary_name}Array(values: {api_name}[]): {boundary_name}[] {{\n  const lowered: {boundary_name}[] = [];\n  let index: i32 = 0;\n  while (index < values.length) {{\n    lowered.push(values[index].{raw_field});\n    index = index + 1;\n  }}\n  return lowered;\n}}\n\n"
+                        "function to{boundary_name}Array(values: {api_name}[]): {boundary_name}[] {{\n  const lowered: {boundary_name}[] = [];\n  let index: i32 = 0;\n  while (index < values.length) {{\n    lowered.push(values[index].{raw_field});\n    index += 1;\n  }}\n  return lowered;\n}}\n\n"
                     ));
                 }
                 DescriptorFieldConversion::OptionalDescriptor {
@@ -6452,21 +6445,39 @@ fn render_interface_class(
         interface.name.as_str()
     };
     out.push_str(&format!("export class {class_name} {{\n"));
+    let parameter_properties = !interface.idempotent_dispose
+        && !interface.methods.iter().any(|method| {
+            matches!(
+                method,
+                MethodPlan::Attribute {
+                    name,
+                    result_class: Some(_),
+                    ..
+                } if !(host_owned && interface.name == "GPUDevice" && name == "queue")
+            )
+        });
+    let field_visibility = if interface.host_owned {
+        "private "
+    } else {
+        "public "
+    };
     let shared_instance_field = interface.needs_instance && interface.raw_field == "instance";
-    if interface.needs_instance {
-        if interface.host_owned {
-            out.push_str("  private instance: SubscriptTypegpuInstance;\n");
-        } else {
-            out.push_str("  instance: SubscriptTypegpuInstance;\n");
+    if !parameter_properties {
+        if interface.needs_instance {
+            if interface.host_owned {
+                out.push_str("  private instance: SubscriptTypegpuInstance;\n");
+            } else {
+                out.push_str("  instance: SubscriptTypegpuInstance;\n");
+            }
         }
-    }
-    if !shared_instance_field {
-        out.push_str(&format!(
-            "  {}{}: SubscriptTypegpu{};\n",
-            if interface.host_owned { "private " } else { "" },
-            interface.raw_field,
-            interface.boundary
-        ));
+        if !shared_instance_field {
+            out.push_str(&format!(
+                "  {}{}: SubscriptTypegpu{};\n",
+                if interface.host_owned { "private " } else { "" },
+                interface.raw_field,
+                interface.boundary
+            ));
+        }
     }
     if interface.idempotent_dispose {
         out.push_str("  private disposed: boolean;\n");
@@ -6486,25 +6497,35 @@ fn render_interface_class(
     }
     out.push('\n');
     let mut constructor_params = Vec::new();
+    let parameter_visibility = if parameter_properties {
+        field_visibility
+    } else {
+        ""
+    };
     if interface.needs_instance {
-        constructor_params.push("instance: SubscriptTypegpuInstance".to_owned());
+        constructor_params.push(format!(
+            "{parameter_visibility}instance: SubscriptTypegpuInstance"
+        ));
     }
     if !shared_instance_field {
         constructor_params.push(format!(
-            "{}: SubscriptTypegpu{}",
+            "{parameter_visibility}{}: SubscriptTypegpu{}",
             interface.raw_field, interface.boundary
         ));
     }
     out.push_str(&format!(
-        "  {}constructor({}) {{\n",
+        "  {}constructor({}) {{",
         if host_owned { "private " } else { "" },
         constructor_params.join(", ")
     ));
-    if interface.needs_instance {
-        out.push_str("    this.instance = instance;\n");
-    }
-    if !shared_instance_field {
-        out.push_str(&format!("    this.{0} = {0};\n", interface.raw_field));
+    if !parameter_properties {
+        out.push('\n');
+        if interface.needs_instance {
+            out.push_str("    this.instance = instance;\n");
+        }
+        if !shared_instance_field {
+            out.push_str(&format!("    this.{0} = {0};\n", interface.raw_field));
+        }
     }
     if interface.idempotent_dispose {
         out.push_str("    this.disposed = false;\n");
@@ -6531,7 +6552,11 @@ fn render_interface_class(
             out.push_str(&format!("    this.{name}Value = {constructor};\n"));
         }
     }
-    out.push_str("  }\n\n");
+    out.push_str(if parameter_properties {
+        "}\n\n"
+    } else {
+        "  }\n\n"
+    });
     if host_owned {
         out.push_str(&format!(
             "  /** Creates a wrapper for a host-owned device. */\n  static create(instance: SubscriptTypegpuInstance, {0}: SubscriptTypegpu{1}): GPUHostOwnedDevice {{\n    return new GPUHostOwnedDevice(instance, {0});\n  }}\n\n",
@@ -6797,7 +6822,7 @@ fn render_mapped_range_methods(
     out.push_str("    let index: u64 = 0;\n");
     out.push_str("    while (index < size) {\n");
     out.push_str("      bytes.push(0);\n");
-    out.push_str("      index = index + 1;\n");
+    out.push_str("      index += 1;\n");
     out.push_str("    }\n");
     out.push_str(&format!(
         "    if ({read}(this.{}, offset, bytes) != 1) {{\n",
@@ -6839,7 +6864,7 @@ fn render_typed_read_f32(out: &mut String, interface: &InterfacePlan, function: 
     out.push_str("    let index: u64 = 0;\n");
     out.push_str("    while (index < count) {\n");
     out.push_str("      values.push(0);\n");
-    out.push_str("      index = index + 1;\n");
+    out.push_str("      index += 1;\n");
     out.push_str("    }\n");
     out.push_str(&format!(
         "    if ({function}(this.{}, offset, values) != 1) {{\n",

@@ -603,3 +603,28 @@ examples. The five examples with `main` and no `frame` entry
 (`dispatch`, `matrix-multiplication`, `matrix-next`, `prefix-scan`,
 `prng-cpu-gpu`) exit 1 under the window host, which needs the frame
 entries.
+
+### lib/ uses the current forms (2026-10-28)
+
+The hand-written `lib/` sources and the `lib/webgpu.ts` emitter use
+parameter properties (71 constructors), inferred type arguments (8
+sites), and compound assignment (46 sites). Every export, public
+signature, and field order is unchanged. Constructors that also build
+state keep the old form, for example `Uniform`, `GPUDevice`, and
+`ComputePipeline` (its field order differs from its parameter order).
+
+Evidence: the first `tools/gate.sh --require-backend` run failed one
+test, 129 passed, 325.8 s: the ship tier of `b11-texture.ts` reported
+`ld: file cannot be open()ed, errno=2` for
+`target/ship-build/release/libsubscript_typegpu_facade.a`. This is the
+second occurrence (the first is at `8d99fe1`). The second run: `gate:
+green`, 292 passed, 0 failed, 1 ignored, 335.4 s wall. No WGSL or
+`.expected` golden moved. `tools/window.sh <example> --frames 30`: 27
+window examples exit 0 with no `FAIL`.
+
+Cause, measured: a fresh `cargo rustc --release -p
+subscript-typegpu-facade` run replaces the uplifted
+`target/ship-build/release/libsubscript_typegpu_facade.a` (its inode
+changes from 151734270 to 151734393 with no rebuild). Each ship-tier
+child process runs that command, so a child that links while another
+child runs it can find no archive.

@@ -22,23 +22,13 @@ function uiTrap(rule: string, method: string, values: string): void {
 // A mutable holder for a widget's value.
 // A stateful widget writes `value` in place when the user changes it.
 export class UiState<T> {
-  value: T;
-  constructor(value: T) { this.value = value; }
+  constructor(public value: T) {}
 }
 
 // An axis-aligned rectangle in pixels. `x` and `y` are the top-left corner.
 @ValueType
 export class UiRect {
-  x: i32;
-  y: i32;
-  w: i32;
-  h: i32;
-  constructor(x: i32, y: i32, w: i32, h: i32) {
-    this.x = x;
-    this.y = y;
-    this.w = w;
-    this.h = h;
-  }
+  constructor(public x: i32, public y: i32, public w: i32, public h: i32) {}
 }
 
 const UI_UNCLIPPED: UiRect = new UiRect(0, 0, 16777216, 16777216);
@@ -1044,47 +1034,27 @@ export class UiContext {
 // the atlas, and `color` packs `0xAABBGGRR`.
 @ValueType
 export class UiVertex {
-  position: Vec2f;
-  uv: Vec2f;
-  color: u32;
-  constructor(position: Vec2f, uv: Vec2f, color: u32) {
-    this.position = position; this.uv = uv; this.color = color;
-  }
+  constructor(public position: Vec2f, public uv: Vec2f, public color: u32) {}
 }
 
 // The uniform that the vertex kernel divides by to reach clip space. Both fields
 // hold the render target size in pixels.
 @ValueType
 export class UiViewport {
-  width: f32;
-  height: f32;
-  constructor(width: f32, height: f32) { this.width = width; this.height = height; }
+  constructor(public width: f32, public height: f32) {}
 }
 
 // The bind group of the UI pipeline: the viewport uniform, the atlas texture, and
 // the nearest-filter sampler.
 export class UiRenderLayout {
-  viewport: Uniform<UiViewport>;
-  atlas: Texture2d<f32>;
-  nearest: Sampler;
-
-  constructor(viewport: Uniform<UiViewport>, atlas: Texture2d<f32>, nearest: Sampler) {
-    this.viewport = viewport;
-    this.atlas = atlas;
-    this.nearest = nearest;
-  }
+  constructor(public viewport: Uniform<UiViewport>, public atlas: Texture2d<f32>, public nearest: Sampler) {}
 }
 
 // The vertex kernel's output and the fragment kernel's input. `color` carries the
 // unpacked RGBA in the 0 to 1 range.
 @ValueType
 export class UiVarying {
-  position: Vec4f;
-  uv: Vec2f;
-  color: Vec4f;
-  constructor(position: Vec4f, uv: Vec2f, color: Vec4f) {
-    this.position = position; this.uv = uv; this.color = color;
-  }
+  constructor(public position: Vec4f, public uv: Vec2f, public color: Vec4f) {}
 }
 
 // The vertex kernel. It maps a pixel position to clip space through the viewport
@@ -1118,19 +1088,14 @@ export const UI_BLEND: GPUBlendState = {
 // What the generator produces for the UI pipeline and a program hands to the
 // renderer: the WGSL, the two entry names, the two layouts, and the pipeline spec.
 export class UiPipelineFacts {
-  wgsl: string;
-  vertexEntry: string;
-  fragmentEntry: string;
-  layout: BindGroupLayoutSpec;
-  vertexLayout: VertexBufferLayoutSpec;
-  spec: RenderPipelineSpec;
-  constructor(wgsl: string, vertexEntry: string, fragmentEntry: string,
-    layout: BindGroupLayoutSpec, vertexLayout: VertexBufferLayoutSpec,
-    spec: RenderPipelineSpec) {
-    this.wgsl = wgsl; this.vertexEntry = vertexEntry; this.fragmentEntry = fragmentEntry;
-    this.layout = layout; this.vertexLayout = vertexLayout;
-    this.spec = spec;
-  }
+  constructor(
+    public wgsl: string,
+    public vertexEntry: string,
+    public fragmentEntry: string,
+    public layout: BindGroupLayoutSpec,
+    public vertexLayout: VertexBufferLayoutSpec,
+    public spec: RenderPipelineSpec,
+  ) {}
 }
 
 // One indexed draw and its scissor rect. `first` and `count` count indices, not quads.

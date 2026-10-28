@@ -3,13 +3,7 @@
 // maps each method to a WGSL operator or builtin.
 @ValueType({ align: 8 })
 export class Vec2f {
-  x: f32;
-  y: f32;
-
-  constructor(x: f32, y: f32) {
-    this.x = x;
-    this.y = y;
-  }
+  constructor(public x: f32, public y: f32) {}
 
   add(other: Vec2f): Vec2f {
     return new Vec2f(this.x + other.x, this.y + other.y);
@@ -99,15 +93,7 @@ export class Vec2f {
 // A schema that puts a scalar field after a `Vec3f` field fails the layout check.
 @ValueType({ align: 16 })
 export class Vec3f {
-  x: f32;
-  y: f32;
-  z: f32;
-
-  constructor(x: f32, y: f32, z: f32) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-  }
+  constructor(public x: f32, public y: f32, public z: f32) {}
 
   add(other: Vec3f): Vec3f {
     return new Vec3f(this.x + other.x, this.y + other.y, this.z + other.z);
@@ -196,17 +182,7 @@ export class Vec3f {
 // a `Vec4f` field never moves the field after it.
 @ValueType({ align: 16 })
 export class Vec4f {
-  x: f32;
-  y: f32;
-  z: f32;
-  w: f32;
-
-  constructor(x: f32, y: f32, z: f32, w: f32) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.w = w;
-  }
+  constructor(public x: f32, public y: f32, public z: f32, public w: f32) {}
 
   add(other: Vec4f): Vec4f {
     return new Vec4f(this.x + other.x, this.y + other.y, this.z + other.z, this.w + other.w);
@@ -290,13 +266,7 @@ export class Vec4f {
 // `normalize`, or transcendental method, because WGSL defines those for float types only.
 @ValueType({ align: 8 })
 export class Vec2i {
-  x: i32;
-  y: i32;
-
-  constructor(x: i32, y: i32) {
-    this.x = x;
-    this.y = y;
-  }
+  constructor(public x: i32, public y: i32) {}
 
   add(other: Vec2i): Vec2i { return new Vec2i(this.x + other.x, this.y + other.y); }
   sub(other: Vec2i): Vec2i { return new Vec2i(this.x - other.x, this.y - other.y); }
@@ -322,15 +292,7 @@ export class Vec2i {
 // with `Vec3f`.
 @ValueType({ align: 16 })
 export class Vec3i {
-  x: i32;
-  y: i32;
-  z: i32;
-
-  constructor(x: i32, y: i32, z: i32) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-  }
+  constructor(public x: i32, public y: i32, public z: i32) {}
 
   add(other: Vec3i): Vec3i { return new Vec3i(this.x + other.x, this.y + other.y, this.z + other.z); }
   sub(other: Vec3i): Vec3i { return new Vec3i(this.x - other.x, this.y - other.y, this.z - other.z); }
@@ -356,17 +318,7 @@ export class Vec3i {
 // A four-component `i32` vector, WGSL `vec4<i32>`.
 @ValueType({ align: 16 })
 export class Vec4i {
-  x: i32;
-  y: i32;
-  z: i32;
-  w: i32;
-
-  constructor(x: i32, y: i32, z: i32, w: i32) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.w = w;
-  }
+  constructor(public x: i32, public y: i32, public z: i32, public w: i32) {}
 
   add(other: Vec4i): Vec4i { return new Vec4i(this.x + other.x, this.y + other.y, this.z + other.z, this.w + other.w); }
   sub(other: Vec4i): Vec4i { return new Vec4i(this.x - other.x, this.y - other.y, this.z - other.z, this.w - other.w); }
@@ -399,13 +351,7 @@ export class Vec4i {
 // A two-component `u32` vector, WGSL `vec2<u32>`.
 @ValueType({ align: 8 })
 export class Vec2u {
-  x: u32;
-  y: u32;
-
-  constructor(x: u32, y: u32) {
-    this.x = x;
-    this.y = y;
-  }
+  constructor(public x: u32, public y: u32) {}
 
   add(other: Vec2u): Vec2u { return new Vec2u(this.x + other.x, this.y + other.y); }
   sub(other: Vec2u): Vec2u { return new Vec2u(this.x - other.x, this.y - other.y); }
@@ -428,15 +374,7 @@ export class Vec2u {
 // with `Vec3f`.
 @ValueType({ align: 16 })
 export class Vec3u {
-  x: u32;
-  y: u32;
-  z: u32;
-
-  constructor(x: u32, y: u32, z: u32) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-  }
+  constructor(public x: u32, public y: u32, public z: u32) {}
 
   add(other: Vec3u): Vec3u { return new Vec3u(this.x + other.x, this.y + other.y, this.z + other.z); }
   sub(other: Vec3u): Vec3u { return new Vec3u(this.x - other.x, this.y - other.y, this.z - other.z); }
@@ -461,17 +399,7 @@ export class Vec3u {
 // A four-component `u32` vector, WGSL `vec4<u32>`.
 @ValueType({ align: 16 })
 export class Vec4u {
-  x: u32;
-  y: u32;
-  z: u32;
-  w: u32;
-
-  constructor(x: u32, y: u32, z: u32, w: u32) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.w = w;
-  }
+  constructor(public x: u32, public y: u32, public z: u32, public w: u32) {}
 
   add(other: Vec4u): Vec4u { return new Vec4u(this.x + other.x, this.y + other.y, this.z + other.z, this.w + other.w); }
   sub(other: Vec4u): Vec4u { return new Vec4u(this.x - other.x, this.y - other.y, this.z - other.z, this.w - other.w); }
@@ -505,13 +433,7 @@ export class Vec4u {
 // host-shareable layout.
 @ValueType
 export class Vec2b {
-  x: boolean;
-  y: boolean;
-
-  constructor(x: boolean, y: boolean) {
-    this.x = x;
-    this.y = y;
-  }
+  constructor(public x: boolean, public y: boolean) {}
 
   any(): boolean { return this.x || this.y; }
   all(): boolean { return this.x && this.y; }
@@ -521,15 +443,7 @@ export class Vec2b {
 // A three-component boolean mask, WGSL `vec3<bool>`.
 @ValueType
 export class Vec3b {
-  x: boolean;
-  y: boolean;
-  z: boolean;
-
-  constructor(x: boolean, y: boolean, z: boolean) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-  }
+  constructor(public x: boolean, public y: boolean, public z: boolean) {}
 
   any(): boolean { return this.x || this.y || this.z; }
   all(): boolean { return this.x && this.y && this.z; }
@@ -539,17 +453,7 @@ export class Vec3b {
 // A four-component boolean mask, WGSL `vec4<bool>`.
 @ValueType
 export class Vec4b {
-  x: boolean;
-  y: boolean;
-  z: boolean;
-  w: boolean;
-
-  constructor(x: boolean, y: boolean, z: boolean, w: boolean) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.w = w;
-  }
+  constructor(public x: boolean, public y: boolean, public z: boolean, public w: boolean) {}
 
   any(): boolean { return this.x || this.y || this.z || this.w; }
   all(): boolean { return this.x && this.y && this.z && this.w; }
@@ -561,43 +465,19 @@ export class Vec4b {
 // `enable f16;`.
 @ValueType({ align: 4 })
 export class Vec2h {
-  x: f16;
-  y: f16;
-
-  constructor(x: f16, y: f16) {
-    this.x = x;
-    this.y = y;
-  }
+  constructor(public x: f16, public y: f16) {}
 }
 
 // A three-component `f16` vector, WGSL `vec3<f16>`. The C size is 8 and the WGSL size is 6.
 @ValueType({ align: 8 })
 export class Vec3h {
-  x: f16;
-  y: f16;
-  z: f16;
-
-  constructor(x: f16, y: f16, z: f16) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-  }
+  constructor(public x: f16, public y: f16, public z: f16) {}
 }
 
 // A four-component `f16` vector, WGSL `vec4<f16>`.
 @ValueType({ align: 8 })
 export class Vec4h {
-  x: f16;
-  y: f16;
-  z: f16;
-  w: f16;
-
-  constructor(x: f16, y: f16, z: f16, w: f16) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.w = w;
-  }
+  constructor(public x: f16, public y: f16, public z: f16, public w: f16) {}
 }
 
 // A `u32` cell for atomic access, WGSL `atomic<u32>`. `add`, `sub`, `min`, `max`, and `exchange`
@@ -605,11 +485,7 @@ export class Vec4h {
 // a workgroup variable.
 @ValueType({ align: 4 })
 export class AtomicU32 {
-  value: u32;
-
-  constructor(value: u32) {
-    this.value = value;
-  }
+  constructor(public value: u32) {}
 
   load(): u32 {
     return this.value;
@@ -658,11 +534,7 @@ export class AtomicU32 {
 // an atomic into a local, and cannot write one as a whole value.
 @ValueType({ align: 4 })
 export class AtomicI32 {
-  value: i32;
-
-  constructor(value: i32) {
-    this.value = value;
-  }
+  constructor(public value: i32) {}
 
   load(): i32 {
     return this.value;
@@ -711,13 +583,7 @@ export class AtomicI32 {
 // column-major.
 @ValueType({ align: 8 })
 export class Mat2x2f {
-  c0: Vec2f;
-  c1: Vec2f;
-
-  constructor(c0: Vec2f, c1: Vec2f) {
-    this.c0 = c0;
-    this.c1 = c1;
-  }
+  constructor(public c0: Vec2f, public c1: Vec2f) {}
 
   // The matrix-vector product, WGSL `m * v`. `mul` is the matrix-matrix form, and both emit the
   // same WGSL operator.
@@ -744,15 +610,7 @@ export class Mat2x2f {
 // size is 48 bytes, not 36.
 @ValueType({ align: 16 })
 export class Mat3x3f {
-  c0: Vec3f;
-  c1: Vec3f;
-  c2: Vec3f;
-
-  constructor(c0: Vec3f, c1: Vec3f, c2: Vec3f) {
-    this.c0 = c0;
-    this.c1 = c1;
-    this.c2 = c2;
-  }
+  constructor(public c0: Vec3f, public c1: Vec3f, public c2: Vec3f) {}
 
   mulVec(value: Vec3f): Vec3f {
     return new Vec3f(
@@ -782,17 +640,7 @@ export class Mat3x3f {
 // A 4x4 `f32` matrix, WGSL `mat4x4<f32>`. The size is 64 bytes.
 @ValueType({ align: 16 })
 export class Mat4x4f {
-  c0: Vec4f;
-  c1: Vec4f;
-  c2: Vec4f;
-  c3: Vec4f;
-
-  constructor(c0: Vec4f, c1: Vec4f, c2: Vec4f, c3: Vec4f) {
-    this.c0 = c0;
-    this.c1 = c1;
-    this.c2 = c2;
-    this.c3 = c3;
-  }
+  constructor(public c0: Vec4f, public c1: Vec4f, public c2: Vec4f, public c3: Vec4f) {}
 
   mulVec(value: Vec4f): Vec4f {
     return new Vec4f(
@@ -938,54 +786,29 @@ export function mat4x4fIdentity(): Mat4x4f {
 // writes it with `Context.bytesOf` into a buffer that carries `GPUBufferUsage.INDIRECT`.
 @ValueType
 export class DispatchIndirectArgs {
-  x: u32;
-  y: u32;
-  z: u32;
-
-  constructor(x: u32, y: u32, z: u32) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-  }
+  constructor(public x: u32, public y: u32, public z: u32) {}
 }
 
 // The argument block of an indirect draw, 16 bytes in the order WebGPU fixes.
 @ValueType
 export class DrawIndirectArgs {
-  vertexCount: u32;
-  instanceCount: u32;
-  firstVertex: u32;
-  firstInstance: u32;
-
-  constructor(vertexCount: u32, instanceCount: u32, firstVertex: u32, firstInstance: u32) {
-    this.vertexCount = vertexCount;
-    this.instanceCount = instanceCount;
-    this.firstVertex = firstVertex;
-    this.firstInstance = firstInstance;
-  }
+  constructor(
+    public vertexCount: u32,
+    public instanceCount: u32,
+    public firstVertex: u32,
+    public firstInstance: u32,
+  ) {}
 }
 
 // The argument block of an indirect indexed draw, 20 bytes. `baseVertex` is signed, and it
 // shifts every index the draw reads.
 @ValueType
 export class DrawIndexedIndirectArgs {
-  indexCount: u32;
-  instanceCount: u32;
-  firstIndex: u32;
-  baseVertex: i32;
-  firstInstance: u32;
-
   constructor(
-    indexCount: u32,
-    instanceCount: u32,
-    firstIndex: u32,
-    baseVertex: i32,
-    firstInstance: u32,
-  ) {
-    this.indexCount = indexCount;
-    this.instanceCount = instanceCount;
-    this.firstIndex = firstIndex;
-    this.baseVertex = baseVertex;
-    this.firstInstance = firstInstance;
-  }
+    public indexCount: u32,
+    public instanceCount: u32,
+    public firstIndex: u32,
+    public baseVertex: i32,
+    public firstInstance: u32,
+  ) {}
 }

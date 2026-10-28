@@ -239,6 +239,12 @@ fn synthetic_result_enum_trap_names_its_converter() {
     assert!(generated.source.contains(
         "print(\"fromSubscriptTypegpuErrorRecord: unexpected result enum\");\n  unreachable();"
     ));
+    assert!(generated.source.contains(
+        "export class GPUError {\n  constructor(readonly type: GPUErrorType, readonly message: string) {}\n}"
+    ));
+    assert!(generated.source.contains(
+        "export class GPUDeviceLostInfo {\n  constructor(readonly reason: GPUDeviceLostReason, readonly message: string) {}\n}"
+    ));
 }
 
 #[test]

@@ -134,6 +134,25 @@ fn wire_enum_aliases_are_current() {
 #[test]
 fn webgpu_api_is_current() {
     compare_libclang_output("lib/webgpu.ts");
+    let regeneration = regeneration();
+    if regeneration.libclang_pending {
+        return;
+    }
+    let api = read(&regeneration.scratch.0.join("lib/webgpu.ts"));
+    for expected in [
+        "constructor(public instance: SubscriptTypegpuInstance, public buffer: SubscriptTypegpuBuffer) {}",
+        "private constructor(private instance: SubscriptTypegpuInstance, private device: SubscriptTypegpuDevice) {}",
+        "constructor(readonly vendor: string, readonly architecture: string, readonly device: string, readonly description: string) {}",
+        "readonly maxUniformBufferBindingSize: u64",
+        "readonly maxStorageBufferBindingSize: u64",
+        "readonly maxBufferSize: u64",
+        "    index += 1;",
+        "constructor(instance: SubscriptTypegpuInstance, device: SubscriptTypegpuDevice) {\n    this.instance = instance;",
+        "constructor(instance: SubscriptTypegpuInstance, queue: SubscriptTypegpuQueue) {\n    this.instance = instance;",
+    ] {
+        assert!(api.contains(expected), "API form differs: {expected}");
+    }
+    assert!(!api.contains("index = index + 1;"));
 }
 
 #[test]

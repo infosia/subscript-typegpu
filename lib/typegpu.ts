@@ -210,11 +210,7 @@ export class Texture2d<T> {
  * traps with TX3 inside a sample call.
  */
 export class Sampler {
-  private filterMode: string;
-
-  constructor(filterMode: string) {
-    this.filterMode = filterMode;
-  }
+  constructor(private filterMode: string) {}
 
   isNearest(): boolean {
     return this.filterMode == "nearest";
@@ -503,17 +499,7 @@ export class WriteStorageTexture2dArray<F> {
  * The class owns the `GPUBuffer`, and `dispose()` releases it.
  */
 export class Buffer<T> {
-  buffer: GPUBuffer;
-  elementSize: u32;
-  count: u32;
-  usage: u64;
-
-  constructor(buffer: GPUBuffer, elementSize: u32, count: u32, usage: u64) {
-    this.buffer = buffer;
-    this.elementSize = elementSize;
-    this.count = count;
-    this.usage = usage;
-  }
+  constructor(public buffer: GPUBuffer, public elementSize: u32, public count: u32, public usage: u64) {}
 
   write(queue: GPUQueue, elementIndex: u32, bytes: u8[]): void {
     if ((this.usage & GPUBufferUsage.COPY_DST) == 0) {
@@ -636,7 +622,7 @@ export class Buffer<T> {
       staging.dispose();
       authorTrap("BF9", "Buffer.read", `elementIndex=${elementIndex} elementCount=${elementCount} count=${this.count}`);
     }
-    const bytes: u8[] = readBuffer<T>(staging, 0, elementCount);
+    const bytes: u8[] = readBuffer(staging, 0, elementCount);
     staging.handle().unmap();
     staging.dispose();
     return bytes;
@@ -706,7 +692,7 @@ export function createBuffer<T>(
   usage: u64,
   label: string,
 ): Buffer<T> {
-  return new Buffer<T>(
+  return new Buffer(
     device.createBuffer({
       size: (elementSize as u64) * (count as u64),
       usage,
@@ -729,7 +715,7 @@ export function createBufferHost<T>(
   usage: u64,
   label: string,
 ): Buffer<T> {
-  return new Buffer<T>(
+  return new Buffer(
     device.createBuffer({
       size: (elementSize as u64) * (count as u64),
       usage,
@@ -747,25 +733,13 @@ export function createBufferHost<T>(
  * The host lane builds one per invocation, and a program never constructs one itself.
  */
 export class ComputeInvocation {
-  globalId: Vec3u;
-  localId: Vec3u;
-  workgroupId: Vec3u;
-  numWorkgroups: Vec3u;
-  localIndex: u32;
-
   constructor(
-    globalId: Vec3u,
-    localId: Vec3u,
-    workgroupId: Vec3u,
-    numWorkgroups: Vec3u,
-    localIndex: u32,
-  ) {
-    this.globalId = globalId;
-    this.localId = localId;
-    this.workgroupId = workgroupId;
-    this.numWorkgroups = numWorkgroups;
-    this.localIndex = localIndex;
-  }
+    public globalId: Vec3u,
+    public localId: Vec3u,
+    public workgroupId: Vec3u,
+    public numWorkgroups: Vec3u,
+    public localIndex: u32,
+  ) {}
 }
 
 /**
@@ -774,13 +748,7 @@ export class ComputeInvocation {
  * the kernel reads.
  */
 export class VertexInvocation {
-  vertexIndex: u32;
-  instanceIndex: u32;
-
-  constructor(vertexIndex: u32, instanceIndex: u32) {
-    this.vertexIndex = vertexIndex;
-    this.instanceIndex = instanceIndex;
-  }
+  constructor(public vertexIndex: u32, public instanceIndex: u32) {}
 }
 
 /**
@@ -789,11 +757,7 @@ export class VertexInvocation {
  * The fragment position arrives as the varyings' `position` field, never through this class.
  */
 export class FragmentInvocation {
-  frontFacing: boolean;
-
-  constructor(frontFacing: boolean) {
-    this.frontFacing = frontFacing;
-  }
+  constructor(public frontFacing: boolean) {}
 }
 
 /**
@@ -819,11 +783,8 @@ export class Uniform<T> {
  */
 export class Storage<T> {
   readonly [index: u32]: T;
-  private values: T[];
 
-  constructor(values: T[]) {
-    this.values = values;
-  }
+  constructor(private values: T[]) {}
 
   get(index: u32): T {
     return this.values[index as i32];
@@ -841,11 +802,8 @@ export class Storage<T> {
  */
 export class MutStorage<T> {
   [index: u32]: T;
-  private values: T[];
 
-  constructor(values: T[]) {
-    this.values = values;
-  }
+  constructor(private values: T[]) {}
 
   get(index: u32): T {
     return this.values[index as i32];
@@ -865,11 +823,7 @@ export class MutStorage<T> {
  * A kernel reads and writes it as `x.$` and `x.$ = value`, and every invocation holds its own copy.
  */
 export class PrivateVar<T> {
-  private value: T;
-
-  constructor(value: T) {
-    this.value = value;
-  }
+  constructor(private value: T) {}
 
   get $(): T {
     return this.value;
@@ -941,7 +895,7 @@ export class WorkgroupArray<T> {
  * The generator folds `init`, and an initializer it cannot fold is a K20 diagnostic.
  */
 export function privateVar<T>(init: T): PrivateVar<T> {
-  return new PrivateVar<T>(init);
+  return new PrivateVar(init);
 }
 
 /**
@@ -949,7 +903,7 @@ export function privateVar<T>(init: T): PrivateVar<T> {
  * WGSL gives a workgroup variable no initializer, so a kernel writes it before it reads it.
  */
 export function workgroupVar<T>(): WorkgroupVar<T> {
-  return new WorkgroupVar<T>();
+  return new WorkgroupVar();
 }
 
 /**
@@ -957,7 +911,7 @@ export function workgroupVar<T>(): WorkgroupVar<T> {
  * `n` must be a literal, because the generator writes it into the WGSL array type.
  */
 export function workgroupArray<T>(n: u32): WorkgroupArray<T> {
-  return new WorkgroupArray<T>(n);
+  return new WorkgroupArray(n);
 }
 
 /**
@@ -1147,7 +1101,7 @@ export function simulateCompute<L>(
   hostRunnable: boolean,
 ): void {
   requireHostRunnable("simulateCompute", spec, hostRunnable);
-  simulateComputeLoop<L>(kernel, res, spec, workgroups, [0, 0, 0], false);
+  simulateComputeLoop(kernel, res, spec, workgroups, [0, 0, 0], false);
 }
 
 /**
@@ -1171,7 +1125,7 @@ export function simulateComputeThreads<L>(
     (y + spec.workgroupSize[1] - 1) / spec.workgroupSize[1],
     (z + spec.workgroupSize[2] - 1) / spec.workgroupSize[2],
   ];
-  simulateComputeLoop<L>(kernel, res, spec, workgroups, [x, y, z], true);
+  simulateComputeLoop(kernel, res, spec, workgroups, [x, y, z], true);
 }
 
 /**
@@ -1560,7 +1514,7 @@ export class ComputePipeline {
       if (this.guardGroups[index] == group) {
         return this.guardBuffers[index];
       }
-      index = index + 1;
+      index += 1;
     }
     return null;
   }
@@ -1589,7 +1543,7 @@ export class ComputePipeline {
     let index: i32 = 0;
     while (index < this.guardBuffers.length) {
       queue.writeBuffer(this.guardBuffers[index], 0, bytes);
-      index = index + 1;
+      index += 1;
     }
   }
 
@@ -1605,7 +1559,7 @@ export class ComputePipeline {
     let group: i32 = 0;
     while (group < groups.length) {
       pass.setBindGroup(group as u32, groups[group]);
-      group = group + 1;
+      group += 1;
     }
     pass.dispatchWorkgroups(x, y, z);
     pass.end();
@@ -1660,7 +1614,7 @@ export class ComputePipeline {
     let group: i32 = 0;
     while (group < groups.length) {
       pass.setBindGroup(group as u32, groups[group]);
-      group = group + 1;
+      group += 1;
     }
     pass.dispatchWorkgroupsIndirect(buffer, offset);
     pass.end();
@@ -1692,7 +1646,7 @@ export class ComputePipeline {
     let group: i32 = 0;
     while (group < groups.length) {
       pass.setBindGroup(group as u32, groups[group]);
-      group = group + 1;
+      group += 1;
     }
     pass.dispatchWorkgroups(x, y, z);
     pass.end();
@@ -1702,7 +1656,7 @@ export class ComputePipeline {
     let index: i32 = 0;
     while (index < this.guardBuffers.length) {
       this.guardBuffers[index].dispose();
-      index = index + 1;
+      index += 1;
     }
     if (this.guardQueue != null) {
       if (this.guardQueueOwned) {
@@ -1725,13 +1679,7 @@ export class ComputePipeline {
  * `dispose()` destroys the query set and releases the resolve buffer.
  */
 export class TimestampPair {
-  private queries: GPUQuerySet;
-  private resolved: GPUBuffer;
-
-  constructor(queries: GPUQuerySet, resolved: GPUBuffer) {
-    this.queries = queries;
-    this.resolved = resolved;
-  }
+  constructor(private queries: GPUQuerySet, private resolved: GPUBuffer) {}
 
   querySet(): GPUQuerySet {
     return this.queries;
@@ -1787,13 +1735,7 @@ export function createTimestampPair(device: GPUDevice): TimestampPair | null {
  * When the declaration names no `indexFormat`, `setIndexBuffer` traps with RN18.
  */
 export class RenderPipeline {
-  private pipeline: GPURenderPipeline;
-  private indexFormat: GPUIndexFormat;
-
-  constructor(pipeline: GPURenderPipeline, indexFormat: GPUIndexFormat) {
-    this.pipeline = pipeline;
-    this.indexFormat = indexFormat;
-  }
+  constructor(private pipeline: GPURenderPipeline, private indexFormat: GPUIndexFormat) {}
 
   bindGroupLayout(group: u32): GPUBindGroupLayout {
     return this.pipeline.getBindGroupLayout(group);
@@ -1808,12 +1750,12 @@ export class RenderPipeline {
     let group: i32 = 0;
     while (group < groups.length) {
       pass.setBindGroup(group as u32, groups[group]);
-      group = group + 1;
+      group += 1;
     }
     let slot: i32 = 0;
     while (slot < vertexBuffers.length) {
       pass.setVertexBuffer(slot as u32, vertexBuffers[slot], 0, vertexBuffers[slot].size);
-      slot = slot + 1;
+      slot += 1;
     }
   }
 
@@ -1895,10 +1837,10 @@ function nativeBindGroupLayoutEntries(
       } else {
         authorTrap("TX5", "bind group layout", `binding=${source.binding} has unknown kind=${source.kind}`);
       }
-      binding = binding + 1;
+      binding += 1;
     }
     groups.push(entries);
-    group = group + 1;
+    group += 1;
   }
   return groups;
 }
@@ -1911,7 +1853,7 @@ function createNativeBindGroupLayouts(
   let group: i32 = 0;
   while (group < entries.length) {
     nativeLayouts.push(device.createBindGroupLayout({ entries: entries[group] }));
-    group = group + 1;
+    group += 1;
   }
   return nativeLayouts;
 }
@@ -1924,7 +1866,7 @@ function createNativeBindGroupLayoutsHost(
   let group: i32 = 0;
   while (group < entries.length) {
     nativeLayouts.push(device.createBindGroupLayout({ entries: entries[group] }));
-    group = group + 1;
+    group += 1;
   }
   return nativeLayouts;
 }
@@ -1955,14 +1897,14 @@ function nativeVertexBufferLayouts(
         offset: source.offset,
         shaderLocation: source.shaderLocation,
       });
-      attribute = attribute + 1;
+      attribute += 1;
     }
     nativeVertexLayouts.push({
       arrayStride: vertexLayouts[slot].arrayStride,
       stepMode: vertexLayouts[slot].stepMode,
       attributes,
     });
-    slot = slot + 1;
+    slot += 1;
   }
   return nativeVertexLayouts;
 }
@@ -2043,9 +1985,9 @@ export function createComputePipeline(
           usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
         }));
       }
-      guardEntry = guardEntry + 1;
+      guardEntry += 1;
     }
-    guardGroup = guardGroup + 1;
+    guardGroup += 1;
   }
   const layoutEntries: GPUBindGroupLayoutEntry[][] = nativeBindGroupLayoutEntries(layouts);
   const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayouts(device, layoutEntries);
@@ -2055,7 +1997,7 @@ export function createComputePipeline(
   let group: i32 = 0;
   while (group < nativeLayouts.length) {
     nativeLayouts[group].dispose();
-    group = group + 1;
+    group += 1;
   }
   const guardQueue: GPUQueue | null = guardBuffers.length > 0 ? device.queue : null;
   return finishComputePipeline(
@@ -2094,9 +2036,9 @@ export function createComputePipelineHost(
           usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
         }));
       }
-      guardEntry = guardEntry + 1;
+      guardEntry += 1;
     }
-    guardGroup = guardGroup + 1;
+    guardGroup += 1;
   }
   const layoutEntries: GPUBindGroupLayoutEntry[][] = nativeBindGroupLayoutEntries(layouts);
   const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayoutsHost(device, layoutEntries);
@@ -2106,7 +2048,7 @@ export function createComputePipelineHost(
   let group: i32 = 0;
   while (group < nativeLayouts.length) {
     nativeLayouts[group].dispose();
-    group = group + 1;
+    group += 1;
   }
   const guardQueue: GPUQueue | null = guardBuffers.length > 0 ? device.queue() : null;
   return finishComputePipeline(
@@ -2150,7 +2092,7 @@ export function createRenderPipeline(
   group = 0;
   while (group < nativeLayouts.length) {
     nativeLayouts[group].dispose();
-    group = group + 1;
+    group += 1;
   }
   return finishRenderPipeline(pipeline, spec);
 }
@@ -2185,7 +2127,7 @@ export function createRenderPipelineHost(
   let group: i32 = 0;
   while (group < nativeLayouts.length) {
     nativeLayouts[group].dispose();
-    group = group + 1;
+    group += 1;
   }
   return finishRenderPipeline(pipeline, spec);
 }
@@ -2206,8 +2148,8 @@ function bindGroupEntries(
   let authorCount: i32 = 0;
   let countIndex: i32 = 0;
   while (countIndex < spec.entries.length) {
-    if (spec.entries[countIndex].kind != "guard") authorCount = authorCount + 1;
-    countIndex = countIndex + 1;
+    if (spec.entries[countIndex].kind != "guard") authorCount += 1;
+    countIndex += 1;
   }
   if (authorCount != resources.length) {
     authorTrap("PI9", "createBindGroup", `expected ${authorCount} resources but received ${resources.length}`);
@@ -2226,21 +2168,21 @@ function bindGroupEntries(
       }
     } else {
       resource = resources[resourceIndex];
-      resourceIndex = resourceIndex + 1;
+      resourceIndex += 1;
     }
     let actual: string = "none";
     let fieldCount: u32 = 0;
     if (resource.buffer != null) {
       actual = "buffer";
-      fieldCount = fieldCount + 1;
+      fieldCount += 1;
     }
     if (resource.textureView != null) {
       actual = "texture";
-      fieldCount = fieldCount + 1;
+      fieldCount += 1;
     }
     if (resource.sampler != null) {
       actual = "sampler";
-      fieldCount = fieldCount + 1;
+      fieldCount += 1;
     }
     if (fieldCount != 1) {
       authorTrap("TX4", "createBindGroup", `binding=${specEntry.binding} resourceFields=${fieldCount}`);
@@ -2263,7 +2205,7 @@ function bindGroupEntries(
       textureView: resource.textureView,
       sampler: resource.sampler,
     });
-    index = index + 1;
+    index += 1;
   }
   return entries;
 }

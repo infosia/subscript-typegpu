@@ -10,13 +10,7 @@ import {
 // A rounded upper endpoint clamps to the largest `f32` below 1.
 @ValueType
 export class RandomF32 {
-  state: u32;
-  value: f32;
-
-  constructor(state: u32, value: f32) {
-    this.state = state;
-    this.value = value;
-  }
+  constructor(public state: u32, public value: f32) {}
 }
 
 // The kernel expression set has no `^`, so the exclusive or comes from `|`, `&`, and `~`.
