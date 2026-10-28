@@ -628,3 +628,20 @@ subscript-typegpu-facade` run replaces the uplifted
 changes from 151734270 to 151734393 with no rebuild). Each ship-tier
 child process runs that command, so a child that links while another
 child runs it can find no archive.
+
+Fix: `build_staticlib` and `facade_link_inputs` in
+`crates/harness/src/lib.rs` run the nested cargo command and copy the
+archive under an exclusive lock on
+`target/ship-build/link-archives.lock`. The copy goes to an immutable
+content-keyed path under `target/ship-build/link-archives/`, and the
+ship link reads that path. A process holds a shared lock on the
+version it uses until it exits, and an unused version is removed, so
+the directory holds one version per live archive content. Three unit
+tests cover it: two show that the returned archive keeps its inode
+after a later nested cargo run (red against the old code: the inode
+changed), and one covers a content change, a version in use, and the
+removal of an unused version. `target/ship-build` measured 255 MB
+before and after a differential run. Windows is not run.
+
+Evidence: `tools/gate.sh --require-backend` with the yawgpu library,
+`gate: green`, 295 passed, 0 failed, 1 ignored, 336.1 s wall.

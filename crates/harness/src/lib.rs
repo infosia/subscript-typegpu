@@ -20,6 +20,8 @@ pub mod native_symbols_generated;
 
 use std::collections::VecDeque;
 use std::ffi::OsStr;
+use std::fs::{File, OpenOptions, TryLockError};
+use std::hash::{Hash, Hasher};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -259,11 +261,106 @@ fn artifact_path(output: &Output, package: &str) -> Result<PathBuf, String> {
     ))
 }
 
-/// Builds one package as a release static library and returns the archive path.
-///
-/// The build writes into `target/ship-build`, which the cold-build measurement counts as its own
-/// step (T12).
-fn build_staticlib(package: &str) -> Result<PathBuf, String> {
+/// An immutable archive with a shared lease that protects it from cache cleanup.
+struct LinkArchive {
+    path: PathBuf,
+    _lease: File,
+}
+
+/// The facade link arguments and the lease for their archive.
+struct FacadeLinkInputs {
+    inputs: Vec<String>,
+    _archive: LinkArchive,
+}
+
+/// Serializes nested cargo commands and archive publication across processes.
+fn lock_ship_build() -> Result<File, String> {
+    let target = repository_root().join("target/ship-build");
+    std::fs::create_dir_all(&target).map_err(|error| format!("create ship target: {error}"))?;
+    let lock = open_archive_lock(&target.join("link-archives.lock"))?;
+    lock.lock()
+        .map_err(|error| format!("lock ship build: {error}"))?;
+    Ok(lock)
+}
+
+/// Opens a persistent lock file without a content change.
+fn open_archive_lock(path: &Path) -> Result<File, String> {
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)
+        .map_err(|error| format!("open archive lock {}: {error}", path.display()))
+}
+
+/// Copies an archive to an immutable content key under the ship-build lock.
+/// Shared leases retain active versions. An exclusive lease permits removal of an unused version.
+/// A byte comparison rejects a hash collision before any archive reaches the linker.
+fn retain_link_archive(source: &Path, package: &str) -> Result<LinkArchive, String> {
+    let directory = repository_root()
+        .join("target/ship-build/link-archives")
+        .join(package);
+    std::fs::create_dir_all(&directory)
+        .map_err(|error| format!("create archive directory: {error}"))?;
+    let contents = std::fs::read(source)
+        .map_err(|error| format!("read archive {}: {error}", source.display()))?;
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    contents.hash(&mut hash);
+    let extension = source.extension().unwrap_or_else(|| OsStr::new("a"));
+    let path = directory
+        .join(format!("{:016x}", hash.finish()))
+        .with_extension(extension);
+    if path.exists() {
+        let existing =
+            std::fs::read(&path).map_err(|error| format!("read retained archive: {error}"))?;
+        if existing != contents {
+            return Err(format!("archive content key collision: {}", path.display()));
+        }
+    } else {
+        let temporary = directory.join("archive.tmp");
+        std::fs::write(&temporary, &contents)
+            .map_err(|error| format!("write archive copy: {error}"))?;
+        std::fs::rename(&temporary, &path)
+            .map_err(|error| format!("publish archive copy: {error}"))?;
+    }
+    let lease = open_archive_lock(&path.with_extension("lock"))?;
+    lease
+        .lock_shared()
+        .map_err(|error| format!("retain archive lease: {error}"))?;
+    for entry in
+        std::fs::read_dir(&directory).map_err(|error| format!("read archive directory: {error}"))?
+    {
+        let candidate = entry
+            .map_err(|error| format!("read archive entry: {error}"))?
+            .path();
+        if candidate == path || candidate.extension() != Some(extension) {
+            continue;
+        }
+        let lease_path = candidate.with_extension("lock");
+        let unused = open_archive_lock(&lease_path)?;
+        match unused.try_lock() {
+            Ok(()) => {
+                std::fs::remove_file(&candidate)
+                    .map_err(|error| format!("remove unused archive: {error}"))?;
+                drop(unused);
+                std::fs::remove_file(&lease_path)
+                    .map_err(|error| format!("remove unused archive lease: {error}"))?;
+            }
+            Err(TryLockError::WouldBlock) => {}
+            Err(error) => return Err(format!("lock unused archive: {error}")),
+        }
+    }
+    Ok(LinkArchive {
+        path,
+        _lease: lease,
+    })
+}
+
+/// Builds a release static library and retains an immutable copy under the ship-build lock.
+/// The returned lease protects the copy until the caller releases it.
+fn build_staticlib(package: &str) -> Result<LinkArchive, String> {
+    let _lock = lock_ship_build()?;
     let target = repository_root().join("target/ship-build");
     let mut command = cargo_command();
     command.args([
@@ -277,14 +374,15 @@ fn build_staticlib(package: &str) -> Result<PathBuf, String> {
     ]);
     command.arg(target);
     let output = run_nested_cargo(&mut command, &format!("build {package}"))?;
-    artifact_path(&output, package)
+    retain_link_archive(&artifact_path(&output, package)?, package)
 }
 
-/// Builds the facade archive and returns it with the platform libraries that it needs.
+/// Builds an immutable facade archive and retains its lease with the platform link arguments.
 ///
 /// The facade links `libloading` and the platform dynamic loader (L5), which the C link of a
 /// ship-tier program must repeat. `cargo rustc --print native-static-libs` names them.
-fn facade_link_inputs() -> Result<Vec<String>, String> {
+fn facade_link_inputs() -> Result<FacadeLinkInputs, String> {
+    let _lock = lock_ship_build()?;
     let target = repository_root().join("target/ship-build");
     let mut command = cargo_command();
     command.args([
@@ -303,7 +401,10 @@ fn facade_link_inputs() -> Result<Vec<String>, String> {
         &mut command,
         "build facade and query native static libraries",
     )?;
-    let facade = artifact_path(&output, "subscript-typegpu-facade")?;
+    let facade = retain_link_archive(
+        &artifact_path(&output, "subscript-typegpu-facade")?,
+        "subscript-typegpu-facade",
+    )?;
     for line in String::from_utf8_lossy(&output.stderr)
         .lines()
         .chain(String::from_utf8_lossy(&output.stdout).lines())
@@ -312,21 +413,27 @@ fn facade_link_inputs() -> Result<Vec<String>, String> {
             // A JSON message holds the whole note on one line. The list ends at the first
             // escaped newline.
             let libraries = libraries.split("\\n").next().unwrap_or(libraries);
-            let mut inputs = vec![facade.to_string_lossy().into_owned()];
+            let mut inputs = vec![facade.path.to_string_lossy().into_owned()];
             inputs.extend(libraries.split_whitespace().map(str::to_owned));
-            return Ok(inputs);
+            return Ok(FacadeLinkInputs {
+                inputs,
+                _archive: facade,
+            });
         }
     }
     Err("cargo rustc reported no native static libraries for the facade".to_owned())
 }
 
-/// Builds the ship-tier runtime archive in the dedicated target directory.
+/// Returns an immutable runtime archive path and retains its lease for the process lifetime.
+/// The first call builds the archive. Later calls reuse the same path.
 #[doc(hidden)]
 pub fn ensure_runtime_staticlib() -> Result<PathBuf, String> {
-    static RUNTIME: OnceLock<Result<PathBuf, String>> = OnceLock::new();
+    static RUNTIME: OnceLock<Result<LinkArchive, String>> = OnceLock::new();
     RUNTIME
         .get_or_init(|| build_staticlib("subscript-runtime"))
-        .clone()
+        .as_ref()
+        .map(|archive| archive.path.clone())
+        .map_err(Clone::clone)
 }
 
 /// Returns the directory that holds the generated `subscript-typegpu.h`.
@@ -588,10 +695,15 @@ fn facade_counting_library() -> NativeLibrary {
     }
 }
 
-/// Builds and returns the facade archive and its platform libraries.
+/// Returns an immutable facade archive path and its platform libraries.
+/// The first call builds the archive and retains its lease for the process lifetime.
 pub fn ship_link_inputs() -> Result<Vec<String>, String> {
-    static INPUTS: OnceLock<Result<Vec<String>, String>> = OnceLock::new();
-    INPUTS.get_or_init(facade_link_inputs).clone()
+    static INPUTS: OnceLock<Result<FacadeLinkInputs, String>> = OnceLock::new();
+    INPUTS
+        .get_or_init(facade_link_inputs)
+        .as_ref()
+        .map(|inputs| inputs.inputs.clone())
+        .map_err(Clone::clone)
 }
 
 /// Runs one program through the development JIT.
@@ -648,6 +760,72 @@ mod tests {
     )]
 
     use super::*;
+
+    fn assert_archive_unchanged(path: &Path, rebuild: impl FnOnce()) {
+        let contents = std::fs::read(path).expect("read archive");
+        #[cfg(unix)]
+        let inode = {
+            use std::os::unix::fs::MetadataExt;
+            std::fs::metadata(path).expect("archive metadata").ino()
+        };
+        rebuild();
+        assert_eq!(std::fs::read(path).expect("archive still exists"), contents);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            assert_eq!(
+                std::fs::metadata(path).expect("archive metadata").ino(),
+                inode
+            );
+        }
+    }
+
+    #[test]
+    fn archive_cache_retains_active_versions_and_removes_unused_versions() {
+        let _lock = lock_ship_build().expect("ship build lock");
+        let package = "archive-cache-test";
+        let directory = repository_root()
+            .join("target/ship-build/link-archives")
+            .join(package);
+        let source = repository_root().join("target/ship-build/archive-cache-test.a");
+        std::fs::write(&source, b"first build").expect("first source archive");
+        let first = retain_link_archive(&source, package).expect("first archive copy");
+        assert_archive_unchanged(&first.path, || {
+            let repeated = retain_link_archive(&source, package).expect("reuse archive copy");
+            assert_eq!(first.path, repeated.path);
+        });
+        std::fs::write(&source, b"next build!").expect("rebuilt source archive");
+        let next = retain_link_archive(&source, package).expect("rebuilt archive copy");
+        assert_ne!(first.path, next.path);
+        assert_eq!(std::fs::read(&first.path).unwrap(), b"first build");
+        assert_eq!(std::fs::read(&next.path).unwrap(), b"next build!");
+        let old_path = first.path.clone();
+        drop(first);
+        let repeated = retain_link_archive(&source, package).expect("remove unused archive");
+        assert_eq!(next.path, repeated.path);
+        assert!(!old_path.exists());
+        assert!(!old_path.with_extension("lock").exists());
+        drop(next);
+        drop(repeated);
+        std::fs::remove_dir_all(directory).expect("remove archive test cache");
+        std::fs::remove_file(source).expect("remove archive test source");
+    }
+
+    #[test]
+    fn facade_archive_survives_nested_cargo() {
+        let inputs = ship_link_inputs().expect("facade link inputs");
+        assert_archive_unchanged(Path::new(&inputs[0]), || {
+            facade_link_inputs().expect("repeat facade cargo command");
+        });
+    }
+
+    #[test]
+    fn runtime_archive_survives_nested_cargo() {
+        let path = ensure_runtime_staticlib().expect("runtime archive");
+        assert_archive_unchanged(&path, || {
+            build_staticlib("subscript-runtime").expect("repeat runtime cargo command");
+        });
+    }
 
     #[test]
     fn coverage_ignores_out_of_range_indices_and_counts_valid_calls() {
