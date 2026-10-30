@@ -104,6 +104,42 @@ fn constructor_arguments<T: Clone>(
         .collect()
 }
 
+/// Returns the conditional assignment and its branch for a boolean place (K7).
+fn logical_assignment(expr: &Expr) -> Option<(&Expr, &Expr, bool)> {
+    fn same_place(a: &Expr, b: &Expr) -> bool {
+        match (&a.kind, &b.kind) {
+            (ExprKind::Local(a, _, _), ExprKind::Local(b, _, _)) => a == b,
+            (ExprKind::Field { obj: a, name: an }, ExprKind::Field { obj: b, name: bn }) => {
+                an == bn && same_place(a, b)
+            }
+            _ => false,
+        }
+    }
+    let ExprKind::Cond { cond, then, els } = &expr.kind else {
+        return None;
+    };
+    if cond.ty != Type::Bool {
+        return None;
+    }
+    for (assignment, read, negated) in [
+        (then.as_ref(), els.as_ref(), false),
+        (els.as_ref(), then.as_ref(), true),
+    ] {
+        if let ExprKind::Assign {
+            op: None,
+            update: None,
+            target,
+            ..
+        } = &assignment.kind
+        {
+            if same_place(cond, read) && same_place(cond, target) {
+                return Some((cond, assignment, negated));
+            }
+        }
+    }
+    None
+}
+
 /// Statements that must run before an expression, each with its indent relative to the statement.
 ///
 /// A lowered conditional puts its `if`/`else` here, so both sides keep short-circuit evaluation
@@ -182,7 +218,87 @@ fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
 /// Returns the module-level function of this declaration symbol, and `None` when the module
 /// declares none.
 fn function<'a>(module: &'a Module, symbol: &Symbol) -> Option<&'a Function> {
-    crate::pipeline::function(module, symbol)
+    crate::pipeline::function(module, symbol).or_else(|| {
+        module.classes.iter().find_map(|class| {
+            class
+                .methods
+                .iter()
+                .find(|method| method_symbol(class, method) == *symbol)
+        })
+    })
+}
+
+/// Gives a value method a declaration identity within its class (K33).
+fn method_symbol(class: &subscript_compiler::hir::ClassDef, method: &Function) -> Symbol {
+    Symbol::from_full_text(format!(
+        "{}::{}",
+        class.symbol.full_text(),
+        method.symbol.full_text()
+    ))
+}
+
+/// Returns the receiver class of a method body.
+fn receiver_class<'a>(
+    module: &'a Module,
+    function: &Function,
+) -> Option<&'a subscript_compiler::hir::ClassDef> {
+    module.classes.iter().find(|class| {
+        class
+            .methods
+            .iter()
+            .any(|method| std::ptr::eq(method, function))
+    })
+}
+
+/// Uses source type names for vector, matrix, and schema arguments (K33).
+fn helper_name(symbol: &Symbol) -> String {
+    let source = symbol.source_name();
+    let mut name = source
+        .replace("::", "_")
+        .replace(['<', ','], "_")
+        .replace(['>', ' '], "");
+    fn identity(text: &str, kind: &str) -> Option<String> {
+        let marker = format!("[[identity:{kind}:");
+        let encoded = text.split(&marker).nth(1)?.split_once("]]")?.0;
+        let bytes = encoded
+            .as_bytes()
+            .chunks_exact(2)
+            .map(|pair| {
+                std::str::from_utf8(pair)
+                    .ok()
+                    .and_then(|digits| u8::from_str_radix(digits, 16).ok())
+            })
+            .collect::<Option<Vec<_>>>()?;
+        String::from_utf8(bytes).ok()
+    }
+    let instance = identity(symbol.full_text(), "instance");
+    let origin = instance.as_deref().unwrap_or(symbol.full_text());
+    if let Some(path) = identity(origin, "local") {
+        if let Some((path, _)) = path.rsplit_once('#') {
+            let suffix = source
+                .find('<')
+                .and_then(|start| source.get(start..))
+                .unwrap_or("");
+            name = format!("{}{suffix}", path.replace('/', "_"))
+                .replace(['<', ','], "_")
+                .replace(['>', ' '], "");
+        }
+    }
+    name
+}
+
+/// Selects an enum representation from its checked members (K32).
+fn enum_type(
+    module: &Module,
+    id: subscript_compiler::types::EnumId,
+    pos: &Pos,
+) -> Result<&'static str, Diagnostic> {
+    let definition = module
+        .enums
+        .get(id.0)
+        .ok_or_else(|| generator_diagnostic("enum disappeared from typed HIR", pos.clone()))?;
+    let signed = definition.members.iter().any(|(_, value)| *value < 0);
+    Ok(if signed { "i32" } else { "u32" })
 }
 
 /// Returns the class name of a class type, and `None` for every other type.
@@ -916,6 +1032,7 @@ pub(crate) fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String,
         Type::I32 => "i32".to_owned(),
         Type::U32 => "u32".to_owned(),
         Type::Bool => "bool".to_owned(),
+        Type::Enum(id) => enum_type(module, *id, pos)?.to_owned(),
         Type::F16 => {
             return Err(diagnostic(
                 "K4",
@@ -1845,7 +1962,7 @@ fn validate_statement_subset(statements: &[Stmt]) -> Result<(), Diagnostic> {
                     pos.clone(),
                 ));
             }
-            Stmt::GeneratorForOf { pos, .. } | Stmt::DoWhile { pos, .. } => {
+            Stmt::GeneratorForOf { pos, .. } => {
                 return Err(diagnostic(
                     "K7",
                     "statement is outside the current kernel subset",
@@ -1858,7 +1975,10 @@ fn validate_statement_subset(statements: &[Stmt]) -> Result<(), Diagnostic> {
                     validate_statement_subset(els)?;
                 }
             }
-            Stmt::While { body, .. } | Stmt::For { body, .. } | Stmt::ForOf { body, .. } => {
+            Stmt::While { body, .. }
+            | Stmt::DoWhile { body, .. }
+            | Stmt::For { body, .. }
+            | Stmt::ForOf { body, .. } => {
                 validate_statement_subset(body)?;
             }
             Stmt::Switch { cases, .. } => {
@@ -2004,6 +2124,8 @@ struct Emitter<'a> {
     globals: BTreeMap<Symbol, KernelGlobal>,
     /// The emitted name of each parameter and local (K14).
     local_names: BTreeMap<String, String>,
+    /// The value-method receiver name, distinct from module and local names (K14, K33).
+    receiver_name: Option<String>,
     /// The builtins the body reads. The entry point declares these parameters and no other (PI4).
     used_builtins: BTreeSet<String>,
     /// The counter behind each lowered conditional's placeholder name (K9).
@@ -2101,6 +2223,7 @@ impl<'a> Emitter<'a> {
                 .map(|global| (global.symbol.clone(), global.clone()))
                 .collect(),
             local_names,
+            receiver_name: None,
             used_builtins: BTreeSet::new(),
             conditional_index: 0,
             loop_depth: 0,
@@ -2119,6 +2242,14 @@ impl<'a> Emitter<'a> {
         globals: &[KernelGlobal],
         module_names: &BTreeSet<String>,
     ) -> Self {
+        let mut reserved = module_names.clone();
+        let receiver_name = receiver_class(module, helper).map(|_| {
+            let mut name = mapping::ident("self");
+            while !reserved.insert(name.clone()) {
+                name.push('_');
+            }
+            name
+        });
         Self {
             module,
             layout_params: BTreeMap::new(),
@@ -2130,13 +2261,24 @@ impl<'a> Emitter<'a> {
                 .iter()
                 .map(|global| (global.symbol.clone(), global.clone()))
                 .collect(),
-            local_names: local_names(helper, module_names),
+            local_names: local_names(helper, &reserved),
+            receiver_name,
             used_builtins: BTreeSet::new(),
             conditional_index: 0,
             loop_depth: 0,
             switch_depth: 0,
             in_helper: true,
         }
+    }
+
+    /// Returns the first parameter of a value-method helper (K33).
+    fn receiver_parameter(&self, helper: &Function) -> Option<String> {
+        let class = receiver_class(self.module, helper)?;
+        Some(format!(
+            "{}: {}",
+            self.receiver_name.as_ref()?,
+            mapping::ident(&class.name)
+        ))
     }
 
     /// Returns the emitted name of one local or parameter (K14).
@@ -2284,6 +2426,7 @@ impl<'a> Emitter<'a> {
     /// Returns a K11 diagnostic for an operator outside K11, and the diagnostics of `snippet`.
     fn fround_argument(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
         match (&expr.kind, &expr.ty) {
+            (ExprKind::Cast(value), Type::F64) if value.ty == Type::F32 => self.snippet(value),
             (ExprKind::Float(value), Type::F64) => Ok(Snippet::atom(f32_literal(*value))),
             (ExprKind::Binary { op, left, right }, Type::F64) => {
                 let Some(spelling) = binop(*op) else {
@@ -2315,6 +2458,26 @@ impl<'a> Emitter<'a> {
         }
     }
 
+    /// Emits an f32 argument or a nested scalar builtin (K11).
+    fn math_argument(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
+        match (&expr.kind, &expr.ty) {
+            (ExprKind::Cast(value), Type::F64) if value.ty == Type::F32 => self.snippet(value),
+            (ExprKind::Float(value), Type::F64) if value.is_finite() => {
+                Ok(Snippet::atom(f32_literal(*value)))
+            }
+            (
+                ExprKind::Call {
+                    callee: Callee::Math(function),
+                    args,
+                },
+                _,
+            ) if mapping::math(*function).is_some() => {
+                self.call(expr, &Callee::Math(*function), args)
+            }
+            _ => self.snippet(expr),
+        }
+    }
+
     /// Emits one expression as a WGSL snippet (K9).
     ///
     /// The returned prelude holds the statements that must precede the expression, which only a
@@ -2328,15 +2491,36 @@ impl<'a> Emitter<'a> {
     /// an increment, or a decrement gives a K7 diagnostic, because it is legal only in statement
     /// position ([`Self::statement_snippet`]).
     fn snippet(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
+        if matches!(&expr.kind, ExprKind::Float(value) if !value.is_finite()) {
+            return Err(diagnostic(
+                "K11",
+                "Math.max() and Math.min() require an argument",
+                expr.pos.clone(),
+            ));
+        }
         if let ExprKind::Cast(value) = &expr.kind {
+            if matches!(&value.kind, ExprKind::Float(number) if !number.is_finite()) {
+                return Err(diagnostic(
+                    "K11",
+                    "Math.max() and Math.min() require an argument",
+                    expr.pos.clone(),
+                ));
+            }
+            if matches!(value.ty, Type::Enum(_)) && !matches!(expr.ty, Type::U32 | Type::I32) {
+                return Err(diagnostic(
+                    "K12",
+                    "enum casts require i32 or u32",
+                    expr.pos.clone(),
+                ));
+            }
             let fround_to_f32 = matches!(
                 &value.kind,
                 ExprKind::Call { callee: Callee::Math(function), .. }
-                    if mapping::math(*function) == Some("") && expr.ty == Type::F32
+                    if mapping::math(*function).is_some() && expr.ty == Type::F32
             );
             if !fround_to_f32
                 && (!matches!(expr.ty, Type::F32 | Type::I32 | Type::U32)
-                    || !matches!(value.ty, Type::F32 | Type::I32 | Type::U32))
+                    || !matches!(value.ty, Type::F32 | Type::I32 | Type::U32 | Type::Enum(_)))
             {
                 return Err(diagnostic(
                     "K12",
@@ -2355,6 +2539,17 @@ impl<'a> Emitter<'a> {
         };
         let local = |text: String, _ty: String| Snippet::atom(text);
         match &expr.kind {
+            ExprKind::EnumMember { id, value, .. } => {
+                let ty = enum_type(self.module, *id, &expr.pos)?;
+                let text = if ty == "u32" {
+                    format!("{value}u")
+                } else if *value == i64::from(i32::MIN) {
+                    "(-2147483647i - 1i)".to_owned()
+                } else {
+                    format!("{value}i")
+                };
+                Ok(Snippet::atom(text))
+            }
             ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) => {
                 Ok(local(literal(expr)?, ty))
             }
@@ -2368,6 +2563,12 @@ impl<'a> Emitter<'a> {
                 "string local or expression in kernel",
                 expr.pos.clone(),
             )),
+            ExprKind::This => {
+                let name = self.receiver_name.as_ref().ok_or_else(|| {
+                    generator_diagnostic("method receiver has no WGSL parameter", expr.pos.clone())
+                })?;
+                Ok(Snippet::atom(name.clone()))
+            }
             ExprKind::Local(name, _, _) => Ok(Snippet::atom(self.local_name(name))),
             ExprKind::Global(symbol) => {
                 let Some(global) = self.globals.get(symbol) else {
@@ -2447,8 +2648,13 @@ impl<'a> Emitter<'a> {
                     args,
                 } = &value.kind
                 {
-                    if mapping::math(*function) == Some("") && expr.ty == Type::F32 {
+                    if mapping::math(*function).is_some() && expr.ty == Type::F32 {
                         return self.call(value, &Callee::Math(*function), args);
+                    }
+                }
+                if let Type::Enum(id) = value.ty {
+                    if enum_type(self.module, id, &value.pos)? == ty {
+                        return self.snippet(value);
                     }
                 }
                 let value = self.snippet(value)?;
@@ -2646,6 +2852,20 @@ impl<'a> Emitter<'a> {
         else {
             return self.snippet(expr);
         };
+        fn this_field(expr: &Expr) -> bool {
+            match &expr.kind {
+                ExprKind::This => true,
+                ExprKind::Field { obj, .. } | ExprKind::Index { obj, .. } => this_field(obj),
+                _ => false,
+            }
+        }
+        if this_field(target) {
+            return Err(diagnostic(
+                "K33",
+                "a value method cannot write a field of this",
+                expr.pos.clone(),
+            ));
+        }
         if (self.binding_root(target).is_some() || self.global_root(target).is_some())
             && type_contains_atomic(self.module, &target.ty, &target.pos)?
         {
@@ -2691,6 +2911,13 @@ impl<'a> Emitter<'a> {
     /// TX3 or a TX11 diagnostic. A method with no table row gives a K10 diagnostic.
     fn call(&mut self, expr: &Expr, callee: &Callee, args: &[Expr]) -> Result<Snippet, Diagnostic> {
         match callee {
+            Callee::Num(
+                subscript_compiler::hir::NumFn::IsNaN | subscript_compiler::hir::NumFn::IsFinite,
+            ) => Err(diagnostic(
+                "K11",
+                "NaN and infinity tests are not portable in WGSL",
+                expr.pos.clone(),
+            )),
             Callee::Math(function) => {
                 let Some(name) = mapping::math(*function) else {
                     return Err(diagnostic(
@@ -2714,12 +2941,7 @@ impl<'a> Emitter<'a> {
                 let mut texts = Vec::with_capacity(args.len());
                 let mut prelude = Vec::new();
                 for arg in args {
-                    let value = match (&arg.kind, &arg.ty) {
-                        // JavaScript Math arguments are typed as f64 by the checker; K11 maps
-                        // those literal arguments to WGSL f32 without admitting f64 elsewhere.
-                        (ExprKind::Float(value), Type::F64) => Snippet::atom(f32_literal(*value)),
-                        _ => self.snippet(arg)?,
-                    };
+                    let value = self.math_argument(arg)?;
                     prelude.extend(value.prelude);
                     texts.push(value.text);
                 }
@@ -2745,7 +2967,7 @@ impl<'a> Emitter<'a> {
                 let mapped = is_library.then(|| mapping::free_function(&base)).flatten();
                 let called = match mapped {
                     Some(mapped) => mapped.to_owned(),
-                    None => mapping::ident(&base),
+                    None => mapping::ident(&helper_name(name)),
                 };
                 let (args, prelude) = self.snippets(args)?;
                 Ok(Snippet {
@@ -2755,6 +2977,31 @@ impl<'a> Emitter<'a> {
                 })
             }
             Callee::Method { recv, name } => {
+                if let Type::Class(id) = recv.ty {
+                    if let Some(class) = self
+                        .module
+                        .classes
+                        .get(id.0)
+                        .filter(|class| class.is_value && class.pos.file != "typegpu-types.ts")
+                    {
+                        if let Some(method) =
+                            class.methods.iter().find(|method| method.symbol == *name)
+                        {
+                            let called =
+                                mapping::ident(&helper_name(&method_symbol(class, method)));
+                            let receiver = self.snippet(recv)?;
+                            let (mut texts, prelude) = self.snippets(args)?;
+                            texts.insert(0, receiver.text);
+                            let mut receiver_prelude = receiver.prelude;
+                            receiver_prelude.extend(prelude);
+                            return Ok(Snippet {
+                                text: format!("{called}({})", texts.join(", ")),
+                                precedence: 10,
+                                prelude: receiver_prelude,
+                            });
+                        }
+                    }
+                }
                 let name = name.source_name();
                 if atomic_scalar(self.module, &recv.ty, &expr.pos)?.is_some() {
                     let place = self.atomic_place(recv)?;
@@ -3006,6 +3253,13 @@ impl<'a> Emitter<'a> {
                                 expr.pos.clone(),
                             ));
                         }
+                        (BindingKind::Sampler, _, _) => {
+                            return Err(diagnostic(
+                                "K10",
+                                format!("binding method `{name}` is outside K10"),
+                                expr.pos.clone(),
+                            ));
+                        }
                         _ => {
                             return Err(generator_diagnostic(
                                 format!("binding method `{name}` is not valid for this wrapper"),
@@ -3254,6 +3508,21 @@ impl<'a> Emitter<'a> {
                     Self::line(out, indent, &format!("{barrier}();"));
                     return Ok(());
                 }
+                if let Some((condition, assignment, negated)) = logical_assignment(expr) {
+                    let condition = self.snippet(condition)?;
+                    Self::emit_prelude(out, indent, condition.prelude);
+                    let text = if negated {
+                        format!("!({})", condition.text)
+                    } else {
+                        condition.text
+                    };
+                    Self::line(out, indent, &format!("if ({text}) {{"));
+                    let assignment = self.statement_snippet(assignment)?;
+                    Self::emit_prelude(out, indent + 1, assignment.prelude);
+                    Self::line(out, indent + 1, &format!("{};", assignment.text));
+                    Self::line(out, indent, "}");
+                    return Ok(());
+                }
                 let value = self.statement_snippet(expr)?;
                 Self::emit_prelude(out, indent, value.prelude);
                 Self::line(out, indent, &format!("{};", value.text));
@@ -3278,6 +3547,19 @@ impl<'a> Emitter<'a> {
                     Self::line(out, indent, "} else {");
                     self.statements(els, indent + 1, out)?;
                 }
+                Self::line(out, indent, "}");
+            }
+            Stmt::DoWhile { cond, body, .. } => {
+                let cond = self.snippet(cond)?;
+                Self::line(out, indent, "loop {");
+                self.loop_depth += 1;
+                let result = self.statements(body, indent + 1, out);
+                self.loop_depth -= 1;
+                result?;
+                Self::line(out, indent + 1, "continuing {");
+                Self::emit_prelude(out, indent + 2, cond.prelude);
+                Self::line(out, indent + 2, &format!("break if !({});", cond.text));
+                Self::line(out, indent + 1, "}");
                 Self::line(out, indent, "}");
             }
             Stmt::While { cond, body, .. } => {
@@ -3454,14 +3736,45 @@ impl<'a> Emitter<'a> {
                 Self::line(out, indent, "}");
             }
             Stmt::Switch { disc, cases, pos } => {
-                if !matches!(disc.ty, Type::I32 | Type::U32) {
+                if !matches!(disc.ty, Type::I32 | Type::U32 | Type::Enum(_)) {
                     return Err(diagnostic(
                         "K18",
                         "switch discriminant is not i32 or u32",
                         disc.pos.clone(),
                     ));
                 }
-                if !cases.iter().any(|case| case.test.is_none()) {
+                let exhaustive = if let Type::Enum(id) = disc.ty {
+                    enum_type(self.module, id, &disc.pos)?;
+                    let values = cases
+                        .iter()
+                        .filter_map(|case| case.test.as_ref())
+                        .filter_map(|test| match test.kind {
+                            ExprKind::EnumMember { value, .. } => Some(value),
+                            _ => None,
+                        })
+                        .collect::<BTreeSet<_>>();
+                    self.module.enums.get(id.0).is_some_and(|definition| {
+                        definition
+                            .members
+                            .iter()
+                            .all(|(_, value)| values.contains(value))
+                    })
+                } else {
+                    false
+                };
+                let synthetic_default = exhaustive && cases.last().is_some_and(|case| {
+                    case.test.is_none() && case.pos == *pos && matches!(case.body.as_slice(),
+                        [Stmt::Expr(Expr { kind: ExprKind::Call { callee: Callee::Ambient(subscript_compiler::hir::AmbientFn::Unreachable), args }, .. })] if args.is_empty())
+                });
+                let cases = if synthetic_default {
+                    cases.split_last().map(|(_, rest)| rest).ok_or_else(|| {
+                        generator_diagnostic("exhaustive enum switch has no cases", pos.clone())
+                    })?
+                } else {
+                    cases.as_slice()
+                };
+                let has_default = cases.iter().any(|case| case.test.is_none());
+                if !has_default && !exhaustive {
                     return Err(diagnostic("K18", "switch has no default case", pos.clone()));
                 }
                 let disc = self.snippet(disc)?;
@@ -3470,7 +3783,7 @@ impl<'a> Emitter<'a> {
                 // An empty case shares the next case's body, which WGSL writes as one selector
                 // with several values. The labels accumulate until a body arrives (K18).
                 let mut labels = Vec::new();
-                for case in cases {
+                for (index, case) in cases.iter().enumerate() {
                     let label = if let Some(test) = &case.test {
                         let value = self.snippet(test)?;
                         if !value.prelude.is_empty() {
@@ -3485,6 +3798,9 @@ impl<'a> Emitter<'a> {
                         "default".to_owned()
                     };
                     labels.push(label);
+                    if exhaustive && !has_default && index + 1 == cases.len() {
+                        labels.push("default".to_owned());
+                    }
                     if case.body.is_empty() {
                         continue;
                     }
@@ -3531,9 +3847,7 @@ impl<'a> Emitter<'a> {
                 self.statements(body, indent + 1, out)?;
                 Self::line(out, indent, "}");
             }
-            Stmt::ForOf { pos, .. }
-            | Stmt::GeneratorForOf { pos, .. }
-            | Stmt::DoWhile { pos, .. } => {
+            Stmt::ForOf { pos, .. } | Stmt::GeneratorForOf { pos, .. } => {
                 return Err(diagnostic(
                     "K7",
                     "statement is outside the current kernel subset",
@@ -3806,6 +4120,10 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
     /// `control` is the taint of the enclosing conditions, so an assignment under a non-uniform
     /// branch taints its target.
     fn collect_assignment(&mut self, expr: &Expr, control: UniformityTaint) {
+        if let Some((condition, assignment, _)) = logical_assignment(expr) {
+            self.collect_assignment(assignment, control.merge(self.expression(condition)));
+            return;
+        }
         let ExprKind::Assign {
             op, target, value, ..
         } = &expr.kind
@@ -4235,6 +4553,10 @@ fn assigned_local(expr: &Expr) -> Option<&str> {
 
 /// Adds the local that `expr` assigns to `out`, when `expr` is an assignment.
 fn written_locals_expr(expr: &Expr, out: &mut BTreeSet<String>) {
+    if let Some((_, assignment, _)) = logical_assignment(expr) {
+        written_locals_expr(assignment, out);
+        return;
+    }
     if let ExprKind::Assign { target, .. } = &expr.kind {
         if let Some(name) = assigned_local(target) {
             out.insert(name.to_owned());
@@ -4385,11 +4707,11 @@ fn last_barrier_position(module: &Module, statements: &[Stmt]) -> Option<(u32, u
 }
 
 /// Collects the names of the functions that `expr` calls directly.
-fn called_functions_expr(expr: &Expr, out: &mut BTreeSet<Symbol>) {
+fn called_functions_expr(module: &Module, expr: &Expr, out: &mut BTreeSet<Symbol>) {
     match &expr.kind {
         ExprKind::Seq { effects, value } => {
             for item in effects.iter().chain(std::iter::once(value.as_ref())) {
-                called_functions_expr(item, out);
+                called_functions_expr(module, item, out);
             }
         }
         ExprKind::Call { callee, args } => {
@@ -4397,76 +4719,89 @@ fn called_functions_expr(expr: &Expr, out: &mut BTreeSet<Symbol>) {
                 out.insert(name.clone());
             }
             if let Callee::Value(value) = callee {
-                called_functions_expr(value, out);
+                called_functions_expr(module, value, out);
             }
-            if let Callee::Method { recv, .. } = callee {
-                called_functions_expr(recv, out);
+            if let Callee::Method { recv, name } = callee {
+                if let Type::Class(id) = recv.ty {
+                    if let Some(class) = module
+                        .classes
+                        .get(id.0)
+                        .filter(|class| class.is_value && class.pos.file != "typegpu-types.ts")
+                    {
+                        if let Some(method) =
+                            class.methods.iter().find(|method| method.symbol == *name)
+                        {
+                            out.insert(method_symbol(class, method));
+                        }
+                    }
+                }
+                called_functions_expr(module, recv, out);
             }
             for arg in args {
-                called_functions_expr(arg, out);
+                called_functions_expr(module, arg, out);
             }
         }
         ExprKind::AbsenceTest { value: operand, .. }
         | ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
-        | ExprKind::Field { obj: operand, .. } => called_functions_expr(operand, out),
+        | ExprKind::Field { obj: operand, .. } => called_functions_expr(module, operand, out),
         ExprKind::Binary { left, right, .. } => {
-            called_functions_expr(left, out);
-            called_functions_expr(right, out);
+            called_functions_expr(module, left, out);
+            called_functions_expr(module, right, out);
         }
         ExprKind::Assign { target, value, .. } => {
-            called_functions_expr(target, out);
-            called_functions_expr(value, out);
+            called_functions_expr(module, target, out);
+            called_functions_expr(module, value, out);
         }
         ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => {
             for arg in args {
-                called_functions_expr(arg, out);
+                called_functions_expr(module, arg, out);
             }
         }
         ExprKind::DescriptorLit { fields, .. } => {
             for field in fields.iter().flatten() {
-                called_functions_expr(field, out);
+                called_functions_expr(module, field, out);
             }
         }
         ExprKind::Index { obj, index, .. } => {
-            called_functions_expr(obj, out);
-            called_functions_expr(index, out);
+            called_functions_expr(module, obj, out);
+            called_functions_expr(module, index, out);
         }
         ExprKind::Cond { cond, then, els } => {
-            called_functions_expr(cond, out);
-            called_functions_expr(then, out);
-            called_functions_expr(els, out);
+            called_functions_expr(module, cond, out);
+            called_functions_expr(module, then, out);
+            called_functions_expr(module, els, out);
         }
         _ => {}
     }
 }
 
 /// Runs `called_functions_expr` over every expression the statement holds, nested bodies included.
-fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<Symbol>) {
+fn called_functions_stmt(module: &Module, stmt: &Stmt, out: &mut BTreeSet<Symbol>) {
     match stmt {
-        Stmt::Let { init, .. } | Stmt::Expr(init) => called_functions_expr(init, out),
+        Stmt::Let { init, .. } | Stmt::Expr(init) => called_functions_expr(module, init, out),
         Stmt::Return {
             value: Some(value), ..
-        } => called_functions_expr(value, out),
+        } => called_functions_expr(module, value, out),
         Stmt::Return { value: None, .. } => {}
         Stmt::If {
             cond, then, els, ..
         } => {
-            called_functions_expr(cond, out);
+            called_functions_expr(module, cond, out);
             for stmt in then {
-                called_functions_stmt(stmt, out);
+                called_functions_stmt(module, stmt, out);
             }
             if let Some(els) = els {
                 for stmt in els {
-                    called_functions_stmt(stmt, out);
+                    called_functions_stmt(module, stmt, out);
                 }
             }
         }
         Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
-            called_functions_expr(cond, out);
+            called_functions_expr(module, cond, out);
             for stmt in body {
-                called_functions_stmt(stmt, out);
+                called_functions_stmt(module, stmt, out);
             }
         }
         Stmt::For {
@@ -4477,33 +4812,33 @@ fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<Symbol>) {
             ..
         } => {
             if let Some(init) = init {
-                called_functions_stmt(init, out);
+                called_functions_stmt(module, init, out);
             }
             if let Some(cond) = cond {
-                called_functions_expr(cond, out);
+                called_functions_expr(module, cond, out);
             }
             for item in step {
-                called_functions_stmt(item, out);
+                called_functions_stmt(module, item, out);
             }
             for stmt in body {
-                called_functions_stmt(stmt, out);
+                called_functions_stmt(module, stmt, out);
             }
         }
         Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
-            called_functions_expr(subject, out);
+            called_functions_expr(module, subject, out);
             for stmt in body {
-                called_functions_stmt(stmt, out);
+                called_functions_stmt(module, stmt, out);
             }
         }
         Stmt::Switch { disc, cases, .. } => {
-            called_functions_expr(disc, out);
+            called_functions_expr(module, disc, out);
             for stmt in cases.iter().flat_map(|case| &case.body) {
-                called_functions_stmt(stmt, out);
+                called_functions_stmt(module, stmt, out);
             }
         }
         Stmt::Block(body) => {
             for stmt in body {
-                called_functions_stmt(stmt, out);
+                called_functions_stmt(module, stmt, out);
             }
         }
         Stmt::Using {
@@ -4511,16 +4846,16 @@ fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<Symbol>) {
         } => {
             for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
                 for stmt in body {
-                    called_functions_stmt(stmt, out);
+                    called_functions_stmt(module, stmt, out);
                 }
             }
         }
         Stmt::Try { body, handler, .. } => {
             for stmt in body.iter().chain(handler) {
-                called_functions_stmt(stmt, out);
+                called_functions_stmt(module, stmt, out);
             }
         }
-        Stmt::Throw { value, .. } => called_functions_expr(value, out),
+        Stmt::Throw { value, .. } => called_functions_expr(module, value, out),
         Stmt::Break(_) | Stmt::Continue(_) => {}
     }
 }
@@ -4823,6 +5158,9 @@ fn validate_unique_sources(
     entries: &[&Symbol],
     dependencies: &[Symbol],
     globals: &[KernelGlobal],
+    structs: &[(String, String)],
+    layouts: &[crate::pipeline::Layout],
+    interface_names: &[String],
     pos: &Pos,
 ) -> Result<(), Diagnostic> {
     let mut owners = BTreeMap::<String, &Symbol>::new();
@@ -4830,7 +5168,7 @@ fn validate_unique_sources(
         .iter()
         .copied()
         .chain(dependencies)
-        .map(|symbol| (crate::base_name(symbol), symbol));
+        .map(|symbol| (helper_name(symbol), symbol));
     let declarations = globals
         .iter()
         .map(|global| (global.name.clone(), &global.symbol));
@@ -4848,6 +5186,26 @@ fn validate_unique_sources(
             None => {
                 owners.insert(emitted, symbol);
             }
+        }
+    }
+    for name in structs
+        .iter()
+        .map(|(name, _)| name)
+        .chain(
+            layouts
+                .iter()
+                .flat_map(|layout| layout.bindings.iter().map(|binding| &binding.name)),
+        )
+        .chain(interface_names)
+    {
+        if owners.contains_key(&mapping::ident(name)) {
+            return Err(diagnostic(
+                "K14",
+                format!(
+                    "two program declarations share the source name `{name}` in one WGSL module"
+                ),
+                pos.clone(),
+            ));
         }
     }
     Ok(())
@@ -4911,7 +5269,7 @@ fn dependencies(
         stack.push(name.clone());
         let mut calls = BTreeSet::new();
         for stmt in &function.body {
-            called_functions_stmt(stmt, &mut calls);
+            called_functions_stmt(module, stmt, &mut calls);
         }
         for called in source_order(calls) {
             visit(module, &called, shells, stack, done, order, &function.pos)?;
@@ -4923,7 +5281,7 @@ fn dependencies(
     }
     let mut calls = BTreeSet::new();
     for stmt in &kernel.body {
-        called_functions_stmt(stmt, &mut calls);
+        called_functions_stmt(module, stmt, &mut calls);
     }
     let mut order = Vec::new();
     let mut done = BTreeSet::new();
@@ -4986,12 +5344,12 @@ fn module_scope_names(
     names.extend(
         helpers
             .iter()
-            .map(|name| mapping::ident(&crate::base_name(name))),
+            .map(|name| mapping::ident(&helper_name(name))),
     );
     names.extend(
         entries
             .iter()
-            .map(|name| mapping::ident(&crate::base_name(name))),
+            .map(|name| mapping::ident(&helper_name(name))),
     );
     names.extend(declaration_names.into_iter().flatten().cloned());
     names.extend(
@@ -5209,7 +5567,7 @@ pub(crate) fn emit(
             let _ = wgsl_type(module, &param.ty, &param.pos)?;
         }
         let mut helper_emitter = Emitter::helper(module, helper, &globals, &module_names);
-        let params = helper
+        let mut params = helper
             .params
             .iter()
             .map(|param| {
@@ -5220,6 +5578,9 @@ pub(crate) fn emit(
                 ))
             })
             .collect::<Result<Vec<_>, Diagnostic>>()?;
+        if let Some(receiver) = helper_emitter.receiver_parameter(helper) {
+            params.insert(0, receiver);
+        }
         let result = if helper.ret == Type::Void {
             String::new()
         } else {
@@ -5227,7 +5588,7 @@ pub(crate) fn emit(
         };
         helper_text.push_str(&format!(
             "fn {}({}){result} {{\n",
-            mapping::ident(&crate::base_name(name)),
+            mapping::ident(&helper_name(name)),
             params.join(", ")
         ));
         helper_emitter.statements(&helper.body, 1, &mut helper_text)?;
@@ -5266,7 +5627,15 @@ pub(crate) fn emit(
     // The check resolves bindings and globals through the emitter, so it reads the same maps the
     // emitted text did (K22).
     BarrierValidator::new(&emitter, kernel).validate(kernel)?;
-    validate_unique_sources(&[&pipeline.entry], &dependencies, &globals, &pipeline.pos)?;
+    validate_unique_sources(
+        &[&pipeline.entry],
+        &dependencies,
+        &globals,
+        structs,
+        &pipeline.layouts,
+        &[],
+        &pipeline.pos,
+    )?;
 
     // The order below is K14's, the same for every module. It runs from the `enable` directives
     // to the raw declarations, the schema structs, the shells, the bindings, the module variables,
@@ -5553,7 +5922,7 @@ fn render_helpers(
             let _ = wgsl_type(module, &param.ty, &param.pos)?;
         }
         let mut emitter = Emitter::helper(module, helper, globals, module_names);
-        let params = helper
+        let mut params = helper
             .params
             .iter()
             .map(|param| {
@@ -5564,6 +5933,9 @@ fn render_helpers(
                 ))
             })
             .collect::<Result<Vec<_>, Diagnostic>>()?;
+        if let Some(receiver) = emitter.receiver_parameter(helper) {
+            params.insert(0, receiver);
+        }
         let result = if helper.ret == Type::Void {
             String::new()
         } else {
@@ -5571,7 +5943,7 @@ fn render_helpers(
         };
         out.push_str(&format!(
             "fn {}({}){result} {{\n",
-            mapping::ident(&crate::base_name(&name)),
+            mapping::ident(&helper_name(&name)),
             params.join(", ")
         ));
         emitter.statements(&helper.body, 1, &mut out)?;
@@ -5621,7 +5993,13 @@ pub(crate) fn emit_render(
         &[&pipeline.vertex_entry, &pipeline.fragment_entry],
         shells.declarations.as_ref().map(|item| &item.names),
     );
-    module_names.insert(mapping::ident(&pipeline.varyings_name));
+    let interface_names = pipeline
+        .vertex_buffers
+        .iter()
+        .map(|buffer| buffer.schema.clone())
+        .chain(std::iter::once(pipeline.varyings_name.clone()))
+        .collect::<Vec<_>>();
+    module_names.extend(interface_names.iter().map(|name| mapping::ident(name)));
     let layout_count = pipeline.layouts.len();
     let vertex_value_count = pipeline.vertex_buffers.len();
     let mut vertex_emitter = Emitter::entry(
@@ -5720,6 +6098,9 @@ pub(crate) fn emit_render(
         &[&pipeline.vertex_entry, &pipeline.fragment_entry],
         &helper_names,
         &globals,
+        structs,
+        &pipeline.layouts,
+        &interface_names,
         &pipeline.pos,
     )?;
 

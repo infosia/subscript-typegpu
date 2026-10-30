@@ -1,0 +1,9 @@
+pipeline:created
+FormsItem_STRIDE=4
+kernelForms_WORKGROUP_X=2
+kernelForms_WORKGROUP_Y=1
+kernelForms_WORKGROUP_Z=1
+kernelForms_WGSL_LINES=73
+dispatch:submitted
+host:out=42,41
+PASS

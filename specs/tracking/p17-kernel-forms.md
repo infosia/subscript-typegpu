@@ -58,3 +58,44 @@ generates. No golden moved.
 
 Evidence: `tools/gate.sh --require-backend` with the yawgpu library,
 `gate: green`, 304 passed, 0 failed, 1 ignored, 345.4 s wall.
+
+## Slice 2 — the kernel forms (2026-10-30)
+
+Kernels accept `do…while` and statement-position `&&=` / `||=` (K7
+Rev 20), the `as f64` / `as f32` cast form around K11 calls with the
+§201 fold to nested `max`/`min` (K11 Rev 1), enums (K32), and generic
+instances, value-class method helpers, local functions, and calls
+through `T extends I` under emitter-made names (K33): `id_Vec2f`,
+`first_f32_u32`, `P_scale(self_: P)`, `outer_id_u32`, `apply_P`.
+`Math.max()` / `Math.min()` with no argument, `isNaN`, `isFinite`,
+`Number.isNaN`, and `Number.isFinite` are K11 diagnostics.
+
+Correction: K32 Rev 0 required a diagnostic for a member value that
+does not fit the emitted type. The checker limits member values to
+`i32` (S100 for an explicit value outside it, S008 for an implicit
+overflow), so no such value reaches the emitter. The clause is
+deleted.
+
+Fixtures: 16 new reject fixtures (`k7-logical-assignment-value`,
+four `k11-` NaN and infinity tests, two `k11-` empty calls,
+`k33-this-write`, and eight `k33-name-collision` forms), each with
+exit 1 and its diagnostic recorded. The accept tests failed 26 of 69
+against the old emitter. `k17-method.ts` and `rn16-texture-sample.ts`
+tested that a value-class method in a kernel is K10. K33 accepts that
+form, so both became accept tests, and `k10-sampler-host-method.ts`
+keeps the K10 rejection of a host-only method.
+
+Programs: `b25-kernel-forms` (structure and the host
+`simulateCompute` result `42,41`, with its `.wgsl` and `.expected`
+goldens) and `x25-live-kernel-forms` (zeroed output, dispatch,
+readback, comparison with an independent host run). Under Noop, `x25`
+prints `FAIL 0 expected=42 got=0`, which shows the comparison is
+real. A first `b25` draft wrote the expected values into the GPU
+buffer before the dispatch, so its Noop readback compared the prefill
+with itself. The review caught it before the commit.
+
+Evidence: `tools/live.sh` on Metal (yawgpu):
+`live::every_x_program_passes_on_a_real_adapter ... ok`, 151.6 s.
+`tools/gate.sh --require-backend` with the yawgpu library, `gate:
+green`, 332 passed, 0 failed, 1 ignored, 356.2 s wall. No existing
+WGSL or `.expected` golden moved.

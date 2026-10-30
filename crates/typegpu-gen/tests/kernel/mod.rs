@@ -1151,25 +1151,28 @@ fn multi_argument_array_push_lowers_to_seq() {
 }
 
 #[test]
-fn k7_rejects_do_while() {
-    use subscript_compiler::{hir::Stmt, CheckOptions};
-    let source = support::read(
-        &support::root().join("crates/typegpu-gen/tests/fixtures/reject/k7-do-while.ts"),
+fn k7_do_while_runs_condition_after_continue() {
+    let source = r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { out: MutStorage<u32>; constructor(out: MutStorage<u32>) { this.out = out; } }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  let i: u32 = 0;
+  do { i++; if (i == 1) { continue; } res.out[ctx.localIndex] = i; }
+  while (ctx.localIndex == 0 ? i < 3 : i < 2);
+}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#;
+    let generated = generate(source);
+    let wgsl = &generated.pipelines[0].1;
+    assert!(wgsl.contains("loop {"), "{wgsl}");
+    assert!(wgsl.contains("continue;"), "{wgsl}");
+    let continuing = wgsl.split_once("continuing {").expect("continuing").1;
+    assert!(continuing.contains("var _g_conditional_0: bool;"), "{wgsl}");
+    assert!(
+        continuing.contains("break if !(_g_conditional_0);"),
+        "{wgsl}"
     );
-    let files = support::source_files(SourceFile::entry("do-while.ts", &source));
-    let module = subscript_compiler::check_program_with(&files, &CheckOptions::default())
-        .expect("check do while loop");
-    let kernel = module
-        .functions
-        .iter()
-        .find(|function| function.name == "kernel")
-        .expect("kernel");
-    assert!(matches!(kernel.body[0], Stmt::DoWhile { .. }));
-    let diagnostic = reject(&source);
-    assert_eq!(
-        diagnostic.message,
-        "K7: statement is outside the current kernel subset (author)"
-    );
+    validate(wgsl);
 }
 
 #[test]
@@ -1323,4 +1326,495 @@ const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "p
     assert!(continuing.contains("i += _g_conditional_1;"), "{wgsl}");
     assert!(!wgsl.contains("break if"), "{wgsl}");
     validate(wgsl);
+}
+
+#[test]
+fn k7_logical_assignment_statement() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+import { Vec2b } from "./typegpu-types";
+class Layout { out: MutStorage<u32>; constructor(out: MutStorage<u32>) { this.out = out; } }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  let p: boolean = ctx.localIndex == 0;
+  p &&= ctx.localIndex < 2;
+  p ||= false;
+  let v: Vec2b = new Vec2b(true, false);
+  v.x &&= p;
+  v.y ||= p;
+  if (v.x) { res.out[0] = 1; }
+}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    for expected in [
+        "if (p) {\n    p = localIndex < 2u;",
+        "if (!(p)) {\n    p = false;",
+        "if (v.x) {\n    v.x = p;",
+        "if (!(v.y)) {\n    v.y = p;",
+    ] {
+        assert!(wgsl.contains(expected), "{wgsl}");
+    }
+    validate(wgsl);
+}
+
+#[test]
+fn k11_scalar_math_casts_and_folds() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { out: MutStorage<f32>; constructor(out: MutStorage<f32>) { this.out = out; } }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  const a: f32 = 1.0;
+  const b: f32 = Math.max(a as f64, (a + 2.0) as f64) as f32;
+  const c: f32 = Math.min(a as f64, b as f64, (b + 3.0) as f64) as f32;
+  res.out[0] = Math.sqrt(c as f64) as f32;
+}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    for text in ["max(a, a + 2.0f)", "min(min(a, b), b + 3.0f)", "sqrt(c)"] {
+        assert!(wgsl.contains(text), "{wgsl}");
+    }
+    validate(wgsl);
+}
+
+#[test]
+fn k11_empty_math_calls() {
+    for source in [
+        include_str!("../fixtures/reject/k11-max-empty.ts"),
+        include_str!("../fixtures/reject/k11-min-empty.ts"),
+    ] {
+        let diagnostic = reject(source);
+        assert!(diagnostic.message.starts_with("K11:"), "{diagnostic:?}");
+    }
+}
+
+#[test]
+fn k11_isnan_diagnostic() {
+    let diagnostic = reject(include_str!("../fixtures/reject/k11-isnan.ts"));
+    assert!(diagnostic.message.starts_with("K11:"), "{diagnostic:?}");
+    assert!(
+        diagnostic
+            .message
+            .contains("NaN and infinity tests are not portable in WGSL"),
+        "{diagnostic:?}"
+    );
+}
+
+#[test]
+fn k11_isfinite_diagnostic() {
+    let diagnostic = reject(include_str!("../fixtures/reject/k11-isfinite.ts"));
+    assert!(diagnostic.message.starts_with("K11:"), "{diagnostic:?}");
+    assert!(
+        diagnostic
+            .message
+            .contains("NaN and infinity tests are not portable in WGSL"),
+        "{diagnostic:?}"
+    );
+}
+
+#[test]
+fn k11_number_isnan_diagnostic() {
+    let diagnostic = reject(include_str!("../fixtures/reject/k11-number-isnan.ts"));
+    assert!(diagnostic.message.starts_with("K11:"), "{diagnostic:?}");
+    assert!(
+        diagnostic
+            .message
+            .contains("NaN and infinity tests are not portable in WGSL"),
+        "{diagnostic:?}"
+    );
+}
+
+#[test]
+fn k11_number_isfinite_diagnostic() {
+    let diagnostic = reject(include_str!("../fixtures/reject/k11-number-isfinite.ts"));
+    assert!(diagnostic.message.starts_with("K11:"), "{diagnostic:?}");
+    assert!(
+        diagnostic
+            .message
+            .contains("NaN and infinity tests are not portable in WGSL"),
+        "{diagnostic:?}"
+    );
+}
+
+#[test]
+fn k32_enum_values_types_casts_and_exhaustive_switch() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { out: MutStorage<u32>; constructor(out: MutStorage<u32>) { this.out = out; } }
+enum Mode { A = 2, B = 4 }
+enum Signed { A = -1, B = 3 }
+function identity(m: Mode): Mode { return m; }
+function pick(m: Mode): u32 { switch (m) { case Mode.A: return 1; case Mode.B: return 2; } }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  const mode: Mode = identity(Mode.B);
+  const signed: Signed = Signed.A;
+  const a: i32 = mode as i32;
+  const b: u32 = signed as u32;
+  const c: i32 = signed as i32;
+  res.out[0] = pick(mode) + (mode as u32) + b + (a as u32) + (c as u32);
+}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    for text in [
+        "fn identity(m: u32) -> u32",
+        "case 4u, default:",
+        "let signed = -1i;",
+        "let a = i32(mode);",
+        "let b = u32(signed);",
+        "let c = signed;",
+    ] {
+        assert!(wgsl.contains(text), "{wgsl}");
+    }
+    validate(wgsl);
+}
+
+#[test]
+fn k33_helper_forms() {
+    let source = r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+import { Vec2f, Mat2x2f, vec2f } from "./typegpu-types";
+class Layout { out: MutStorage<f32>; constructor(out: MutStorage<f32>) { this.out = out; } }
+interface Scaled { scale(): f32; }
+@ValueType class P implements Scaled { constructor(public v: f32) {} scale(): f32 { return this.v * 2.0; } }
+@ValueType class Q implements Scaled { constructor(public v: f32) {} scale(): f32 { return this.v * 3.0; } }
+function id<T>(x: T): T { return x; }
+function first<A, B>(a: A, b: B): A { return a; }
+function apply<T extends Scaled>(x: T): f32 { return x.scale(); }
+function h1(): f32 { function f(x: f32): f32 { return x * 2.0; } return f(1.0); }
+function h2(): f32 { function f(x: f32): f32 { return x * 3.0; } return f(1.0); }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  const v: Vec2f = id<Vec2f>(vec2f(1.0, 2.0));
+  const matrix: Mat2x2f = id<Mat2x2f>(new Mat2x2f(v, v));
+  const p: P = id<P>(new P(3.0));
+  const pair: f32 = first<f32, u32>(2.0, 3);
+  res.out[0] = id<f32>(1.0) + (id<u32>(2) as f32) + apply(p) + apply(new Q(4.0)) + p.scale() + h1() + h2() + matrix.mulVec(v).x + pair;
+}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#;
+    let generated = generate(source);
+    let wgsl = &generated.pipelines[0].1;
+    for text in [
+        "fn id_f32(",
+        "fn id_u32(",
+        "fn id_Vec2f(x: vec2<f32>) -> vec2<f32>",
+        "fn id_Mat2x2f(x: mat2x2<f32>) -> mat2x2<f32>",
+        "fn id_P(x: P) -> P",
+        "fn first_f32_u32(a: f32, b: u32) -> f32",
+        "fn P_scale(self_: P)",
+        "fn apply_P(",
+        "fn apply_Q(",
+        "fn Q_scale(self_: Q)",
+        "fn h1_f(",
+        "fn h2_f(",
+        "return self_.v * 2.0f;",
+        "P_scale(x)",
+    ] {
+        assert!(wgsl.contains(text), "{wgsl}");
+    }
+    validate(wgsl);
+}
+
+#[test]
+fn k33_this_write_fixture() {
+    let diagnostic = reject(include_str!("../fixtures/reject/k33-this-write.ts"));
+    assert!(diagnostic.message.starts_with("K33:"), "{diagnostic:?}");
+    assert!(
+        diagnostic.message.contains("cannot write a field of this"),
+        "{diagnostic:?}"
+    );
+}
+
+#[test]
+fn k33_name_collision_fixture() {
+    let diagnostic = reject(include_str!("../fixtures/reject/k33-name-collision.ts"));
+    assert!(diagnostic.message.starts_with("K14:"), "{diagnostic:?}");
+    assert!(
+        diagnostic
+            .message
+            .contains("two program declarations share the source name `id_u32`"),
+        "{diagnostic:?}"
+    );
+}
+
+#[test]
+fn k7_logical_assignment_value_fixture() {
+    let diagnostic = reject(include_str!(
+        "../fixtures/reject/k7-logical-assignment-value.ts"
+    ));
+    assert!(diagnostic.message.starts_with("K7:"), "{diagnostic:?}");
+    assert!(
+        diagnostic
+            .message
+            .contains("an assignment is used as a value"),
+        "{diagnostic:?}"
+    );
+}
+
+#[test]
+fn k33_method_receiver_keeps_parameter_names_distinct() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+@ValueType class P {
+  constructor(public value: f32) {}
+  plus(self_: f32): f32 { return this.value + self_; }
+}
+class Layout { out: MutStorage<f32>; constructor(out: MutStorage<f32>) { this.out = out; } }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.out[0] = new P(2.0).plus(3.0); }
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(
+        wgsl.contains("fn P_plus(self_: P, self__: f32) -> f32"),
+        "{wgsl}"
+    );
+    assert!(wgsl.contains("return self_.value + self__;"), "{wgsl}");
+    assert!(wgsl.contains("P_plus(P(2.0f), 3.0f)"), "{wgsl}");
+    validate(wgsl);
+}
+
+#[test]
+fn k33_generic_local_function_keeps_its_enclosing_name() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { out: MutStorage<u32>; constructor(out: MutStorage<u32>) { this.out = out; } }
+function outer(): u32 { function id<T>(x: T): T { return x; } return id<u32>(2); }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.out[0] = outer(); }
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(wgsl.contains("fn outer_id_u32("), "{wgsl}");
+    assert!(wgsl.contains("return outer_id_u32(2u);"), "{wgsl}");
+    validate(wgsl);
+}
+
+#[test]
+fn k33_name_collision_schema() {
+    let diagnostic = reject(include_str!(
+        "../fixtures/reject/k33-name-collision-schema.ts"
+    ));
+    assert!(diagnostic.message.starts_with("K14:"), "{diagnostic:?}");
+    assert!(diagnostic.message.contains("`id_f32`"), "{diagnostic:?}");
+}
+
+#[test]
+fn k33_name_collision_binding() {
+    let diagnostic = reject(include_str!(
+        "../fixtures/reject/k33-name-collision-binding.ts"
+    ));
+    assert!(diagnostic.message.starts_with("K14:"), "{diagnostic:?}");
+    assert!(diagnostic.message.contains("`id_u32`"), "{diagnostic:?}");
+}
+
+#[test]
+fn k33_name_collision_method() {
+    let diagnostic = reject(include_str!(
+        "../fixtures/reject/k33-name-collision-method.ts"
+    ));
+    assert!(diagnostic.message.starts_with("K14:"), "{diagnostic:?}");
+    assert!(diagnostic.message.contains("`P_read`"), "{diagnostic:?}");
+}
+
+#[test]
+fn k33_name_collision_local() {
+    let diagnostic = reject(include_str!(
+        "../fixtures/reject/k33-name-collision-local.ts"
+    ));
+    assert!(diagnostic.message.starts_with("K14:"), "{diagnostic:?}");
+    assert!(
+        diagnostic.message.contains("`outer_local`"),
+        "{diagnostic:?}"
+    );
+}
+
+#[test]
+fn k22_logical_assignments_taint_locals_and_fields() {
+    for body in [
+        "let p: boolean = true; p &&= ctx.localIndex == 0; if (p) { workgroupBarrier(); }",
+        "let p: boolean = false; p ||= ctx.localIndex == 0; if (p) { workgroupBarrier(); }",
+        "let p = new Vec2b(true, false); p.x &&= ctx.localIndex == 0; if (p.x) { workgroupBarrier(); }",
+        "let p = new Vec2b(true, false); p.y ||= ctx.localIndex == 0; if (p.y) { workgroupBarrier(); }",
+    ] {
+        let source = format!(r#"
+import {{ ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline, workgroupBarrier }} from "./typegpu";
+import {{ Vec2b }} from "./typegpu-types";
+class Layout {{ constructor(public out: MutStorage<u32>) {{}} }}
+function kernel(res: Layout, ctx: ComputeInvocation): void {{ {body} }}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, {{ name: "pipeline", workgroupSize: [1, 1, 1] }});
+"#);
+        let diagnostic = reject(&source);
+        assert!(diagnostic.message.starts_with("K22:"), "{diagnostic:?}");
+    }
+}
+
+#[test]
+fn k22_do_while_uses_while_uniformity_rules() {
+    let source = r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline, workgroupBarrier } from "./typegpu";
+class Layout { constructor(public out: MutStorage<u32>) {} }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  let i: u32 = 0;
+  do { workgroupBarrier(); i++; } while (i < 2);
+}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#;
+    let generated = generate(source);
+    validate(&generated.pipelines[0].1);
+    let diagnostic = reject(&source.replace("i < 2", "i < ctx.localIndex"));
+    assert!(diagnostic.message.starts_with("K22:"), "{diagnostic:?}");
+}
+
+#[test]
+fn k32_signed_enum_switch_and_boundary_members() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { constructor(public out: MutStorage<i32>) {} }
+enum Signed { Low = -2147483648, High = 2147483647 }
+function choose(value: Signed): i32 {
+  switch (value) { case Signed.Low: return -1; case Signed.High: return 1; }
+}
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  const low: Signed = Signed.Low;
+  if (low != Signed.High && low == Signed.Low) { res.out[0] = choose(low); }
+}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    for text in [
+        "fn choose(value: i32) -> i32",
+        "case (-2147483647i - 1i):",
+        "case 2147483647i, default:",
+        "low != 2147483647i",
+        "low == (-2147483647i - 1i)",
+    ] {
+        assert!(wgsl.contains(text), "{wgsl}");
+    }
+    validate(wgsl);
+}
+
+#[test]
+fn k33_receiver_reserves_the_source_name_self() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+@ValueType class P {
+  constructor(public value: f32) {}
+  plus(self: f32): f32 { return this.value + self; }
+}
+class Layout { out: MutStorage<f32>; constructor(out: MutStorage<f32>) { this.out = out; } }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.out[0] = new P(2.0).plus(3.0); }
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(
+        wgsl.contains("fn P_plus(self_: P, self__: f32) -> f32"),
+        "{wgsl}"
+    );
+    assert!(wgsl.contains("return self_.value + self__;"), "{wgsl}");
+    assert!(wgsl.contains("P_plus(P(2.0f), 3.0f)"), "{wgsl}");
+    validate(wgsl);
+}
+
+#[test]
+fn k33_receiver_does_not_shadow_a_module_helper() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+@ValueType class P { constructor(public value: f32) {} read(): f32 { return this.value; } }
+class Layout { constructor(public out: MutStorage<f32>) {} }
+function self(): f32 { return 1.0; }
+function kernel(res: Layout, ctx: ComputeInvocation): void { res.out[0] = new P(2.0).read() + self(); }
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(wgsl.contains("fn P_read(self__: P) -> f32"), "{wgsl}");
+    assert!(wgsl.contains("return self__.value;"), "{wgsl}");
+    validate(wgsl);
+}
+
+#[test]
+fn k33_value_method_on_a_storage_copy() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, computePipeline, ComputePipelineSpec, Storage } from "./typegpu";
+@ValueType class Item { value: f32; constructor(value: f32) { this.value = value; } double(): f32 { return this.value * 2.0; } }
+class Layout { input: Storage<Item>; constructor(input: Storage<Item>) { this.input = input; } }
+function kernel(res: Layout, ctx: ComputeInvocation): void { const item: Item = res.input[0]; const doubled: f32 = item.double(); }
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(
+        wgsl.contains("fn Item_double(self_: Item) -> f32"),
+        "{wgsl}"
+    );
+    assert!(wgsl.contains("let doubled = Item_double(item);"), "{wgsl}");
+    validate(wgsl);
+}
+
+#[test]
+fn k33_fragment_value_method_uses_a_helper() {
+    let generated = generate(
+        r#"
+import { FragmentInvocation, renderPipeline, RenderPipelineSpec, VertexInvocation } from "./typegpu";
+import { Vec2f, Vec4f } from "./typegpu-types";
+@ValueType class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
+@ValueType class Varyings { position: Vec4f; constructor(position: Vec4f) { this.position = position; } }
+function vert(value: Vertex, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(value.position.x, value.position.y, 0.0, 1.0)); }
+@ValueType class Sample { value: Vec4f; constructor(value: Vec4f) { this.value = value; } textureSample(): Vec4f { return this.value; } }
+function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { const sample = new Sample(input.position); return sample.textureSample(); }
+const pipeline: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(
+        wgsl.contains("fn Sample_textureSample(self_: Sample) -> vec4<f32>"),
+        "{wgsl}"
+    );
+    assert!(
+        wgsl.contains("return Sample_textureSample(sample);"),
+        "{wgsl}"
+    );
+    validate(wgsl);
+}
+
+#[test]
+fn k10_sampler_host_method_fixture() {
+    let diagnostic = reject(include_str!(
+        "../fixtures/reject/k10-sampler-host-method.ts"
+    ));
+    assert!(diagnostic.message.starts_with("K10:"), "{diagnostic:?}");
+    assert!(diagnostic.message.contains("isNearest"), "{diagnostic:?}");
+}
+
+#[test]
+fn k33_name_collision_vertex() {
+    let diagnostic = reject(include_str!(
+        "../fixtures/reject/k33-name-collision-vertex.ts"
+    ));
+    assert!(diagnostic.message.starts_with("K14:"), "{diagnostic:?}");
+    assert!(diagnostic.message.contains("`id_f32`"), "{diagnostic:?}");
+}
+
+#[test]
+fn k33_name_collision_varyings() {
+    let diagnostic = reject(include_str!(
+        "../fixtures/reject/k33-name-collision-varyings.ts"
+    ));
+    assert!(diagnostic.message.starts_with("K14:"), "{diagnostic:?}");
+    assert!(diagnostic.message.contains("`id_f32`"), "{diagnostic:?}");
 }

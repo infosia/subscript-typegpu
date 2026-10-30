@@ -560,6 +560,7 @@ fn every_simulation_call_uses_its_generated_pipeline_pair() {
                 | "x03-live-particles.ts"
                 | "x04-live-control-flow.ts"
                 | "x09-live-switch.ts"
+                | "x25-live-kernel-forms.ts"
         ) && simulation_calls == 0
         {
             failures.push(format!(

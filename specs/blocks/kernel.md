@@ -12,7 +12,8 @@ parentheses), 2026-08-24. Rev 12 (K5 Rev 1 `using`, absence test),
 assignments used as values, `let x: T;`), 2026-10-05. Rev 17 (K7 `for` step shape, generator
 `for...of`), 2026-10-11. Rev 18 (K7 `do…while`, K9 sequence
 expressions), 2026-10-30. Rev 19 (K7 the loop-form step, K9 Rev 2
-schema construction), 2026-10-30. Plan §3 D2, D3, D7, D9 and §4
+schema construction), 2026-10-30. Rev 20 (P17 slice 2: K7 Rev 20,
+K11 Rev 1, K32, K33), 2026-10-30. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -80,11 +81,17 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   subscript lowering expands to several statements, for example
   `res.out[k + 0]++`, is a diagnostic under this rule. A `for...of`
   over a generator (subscript §176) is a diagnostic under this rule.
-  A `do…while` (subscript §203) is a diagnostic under this rule.
   Rev 19, 2026-10-30: when a `for` loop emits as a WGSL `loop`
   (its condition or step has a prelude), the step emits in the
   `continuing` block, so `continue` runs the step as it does on the
-  host.
+  host. Rev 20, 2026-10-30 (P17): a `do…while` (subscript §203)
+  emits as `loop { <body> continuing { <condition prelude> break if
+  !(<condition>); } }`, so `continue` reaches the test as it does on
+  the host. The uniformity analysis treats it as a `while`. A logical
+  assignment `p &&= v` or `p ||= v` (subscript §199) on a `bool`
+  local or field in statement position emits as `if (p) { p = v; }`
+  or `if (!p) { p = v; }`. A logical assignment used as a value stays
+  a diagnostic under this rule.
 - **K8 — `let` and `const` map to `var` and `let`.** A subscript
   `const` binding emits a WGSL `let`. A subscript `let` binding emits
   a WGSL `var`. A value class local is always `var`, because the
@@ -132,10 +139,22 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   value is already `f32`). Library free functions `clamp`, `mix`,
   `step`, `smoothstep`, `fract`, `sign` in `typegpu-types.ts` have
   real bodies and map to their WGSL names. Any other `Math` member
-  is a diagnostic.
+  is a diagnostic. Rev 1, 2026-10-30 (P17, owner choice): the `Math`
+  members take `f64` arguments, so a kernel writes the cast form
+  `Math.max(a as f64, b as f64) as f32`. The emitter accepts an
+  `<f32 expression> as f64` argument and an `as f32` result around a
+  K11 call, drops both casts, and emits the builtin on `f32`.
+  `Math.max` and `Math.min` with three or more arguments (subscript
+  §201) emit as nested two-argument calls. `Math.max()` and
+  `Math.min()` with no argument are a diagnostic. An `f64` value
+  anywhere else stays a K12 diagnostic. `isNaN`, `isFinite`,
+  `Number.isNaN`, and `Number.isFinite` are a diagnostic that says
+  NaN and infinity tests are not portable in WGSL, because WGSL lets
+  an implementation assume that NaN and infinities are absent
+  *(docs)*.
 - **K12 — Casts.** `x as f32`, `x as i32`, `x as u32` emit `f32(x)`,
   `i32(x)`, `u32(x)`. A cast to or from any other type is a
-  diagnostic.
+  diagnostic, except the K11 cast form and the K32 enum cast.
 - **K13 — Value semantics are preserved.** A schema or vector local
   assigned from a binding or another local copies, in WGSL as in
   subscript. The emitter never synthesizes a pointer in P2. A helper
@@ -430,6 +449,33 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   line inside a span, the harness prefixes the diagnostic with the
   shell name (`shell addBias:`) or `declarations:`. A line outside
   every span stays a generator defect (K15). The module order is K14's.
+- **K32 — Enums.** Rev 0, 2026-10-30 (P17). A kernel or helper can
+  use an `enum` type (subscript §200) as a parameter, local, or
+  result type, and read its members. The type emits as `u32`, or as
+  `i32` when a member is negative. A member emits as its suffixed
+  value. The checker limits member values to the `i32` range
+  (subscript S100 for a value outside it, S008 for an implicit value
+  that overflows), so every value fits the chosen type and the
+  emitter needs no range check. `m as u32` and `m as i32` on an enum value emit as the
+  value itself, converted when the types differ. A `switch` over
+  every member with no `default` emits the last arm as `case <v>,
+  default:`, because WGSL needs a `default` and the host traps on a
+  value that is not a member. An enum field in a schema stays an SC3
+  diagnostic.
+- **K33 — Helper names.** Rev 0, 2026-10-30 (P17). A helper's WGSL
+  name is its source name (K14 Rev 9), with three forms that the
+  emitter names itself. Each instance of a generic helper (subscript
+  §149, §208) is `<name>_<type>` with one underscore-joined part per
+  type argument, in argument order (`id_f32`, `pair_f32_u32`). A
+  method of a user `@ValueType` class used as a helper is
+  `<Class>_<method>`, with the receiver as the first parameter
+  `self: <Class>`, passed by value (K13). A method that writes a
+  field of `this` is a diagnostic, because a by-value receiver loses
+  the write. A local function (subscript §207) is
+  `<enclosing>_<name>`. A generated name that equals another
+  declaration's name is the K14 Rev 9 diagnostic. A call through an
+  interface constraint `T extends I` resolves to the method of the
+  type argument and is named by this rule.
 
 ## Diagnostics
 
