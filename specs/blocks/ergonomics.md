@@ -115,7 +115,12 @@ question (P2 review M6), and the diagnostic sweep.
   and `UiRenderer.create`. One body serves both device classes, and
   the `*Host` variants are removed. Every queue a helper uses is the
   device's cached queue, which the helper borrows and never
-  disposes. The text below is Rev 1. Rev 0,
+  disposes. Rev 3, 2026-10-31: subscript §212 infers a type
+  parameter from the contextual result type. A call writes no type
+  arguments, and its context gives `T`:
+  `using b: Buffer<P> = createBuffer(device, …)`, a return, or a
+  parameter. A call with no contextual type stays an S100 error
+  (§212 rule 5). The text below is Rev 1. Rev 0,
   2026-08-24. Rev 1, 2026-09-05: `createBufferHost<T>` joins them
   with the signature of BF1 and a `GPUHostOwnedDevice` first
   parameter. It creates the buffer through the host device and owns

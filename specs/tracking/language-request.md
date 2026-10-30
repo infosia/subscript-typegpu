@@ -664,3 +664,20 @@ range holds §201 through §209. The `swc_ecma_parser` fork stays at
 Evidence at `c560df1`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 297 passed, 0 failed, 1 ignored,
 370.2 s wall. No WGSL or `.expected` golden moved.
+
+### Re-pin to `1ffbb18` (2026-10-31)
+
+The workspace pin moves from `c560df1` to `1ffbb18`. The subscript
+range holds §210 through §212. The `swc_ecma_parser` fork stays at
+`affcb6e`.
+
+- §212: a generic call infers a type parameter from its contextual
+  result type. This lands the change request of 2026-10-30. A
+  `createBuffer` call drops its type arguments (`ergonomics.md` EG10
+  Rev 3).
+- §210, §211: ship-tier C emission only. No source change.
+
+Evidence at `1ffbb18`, before the call-site change:
+`tools/gate.sh --require-backend` with the yawgpu library,
+`gate: green`, 349 passed, 0 failed, 1 ignored, 380.8 s wall.
+`tools/regen.sh` left no diff.

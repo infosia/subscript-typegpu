@@ -254,3 +254,8 @@ at this pin failed one test after 367.9 s (`language-request.md`).
 
 The `--require-backend` gate: 360.8 s, with the harness at 283.8 s
 and typegpu-gen at 32.8 s. The previous row is 353.7 s.
+
+## Re-pin to `1ffbb18` (2026-10-31)
+
+The `--require-backend` gate: 380.8 s. The previous row is the P17
+close at 518.7 s (`p17-kernel-forms.md`). The P17 rise did not recur.
