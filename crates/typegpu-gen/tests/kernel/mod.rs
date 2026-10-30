@@ -1818,3 +1818,131 @@ fn k33_name_collision_varyings() {
     assert!(diagnostic.message.starts_with("K14:"), "{diagnostic:?}");
     assert!(diagnostic.message.contains("`id_f32`"), "{diagnostic:?}");
 }
+
+#[test]
+fn k18_repeated_literal_switch_selector() {
+    let diagnostic = reject(include_str!(
+        "../fixtures/reject/k18-duplicate-literal-case.ts"
+    ));
+    assert!(diagnostic.message.starts_with("K18:"), "{diagnostic:?}");
+    assert!(
+        diagnostic
+            .message
+            .contains("repeated switch selector value 1"),
+        "{diagnostic:?}"
+    );
+}
+
+#[test]
+fn k18_repeated_enum_switch_selector() {
+    let diagnostic = reject(include_str!(
+        "../fixtures/reject/k18-duplicate-enum-case.ts"
+    ));
+    assert!(diagnostic.message.starts_with("K18:"), "{diagnostic:?}");
+    assert!(
+        diagnostic
+            .message
+            .contains("repeated switch selector value 1"),
+        "{diagnostic:?}"
+    );
+}
+
+#[test]
+fn k11_non_finite_literals() {
+    let source = include_str!("../fixtures/reject/k11-non-finite-literal.ts");
+    for literal in ["Infinity", "-Infinity", "NaN"] {
+        let diagnostic = reject(&source.replace("Infinity", literal));
+        assert!(diagnostic.message.starts_with("K11:"), "{diagnostic:?}");
+        assert!(
+            diagnostic
+                .message
+                .contains(&format!("non-finite float literal {literal}")),
+            "{diagnostic:?}"
+        );
+    }
+}
+
+#[test]
+fn k18_empty_last_switch_case() {
+    let generated = generate(
+        r#"import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { constructor(public out: MutStorage<f32>) {} }
+enum E { A = 1, B = 2, C = 3 }
+function kernel(res: Layout, ctx: ComputeInvocation): void { const e: E = E.A; switch (e) { case E.A: break; case E.B: break; case E.C: } }
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(wgsl.contains("case 3u, default: {\n"), "{wgsl}");
+    validate(wgsl);
+}
+
+#[test]
+fn k11_single_argument_max() {
+    single_argument_math("max");
+}
+
+#[test]
+fn k11_single_argument_min() {
+    single_argument_math("min");
+}
+
+fn single_argument_math(name: &str) {
+    let source = r#"import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { constructor(public out: MutStorage<f32>) {} }
+
+function kernel(res: Layout, ctx: ComputeInvocation): void { const x: f32 = 2.0; res.out[0] = Math.NAME(x as f64) as f32; res.out[1] = x as f64 as f32; res.out[2] = 2.0 * ((x + 1.0) as f64 as f32); }
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#;
+    let generated = generate(&source.replace("NAME", name));
+    let wgsl = &generated.pipelines[0].1;
+    assert!(wgsl.contains("out[0u] = x;"), "{wgsl}");
+    assert!(wgsl.contains("out[1u] = x;"), "{wgsl}");
+    assert!(wgsl.contains("out[2u] = 2.0f * (x + 1.0f);"), "{wgsl}");
+    validate(wgsl);
+}
+
+#[test]
+fn k12_rejects_other_f64_casts() {
+    let source = r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { constructor(public out: MutStorage<f32>) {} }
+function kernel(res: Layout, ctx: ComputeInvocation): void { const x: f32 = 2.0; BODY }
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#;
+    for body in [
+        "const y: f64 = x as f64;",
+        "res.out[0] = (1 as i32) as f64 as f32;",
+        "res.out[0] = (1 as u32) as f64 as f32;",
+        "res.out[0] = (x as f64) as i32 as f32;",
+        "res.out[0] = (x as f64) + 1.0 as f32;",
+    ] {
+        let diagnostic = reject(&source.replace("BODY", body));
+        assert!(
+            diagnostic.message.starts_with("K12:"),
+            "{body}: {diagnostic:?}"
+        );
+    }
+}
+
+#[test]
+fn k18_constant_switch_selectors_use_their_values() {
+    let source = r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { constructor(public out: MutStorage<f32>) {} }
+const first: i32 = -2;
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  switch (ctx.localIndex as i32) { case first: break; case -1: break; default: }
+}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#;
+    let generated = generate(source);
+    validate(&generated.pipelines[0].1);
+    let diagnostic = reject(&source.replace("case -1:", "case -2:"));
+    assert!(
+        diagnostic
+            .message
+            .contains("K18: repeated switch selector value -2"),
+        "{diagnostic:?}"
+    );
+}

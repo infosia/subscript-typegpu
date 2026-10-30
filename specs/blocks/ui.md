@@ -244,7 +244,7 @@ tiers with no GPU. The renderer is the only GPU code.
   `rgba8unorm`, every channel the alpha byte, uploaded once through
   `writeTextureBytes`. No library module imports a generated support
   module.
-- **UI15 — The frame builder.** Rev 3. `UiRenderer` is created by
+- **UI15 — The frame builder.** Rev 6. `UiRenderer` is created by
   the static factory with the program's pipeline facts and a quad
   capacity, default 16,384 (Rev 6, 2026-10-30, P17):
   `UiRenderer.create<D extends GPUDeviceCreation>(device: D, facts,
@@ -252,7 +252,7 @@ tiers with no GPU. The renderer is the only GPU code.
   device (W2, ergonomics.md EG10 Rev 2). The factory creates the
   resources through the device, borrows its cached `queue`, which
   the renderer never disposes, and hands them to the constructor. The constructor is private: the
-  factories are the only creation path, and the subscript checker
+  factory is the only creation path, and the subscript checker
   rejects a direct `new UiRenderer` (subscript §155). `render` writes through
   that queue. `UiPipelineFacts` holds the WGSL, the two entry
   names, the bind group layout, the vertex buffer layout, and the

@@ -191,3 +191,20 @@ ignored, 202.71 s, every port visually passed. Records:
 `specs/tracking/p16-texture-arrays.md`,
 `specs/tracking/cstruct-mutation-request.md`,
 `specs/tracking/build-time.md`.
+
+## P17 — the current language in kernels and the device constraint (2026-10-30)
+
+Slice 1 fixed three silent kernel miscompiles (the loop-form `for`
+step, schema construction, `#name` schema fields). Slice 2 brought
+`do…while`, logical assignment, scalar `Math` in the cast form,
+enums (K32), and emitter-named helpers (K33: generic instances,
+value-class methods, local functions, interface-constrained calls)
+into kernels, with `b25-kernel-forms` and the live
+`x25-live-kernel-forms`. Slice 3 made both device classes implement
+`GPUDeviceCreation` and removed the `*Host` helper variants. Phase
+review: 1 MAJOR and 8 MINOR, the MAJOR and seven MINOR closed, one
+MINOR recorded open. Evidence: gate green, 349 passed, 1 ignored,
+518.7 s; live lane green on Metal; 27 window examples smoke-green.
+Open: the contextual result-type inference request to subscript (the
+`createBuffer<T, D>` call sites). Record:
+`specs/tracking/p17-kernel-forms.md`.

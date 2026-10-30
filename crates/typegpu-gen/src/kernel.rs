@@ -1280,6 +1280,37 @@ fn literal(expr: &Expr) -> Result<String, Diagnostic> {
     }
 }
 
+/// Returns the value of a non-finite literal, including unary negation (K11).
+fn non_finite_literal(expr: &Expr) -> Option<f64> {
+    match &expr.kind {
+        ExprKind::Float(value) if !value.is_finite() => Some(*value),
+        ExprKind::Unary {
+            op: UnOp::Neg,
+            operand,
+        } => non_finite_literal(operand).map(|value| -value),
+        _ => None,
+    }
+}
+
+/// Rejects a non-finite literal before WGSL emission (K11).
+fn reject_non_finite(expr: &Expr) -> Result<(), Diagnostic> {
+    let Some(value) = non_finite_literal(expr) else {
+        return Ok(());
+    };
+    let name = if value.is_nan() {
+        "NaN"
+    } else if value.is_sign_negative() {
+        "-Infinity"
+    } else {
+        "Infinity"
+    };
+    Err(diagnostic(
+        "K11",
+        format!("non-finite float literal {name}"),
+        expr.pos.clone(),
+    ))
+}
+
 /// Returns the WGSL `f32` spelling of a value, with a fraction part and the `f` suffix (K14).
 fn f32_literal(value: f64) -> String {
     let mut text = value.to_string();
@@ -2427,7 +2458,10 @@ impl<'a> Emitter<'a> {
     fn fround_argument(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
         match (&expr.kind, &expr.ty) {
             (ExprKind::Cast(value), Type::F64) if value.ty == Type::F32 => self.snippet(value),
-            (ExprKind::Float(value), Type::F64) => Ok(Snippet::atom(f32_literal(*value))),
+            (ExprKind::Float(value), Type::F64) => {
+                reject_non_finite(expr)?;
+                Ok(Snippet::atom(f32_literal(*value)))
+            }
             (ExprKind::Binary { op, left, right }, Type::F64) => {
                 let Some(spelling) = binop(*op) else {
                     return Err(diagnostic(
@@ -2491,20 +2525,15 @@ impl<'a> Emitter<'a> {
     /// an increment, or a decrement gives a K7 diagnostic, because it is legal only in statement
     /// position ([`Self::statement_snippet`]).
     fn snippet(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
-        if matches!(&expr.kind, ExprKind::Float(value) if !value.is_finite()) {
-            return Err(diagnostic(
-                "K11",
-                "Math.max() and Math.min() require an argument",
-                expr.pos.clone(),
-            ));
-        }
+        reject_non_finite(expr)?;
         if let ExprKind::Cast(value) = &expr.kind {
-            if matches!(&value.kind, ExprKind::Float(number) if !number.is_finite()) {
-                return Err(diagnostic(
-                    "K11",
-                    "Math.max() and Math.min() require an argument",
-                    expr.pos.clone(),
-                ));
+            reject_non_finite(value)?;
+            if expr.ty == Type::F32 && value.ty == Type::F64 {
+                if let ExprKind::Cast(operand) = &value.kind {
+                    if operand.ty == Type::F32 {
+                        return self.snippet(operand);
+                    }
+                }
             }
             if matches!(value.ty, Type::Enum(_)) && !matches!(expr.ty, Type::U32 | Type::I32) {
                 return Err(diagnostic(
@@ -3783,8 +3812,36 @@ impl<'a> Emitter<'a> {
                 // An empty case shares the next case's body, which WGSL writes as one selector
                 // with several values. The labels accumulate until a body arrives (K18).
                 let mut labels = Vec::new();
+                let mut selectors = BTreeSet::new();
                 for (index, case) in cases.iter().enumerate() {
                     let label = if let Some(test) = &case.test {
+                        let selector = match &test.kind {
+                            ExprKind::Int(value) | ExprKind::EnumMember { value, .. } => *value,
+                            _ => match fold_constant_expr(
+                                self.module,
+                                &self.globals,
+                                &mut BTreeMap::new(),
+                                &mut BTreeSet::new(),
+                                test,
+                            ) {
+                                Ok(FoldedConstant::I32(value)) => i64::from(value),
+                                Ok(FoldedConstant::U32(value)) => i64::from(value),
+                                _ => {
+                                    return Err(diagnostic(
+                                        "K18",
+                                        "switch case label is not an integer constant",
+                                        test.pos.clone(),
+                                    ));
+                                }
+                            },
+                        };
+                        if !selectors.insert(selector) {
+                            return Err(diagnostic(
+                                "K18",
+                                format!("repeated switch selector value {selector}"),
+                                test.pos.clone(),
+                            ));
+                        }
                         let value = self.snippet(test)?;
                         if !value.prelude.is_empty() {
                             return Err(diagnostic(
@@ -3801,7 +3858,7 @@ impl<'a> Emitter<'a> {
                     if exhaustive && !has_default && index + 1 == cases.len() {
                         labels.push("default".to_owned());
                     }
-                    if case.body.is_empty() {
+                    if case.body.is_empty() && index + 1 < cases.len() {
                         continue;
                     }
                     if !case.body.is_empty() && !case_terminates(&case.body) {
@@ -3831,14 +3888,6 @@ impl<'a> Emitter<'a> {
                     result?;
                     Self::line(out, indent + 1, "}");
                     labels.clear();
-                }
-                // Labels remain when the last case is empty, so no body follows to share.
-                if !labels.is_empty() {
-                    return Err(diagnostic(
-                        "K18",
-                        "an empty switch case has no following body",
-                        pos.clone(),
-                    ));
                 }
                 Self::line(out, indent, "}");
             }

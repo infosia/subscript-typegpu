@@ -103,7 +103,7 @@ WGSL or `.expected` golden moved.
 ## Slice 3 — the device constraint (2026-10-30)
 
 `lib/webgpu.ts` emits `export interface GPUDeviceCreation` with the
-`queue` read accessor, `hasFeature`, and the 16 creation methods that
+`queue` read accessor, `hasFeature`, and the 15 creation methods that
 both device classes emit with the same signature. Both classes
 declare `implements GPUDeviceCreation`. `GPUHostOwnedDevice.create`
 caches one queue reference, `queue` is a read accessor, and
@@ -151,3 +151,42 @@ or `.expected` golden moved. `tools/live.sh` on Metal:
 `tools/window.sh <example> --frames 30` on Metal: the 27 window
 examples exit 0 with no `FAIL`. The five examples with no `frame`
 entry exit 1 as before.
+
+## Phase review (2026-10-30)
+
+A fresh Opus review of `5a0ff03..016151a` found 1 MAJOR and 8 MINOR.
+
+- MAJOR M1, fixed: a repeated `switch` selector (two literals, or two
+  enum members with one value) exited 0 with a WGSL `case` repeated.
+  It is K18 now (K18 Rev 1). Fixtures `k18-duplicate-literal-case.ts`
+  and `k18-duplicate-enum-case.ts`, red then green.
+- MINOR, fixed: an empty last case emits an empty body (K18 Rev 1). A
+  one-argument `Math.max` / `Math.min` in the cast form emits its
+  argument: subscript lowers the call to its argument, so the emitter
+  accepts the round trip `x as f64 as f32` on an `f32` value and no
+  other `f64` (K12). A non-finite float literal gets a diagnostic that
+  names `Infinity`, `-Infinity`, or `NaN` (`k11-non-finite-literal.ts`).
+- MINOR, fixed: `subscript-typegpu-gen gen` ran only the discovery
+  check, which accepts a missing generated module
+  (`crates/typegpu-gen/src/lib.rs` about 400), and never the full
+  check that the harness runs after it adds the generated modules. The
+  CLI now runs the full check before it writes output
+  (`crates/typegpu-gen/src/main.rs` about 86). A CLI test expects exit
+  1 for the unannotated `createBuffer` call; it exited 0 before.
+- MINOR, fixed in specs: K33 names the receiver `self_`, K11 Rev 1
+  states the WGSL domain of the builtins (`pow` with a negative base
+  can differ from `simulateCompute`), UI15 Rev 6 names one factory,
+  and this record counts 15 creation methods.
+- MINOR, open: a `_g_constructor_` capture evaluates its arguments
+  before earlier operands of the enclosing expression, so
+  `a.add(1) + new P(a.add(2), a.add(3)).x` with atomics runs in a
+  different order on the GPU. The conditional lowering has the same
+  pre-existing behavior. Not fixed in P17.
+
+Evidence: `tools/gate.sh --require-backend` with the yawgpu library,
+`gate: green`, 349 passed, 0 failed, 1 ignored, 518.7 s wall. The
+harness `tests/main.rs` took 429.7 s and the generator tests 57.3 s,
+against 347.5 s, about 290 s, and 35 s at slice 3: 1.49x, below the
+2x red line, cause not measured. No WGSL or `.expected` golden moved.
+
+P17 is COMPLETE: no CRITICAL or MAJOR finding is open.

@@ -13,7 +13,8 @@ assignments used as values, `let x: T;`), 2026-10-05. Rev 17 (K7 `for` step shap
 `for...of`), 2026-10-11. Rev 18 (K7 `do…while`, K9 sequence
 expressions), 2026-10-30. Rev 19 (K7 the loop-form step, K9 Rev 2
 schema construction), 2026-10-30. Rev 20 (P17 slice 2: K7 Rev 20,
-K11 Rev 1, K32, K33), 2026-10-30. Plan §3 D2, D3, D7, D9 and §4
+K11 Rev 1, K32, K33), 2026-10-30. Rev 21 (P17 review: K18 Rev 1,
+K11 Rev 1 one argument and the domain, K33 `self_`), 2026-10-30. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -151,10 +152,19 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `Number.isNaN`, and `Number.isFinite` are a diagnostic that says
   NaN and infinity tests are not portable in WGSL, because WGSL lets
   an implementation assume that NaN and infinities are absent
-  *(docs)*.
+  *(docs)*. `Math.max(x)` and `Math.min(x)` with one argument emit
+  `x`. A non-finite float literal is a diagnostic that names it. The
+  builtins keep their WGSL domain: outside it (for example `pow` with
+  a negative base) WGSL gives an undefined result where the host
+  gives the JavaScript value, so the GPU and `simulateCompute` can
+  differ *(docs)*.
 - **K12 — Casts.** `x as f32`, `x as i32`, `x as u32` emit `f32(x)`,
   `i32(x)`, `u32(x)`. A cast to or from any other type is a
-  diagnostic, except the K11 cast form and the K32 enum cast.
+  diagnostic, except the K11 cast form, the K32 enum cast, and the
+  round trip `x as f64 as f32` on an `f32` value, which emits `x`
+  (subscript lowers a one-argument `Math.max` or `Math.min` to its
+  argument, so the K11 cast form of that call reaches the emitter as
+  this round trip).
 - **K13 — Value semantics are preserved.** A schema or vector local
   assigned from a binding or another local copies, in WGSL as in
   subscript. The emitter never synthesizes a pointer in P2. A helper
@@ -247,6 +257,10 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `return`, or is empty and shares the next case's body, `default`
   included: the emitter writes `case a, b:` or `case a, default:`.
   A case body that falls through with statements is a diagnostic.
+  Rev 1, 2026-10-30 (P17 review): two case selectors with one value
+  (two literals, or two enum members with one value) are a
+  diagnostic that names the value, because WGSL rejects a repeated
+  selector. An empty last case emits an empty body.
   `break` and `continue` inside a `for`, `while`, or `switch` emit
   the WGSL statement of the same name. A `continue` inside a
   `switch` inside a loop targets the loop, as in WGSL.
@@ -469,7 +483,8 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   type argument, in argument order (`id_f32`, `pair_f32_u32`). A
   method of a user `@ValueType` class used as a helper is
   `<Class>_<method>`, with the receiver as the first parameter
-  `self: <Class>`, passed by value (K13). A method that writes a
+  `self_: <Class>` (K14 maps the reserved word `self`), passed by
+  value (K13). A method that writes a
   field of `this` is a diagnostic, because a by-value receiver loses
   the write. A local function (subscript §207) is
   `<enclosing>_<name>`. A generated name that equals another

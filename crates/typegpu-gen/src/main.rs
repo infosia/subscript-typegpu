@@ -72,6 +72,10 @@ fn run() -> Result<(), String> {
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or_else(|| format!("program has no UTF-8 file name: {}", program.display()))?;
+    let stem = program
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .ok_or_else(|| format!("program has no UTF-8 stem: {}", program.display()))?;
     let program_file = SourceFile::entry(program_name, read(&program)?);
     let mut files = subscript_typegpu_gen::load_library_files(&library, &program_file)
         .map_err(|error| error.to_string())?;
@@ -79,12 +83,15 @@ fn run() -> Result<(), String> {
     files.push(program_file);
     let generated = subscript_typegpu_gen::generate(&files)
         .map_err(|diagnostics| subscript_compiler::render_diagnostics(&files, &diagnostics))?;
+    // Discovery permits absent support facts. Check the complete source set before any write.
+    files.push(SourceFile::new(
+        format!("{stem}.typegpu.ts"),
+        generated.support_module.clone(),
+    ));
+    subscript_compiler::check_program(&files)
+        .map_err(|diagnostics| subscript_compiler::render_diagnostics(&files, &diagnostics))?;
     std::fs::create_dir_all(&output)
         .map_err(|error| format!("create {}: {error}", output.display()))?;
-    let stem = program
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .ok_or_else(|| format!("program has no UTF-8 stem: {}", program.display()))?;
     let destination = output.join(format!("{stem}.typegpu.ts"));
     std::fs::write(&destination, generated.support_module)
         .map_err(|error| format!("write {}: {error}", destination.display()))?;

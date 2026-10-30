@@ -6,9 +6,11 @@ use crate::support;
 struct TempDir(PathBuf);
 
 impl TempDir {
-    fn new() -> Self {
-        let directory =
-            std::env::temp_dir().join(format!("subscript-typegpu-cli-{}", std::process::id()));
+    fn new(name: &str) -> Self {
+        let directory = std::env::temp_dir().join(format!(
+            "subscript-typegpu-cli-{name}-{}",
+            std::process::id()
+        ));
         if directory.exists() {
             std::fs::remove_dir_all(&directory).expect("remove stale CLI directory");
         }
@@ -26,7 +28,7 @@ impl Drop for TempDir {
 #[test]
 fn cli_writes_the_same_support_and_wgsl_as_the_library_for_every_program() {
     let root = support::root();
-    let output = TempDir::new();
+    let output = TempDir::new("programs");
     let directory = root.join("programs");
     let mut programs = std::fs::read_dir(&directory)
         .expect("read programs")
@@ -88,4 +90,36 @@ fn cli_writes_the_same_support_and_wgsl_as_the_library_for_every_program() {
             );
         }
     }
+}
+
+#[test]
+fn gen_rejects_uninferrable_create_buffer() {
+    let root = support::root();
+    let scratch = TempDir::new("inference");
+    let source = support::read(&root.join("programs/b05-buffer.ts")).replacen(
+        "using source: Buffer<Particle> = createBuffer<Particle, GPUDevice>(",
+        "using source = createBuffer(",
+        1,
+    );
+    let program = scratch.0.join("b05-buffer.ts");
+    std::fs::write(&program, source).expect("write invalid buffer program");
+    let output = scratch.0.join("output");
+    let result = Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-gen"))
+        .arg("gen")
+        .arg(&program)
+        .arg("--lib")
+        .arg(root.join("lib"))
+        .arg("-o")
+        .arg(&output)
+        .output()
+        .expect("run generator CLI");
+    assert_eq!(result.status.code(), Some(1), "{result:?}");
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(
+        stderr.contains("S100")
+            && stderr.contains("cannot infer type parameter `T`")
+            && stderr.contains("no candidate"),
+        "{stderr}"
+    );
+    assert!(!output.exists(), "invalid program produced output");
 }
