@@ -126,7 +126,7 @@ export async function main(): Promise<void> {
     using device = deviceResult;
     // `RandomValue_STRIDE` is a generated constant, so the element pitch follows the schema
     // layout. STORAGE binds the buffer to the kernel, and COPY_SRC admits the readback copy.
-    using output: Buffer<RandomValue> = createBuffer<RandomValue>(
+    using output: Buffer<RandomValue> = createBuffer<RandomValue, GPUDevice>(
       device,
       RandomValue_STRIDE,
       SAMPLE_COUNT,

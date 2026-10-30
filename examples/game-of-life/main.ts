@@ -23,9 +23,9 @@ import {
   VertexInvocation,
   bufferResource,
   computePipeline,
-  createBindGroupHost,
-  createComputePipelineHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createComputePipeline,
+  createRenderPipeline,
   renderPipelineL,
   textureResource,
   writeTexturePixels,
@@ -290,8 +290,8 @@ export function init(
     print(`FAIL format expected=${lifeRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
-  // The wrapper adapts the host handles to the API layer. It carries no `dispose`, because
-  // the host owns the device.
+  // The wrapper adapts the host handles and caches a queue reference.
+  // Its disposal releases that queue reference. The host owns the device.
   const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // The vertex buffer holds the four corners of the strip. Vertex_STRIDE keeps the size right
   // when the schema changes.
@@ -334,9 +334,8 @@ export function init(
     new Vertex(new Vec2f(-1.0, 1.0)),
     new Vertex(new Vec2f(1.0, 1.0)),
   ];
-  // The queue wrapper is a handle. `using` disposes it at the end of `init`, and `frame`
-  // takes a fresh one.
-  using queue = hostDevice.queue();
+  // The device lends its cached queue to both `init` and `frame`.
+  const queue = hostDevice.queue;
   // `Context.bytesOf` lays out the values with the generated C layout, so the bytes match the
   // WGSL that the generator emits.
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 4>>(vertexValues));
@@ -349,14 +348,14 @@ export function init(
   hostDevice.pushErrorScope("validation");
   // Each compute call takes the generated WGSL, the entry name, the bind group layout, and the
   // workgroup size that the declaration above names.
-  const stepPipeline = createComputePipelineHost(
+  const stepPipeline = createComputePipeline(
     hostDevice,
     lifeStep_WGSL,
     lifeStep_ENTRY,
     [lifeStep_LAYOUT0],
     [8, 8, 1],
   );
-  const editPipeline = createComputePipelineHost(
+  const editPipeline = createComputePipeline(
     hostDevice,
     lifeEdit_WGSL,
     lifeEdit_ENTRY,
@@ -364,7 +363,7 @@ export function init(
     [8, 8, 1],
   );
   // The render call adds the two entry names and the vertex layout. No shader text is built here.
-  const renderPipeline = createRenderPipelineHost(
+  const renderPipeline = createRenderPipeline(
     hostDevice,
     lifeRender_WGSL,
     lifeRender_VERTEX_ENTRY,
@@ -386,6 +385,7 @@ export function init(
     generationA.dispose();
     editParams.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -397,26 +397,26 @@ export function init(
   using renderLayout = renderPipeline.bindGroupLayout(0);
   // Six bind groups cover both directions of the swap for each pass. The frame then picks
   // three of them and builds none.
-  const stepAB = createBindGroupHost(hostDevice, stepLayout, lifeStep_LAYOUT0, [
+  const stepAB = createBindGroup(hostDevice, stepLayout, lifeStep_LAYOUT0, [
     textureResource(viewA),
     textureResource(viewB),
   ]);
-  const stepBA = createBindGroupHost(hostDevice, stepLayout, lifeStep_LAYOUT0, [
+  const stepBA = createBindGroup(hostDevice, stepLayout, lifeStep_LAYOUT0, [
     textureResource(viewB),
     textureResource(viewA),
   ]);
-  const editA = createBindGroupHost(hostDevice, editLayout, lifeEdit_LAYOUT0, [
+  const editA = createBindGroup(hostDevice, editLayout, lifeEdit_LAYOUT0, [
     textureResource(viewA),
     bufferResource(editParams),
   ]);
-  const editB = createBindGroupHost(hostDevice, editLayout, lifeEdit_LAYOUT0, [
+  const editB = createBindGroup(hostDevice, editLayout, lifeEdit_LAYOUT0, [
     textureResource(viewB),
     bufferResource(editParams),
   ]);
-  const renderA = createBindGroupHost(hostDevice, renderLayout, lifeRender_LAYOUT0, [
+  const renderA = createBindGroup(hostDevice, renderLayout, lifeRender_LAYOUT0, [
     textureResource(viewA),
   ]);
-  const renderB = createBindGroupHost(hostDevice, renderLayout, lifeRender_LAYOUT0, [
+  const renderB = createBindGroup(hostDevice, renderLayout, lifeRender_LAYOUT0, [
     textureResource(viewB),
   ]);
   // The state moves to module scope only after every step passes. A failed `init` leaves
@@ -470,7 +470,7 @@ export function frame(
       (1.0 - pointerY / (height as f32)) * ((GRID_SIZE - 1) as f32),
     );
   }
-  using queue = active.device.queue();
+  const queue = active.device.queue;
   // The frame parity picks the step source and target. The edit pass and the render pass
   // both use the step target, so an edit lands on the grid the frame displays.
   const readsA: boolean = frameCount % 2 == 0;
@@ -544,6 +544,7 @@ export function shutdown(): void {
   active.edit.dispose();
   active.step.dispose();
   // The null assignment makes a second `shutdown` call safe.
+  active.device.dispose();
   activeState = null;
   frameCount = 0;
 }

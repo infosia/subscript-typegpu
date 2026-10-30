@@ -11,8 +11,8 @@ import {
   Uniform,
   VertexInvocation,
   bufferResource,
-  createBindGroupHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createRenderPipeline,
   renderPipelineL,
 } from "./typegpu";
 import {
@@ -157,7 +157,7 @@ export function init(
   });
   // Two queue writes seed both buffers. The three vertices form one oversized triangle whose
   // 3.0 coordinates fall outside the clip volume, so it covers the whole surface.
-  using queue = hostDevice.queue();
+  const queue = hostDevice.queue;
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>([
     new Vertex(new Vec2f(-1.0, -1.0)),
     new Vertex(new Vec2f(3.0, -1.0)),
@@ -168,7 +168,7 @@ export function init(
   // The generated entry names, the generated layouts, and the declaration build the pipeline.
   // The scope catches a validation error from that call.
   hostDevice.pushErrorScope("validation");
-  const pipeline = createRenderPipelineHost(
+  const pipeline = createRenderPipeline(
     hostDevice,
     noise_WGSL,
     noise_VERTEX_ENTRY,
@@ -186,13 +186,14 @@ export function init(
     pipeline.dispose();
     frameBuffer.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
   // The bind group joins the uniform buffer to the generated layout. It survives every frame,
   // because the buffer handle never changes.
   using bindLayout = pipeline.bindGroupLayout(0);
-  const group = createBindGroupHost(
+  const group = createBindGroup(
     hostDevice,
     bindLayout,
     noise_LAYOUT0,
@@ -233,7 +234,7 @@ export function frame(
   frameCount += 1;
   // The queue keeps its work in the order it receives it, so this write lands before the
   // submitted pass reads the uniform.
-  using queue = device.queue();
+  const queue = device.queue;
   queue.writeBuffer(
     frameBuffer,
     0,
@@ -279,6 +280,7 @@ export function shutdown(): void {
   activeVertices = null;
   activePipeline = null;
   activeGroup = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
   frameCount = 0;
 }

@@ -12,14 +12,14 @@ export async function main(): Promise<void> {
   if (adapter == null) { print("FAIL adapter"); return; }
   const device: GPUDevice | null = await adapter.requestDevice();
   if (device == null) { print("FAIL device"); return; }
-  using source: Buffer<u16> = createBuffer<u16>(
+  using source: Buffer<u16> = createBuffer<u16, GPUDevice>(
     device,
     2,
     1,
     GPUBufferUsage.COPY_SRC,
     "trap-copy-unaligned-source",
   );
-  using target: Buffer<u16> = createBuffer<u16>(
+  using target: Buffer<u16> = createBuffer<u16, GPUDevice>(
     device,
     2,
     1,

@@ -12,8 +12,8 @@ import {
   Uniform,
   VertexInvocation,
   bufferResource,
-  createBindGroupHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createRenderPipeline,
   renderPipelineL,
 } from "./typegpu";
 import {
@@ -175,8 +175,8 @@ export function init(
     size: OklabUniforms_SIZE as u64,
     usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
   });
-  // A host-owned device returns a new queue wrapper from each call, so this block frees it.
-  using queue = hostDevice.queue();
+  // The device lends its cached queue until shutdown.
+  const queue = hostDevice.queue;
   // One oversized triangle covers the whole surface. The parts outside the viewport clip
   // away, so this example needs no quad and no index buffer.
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>([
@@ -199,7 +199,7 @@ export function init(
   // layout into a value the code below tests.
   hostDevice.pushErrorScope("validation");
   // The generated WGSL, the entry names, and the layout constants build the pipeline.
-  const pipeline = createRenderPipelineHost(
+  const pipeline = createRenderPipeline(
     hostDevice,
     oklab_WGSL,
     oklab_VERTEX_ENTRY,
@@ -215,6 +215,7 @@ export function init(
     pipeline.dispose();
     uniforms.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -222,7 +223,7 @@ export function init(
   // disagree about group 0.
   using bindLayout = pipeline.bindGroupLayout(0);
   // The resource list follows the field order of OklabLayout. One uniform buffer fills binding 0.
-  const group = createBindGroupHost(
+  const group = createBindGroup(
     hostDevice,
     bindLayout,
     oklab_LAYOUT0,
@@ -270,7 +271,7 @@ export function frame(
   if (pointerX >= 0.0 && pointerY >= 0.0) {
     pointer = new Vec2f(pointerX / (width as f32), 1.0 - pointerY / (height as f32));
   }
-  using queue = device.queue();
+  const queue = device.queue;
   // The uniform update enters the queue before the submit below. The queue keeps that
   // order, so the draw reads this frame's hue and pointer.
   queue.writeBuffer(
@@ -317,5 +318,6 @@ export function shutdown(): void {
   activeVertices = null;
   activePipeline = null;
   activeGroup = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
 }

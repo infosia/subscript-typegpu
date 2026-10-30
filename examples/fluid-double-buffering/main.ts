@@ -18,8 +18,8 @@ import {
   Uniform,
   VertexInvocation,
   computePipeline,
-  createComputePipelineHost,
-  createRenderPipelineHost,
+  createComputePipeline,
+  createRenderPipeline,
   renderPipelineL,
 } from "./typegpu";
 import {
@@ -340,8 +340,8 @@ export function init(
     print(`FAIL format expected=${fluidRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
-  // The host owns the device and the instance. The wrapper carries no `dispose`, so this example
-  // never releases what it did not create.
+  // The host owns the device and the instance.
+  // The wrapper owns its cached queue reference and releases it in `shutdown`.
   const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // The four strip corners in clip space, in the order the triangle-strip topology needs.
   const vertexValues: FixedArray<Vertex, 4> = [
@@ -376,7 +376,7 @@ export function init(
   });
   // Queue writes land before the commands that a later submit carries, so the initial state
   // reaches the buffers before the first dispatch.
-  using queue = hostDevice.queue();
+  const queue = hostDevice.queue;
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 4>>(vertexValues));
   queue.writeBuffer(params, 0, Context.bytesOf<FluidParams>(new FluidParams(0.0)));
   // The initial state fills a dense block near the bottom center. `Context.bytesOf` returns the
@@ -400,21 +400,21 @@ export function init(
   hostDevice.pushErrorScope("validation");
   // Each compute pipeline takes the generated WGSL text, the entry name, the layout facts, and
   // the workgroup size. That size must equal the size in the declaration above.
-  const flowPipeline = createComputePipelineHost(
+  const flowPipeline = createComputePipeline(
     hostDevice,
     flow_WGSL,
     flow_ENTRY,
     [flow_LAYOUT0],
     [8, 8, 1],
   );
-  const evaporatePipeline = createComputePipelineHost(
+  const evaporatePipeline = createComputePipeline(
     hostDevice,
     evaporate_WGSL,
     evaporate_ENTRY,
     [evaporate_LAYOUT0],
     [8, 8, 1],
   );
-  const obstaclePipeline = createComputePipelineHost(
+  const obstaclePipeline = createComputePipeline(
     hostDevice,
     obstacle_WGSL,
     obstacle_ENTRY,
@@ -423,7 +423,7 @@ export function init(
   );
   // The render pipeline also takes the vertex buffer layout and the declaration, which carries
   // the target format and the topology.
-  const renderPipeline = createRenderPipelineHost(
+  const renderPipeline = createRenderPipeline(
     hostDevice,
     fluidRender_WGSL,
     fluidRender_VERTEX_ENTRY,
@@ -442,6 +442,7 @@ export function init(
     cellsB.dispose();
     cellsA.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -596,7 +597,7 @@ export function frame(
   frameCount += 1;
   // The uniform write reaches the device before the submit below, so all three passes read the
   // obstacle position of this frame.
-  using queue = device.queue();
+  const queue = device.queue;
   queue.writeBuffer(
     params,
     0,
@@ -676,5 +677,6 @@ export function shutdown(): void {
   activeObstacle = null;
   activeEvaporate = null;
   activeFlow = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
 }

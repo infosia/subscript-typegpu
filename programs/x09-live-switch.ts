@@ -86,14 +86,14 @@ export async function main(): Promise<void> {
       1,
       liveSwitch_HOST_RUNNABLE,
     );
-    using output: Buffer<SwitchValue> = createBuffer<SwitchValue>(
+    using output: Buffer<SwitchValue> = createBuffer<SwitchValue, GPUDevice>(
       device,
       SwitchValue_STRIDE,
       count,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_SRC,
       "x09-output",
     );
-    using readback: Buffer<SwitchValue> = createBuffer<SwitchValue>(
+    using readback: Buffer<SwitchValue> = createBuffer<SwitchValue, GPUDevice>(
       device,
       SwitchValue_STRIDE,
       count,

@@ -27,9 +27,9 @@ import {
   VertexInvocation,
   bufferResource,
   computePipeline,
-  createBindGroupHost,
-  createComputePipelineHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createComputePipeline,
+  createRenderPipeline,
   renderPipelineL,
   textureResource,
   writeTexturePixels,
@@ -328,8 +328,8 @@ export function init(
     print(`FAIL format expected=${slimeRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
-  // The host owns the device and the instance. The wrapper carries no `dispose`, so this example
-  // never releases what it did not create.
+  // The host owns the device and the instance.
+  // The wrapper owns its cached queue reference and releases it in `shutdown`.
   const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // Buffer sizes come from the generated stride constants, never from a hand count.
   const vertices = hostDevice.createBuffer({
@@ -399,7 +399,7 @@ export function init(
   }
   // Queue writes land before the commands that a later submit carries, so the agents and the
   // empty trails reach the device before the first dispatch.
-  using queue = hostDevice.queue();
+  const queue = hostDevice.queue;
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 4>>(vertexValues));
   queue.writeBuffer(agents, 0, agentBytes);
   const empty: Vec4f[] = zeroTrail();
@@ -411,14 +411,14 @@ export function init(
   hostDevice.pushErrorScope("validation");
   // Each compute pipeline takes the generated WGSL text, the entry name, the layout facts, and
   // the workgroup size. That size must equal the size in the declaration above.
-  const movePipeline = createComputePipelineHost(
+  const movePipeline = createComputePipeline(
     hostDevice,
     slimeMove_WGSL,
     slimeMove_ENTRY,
     [slimeMove_LAYOUT0],
     [64, 1, 1],
   );
-  const diffusePipeline = createComputePipelineHost(
+  const diffusePipeline = createComputePipeline(
     hostDevice,
     slimeDiffuse_WGSL,
     slimeDiffuse_ENTRY,
@@ -427,7 +427,7 @@ export function init(
   );
   // The render pipeline also takes the vertex buffer layout and the declaration, which carries
   // the target format and the topology.
-  const renderPipeline = createRenderPipelineHost(
+  const renderPipeline = createRenderPipeline(
     hostDevice,
     slimeRender_WGSL,
     slimeRender_VERTEX_ENTRY,
@@ -447,6 +447,7 @@ export function init(
     trailA.dispose();
     agents.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -458,28 +459,28 @@ export function init(
   using renderLayout = renderPipeline.bindGroupLayout(0);
   // Six bind groups cover both trail directions for each pass and both display choices.
   // The resource order follows the field order of the layout class.
-  const moveAB = createBindGroupHost(hostDevice, moveLayout, slimeMove_LAYOUT0, [
+  const moveAB = createBindGroup(hostDevice, moveLayout, slimeMove_LAYOUT0, [
     bufferResource(agents),
     textureResource(viewA),
     textureResource(viewB),
   ]);
-  const moveBA = createBindGroupHost(hostDevice, moveLayout, slimeMove_LAYOUT0, [
+  const moveBA = createBindGroup(hostDevice, moveLayout, slimeMove_LAYOUT0, [
     bufferResource(agents),
     textureResource(viewB),
     textureResource(viewA),
   ]);
-  const diffuseAB = createBindGroupHost(hostDevice, diffuseLayout, slimeDiffuse_LAYOUT0, [
+  const diffuseAB = createBindGroup(hostDevice, diffuseLayout, slimeDiffuse_LAYOUT0, [
     textureResource(viewA),
     textureResource(viewB),
   ]);
-  const diffuseBA = createBindGroupHost(hostDevice, diffuseLayout, slimeDiffuse_LAYOUT0, [
+  const diffuseBA = createBindGroup(hostDevice, diffuseLayout, slimeDiffuse_LAYOUT0, [
     textureResource(viewB),
     textureResource(viewA),
   ]);
-  const renderA = createBindGroupHost(hostDevice, renderLayout, slimeRender_LAYOUT0, [
+  const renderA = createBindGroup(hostDevice, renderLayout, slimeRender_LAYOUT0, [
     textureResource(viewA),
   ]);
-  const renderB = createBindGroupHost(hostDevice, renderLayout, slimeRender_LAYOUT0, [
+  const renderB = createBindGroup(hostDevice, renderLayout, slimeRender_LAYOUT0, [
     textureResource(viewB),
   ]);
   // The state reaches module scope only after every creation succeeds.
@@ -555,7 +556,7 @@ export function frame(
   // The command buffer reaches the device queue after the encoder finishes. The frame count then
   // reverses the two texture roles for the next frame.
   using command = encoder.finishDefault();
-  using queue = active.device.queue();
+  const queue = active.device.queue;
   queue.submit([command]);
   frameCount += 1;
 }
@@ -582,6 +583,7 @@ export function shutdown(): void {
   active.diffuse.dispose();
   active.move.dispose();
   // The cleared state leaves no released handle reachable from module scope.
+  active.device.dispose();
   activeState = null;
   frameCount = 0;
 }

@@ -15,9 +15,9 @@ import {
   VertexInvocation,
   bufferResource,
   computePipeline,
-  createBindGroupHost,
-  createComputePipelineHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createComputePipeline,
+  createRenderPipeline,
   renderPipelineInstanced,
 } from "./typegpu";
 import {
@@ -193,8 +193,8 @@ export function init(
     size: (Particle_STRIDE * PARTICLE_COUNT) as u64,
     usage: GPUBufferUsage.STORAGE + GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
-  // A host-owned device returns a new queue wrapper from each call, so this block frees it.
-  using queue = hostDevice.queue();
+  // The device lends its cached queue until shutdown.
+  const queue = hostDevice.queue;
   queue.writeBuffer(vertexBuffer, 0, Context.bytesOf<FixedArray<Vertex, 4>>(vertices));
   // The particles start on an 8 by 8 grid with a color that follows the cell.
   // A fixed start replaces the random start of the upstream example, so every run looks alike.
@@ -223,7 +223,7 @@ export function init(
   // Pipeline creation raises no exception. One error scope covers both pipelines and turns
   // a bad shader or a bad layout into a value the code below tests.
   hostDevice.pushErrorScope("validation");
-  const computePipeline = createComputePipelineHost(
+  const computePipeline = createComputePipeline(
     hostDevice,
     confettiUpdate_WGSL,
     confettiUpdate_ENTRY,
@@ -232,7 +232,7 @@ export function init(
   );
   // The render pipeline declares no bind group layout. Every value it draws arrives through
   // the two vertex buffer slots.
-  const renderPipeline = createRenderPipelineHost(
+  const renderPipeline = createRenderPipeline(
     hostDevice,
     confettiRender_WGSL,
     confettiRender_VERTEX_ENTRY,
@@ -249,13 +249,14 @@ export function init(
     computePipeline.dispose();
     particleBuffer.dispose();
     vertexBuffer.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
   // The guard buffer belongs to the pipeline, and the helper appends it after the author's
   // resources. The bind group entry order stays the field order of ParticleLayout.
   using computeBindLayout = computePipeline.bindGroupLayout(0);
-  const group = createBindGroupHost(
+  const group = createBindGroup(
     hostDevice,
     computeBindLayout,
     confettiUpdate_LAYOUT0,
@@ -326,7 +327,7 @@ export function frame(
   // The pass must end before the encoder finishes. submit hands the command buffer to the
   // queue, which runs it before the host presents the surface.
   using command = encoder.finishDefault();
-  using queue = device.queue();
+  const queue = device.queue;
   queue.submit([command]);
 }
 
@@ -343,5 +344,6 @@ export function shutdown(): void {
   activeVertices = null;
   activeRender = null;
   activeCompute = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
 }

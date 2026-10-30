@@ -11,6 +11,8 @@ use subscript_typegpu_harness::native::{
 
 static TEST_QUEUE_RELEASED: AtomicBool = AtomicBool::new(false);
 static TEST_QUEUE_WRITES: AtomicU32 = AtomicU32::new(0);
+static TEST_QUEUE_REFERENCES: AtomicU32 = AtomicU32::new(0);
+static TEST_DEVICE_RELEASES: AtomicU32 = AtomicU32::new(0);
 
 extern "C" fn test_instance() -> SubscriptTypegpuInstance {
     1_usize as SubscriptTypegpuInstance
@@ -25,6 +27,7 @@ extern "C" fn test_queue_writes() -> u32 {
 }
 
 extern "C" fn test_device_get_queue(_: SubscriptTypegpuDevice) -> SubscriptTypegpuQueue {
+    TEST_QUEUE_REFERENCES.fetch_add(1, Ordering::SeqCst);
     3_usize as SubscriptTypegpuQueue
 }
 
@@ -76,7 +79,12 @@ extern "C" fn test_queue_write_buffer(
 }
 
 extern "C" fn test_queue_release(_: SubscriptTypegpuQueue) {
+    TEST_QUEUE_REFERENCES.fetch_sub(1, Ordering::SeqCst);
     TEST_QUEUE_RELEASED.store(true, Ordering::SeqCst);
+}
+
+extern "C" fn test_device_release(_: SubscriptTypegpuDevice) {
+    TEST_DEVICE_RELEASES.fetch_add(1, Ordering::SeqCst);
 }
 
 extern "C" fn test_buffer_release(_: SubscriptTypegpuBuffer) {}
@@ -109,6 +117,8 @@ fn replace_symbol(symbols: &mut [(String, *const u8)], name: &str, address: *con
 fn owned_device_queue_survives_guarded_pipeline_disposal() {
     TEST_QUEUE_RELEASED.store(false, Ordering::SeqCst);
     TEST_QUEUE_WRITES.store(0, Ordering::SeqCst);
+    TEST_QUEUE_REFERENCES.store(0, Ordering::SeqCst);
+    TEST_DEVICE_RELEASES.store(0, Ordering::SeqCst);
     let directory = std::env::temp_dir().join(format!(
         "subscript-typegpu-queue-ownership-{}",
         std::process::id()
@@ -116,7 +126,7 @@ fn owned_device_queue_survives_guarded_pipeline_disposal() {
     std::fs::create_dir_all(&directory).expect("create queue ownership test directory");
     let program = directory.join("queue-ownership.ts");
     let source = r#"
-import { BindGroupLayoutSpec, createComputePipeline, createBufferHost } from "./typegpu";
+import { BindGroupLayoutSpec, createComputePipeline, createBuffer } from "./typegpu";
 import { GPUBufferUsage, GPUDevice, GPUShaderStage, GPUHostOwnedDevice } from "./webgpu";
 export function main(): void {
   const device = new GPUDevice(test_instance(), test_device());
@@ -135,9 +145,13 @@ export function main(): void {
   device.queue.writeBuffer(target, 0, [1, 0, 0, 0]);
   print(`writes=${test_queue_writes()}`);
   const host = GPUHostOwnedDevice.create(test_instance(), test_device());
-  using buffer = createBufferHost<u32>(host, 4, 2, GPUBufferUsage.COPY_DST, "host-buffer");
+  print(`same-queue=${host.queue == host.queue}`);
+  const hostPipeline = createComputePipeline(host, "@compute @workgroup_size(1) fn main() {}", "main", [guardLayout], [1, 1, 1]);
+  hostPipeline.dispose();
+  using buffer = createBuffer<u32, GPUHostOwnedDevice>(host, 4, 2, GPUBufferUsage.COPY_DST, "host-buffer");
   buffer.write(device.queue, 1, [2, 0, 0, 0]);
   print(`host=${buffer.elementSize},${buffer.count},${buffer.usage},writes=${test_queue_writes()}`);
+  host.dispose();
 }
 "#;
     std::fs::write(&program, "export function main(): void {}\n")
@@ -194,6 +208,10 @@ export function main(): void {
             test_queue_release as *const u8,
         ),
         (
+            "subscript_typegpu_device_release",
+            test_device_release as *const u8,
+        ),
+        (
             "subscript_typegpu_buffer_release",
             test_buffer_release as *const u8,
         ),
@@ -234,8 +252,18 @@ export function main(): void {
     std::fs::remove_file(&program).expect("remove queue ownership test program");
     std::fs::remove_dir(&directory).expect("remove queue ownership test directory");
     assert_eq!(
-        output, "writes=1\nhost=4,2,8,writes=2\n",
+        output, "writes=1\nsame-queue=true\nhost=4,2,8,writes=2\n",
         "queue write did not reach the live buffer: {output}"
+    );
+    assert_eq!(
+        TEST_QUEUE_REFERENCES.load(Ordering::SeqCst),
+        1,
+        "host disposal must release exactly its cached queue reference"
+    );
+    assert_eq!(
+        TEST_DEVICE_RELEASES.load(Ordering::SeqCst),
+        0,
+        "host disposal must leave the device alive"
     );
 }
 

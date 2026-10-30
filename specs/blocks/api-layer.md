@@ -1,6 +1,7 @@
 # Block: API layer (J-rules)
 
-P0 contract. Rev 0, 2026-08-22. These rules come from the proof of
+P0 contract. Rev 0, 2026-08-22. Rev 1 (the host-owned device caches its
+queue, `GPUDeviceCreation`), 2026-10-30. These rules come from the proof of
 concept at <https://github.com/infosia/subscript-gpu>, restated as
 first-party rules. The API generator, the `[api]` policy section, and
 `lib/webgpu.ts` cite them by id.
@@ -45,12 +46,19 @@ first-party rules. The API generator, the `[api]` policy section, and
   generator rejects the retired pattern name, so a stale row fails
   loudly.
 
-  `GPUHostOwnedDevice` is a policy class, not an IDL class. Its
-  `queue()` stays a method, because it returns a new owned wrapper
-  on every call, and a property read that allocates hides that cost.
-  Its existing `host-owned-wrapper` row already states the shape.
-  The owned `GPUDevice` caches its queue, so its `queue` is an
-  accessor like every other attribute.
+  `GPUHostOwnedDevice` is a policy class, not an IDL class. Rev 1,
+  2026-10-30 (P17, owner choice Q1): `GPUHostOwnedDevice.create`
+  acquires one queue reference and caches it, so `queue` is a read
+  accessor on both device classes, and a read never allocates.
+  `GPUHostOwnedDevice.dispose()` (and `[Symbol.dispose]`) releases
+  only that queue reference, never the device, which the host owns.
+  Both device classes declare `implements GPUDeviceCreation`, a
+  policy interface (subscript §208) with no IDL counterpart. Its
+  members are the methods that both classes emit with the same
+  signature (the creation methods and `hasFeature`) and the `queue`
+  read accessor. `popErrorScope`,
+  `destroy`, and `dispose` are not members, because their shapes
+  differ. Its existing `host-owned-wrapper` row states the shape.
 
   A write accessor does not appear. Every covered IDL attribute
   except `label` is read-only, and `label` keeps its write-only

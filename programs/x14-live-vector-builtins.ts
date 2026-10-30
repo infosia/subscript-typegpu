@@ -457,8 +457,8 @@ export async function main(): Promise<void> {
   {
     using adapter = adapterResult;
     using device = deviceResult;
-    using input: Buffer<VectorInput> = createBuffer<VectorInput>(device, VectorInput_STRIDE, 1, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST, "x14-input");
-    using output: Buffer<VectorOutput> = createBuffer<VectorOutput>(device, VectorOutput_STRIDE, 1, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC, "x14-output");
+    using input: Buffer<VectorInput> = createBuffer<VectorInput, GPUDevice>(device, VectorInput_STRIDE, 1, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST, "x14-input");
+    using output: Buffer<VectorOutput> = createBuffer<VectorOutput, GPUDevice>(device, VectorOutput_STRIDE, 1, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC, "x14-output");
     const source = inputValue();
     input.writeOne(device.queue, 0, Context.bytesOf<VectorInput>(source));
     output.writeOne(device.queue, 0, Context.bytesOf<VectorOutput>(new VectorOutput()));

@@ -13,7 +13,7 @@ import {
   GPUComputePipeline,
   GPUComputePipelineDescriptor,
   GPUDevice,
-  GPUHostOwnedDevice,
+  GPUDeviceCreation,
   GPUPipelineLayout,
   GPUQuerySet,
   GPUQueue,
@@ -607,7 +607,7 @@ export class Buffer<T> {
     if (byteOffset % 4 != 0 || byteLength % 4 != 0) {
       authorTrap("BF9", "Buffer.read", `byteOffset=${byteOffset} byteLength=${byteLength}`);
     }
-    const staging: Buffer<T> = createBuffer<T>(
+    const staging: Buffer<T> = createBuffer<T, GPUDevice>(
       device,
       this.elementSize,
       elementCount,
@@ -685,31 +685,8 @@ export function readOne<T>(readback: Buffer<T>, elementIndex: u32): u8[] {
  * Pass the schema's stride constant as `elementSize`, never its size constant.
  * The buffer keeps `usage`, and a method whose usage flag is absent traps with BF10.
  */
-export function createBuffer<T>(
-  device: GPUDevice,
-  elementSize: u32,
-  count: u32,
-  usage: u64,
-  label: string,
-): Buffer<T> {
-  return new Buffer(
-    device.createBuffer({
-      size: (elementSize as u64) * (count as u64),
-      usage,
-      label,
-    }),
-    elementSize,
-    count,
-    usage,
-  );
-}
-
-/**
- * Creates a `Buffer<T>` through a device the host application owns, as `createBuffer` does.
- * The buffer belongs to the script, so the script disposes it.
- */
-export function createBufferHost<T>(
-  device: GPUHostOwnedDevice,
+export function createBuffer<T, D extends GPUDeviceCreation>(
+  device: D,
   elementSize: u32,
   count: u32,
   usage: u64,
@@ -1478,7 +1455,6 @@ export class BindGroupLayoutSpec {
 export class ComputePipeline {
   private pipeline: GPUComputePipeline;
   private guardQueue: GPUQueue | null;
-  private guardQueueOwned: boolean;
   private workgroup: FixedArray<u32, 3>;
   private guarded: boolean;
   private guardGroups: u32[];
@@ -1489,14 +1465,12 @@ export class ComputePipeline {
     pipeline: GPUComputePipeline,
     workgroup: FixedArray<u32, 3>,
     guardQueue: GPUQueue | null = null,
-    guardQueueOwned: boolean = false,
     guarded: boolean = false,
     guardGroups: u32[] = [],
     guardBuffers: GPUBuffer[] = [],
   ) {
     this.pipeline = pipeline;
     this.guardQueue = guardQueue;
-    this.guardQueueOwned = guardQueueOwned;
     this.workgroup = workgroup;
     this.guarded = guarded;
     this.guardGroups = guardGroups;
@@ -1658,13 +1632,7 @@ export class ComputePipeline {
       this.guardBuffers[index].dispose();
       index += 1;
     }
-    if (this.guardQueue != null) {
-      if (this.guardQueueOwned) {
-        this.guardQueue.dispose();
-      }
-      this.guardQueue = null;
-      this.guardQueueOwned = false;
-    }
+    this.guardQueue = null;
     this.pipeline.dispose();
   }
 
@@ -1712,7 +1680,7 @@ export class TimestampPair {
  * When the device lacks the `timestamp-query` feature, this function returns `null`, so a
  * program can continue without timestamps.
  */
-export function createTimestampPair(device: GPUDevice): TimestampPair | null {
+export function createTimestampPair<D extends GPUDeviceCreation>(device: D): TimestampPair | null {
   if (!device.hasFeature("timestamp-query")) {
     return null;
   }
@@ -1845,21 +1813,8 @@ function nativeBindGroupLayoutEntries(
   return groups;
 }
 
-function createNativeBindGroupLayouts(
-  device: GPUDevice,
-  entries: GPUBindGroupLayoutEntry[][],
-): GPUBindGroupLayout[] {
-  const nativeLayouts: GPUBindGroupLayout[] = [];
-  let group: i32 = 0;
-  while (group < entries.length) {
-    nativeLayouts.push(device.createBindGroupLayout({ entries: entries[group] }));
-    group += 1;
-  }
-  return nativeLayouts;
-}
-
-function createNativeBindGroupLayoutsHost(
-  device: GPUHostOwnedDevice,
+function createNativeBindGroupLayouts<D extends GPUDeviceCreation>(
+  device: D,
   entries: GPUBindGroupLayoutEntry[][],
 ): GPUBindGroupLayout[] {
   const nativeLayouts: GPUBindGroupLayout[] = [];
@@ -1939,13 +1894,11 @@ function finishComputePipeline(
   guardGroups: u32[],
   guardBuffers: GPUBuffer[],
   guardQueue: GPUQueue | null,
-  guardQueueOwned: boolean,
 ): ComputePipeline {
   return new ComputePipeline(
     pipeline,
     workgroup,
     guardQueue,
-    guardQueueOwned,
     guardBuffers.length > 0,
     guardGroups,
     guardBuffers,
@@ -1964,8 +1917,8 @@ function finishRenderPipeline(
  * The call runs inside the caller's validation error scope and does not await.
  * It creates one guard buffer per `guard` layout entry, and the pipeline disposes them.
  */
-export function createComputePipeline(
-  device: GPUDevice,
+export function createComputePipeline<D extends GPUDeviceCreation>(
+  device: D,
   wgsl: string,
   entry: string,
   layouts: BindGroupLayoutSpec[],
@@ -2006,58 +1959,6 @@ export function createComputePipeline(
     guardGroups,
     guardBuffers,
     guardQueue,
-    false,
-  );
-}
-
-/**
- * Creates a `ComputePipeline` through a device the host application owns.
- * The call runs inside the caller's validation error scope and does not await.
- * The pipeline owns the queue wrapper it takes for a guarded dispatch, and disposes that wrapper.
- */
-export function createComputePipelineHost(
-  device: GPUHostOwnedDevice,
-  wgsl: string,
-  entry: string,
-  layouts: BindGroupLayoutSpec[],
-  workgroup: FixedArray<u32, 3>,
-): ComputePipeline {
-  const guardGroups: u32[] = [];
-  const guardBuffers: GPUBuffer[] = [];
-  let guardGroup: i32 = 0;
-  while (guardGroup < layouts.length) {
-    let guardEntry: i32 = 0;
-    while (guardEntry < layouts[guardGroup].entries.length) {
-      if (layouts[guardGroup].entries[guardEntry].kind == "guard") {
-        guardGroups.push(guardGroup as u32);
-        guardBuffers.push(device.createBuffer({
-          label: "typegpu-dispatch-guard",
-          size: 16,
-          usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
-        }));
-      }
-      guardEntry += 1;
-    }
-    guardGroup += 1;
-  }
-  const layoutEntries: GPUBindGroupLayoutEntry[][] = nativeBindGroupLayoutEntries(layouts);
-  const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayoutsHost(device, layoutEntries);
-  using shader = device.createShaderModule({ code: wgsl });
-  using layout = device.createPipelineLayout({ bindGroupLayouts: nativeLayouts });
-  const pipeline = device.createComputePipeline(computePipelineDescriptor(shader, layout, entry));
-  let group: i32 = 0;
-  while (group < nativeLayouts.length) {
-    nativeLayouts[group].dispose();
-    group += 1;
-  }
-  const guardQueue: GPUQueue | null = guardBuffers.length > 0 ? device.queue() : null;
-  return finishComputePipeline(
-    pipeline,
-    workgroup,
-    guardGroups,
-    guardBuffers,
-    guardQueue,
-    true,
   );
 }
 
@@ -2066,8 +1967,8 @@ export function createComputePipelineHost(
  * The call runs inside the caller's validation error scope and does not await.
  * The caller disposes the result.
  */
-export function createRenderPipeline(
-  device: GPUDevice,
+export function createRenderPipeline<D extends GPUDeviceCreation>(
+  device: D,
   wgsl: string,
   vertexEntry: string,
   fragmentEntry: string,
@@ -2090,41 +1991,6 @@ export function createRenderPipeline(
     spec,
   ));
   group = 0;
-  while (group < nativeLayouts.length) {
-    nativeLayouts[group].dispose();
-    group += 1;
-  }
-  return finishRenderPipeline(pipeline, spec);
-}
-
-/**
- * Creates a `RenderPipeline` through a device the host application owns.
- * The call runs inside the caller's validation error scope and does not await.
- * The caller disposes the result.
- */
-export function createRenderPipelineHost(
-  device: GPUHostOwnedDevice,
-  wgsl: string,
-  vertexEntry: string,
-  fragmentEntry: string,
-  layouts: BindGroupLayoutSpec[],
-  vertexLayouts: VertexBufferLayoutSpec[],
-  spec: RenderPipelineSpec,
-): RenderPipeline {
-  const layoutEntries: GPUBindGroupLayoutEntry[][] = nativeBindGroupLayoutEntries(layouts);
-  const nativeLayouts: GPUBindGroupLayout[] = createNativeBindGroupLayoutsHost(device, layoutEntries);
-  const nativeVertexLayouts: GPUVertexBufferLayout[] = nativeVertexBufferLayouts(vertexLayouts);
-  using shader = device.createShaderModule({ code: wgsl });
-  using layout = device.createPipelineLayout({ bindGroupLayouts: nativeLayouts });
-  const pipeline = device.createRenderPipeline(renderPipelineDescriptor(
-    shader,
-    layout,
-    vertexEntry,
-    fragmentEntry,
-    nativeVertexLayouts,
-    spec,
-  ));
-  let group: i32 = 0;
   while (group < nativeLayouts.length) {
     nativeLayouts[group].dispose();
     group += 1;
@@ -2216,25 +2082,8 @@ function bindGroupEntries(
  * A resource count that differs from the authored binding count traps with PI9.
  * A `guard` entry takes `guardBuffer` and consumes no resource.
  */
-export function createBindGroup(
-  device: GPUDevice,
-  layout: GPUBindGroupLayout,
-  spec: BindGroupLayoutSpec,
-  resources: BindingResource[],
-  guardBuffer: GPUBuffer | null = null,
-): GPUBindGroup {
-  return device.createBindGroup({
-    layout,
-    entries: bindGroupEntries(spec, resources, guardBuffer),
-  });
-}
-
-/**
- * Creates a bind group through a device the host application owns.
- * The resource order and the checks are the order and the checks of `createBindGroup`.
- */
-export function createBindGroupHost(
-  device: GPUHostOwnedDevice,
+export function createBindGroup<D extends GPUDeviceCreation>(
+  device: D,
   layout: GPUBindGroupLayout,
   spec: BindGroupLayoutSpec,
   resources: BindingResource[],

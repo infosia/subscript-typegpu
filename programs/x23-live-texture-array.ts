@@ -228,7 +228,7 @@ export async function main(): Promise<void> {
       baseArrayLayer: 1,
       arrayLayerCount: 1,
     });
-    using output: Buffer<Vec4f> = createBuffer<Vec4f>(
+    using output: Buffer<Vec4f> = createBuffer<Vec4f, GPUDevice>(
       device,
       16,
       PIXEL_COUNT,

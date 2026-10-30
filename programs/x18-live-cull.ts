@@ -161,7 +161,7 @@ export async function main(): Promise<void> {
     const a = new Vec2f(-0.65, -0.55);
     const b = new Vec2f(0.65, -0.55);
     const c = new Vec2f(0.0, 0.65);
-    using vertices: Buffer<Vertex> = createBuffer<Vertex>(
+    using vertices: Buffer<Vertex> = createBuffer<Vertex, GPUDevice>(
       device,
       Vertex_STRIDE,
       3,
@@ -177,7 +177,7 @@ export async function main(): Promise<void> {
         new Vertex(c),
       ]),
     );
-    using indices: Buffer<u16> = createBuffer<u16>(
+    using indices: Buffer<u16> = createBuffer<u16, GPUDevice>(
       device,
       2,
       4,

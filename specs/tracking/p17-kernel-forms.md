@@ -99,3 +99,55 @@ Evidence: `tools/live.sh` on Metal (yawgpu):
 `tools/gate.sh --require-backend` with the yawgpu library, `gate:
 green`, 332 passed, 0 failed, 1 ignored, 356.2 s wall. No existing
 WGSL or `.expected` golden moved.
+
+## Slice 3 — the device constraint (2026-10-30)
+
+`lib/webgpu.ts` emits `export interface GPUDeviceCreation` with the
+`queue` read accessor, `hasFeature`, and the 16 creation methods that
+both device classes emit with the same signature. Both classes
+declare `implements GPUDeviceCreation`. `GPUHostOwnedDevice.create`
+caches one queue reference, `queue` is a read accessor, and
+`dispose()` releases only that reference. `createBuffer`,
+`createComputePipeline`, `createRenderPipeline`, `createBindGroup`,
+`createTimestampPair`, `UiRenderer.create`, and the generated
+`create<Decl>BindGroup<N>` factories take `D extends
+GPUDeviceCreation`. The `*Host` variants, `guardQueueOwned`, and
+`ownsQueue` are removed. Each windowed example disposes its
+host-owned device wrapper in `shutdown` and on each failed `init`
+path.
+
+Correction: api-layer.md Rev 1 first named the creation methods and
+`queue` as the members. `createTimestampPair` calls `hasFeature`, so
+the checker rejected the generic body with S018. The members are now
+every method that both classes emit with the same signature.
+
+Probes at `c560df1` (the coding agent): an implementation's `= null`
+default conforms to an interface member with no default, and an
+object literal argument gets its type through a constraint call. A
+call through the constraint cannot omit the argument, so a generic
+body writes `device.createSampler(null)`. A class without `implements
+GPUDeviceCreation` passed as `D` fails with S100 "`Device` does not
+declare `implements GPUDeviceCreation`".
+
+Open: `createBuffer<T, D>` has `T` only in its result. subscript
+rejects a partial type argument list, and §149 rule 7 leaves the
+contextual result type out of inference, so 81 call sites write
+`createBuffer<Particle, GPUDevice>(…)`. Measured through the harness
+dev tier: `using b: Buffer<Particle> = createBuffer(device, …)` fails
+with S100 "cannot infer type parameter `T` of `createBuffer`: no
+candidate". The owner chose a subscript change request (2026-10-30):
+a generic call infers a type parameter from its contextual result
+type, as §197 rule 3 does for a constructor. The call sites shorten
+at the re-pin that lands it.
+
+Open: `subscript-typegpu-gen gen` exited 0 on the unannotated
+`using b = createBuffer(device, …)` that the dev tier rejects. To
+investigate.
+
+Evidence: `tools/gate.sh --require-backend` with the yawgpu library,
+`gate: green`, 340 passed, 0 failed, 1 ignored, 347.5 s wall. No WGSL
+or `.expected` golden moved. `tools/live.sh` on Metal:
+`live::every_x_program_passes_on_a_real_adapter ... ok`, 143.6 s.
+`tools/window.sh <example> --frames 30` on Metal: the 27 window
+examples exit 0 with no `FAIL`. The five examples with no `frame`
+entry exit 1 as before.

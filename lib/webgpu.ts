@@ -27,7 +27,8 @@
 // - GPU.requestAdapter: the facade exports only subscript_typegpu_instance_request_adapter(instance) and no options-bearing entry point, so this API drops the IDL options argument and polls the facade future explicitly
 // - GPUAdapter.requestDevice: GPUDeviceDescriptor is lowered through the facade's WithDescriptor route and requiredFeatures entries are passed without filtering, so an unsupported feature fails the request rather than being dropped. JavaScript rejects requestDevice with a DOMException on failure, while this API resolves null without an error reason or message
 // - GPUDeviceDescriptor.requiredLimits: WebIDL accepts an open record<DOMString, GPUSize64>, while this API uses a fixed-key GPURequiredLimits descriptor for the 32 fields exposed by the facade (29 u32 and 3 u64), so arbitrary keys, the four compatibility-only limits, and values above u32 for narrowed fields are unavailable. Public zero is reserved for omission and cannot request a real zero-valued limit, lowering u32 omission to WGPU_LIMIT_U32_UNDEFINED and leaving the three u64 fields for the facade's F13 zero-to-undefined rule
-// - GPUDevice.@constructor: JavaScript exposes no GPUDevice constructor. This API keeps a public owning constructor that accepts private raw-handle fields. It acquires and caches one queue reference through subscript_typegpu_device_get_queue. GPUHostOwnedDevice.create returns GPUHostOwnedDevice, which wraps a host-owned device and exposes the same creation methods but neither dispose nor destroy. Each queue call returns a new owned queue wrapper.
+// - GPUDevice.@constructor: JavaScript exposes no GPUDevice constructor. The owning constructor and GPUHostOwnedDevice.create each acquire and cache one queue reference. Both classes implement GPUDeviceCreation and lend their cached queue. GPUHostOwnedDevice.dispose releases only the queue reference. The host owns the device and destroys it.
+// - GPUDeviceCreation.@interface: The interface declares shared creation methods, hasFeature, and the borrowed queue accessor. An interface is a type parameter constraint and has no value form.
 // - GPUBuffer.mapAsync: the facade accepts explicit offset and size values and exposes mapping completion as Promise<boolean> while encapsulating future polling
 // - GPUBuffer.getMappedRange: ArrayBuffer and raw pointers are unavailable, so readMappedRange(offset, size) and writeMappedRange(offset, data) require explicit ranges. Failed reads return an empty u8[] indistinguishable from zero-size success
 // - GPUBuffer.readMappedRangeF32: the IDL spells this element type as Float32Array inside BufferSource, and subscript has no typed-array view. Offset counts bytes and count counts elements
@@ -1913,7 +1914,45 @@ export class GPUAdapter {
   }
 }
 
-export class GPUDevice {
+/** Creates GPU resources and lends the device's cached queue. */
+export interface GPUDeviceCreation {
+  /** Returns the borrowed queue. */
+  get queue(): GPUQueue;
+  /** Returns whether the device enables the named feature. */
+  hasFeature(name: GPUFeatureName): boolean;
+  /** Creates a resource from the descriptor. */
+  createBuffer(descriptor: GPUBufferDescriptor): GPUBuffer;
+  /** Creates a resource from the descriptor. */
+  createTexture(descriptor: GPUTextureDescriptor): GPUTexture;
+  /** Creates a resource from the descriptor. */
+  createSampler(descriptor: GPUSamplerDescriptor | null): GPUSampler;
+  /** Creates a resource from the descriptor. */
+  createBindGroupLayout(descriptor: GPUBindGroupLayoutDescriptor): GPUBindGroupLayout;
+  /** Creates a resource from the descriptor. */
+  createPipelineLayout(descriptor: GPUPipelineLayoutDescriptor): GPUPipelineLayout;
+  /** Creates a resource from the descriptor. */
+  createBindGroup(descriptor: GPUBindGroupDescriptor): GPUBindGroup;
+  /** Creates a resource from the descriptor. */
+  createShaderModule(descriptor: GPUShaderModuleDescriptor): GPUShaderModule;
+  /** Creates a resource from the descriptor. */
+  createComputePipeline(descriptor: GPUComputePipelineDescriptor): GPUComputePipeline;
+  /** Creates a resource from the descriptor. */
+  createRenderPipeline(descriptor: GPURenderPipelineDescriptor): GPURenderPipeline;
+  /** Creates a resource from the descriptor. */
+  createComputePipelineAsync(descriptor: GPUComputePipelineDescriptor): Promise<GPUComputePipeline | null>;
+  /** Creates a resource from the descriptor. */
+  createRenderPipelineAsync(descriptor: GPURenderPipelineDescriptor): Promise<GPURenderPipeline | null>;
+  /** Creates a resource from the descriptor. */
+  createCommandEncoder(descriptor: GPUCommandEncoderDescriptor | null): GPUCommandEncoder;
+  /** Creates a resource with the default descriptor. */
+  createCommandEncoderDefault(): GPUCommandEncoder;
+  /** Creates a resource from the descriptor. */
+  createRenderBundleEncoder(descriptor: GPURenderBundleEncoderDescriptor): GPURenderBundleEncoder;
+  /** Creates a resource from the descriptor. */
+  createQuerySet(descriptor: GPUQuerySetDescriptor): GPUQuerySet;
+}
+
+export class GPUDevice implements GPUDeviceCreation {
   private instance: SubscriptTypegpuInstance;
   private device: SubscriptTypegpuDevice;
   queueValue: GPUQueue;
@@ -2101,9 +2140,16 @@ export class GPUDevice {
   }
 }
 
-export class GPUHostOwnedDevice {
+export class GPUHostOwnedDevice implements GPUDeviceCreation {
+  private instance: SubscriptTypegpuInstance;
+  private device: SubscriptTypegpuDevice;
+  private queueValue: GPUQueue;
 
-  private constructor(private instance: SubscriptTypegpuInstance, private device: SubscriptTypegpuDevice) {}
+  private constructor(instance: SubscriptTypegpuInstance, device: SubscriptTypegpuDevice) {
+    this.instance = instance;
+    this.device = device;
+    this.queueValue = new GPUQueue(this.instance, subscript_typegpu_device_get_queue(this.device));
+  }
 
   /** Creates a wrapper for a host-owned device. */
   static create(instance: SubscriptTypegpuInstance, device: SubscriptTypegpuDevice): GPUHostOwnedDevice {
@@ -2130,8 +2176,8 @@ export class GPUHostOwnedDevice {
     return fromSubscriptTypegpuAdapterInfo(record);
   }
 
-  queue(): GPUQueue {
-    return new GPUQueue(this.instance, subscript_typegpu_device_get_queue(this.device));
+  get queue(): GPUQueue {
+    return this.queueValue;
   }
 
   createBuffer(descriptor: GPUBufferDescriptor): GPUBuffer {
@@ -2270,6 +2316,15 @@ export class GPUHostOwnedDevice {
     subscript_typegpu_device_set_label(this.device, value);
   }
 
+  /** Releases the cached queue reference and leaves the host device alive. */
+  dispose(): void {
+    this.queueValue.dispose();
+  }
+
+  /** Releases the cached queue reference at the end of a using scope. */
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
 }
 
 export class GPUBuffer {

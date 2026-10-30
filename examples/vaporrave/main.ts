@@ -12,8 +12,8 @@ import {
   Uniform,
   VertexInvocation,
   bufferResource,
-  createBindGroupHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createRenderPipeline,
   renderPipelineL,
 } from "./typegpu";
 import {
@@ -219,8 +219,8 @@ export function init(
     size: FrameData_SIZE as u64,
     usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
   });
-  // A host-owned device returns a new queue wrapper from each call, so this block frees it.
-  using queue = hostDevice.queue();
+  // The device lends its cached queue until shutdown.
+  const queue = hostDevice.queue;
   // One oversized triangle covers the whole surface. The parts outside the viewport clip
   // away, so this example needs no quad and no index buffer.
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>([
@@ -235,7 +235,7 @@ export function init(
   // layout into a value the code below tests.
   hostDevice.pushErrorScope("validation");
   // The generated WGSL, the entry names, and the layout constants build the pipeline.
-  const pipeline = createRenderPipelineHost(
+  const pipeline = createRenderPipeline(
     hostDevice,
     vapor_WGSL,
     vapor_VERTEX_ENTRY,
@@ -251,6 +251,7 @@ export function init(
     pipeline.dispose();
     frameBuffer.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -258,7 +259,7 @@ export function init(
   // disagree about group 0.
   using bindLayout = pipeline.bindGroupLayout(0);
   // The resource list follows the field order of VaporLayout. One uniform buffer fills binding 0.
-  const group = createBindGroupHost(
+  const group = createBindGroup(
     hostDevice,
     bindLayout,
     vapor_LAYOUT0,
@@ -298,7 +299,7 @@ export function frame(
   if (group == null) return;
   // The window host carries no clock, so the frame count is the only time source.
   frameCount += 1;
-  using queue = device.queue();
+  const queue = device.queue;
   // The frame count divided by 60.0 gives seconds at the nominal present rate. The aspect
   // ratio follows the reported size, so a resize needs no other work.
   queue.writeBuffer(
@@ -348,5 +349,6 @@ export function shutdown(): void {
   activeVertices = null;
   activePipeline = null;
   activeGroup = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
 }

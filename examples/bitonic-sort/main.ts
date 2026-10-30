@@ -14,9 +14,9 @@ import {
   VertexInvocation,
   bufferResource,
   computePipeline,
-  createBindGroupHost,
-  createComputePipelineHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createComputePipeline,
+  createRenderPipeline,
   renderPipelineL,
 } from "./typegpu";
 import {
@@ -195,8 +195,8 @@ export function init(
     size: (FullscreenVertex_STRIDE * 3) as u64,
     usage: GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
-  // A host-owned device returns a new queue wrapper from each call, so this block frees it.
-  using queue = hostDevice.queue();
+  // The device lends its cached queue until shutdown.
+  const queue = hostDevice.queue;
   // One upload seeds all 4096 values. The shuffle runs on the host, so the first image shows
   // noise before any dispatch.
   queue.writeBuffer(values, 0, shuffledValueBytes());
@@ -218,14 +218,14 @@ export function init(
   // Pipeline creation raises no exception. One error scope covers both pipelines and turns
   // a bad shader or a bad layout into a value the code below tests.
   hostDevice.pushErrorScope("validation");
-  const computePipeline = createComputePipelineHost(
+  const computePipeline = createComputePipeline(
     hostDevice,
     bitonicStepPipeline_WGSL,
     bitonicStepPipeline_ENTRY,
     [bitonicStepPipeline_LAYOUT0],
     [256, 1, 1],
   );
-  const renderPipeline = createRenderPipelineHost(
+  const renderPipeline = createRenderPipeline(
     hostDevice,
     bitonicDisplay_WGSL,
     bitonicDisplay_VERTEX_ENTRY,
@@ -243,20 +243,21 @@ export function init(
     vertices.dispose();
     pass.dispose();
     values.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
   // Two bind groups over one values buffer: the sort group adds the pass uniform, and the
   // display group binds the values alone. Each layout comes back from its own pipeline.
   using computeLayout = computePipeline.bindGroupLayout(0);
-  const computeGroup = createBindGroupHost(
+  const computeGroup = createBindGroup(
     hostDevice,
     computeLayout,
     bitonicStepPipeline_LAYOUT0,
     [bufferResource(values), bufferResource(pass)],
   );
   using renderLayout = renderPipeline.bindGroupLayout(0);
-  const renderGroup = createBindGroupHost(
+  const renderGroup = createBindGroup(
     hostDevice,
     renderLayout,
     bitonicDisplay_LAYOUT0,
@@ -305,7 +306,7 @@ export function frame(
   if (passBuffer == null) return;
   if (vertices == null) return;
 
-  using queue = device.queue();
+  const queue = device.queue;
   // The host stores the last key press as a Unicode scalar and clears the slot after this
   // call. 49 and 50 are the codes for 1 and 2, which replace the upstream buttons.
   if (key == 49) {
@@ -372,6 +373,7 @@ export function shutdown(): void {
   activeValues = null;
   activeRenderPipeline = null;
   activeComputePipeline = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
   sortActive = false;
   sortPassIndex = 0;

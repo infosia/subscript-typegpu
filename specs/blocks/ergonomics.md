@@ -1,6 +1,7 @@
 # Block: ergonomics and diagnostics (EG-rules)
 
-P6 contract. Rev 0, 2026-08-23. Plan §8 P6 governs this block. It
+P6 contract. Rev 0, 2026-08-23. Rev 2 (EG10 Rev 2: one generic helper
+per creation function), 2026-10-30. Plan §8 P6 governs this block. It
 closes items earlier phases deferred: I12's coverage list, the
 typed resources PI8 Rev 1 deferred to R35, the uniform binding-size
 question (P2 review M6), and the diagnostic sweep.
@@ -106,7 +107,15 @@ question (P2 review M6), and the diagnostic sweep.
   WGSL and support module, which no fence gates, because an example
   commits neither artifact. `README.md` links the three documents.
 
-- **EG10 — The pipeline helpers accept a host-owned device.** Rev 0,
+- **EG10 — The pipeline helpers accept a host-owned device.** Rev 2,
+  2026-10-30 (P17): the runtime creation functions take a type
+  parameter `D extends GPUDeviceCreation` (api-layer.md) for the
+  device: `createBuffer`, `createComputePipeline`,
+  `createRenderPipeline`, `createBindGroup`, `createTimestampPair`,
+  and `UiRenderer.create`. One body serves both device classes, and
+  the `*Host` variants are removed. Every queue a helper uses is the
+  device's cached queue, which the helper borrows and never
+  disposes. The text below is Rev 1. Rev 0,
   2026-08-24. Rev 1, 2026-09-05: `createBufferHost<T>` joins them
   with the signature of BF1 and a `GPUHostOwnedDevice` first
   parameter. It creates the buffer through the host device and owns

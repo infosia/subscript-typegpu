@@ -22,9 +22,9 @@ import {
   VertexInvocation,
   bufferResource,
   computePipeline,
-  createBindGroupHost,
-  createComputePipelineHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createComputePipeline,
+  createRenderPipeline,
   renderPipelineL,
   samplerResource,
   textureResource,
@@ -611,9 +611,9 @@ export function init(
   const samplerDescriptor: GPUSamplerDescriptor = { minFilter: "linear", magFilter: "linear" };
   const sampler = hostDevice.createSampler(samplerDescriptor);
   const scene = initialScene();
-  // The queue handle is borrowed for this block, and `using` releases it at the end of `init`.
+  // The device lends its cached queue until shutdown.
   // The buffers it writes stay.
-  using queue = hostDevice.queue();
+  const queue = hostDevice.queue;
   // `Context.bytesOf<T>` produces the exact bytes of the value in the generated layout.
   // TypeGPU converts a JavaScript object to buffer bytes at run time instead.
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>([
@@ -644,14 +644,14 @@ export function init(
   hostDevice.pushErrorScope("validation");
   // Each pipeline takes generated WGSL text, a generated entry name, and a generated layout
   // spec. This file holds no shader text.
-  const cascadePipeline = createComputePipelineHost(
+  const cascadePipeline = createComputePipeline(
     hostDevice,
     cascadePass_WGSL,
     cascadePass_ENTRY,
     [cascadePass_LAYOUT0],
     [16, 16, 1],
   );
-  const fieldPipeline = createComputePipelineHost(
+  const fieldPipeline = createComputePipeline(
     hostDevice,
     fieldBuild_WGSL,
     fieldBuild_ENTRY,
@@ -659,7 +659,7 @@ export function init(
     [16, 16, 1],
   );
   // The render pipeline also takes the vertex layout the generator derived from `Vertex`.
-  const renderPipeline = createRenderPipelineHost(
+  const renderPipeline = createRenderPipeline(
     hostDevice,
     radianceRender_WGSL,
     radianceRender_VERTEX_ENTRY,
@@ -691,6 +691,7 @@ export function init(
     }
     sceneBuffer.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -710,7 +711,7 @@ export function init(
     // The top layer has no layer above it, so it binds its own view. The kernel skips the merge
     // there, and the binding stays valid.
     const upperLayer: u32 = layer + 1 < CASCADE_COUNT ? layer + 1 : layer;
-    cascadeGroups.push(createBindGroupHost(
+    cascadeGroups.push(createBindGroup(
       hostDevice,
       cascadeLayout,
       cascadePass_LAYOUT0,
@@ -726,13 +727,13 @@ export function init(
   }
   // Layer 0 writes one of the two sides. The gather group reads layer 0 of that side.
   const cascade0Side: u32 = cascadeWriteSide(CASCADE_COUNT, 0);
-  const fieldGroup = createBindGroupHost(hostDevice, fieldLayout, fieldBuild_LAYOUT0, [
+  const fieldGroup = createBindGroup(hostDevice, fieldLayout, fieldBuild_LAYOUT0, [
     textureResource(views[(cascade0Side * CASCADE_COUNT) as i32]),
     samplerResource(sampler),
     textureResource(fieldView),
   ]);
   // The render group reads the field and the same scene uniform the kernels read.
-  const renderGroup = createBindGroupHost(hostDevice, renderLayout, radianceRender_LAYOUT0, [
+  const renderGroup = createBindGroup(hostDevice, renderLayout, radianceRender_LAYOUT0, [
     textureResource(fieldView),
     samplerResource(sampler),
     bufferResource(sceneBuffer),
@@ -793,7 +794,7 @@ export function frame(
   }
 
   // The queue and the encoder live for this frame only.
-  using queue = active.device.queue();
+  const queue = active.device.queue;
   using encoder = active.device.createCommandEncoderDefault();
   // The cascades rebuild only after a scene change. A still scene costs one render pass.
   if (active.dirty) {
@@ -883,5 +884,6 @@ export function shutdown(): void {
   active.fieldBuild.dispose();
   active.cascade.dispose();
   // The cleared binding makes a later `frame` call return at its guard.
+  active.device.dispose();
   activeState = null;
 }

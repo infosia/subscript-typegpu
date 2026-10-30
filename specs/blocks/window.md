@@ -7,7 +7,8 @@ review), 2026-08-23. Rev 2 (W8, W13 after the first `--frames` run),
 Rev 2, W13 Rev 2 optional input entries), 2026-09-05. Rev 6 (W3 Rev 3, W13
 Rev 3 from the U3 review), 2026-09-05. Rev 7 (W5 Rev 1, W9 Rev 2 from the
 comment pass), 2026-09-07. Rev 8 (W2 Rev 4: the static factory
-`GPUHostOwnedDevice.create`), 2026-10-27. Plan §8 P9 and
+`GPUHostOwnedDevice.create`), 2026-10-27. Rev 9 (W2 Rev 5: the
+host-owned device caches its queue), 2026-10-30. Plan §8 P9 and
 §8 U3 govern this block. The
 facade side is `facade.md` L14 and `facade-generator.md` F23. The
 script side is the API layer (`api-layer.md`) and the TypeGPU layer.
@@ -37,9 +38,11 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   passes the configured format's wire value (Rev 1: no second
   alias).
   The script wraps the device with `GPUHostOwnedDevice.create(instance,
-  device)` (a `GPUHostOwnedDevice` has neither `dispose` nor
-  `destroy`) and the view with `new GPUTextureView(view)` and
-  disposes neither. The host owns both. A harness test checks the
+  device)` and the view with `new GPUTextureView(view)`. The host owns
+  the device and the view. A `GPUHostOwnedDevice` has no `destroy`.
+  Rev 5, 2026-10-30 (P17): its `dispose()` releases only the queue
+  reference that `create` cached (api-layer.md Rev 1), and the script
+  calls it in `shutdown`. The script disposes no view. A harness test checks the
   three signatures of the example through the HIR.
   Rev 3: four optional entries. When the script exports them, the
   host calls `wheel(deltaX: f32, deltaY: f32): void`,

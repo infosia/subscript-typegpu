@@ -368,8 +368,8 @@ return, before the script creates any resource.
 ```
 
 `GPUHostOwnedDevice` is a distinct class from `GPUDevice`. It carries the same
-creation methods, and it carries neither `dispose` nor `destroy`. The type
-states which side owns the device, so a script cannot release it.
+creation methods and no `destroy`. Its `dispose` releases its cached queue
+reference. The host owns the device.
 
 ### The geometry, once
 
@@ -395,7 +395,7 @@ flags are additive integers. `VERTEX` admits the buffer at a vertex slot, and
 `COPY_DST` admits the queue write on the next line.
 
 ```ts program=examples/window-triangle/main.ts
-  using queue = deviceWrapper.queue();
+  const queue = deviceWrapper.queue;
   queue.writeBuffer(
     vertices,
     0,
@@ -408,15 +408,14 @@ layout of a schema class equals its WGSL layout, and the generator rejects a
 schema where the two disagree. So the bytes this call produces are exactly the
 bytes the vertex layout expects.
 
-The `using` keyword on the queue matters. `GPUHostOwnedDevice.queue()` returns a
-fresh owned wrapper on each call, so the script releases it at the end of the
-block.
+The device lends its cached queue. The script disposes the device wrapper in
+`shutdown`, which releases its queue reference and leaves the host device alive.
 
 ### The error scope replaces the rejected promise
 
 ```ts program=examples/window-triangle/main.ts
   deviceWrapper.pushErrorScope("validation");
-  const createdPipeline = createRenderPipelineHost(
+  const createdPipeline = createRenderPipeline(
     deviceWrapper,
     tri_WGSL,
     tri_VERTEX_ENTRY,
@@ -441,14 +440,15 @@ the script owns, the same call is an `await`.
   if (validationError != null) {
     createdPipeline.dispose();
     vertices.dispose();
+    deviceWrapper.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
 ```
 
 The failure path releases what this function created. A browser port throws here
-and lets the collector clean up. This language has neither, so the two handles
-go back by name, in the reverse order of their creation.
+and lets the collector release resources. The script releases the pipeline,
+buffer, and cached queue reference by name.
 
 ### Module state last
 
@@ -562,7 +562,7 @@ binding.
 
 ```ts program=examples/window-triangle/main.ts
   using command = encoder.finishDefault();
-  using queue = activeDevice.queue();
+  const queue = activeDevice.queue;
   queue.submit([command]);
 }
 ```
@@ -578,12 +578,13 @@ export function shutdown(): void {
   vertexBuffer = null;
   pipeline?.dispose();
   pipeline = null;
+  if (ownedDevice != null) ownedDevice.dispose();
   ownedDevice = null;
 }
 ```
 
 The host calls this one time before it releases the device. The script releases
-the two handles it created and drops its reference to the borrowed device. A
+its pipeline, buffer, and cached queue reference. The host retains the device. A
 browser port calls one `destroy` on a root object and lets the collector reach
 the rest. Here each handle goes back by name.
 

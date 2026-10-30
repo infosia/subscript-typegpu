@@ -79,9 +79,9 @@ export async function main(): Promise<void> {
       1,
       controlFlow_HOST_RUNNABLE,
     );
-    using input: Buffer<Item> = createBuffer<Item>(device, Item_STRIDE, 4, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST, "x04-input");
-    using output: Buffer<Item> = createBuffer<Item>(device, Item_STRIDE, 1, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_SRC, "x04-output");
-    using readback: Buffer<Item> = createBuffer<Item>(device, Item_STRIDE, 1, GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST, "x04-readback");
+    using input: Buffer<Item> = createBuffer<Item, GPUDevice>(device, Item_STRIDE, 4, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST, "x04-input");
+    using output: Buffer<Item> = createBuffer<Item, GPUDevice>(device, Item_STRIDE, 1, GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_SRC, "x04-output");
+    using readback: Buffer<Item> = createBuffer<Item, GPUDevice>(device, Item_STRIDE, 1, GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST, "x04-readback");
     const queue = device.queue;
     input.write(queue, 0, Context.bytesOf<FixedArray<Item, 4>>(inputValues));
     device.pushErrorScope("validation");

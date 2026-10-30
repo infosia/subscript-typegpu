@@ -297,7 +297,7 @@ pub(crate) struct ApiGenerateRow {
 }
 
 /// `[[api.deviations]]` row.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ApiDeviationRow {
     /// `Interface.member` in IDL spelling.

@@ -4,7 +4,8 @@ P2 contract. Rev 0, 2026-08-22. Rev 5 (PI15–PI18 guarded dispatch,
 indirect), 2026-08-23. Rev 6 (PI15 Rev 1, PI18 Rev 1), 2026-08-23. Rev 7 (PI15 Rev 2
 wrapper identity), 2026-08-24. Rev 8 (PI3 Rev 1, the layout
 constructor), 2026-09-12. Rev 9 (PI2 Rev 1 inferred type arguments,
-PI3 Rev 2 parameter properties), 2026-10-27. Plan §3 D1, D3, D10 and §4 govern
+PI3 Rev 2 parameter properties), 2026-10-27. Rev 10 (the guard queue
+Rev 3: always borrowed), 2026-10-30. Plan §3 D1, D3, D10 and §4 govern
 this block. Kernels are `kernel.md`. The runtime classes live in
 `lib/typegpu.ts`.
 
@@ -188,7 +189,11 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   `dispose()` disposes the queue only when the pipeline owns it. The
   earlier text disposed it in both cases, so a guarded pipeline
   released the device's queue, and a later read of `device.queue`
-  reached a released handle.
+  reached a released handle. Rev 3, 2026-10-30 (P17): both device
+  classes cache their queue (api-layer.md Rev 1), so a
+  `ComputePipeline` always borrows the queue, never disposes it, and
+  holds no ownership flag. `createComputePipelineHost` is removed
+  (ergonomics.md EG10 Rev 2).
 - **PI16 — Indirect dispatch.** `ComputePipeline` gains
   `dispatchIndirect(encoder, groups, buffer: GPUBuffer, offset:
   u64)`, which records `dispatchWorkgroupsIndirect`. On a guarded

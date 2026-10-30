@@ -6,7 +6,7 @@ import {
   FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
-  createRenderPipelineHost,
+  createRenderPipeline,
   VertexInvocation,
   renderPipeline,
 } from "./typegpu";
@@ -109,12 +109,12 @@ export function init(
   });
   // One queue write uploads all three vertices. `Context.bytesOf` produces exactly the bytes
   // the generated vertex layout expects.
-  using queue = hostDevice.queue();
+  const queue = hostDevice.queue;
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>(values));
   // The generated entry names, the generated vertex layout, and the declaration build the
   // pipeline. TypeGPU's `root.createRenderPipeline` covers the same step.
   hostDevice.pushErrorScope("validation");
-  const createdPipeline = createRenderPipelineHost(
+  const createdPipeline = createRenderPipeline(
     hostDevice,
     triangle_WGSL,
     triangle_VERTEX_ENTRY,
@@ -126,11 +126,12 @@ export function init(
   // The host-owned device pumps the event loop itself, so the scope result arrives without
   // an await. The device lane awaits the same call.
   const validationError = hostDevice.popErrorScope();
-  // Both handles belong to the script here, so it releases them before it reports the
+  // The script releases its resources and queue reference before it reports the
   // failure and leaves the module state empty.
   if (validationError != null) {
     createdPipeline.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -192,7 +193,7 @@ export function frame(
   // The GPU runs nothing until the queue receives the command buffer. The host presents the
   // surface after this call returns.
   using command = encoder.finishDefault();
-  using queue = device.queue();
+  const queue = device.queue;
   queue.submit([command]);
 }
 
@@ -203,5 +204,6 @@ export function shutdown(): void {
   activeVertices = null;
   activePipeline?.dispose();
   activePipeline = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
 }

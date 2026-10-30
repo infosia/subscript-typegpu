@@ -17,9 +17,9 @@ import {
   VertexInvocation,
   bufferResource,
   computePipeline,
-  createBindGroupHost,
-  createComputePipelineHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createComputePipeline,
+  createRenderPipeline,
   renderPipelineL,
 } from "./typegpu";
 import {
@@ -340,8 +340,8 @@ export function init(
     print(`FAIL format expected=${atomicFluidRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
-  // The host owns the device and the instance. The wrapper carries no `dispose`, so this example
-  // never releases what it did not create.
+  // The host owns the device and the instance.
+  // The wrapper owns its cached queue reference and releases it in `shutdown`.
   const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // The four strip corners in clip space, in the order the triangle-strip topology needs.
   const vertexValues: FixedArray<Vertex, 4> = [
@@ -402,7 +402,7 @@ export function init(
   }
   // Both grids start from the same bytes, so either one can act as the source on the first
   // frame. Queue writes land before the commands that a later submit carries.
-  using queue = hostDevice.queue();
+  const queue = hostDevice.queue;
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 4>>(vertexValues));
   queue.writeBuffer(cellsA, 0, initialCells);
   queue.writeBuffer(cellsB, 0, initialCells);
@@ -422,21 +422,21 @@ export function init(
   hostDevice.pushErrorScope("validation");
   // Each compute pipeline takes the generated WGSL text, the entry name, the layout facts, and
   // the workgroup size. That size must equal the size in the declaration above.
-  const flowPipeline = createComputePipelineHost(
+  const flowPipeline = createComputePipeline(
     hostDevice,
     atomicFlow_WGSL,
     atomicFlow_ENTRY,
     [atomicFlow_LAYOUT0],
     [8, 8, 1],
   );
-  const finalizePipeline = createComputePipelineHost(
+  const finalizePipeline = createComputePipeline(
     hostDevice,
     atomicFinalize_WGSL,
     atomicFinalize_ENTRY,
     [atomicFinalize_LAYOUT0],
     [8, 8, 1],
   );
-  const brushPipeline = createComputePipelineHost(
+  const brushPipeline = createComputePipeline(
     hostDevice,
     atomicBrush_WGSL,
     atomicBrush_ENTRY,
@@ -445,7 +445,7 @@ export function init(
   );
   // The render pipeline also takes the vertex buffer layout and the declaration, which carries
   // the target format and the topology.
-  const renderPipeline = createRenderPipelineHost(
+  const renderPipeline = createRenderPipeline(
     hostDevice,
     atomicFluidRender_WGSL,
     atomicFluidRender_VERTEX_ENTRY,
@@ -464,6 +464,7 @@ export function init(
     cellsB.dispose();
     cellsA.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -476,49 +477,49 @@ export function init(
   using renderLayout = renderPipeline.bindGroupLayout(0);
   // Eight bind groups cover both buffer directions for the flow and the finalize pass, and both
   // choices for the brush and the render pass. The resource order follows the layout fields.
-  const flowGroupAB = createBindGroupHost(
+  const flowGroupAB = createBindGroup(
     hostDevice,
     flowLayout,
     atomicFlow_LAYOUT0,
     [bufferResource(cellsA), bufferResource(cellsB)],
   );
-  const flowGroupBA = createBindGroupHost(
+  const flowGroupBA = createBindGroup(
     hostDevice,
     flowLayout,
     atomicFlow_LAYOUT0,
     [bufferResource(cellsB), bufferResource(cellsA)],
   );
-  const finalizeGroupAB = createBindGroupHost(
+  const finalizeGroupAB = createBindGroup(
     hostDevice,
     finalizeLayout,
     atomicFinalize_LAYOUT0,
     [bufferResource(cellsA), bufferResource(cellsB)],
   );
-  const finalizeGroupBA = createBindGroupHost(
+  const finalizeGroupBA = createBindGroup(
     hostDevice,
     finalizeLayout,
     atomicFinalize_LAYOUT0,
     [bufferResource(cellsB), bufferResource(cellsA)],
   );
-  const brushGroupA = createBindGroupHost(
+  const brushGroupA = createBindGroup(
     hostDevice,
     brushLayout,
     atomicBrush_LAYOUT0,
     [bufferResource(cellsA), bufferResource(brush)],
   );
-  const brushGroupB = createBindGroupHost(
+  const brushGroupB = createBindGroup(
     hostDevice,
     brushLayout,
     atomicBrush_LAYOUT0,
     [bufferResource(cellsB), bufferResource(brush)],
   );
-  const renderGroupA = createBindGroupHost(
+  const renderGroupA = createBindGroup(
     hostDevice,
     renderLayout,
     atomicFluidRender_LAYOUT0,
     [bufferResource(cellsA)],
   );
-  const renderGroupB = createBindGroupHost(
+  const renderGroupB = createBindGroup(
     hostDevice,
     renderLayout,
     atomicFluidRender_LAYOUT0,
@@ -642,7 +643,7 @@ export function frame(
 
   // The brush write reaches the device before the submit below, so the stroke of this frame uses
   // the pointer of this frame.
-  using queue = device.queue();
+  const queue = device.queue;
   queue.writeBuffer(
     brush,
     0,
@@ -721,5 +722,6 @@ export function shutdown(): void {
   activeBrushPipeline = null;
   activeFinalize = null;
   activeFlow = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
 }

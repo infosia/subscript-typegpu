@@ -7,7 +7,7 @@ import {
   FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
-  createRenderPipelineHost,
+  createRenderPipeline,
   VertexInvocation,
   renderPipeline,
 } from "./typegpu";
@@ -114,13 +114,13 @@ export function init(
   });
   // Two queue writes upload the vertices and the indices. `Context.bytesOf` produces exactly
   // the bytes each generated layout expects.
-  using queue = hostDevice.queue();
+  const queue = hostDevice.queue;
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 4>>(values));
   queue.writeBuffer(indexBuffer, 0, Context.bytesOf<FixedArray<u16, 6>>(indices));
   // The generated entry names, the generated vertex layout, and the declaration build the
   // pipeline. The scope catches a validation error from that call.
   hostDevice.pushErrorScope("validation");
-  const createdPipeline = createRenderPipelineHost(
+  const createdPipeline = createRenderPipeline(
     hostDevice,
     square_WGSL,
     square_VERTEX_ENTRY,
@@ -138,6 +138,7 @@ export function init(
     createdPipeline.dispose();
     indexBuffer.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -206,7 +207,7 @@ export function frame(
   // The GPU runs nothing until the queue receives the command buffer. The host presents the
   // surface after this call returns.
   using command = encoder.finishDefault();
-  using queue = device.queue();
+  const queue = device.queue;
   queue.submit([command]);
 }
 
@@ -219,5 +220,6 @@ export function shutdown(): void {
   activeVertices = null;
   activePipeline?.dispose();
   activePipeline = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
 }

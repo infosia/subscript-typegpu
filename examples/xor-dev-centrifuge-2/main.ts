@@ -10,7 +10,7 @@ import {
   Uniform,
   VertexInvocation,
   WgslShellSpec,
-  createRenderPipelineHost,
+  createRenderPipeline,
   renderPipelineL,
   wgslShell,
 } from "./typegpu";
@@ -183,8 +183,8 @@ export function init(
     size: FrameData_SIZE as u64,
     usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
   });
-  // A host-owned device returns a new queue wrapper from each call, so this block frees it.
-  using queue = hostDevice.queue();
+  // The device lends its cached queue until shutdown.
+  const queue = hostDevice.queue;
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>(values));
   // The uniform needs a valid value before the first draw. The aspect ratio starts at 1.0,
   // and the first frame replaces it with the real window ratio.
@@ -193,7 +193,7 @@ export function init(
   // layout into a value the code below tests.
   hostDevice.pushErrorScope("validation");
   // The generated WGSL, the entry names, and the layout constants build the pipeline.
-  const createdPipeline = createRenderPipelineHost(
+  const createdPipeline = createRenderPipeline(
     hostDevice,
     tunnel_WGSL,
     tunnel_VERTEX_ENTRY,
@@ -209,6 +209,7 @@ export function init(
     createdPipeline.dispose();
     frameBuffer.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -271,7 +272,7 @@ export function frame(
   // `requestAnimationFrame` timestamp instead.
   frameCount += 1;
   const aspect: f32 = (width as f32) / (height as f32);
-  using queue = device.queue();
+  const queue = device.queue;
   // The uniform write enters the queue before the submit below. The queue keeps that order,
   // so the draw reads this frame's time.
   queue.writeBuffer(
@@ -318,5 +319,6 @@ export function shutdown(): void {
   activeVertices = null;
   activePipeline?.dispose();
   activePipeline = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
 }

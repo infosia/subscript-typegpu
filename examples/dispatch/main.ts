@@ -95,7 +95,7 @@ const count3d: ComputePipelineSpec = computePipeline(countKernel, {
 // `Counter_SIZE` is a generated constant. STORAGE binds the counter to the kernel, COPY_DST
 // admits the zero write, and COPY_SRC admits the readback copy.
 function counterBuffer(device: GPUDevice, label: string): Buffer<Counter> {
-  return createBuffer<Counter>(
+  return createBuffer<Counter, GPUDevice>(
     device,
     Counter_SIZE,
     1,

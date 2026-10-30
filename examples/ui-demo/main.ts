@@ -207,7 +207,7 @@ export function init(
     uiPipeline_LAYOUT0, uiPipeline_VERTEX_LAYOUT0, uiPipeline,
   );
   ownedDevice = deviceWrapper;
-  renderer = UiRenderer.createHost(deviceWrapper, facts);
+  renderer = UiRenderer.create(deviceWrapper, facts);
 }
 
 export function wheel(deltaX: f32, deltaY: f32): void {
@@ -275,7 +275,7 @@ export function frame(
   // The GPU runs nothing until the queue receives the command buffer. The host presents the
   // surface after this call returns.
   using command = encoder.finishDefault();
-  using queue = activeDevice.queue();
+  const queue = activeDevice.queue;
   queue.submit([command]);
 }
 
@@ -284,5 +284,6 @@ export function frame(
 export function shutdown(): void {
   renderer?.dispose();
   renderer = null;
+  if (ownedDevice != null) ownedDevice.dispose();
   ownedDevice = null;
 }

@@ -68,15 +68,22 @@ fn is_validation_filter(module: &Module, expression: &Expr) -> bool {
 }
 
 fn is_library_creation(module: &Module, symbol: &Symbol) -> bool {
-    let file = match symbol.source_name().as_str() {
+    let source_name = symbol.source_name();
+    let name = source_name.split('<').next().unwrap_or(&source_name);
+    let file = match name {
         "createComputePipeline" | "createRenderPipeline" => "typegpu.ts",
-        "UiRenderer.create" | "UiRenderer.createHost" => "typegpu-ui.ts",
+        "UiRenderer.create" => "typegpu-ui.ts",
         _ => return false,
     };
-    module
-        .functions
-        .iter()
-        .any(|function| function.symbol == *symbol && function.pos.file == file)
+    // Generic instances carry the call position. Their parameters retain declaration positions.
+    module.functions.iter().any(|function| {
+        function.symbol == *symbol
+            && (function.pos.file == file
+                || function
+                    .params
+                    .iter()
+                    .any(|parameter| parameter.pos.file == file))
+    })
 }
 
 fn is_device_creation(module: &Module, receiver: &Expr, name: &str) -> bool {
@@ -373,4 +380,12 @@ fn direct_renderer_construction_is_a_private_constructor_error() {
         error.contains("constructor is private in class `UiRenderer`"),
         "{error}"
     );
+}
+
+#[test]
+fn an_unscoped_generic_creation_call_fails_the_scope_gate() {
+    let program =
+        repository_root().join("crates/harness/tests/fixtures/scopes/generic-unscoped.ts");
+    let failure = scope_failure(&program).expect("unscoped generic creation must fail");
+    assert_eq!(failure, "generic-unscoped.ts: expected one validation scope around 1 creation call(s), found [Creation]");
 }

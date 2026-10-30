@@ -130,28 +130,28 @@ export async function main(): Promise<void> {
       1,
       vecAdd_HOST_RUNNABLE,
     );
-    using a: Buffer<Item> = createBuffer<Item>(
+    using a: Buffer<Item> = createBuffer<Item, GPUDevice>(
       device,
       Item_STRIDE,
       count,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
       "x01-a",
     );
-    using b: Buffer<Item> = createBuffer<Item>(
+    using b: Buffer<Item> = createBuffer<Item, GPUDevice>(
       device,
       Item_STRIDE,
       count,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
       "x01-b",
     );
-    using out: Buffer<Item> = createBuffer<Item>(
+    using out: Buffer<Item> = createBuffer<Item, GPUDevice>(
       device,
       Item_STRIDE,
       count,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_SRC,
       "x01-out",
     );
-    using readback: Buffer<Item> = createBuffer<Item>(
+    using readback: Buffer<Item> = createBuffer<Item, GPUDevice>(
       device,
       Item_STRIDE,
       count,

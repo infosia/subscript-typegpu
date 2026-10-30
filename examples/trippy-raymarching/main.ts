@@ -12,8 +12,8 @@ import {
   Uniform,
   VertexInvocation,
   bufferResource,
-  createBindGroupHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createRenderPipeline,
   renderPipelineL,
 } from "./typegpu";
 import {
@@ -231,8 +231,8 @@ export function init(
     print(`FAIL format expected=${trippy_TARGET_FORMAT} actual=${format}`);
     return;
   }
-  // The wrapper adapts the host handles to the API layer. It carries no `dispose`, because
-  // the host owns the device.
+  // The wrapper adapts the host handles and caches a queue reference.
+  // Its disposal releases that queue reference. The host owns the device.
   const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // The vertex buffer holds the three corners of the fullscreen triangle. Vertex_STRIDE keeps
   // the size right when the schema changes.
@@ -247,9 +247,8 @@ export function init(
     size: FrameData_SIZE as u64,
     usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
   });
-  // The queue wrapper is a handle. `using` disposes it at the end of `init`, and `frame`
-  // takes a fresh one.
-  using queue = hostDevice.queue();
+  // The device lends its cached queue to both `init` and `frame`.
+  const queue = hostDevice.queue;
   // `Context.bytesOf` lays out the values with the generated C layout, so the bytes match the
   // WGSL that the generator emits.
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>([
@@ -268,7 +267,7 @@ export function init(
   hostDevice.pushErrorScope("validation");
   // The call takes the generated WGSL text, the two entry names, the bind group layout, and
   // the vertex layout. No shader text is built here.
-  const pipeline = createRenderPipelineHost(
+  const pipeline = createRenderPipeline(
     hostDevice,
     trippy_WGSL,
     trippy_VERTEX_ENTRY,
@@ -284,6 +283,7 @@ export function init(
     pipeline.dispose();
     frameBuffer.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -291,7 +291,7 @@ export function init(
   // releases the handle right after.
   using bindLayout = pipeline.bindGroupLayout(0);
   // One resource fills the group, in the field order of TrippyLayout.
-  const group = createBindGroupHost(
+  const group = createBindGroup(
     hostDevice,
     bindLayout,
     trippy_LAYOUT0,
@@ -342,7 +342,7 @@ export function frame(
   }
   // The queue applies the write below before it runs the command buffer that the submit sends,
   // so the fragment reads the values of this frame.
-  using queue = device.queue();
+  const queue = device.queue;
   queue.writeBuffer(
     frameBuffer,
     0,
@@ -394,6 +394,7 @@ export function shutdown(): void {
   activeVertices = null;
   activePipeline = null;
   activeGroup = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
   frameCount = 0;
 }

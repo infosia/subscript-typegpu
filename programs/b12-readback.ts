@@ -43,7 +43,7 @@ export async function main(): Promise<void> {
       new Particle(2.5, new Vec3f(-2.0, 8.0, 0.25)),
       new Particle(3.5, new Vec3f(9.0, -3.0, 7.0)),
     ];
-    using buffer: Buffer<Particle> = createBuffer<Particle>(
+    using buffer: Buffer<Particle> = createBuffer<Particle, GPUDevice>(
       device,
       Particle_STRIDE,
       4,

@@ -140,21 +140,21 @@ async function checkLength(
     + GPUBufferUsage.COPY_SRC;
   // An f32 element is 4 bytes. The values buffer holds the padded length, and the sums buffer
   // holds the 256 slots the second pass covers.
-  using values: Buffer<f32> = createBuffer<f32>(
+  using values: Buffer<f32> = createBuffer<f32, GPUDevice>(
     device,
     4,
     plan.paddedLength,
     usage,
     `prefix-scan-values-${length}`,
   );
-  using sums: Buffer<f32> = createBuffer<f32>(
+  using sums: Buffer<f32> = createBuffer<f32, GPUDevice>(
     device,
     4,
     256,
     usage,
     `prefix-scan-sums-${length}`,
   );
-  using total: Buffer<f32> = createBuffer<f32>(
+  using total: Buffer<f32> = createBuffer<f32, GPUDevice>(
     device,
     4,
     1,

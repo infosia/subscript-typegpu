@@ -22,9 +22,9 @@ import {
   WriteStorageTexture2dArray,
   bufferResource,
   computePipeline,
-  createBindGroupHost,
-  createComputePipelineHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createComputePipeline,
+  createRenderPipeline,
   renderPipelineL,
   samplerResource,
   textureResource,
@@ -366,8 +366,8 @@ export function init(
     print(`FAIL format expected=${voronoiRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
-  // The host owns the device and the instance. The wrapper carries no `dispose`, so this example
-  // never releases what it did not create.
+  // The host owns the device and the instance.
+  // The wrapper owns its cached queue reference and releases it in `shutdown`.
   const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // Buffer sizes come from the generated stride and size constants, never from a hand count.
   const vertices = hostDevice.createBuffer({
@@ -433,7 +433,7 @@ export function init(
   const linearSampler = hostDevice.createSampler(samplerDescriptor);
   // Three vertices in clip space cover the surface. Queue writes land before the commands that a
   // later submit carries, so both uniforms hold a value before the first dispatch.
-  using queue = hostDevice.queue();
+  const queue = hostDevice.queue;
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>([
     new Vertex(new Vec2f(-1.0, -1.0)),
     new Vertex(new Vec2f(3.0, -1.0)),
@@ -447,14 +447,14 @@ export function init(
   hostDevice.pushErrorScope("validation");
   // Each compute pipeline takes the generated WGSL text, the entry name, the layout facts, and
   // the workgroup size. That size must equal the size in the declaration above.
-  const seedPipeline = createComputePipelineHost(
+  const seedPipeline = createComputePipeline(
     hostDevice,
     seedVoronoi_WGSL,
     seedVoronoi_ENTRY,
     [seedVoronoi_LAYOUT0],
     [8, 8, 1],
   );
-  const stepPipeline = createComputePipelineHost(
+  const stepPipeline = createComputePipeline(
     hostDevice,
     jumpFloodStep_WGSL,
     jumpFloodStep_ENTRY,
@@ -463,7 +463,7 @@ export function init(
   );
   // The render pipeline also takes the vertex buffer layout and the declaration, which carries
   // the target format.
-  const renderPipeline = createRenderPipelineHost(
+  const renderPipeline = createRenderPipeline(
     hostDevice,
     voronoiRender_WGSL,
     voronoiRender_VERTEX_ENTRY,
@@ -487,6 +487,7 @@ export function init(
     stepParams.dispose();
     seedParams.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -498,29 +499,29 @@ export function init(
   using renderLayout = renderPipeline.bindGroupLayout(0);
   // Two seed groups pick the texture the seed pass fills. Two step groups cover both flood
   // directions, and two render groups pick the texture the frame displays.
-  const seedA = createBindGroupHost(hostDevice, seedLayout, seedVoronoi_LAYOUT0, [
+  const seedA = createBindGroup(hostDevice, seedLayout, seedVoronoi_LAYOUT0, [
     textureResource(arrayViewA),
     bufferResource(seedParams),
   ]);
-  const seedB = createBindGroupHost(hostDevice, seedLayout, seedVoronoi_LAYOUT0, [
+  const seedB = createBindGroup(hostDevice, seedLayout, seedVoronoi_LAYOUT0, [
     textureResource(arrayViewB),
     bufferResource(seedParams),
   ]);
-  const stepAB = createBindGroupHost(hostDevice, stepLayout, jumpFloodStep_LAYOUT0, [
+  const stepAB = createBindGroup(hostDevice, stepLayout, jumpFloodStep_LAYOUT0, [
     textureResource(arrayViewA),
     textureResource(arrayViewB),
     bufferResource(stepParams),
   ]);
-  const stepBA = createBindGroupHost(hostDevice, stepLayout, jumpFloodStep_LAYOUT0, [
+  const stepBA = createBindGroup(hostDevice, stepLayout, jumpFloodStep_LAYOUT0, [
     textureResource(arrayViewB),
     textureResource(arrayViewA),
     bufferResource(stepParams),
   ]);
-  const renderA = createBindGroupHost(hostDevice, renderLayout, voronoiRender_LAYOUT0, [
+  const renderA = createBindGroup(hostDevice, renderLayout, voronoiRender_LAYOUT0, [
     textureResource(colorViewA),
     samplerResource(linearSampler),
   ]);
-  const renderB = createBindGroupHost(hostDevice, renderLayout, voronoiRender_LAYOUT0, [
+  const renderB = createBindGroup(hostDevice, renderLayout, voronoiRender_LAYOUT0, [
     textureResource(colorViewB),
     samplerResource(linearSampler),
   ]);
@@ -560,7 +561,7 @@ export function frame(
   // the same failure as an exception.
   if (activeState == null) return;
   const active = activeState;
-  using queue = active.device.queue();
+  const queue = active.device.queue;
   // One encoder carries the whole frame. The key action, the flood step, and the render pass all
   // record into it, and one submit sends them in order.
   using encoder = active.device.createCommandEncoderDefault();
@@ -663,6 +664,7 @@ export function shutdown(): void {
     index += 1;
   }
   // The cleared state leaves no released handle reachable from module scope.
+  active.device.dispose();
   activeState = null;
   currentIsA = true;
   jumpOffset = 0;

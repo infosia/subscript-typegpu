@@ -174,14 +174,14 @@ export async function main(): Promise<void> {
       }
       instanceIndex += 1;
     }
-    using vertices: Buffer<Vertex> = createBuffer<Vertex>(
+    using vertices: Buffer<Vertex> = createBuffer<Vertex, GPUDevice>(
       device,
       Vertex_STRIDE,
       4,
       GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
       "x06-vertices",
     );
-    using instances: Buffer<Instance> = createBuffer<Instance>(
+    using instances: Buffer<Instance> = createBuffer<Instance, GPUDevice>(
       device,
       Instance_STRIDE,
       3,

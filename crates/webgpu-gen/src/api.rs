@@ -13,6 +13,8 @@ use crate::policy::{ApiDeviationRow, ApiSection, Policy};
 
 /// The reserved member key of the `GPUDevice` constructor, which the host seam uses.
 const GPU_DEVICE_CONSTRUCTOR: &str = "GPUDevice.@constructor";
+/// The policy-only constraint shared by both device wrappers.
+const GPU_DEVICE_CREATION: &str = "GPUDeviceCreation.@interface";
 /// The deviation pattern that opens the host seam (J13).
 const HOST_OWNED_WRAPPER_PATTERN: &str = "host-owned-wrapper";
 /// The synthetic API member of the typed f32 buffer write (S3).
@@ -804,7 +806,11 @@ fn build_plan(
     }
     for row in &policy.deviations {
         if !(reachable.contains_key(&row.member)
-            || host_owned_device && row.member == GPU_DEVICE_CONSTRUCTOR
+            || host_owned_device
+                && matches!(
+                    row.member.as_str(),
+                    GPU_DEVICE_CONSTRUCTOR | GPU_DEVICE_CREATION
+                )
             || synthetic_typed_anchor(row).is_some())
         {
             return Err(unknown(&row.member));
@@ -825,6 +831,7 @@ fn build_plan(
     }
     if host_owned_device {
         consume(&mut ledger, &format!("deviation:{GPU_DEVICE_CONSTRUCTOR}"));
+        consume(&mut ledger, &format!("deviation:{GPU_DEVICE_CREATION}"));
     }
     for row in policy
         .deviations
@@ -1213,6 +1220,24 @@ fn validate_host_owned_device_policy(
         return Err(ApiPolicyError::Invalid {
             entry: GPU_DEVICE_CONSTRUCTOR.to_owned(),
             message: "host-owned-wrapper accepts only member, pattern, and reason".to_owned(),
+        });
+    }
+    let creation = policy
+        .deviations
+        .iter()
+        .find(|row| row.member == GPU_DEVICE_CREATION)
+        .ok_or_else(|| ApiPolicyError::Unpoliced {
+            construct: GPU_DEVICE_CREATION.to_owned(),
+        })?;
+    let mut expected = row.clone();
+    expected.member = GPU_DEVICE_CREATION.to_owned();
+    expected.pattern = "device-creation-interface".to_owned();
+    expected.reason = creation.reason.clone();
+    if *creation != expected {
+        return Err(ApiPolicyError::Invalid {
+            entry: GPU_DEVICE_CREATION.to_owned(),
+            message: "device-creation-interface accepts only member, pattern, and reason"
+                .to_owned(),
         });
     }
     Ok(true)
@@ -6421,6 +6446,9 @@ fn render_interface(
     interface: &InterfacePlan,
     needs: &BTreeMap<&str, bool>,
 ) -> Result<(), ApiPolicyError> {
+    if interface.host_owned {
+        render_device_creation(out, interface);
+    }
     render_interface_class(out, interface, needs, false)?;
     if interface.host_owned {
         render_interface_class(out, interface, needs, true)?;
@@ -6428,11 +6456,65 @@ fn render_interface(
     Ok(())
 }
 
+/// Renders the creation methods and cached queue that both device classes expose.
+fn render_device_creation(out: &mut String, interface: &InterfacePlan) {
+    out.push_str("/** Creates GPU resources and lends the device's cached queue. */\nexport interface GPUDeviceCreation {\n  /** Returns the borrowed queue. */\n  get queue(): GPUQueue;\n");
+    for method in &interface.methods {
+        let (name, params, result, default_variant) = match method {
+            MethodPlan::Operation {
+                name,
+                params,
+                return_type,
+                default_variant,
+                ..
+            } if name.starts_with("create") || name == "hasFeature" => {
+                (name, params, return_type.clone(), default_variant.as_ref())
+            }
+            MethodPlan::Async {
+                name,
+                params,
+                result_class: Some(result),
+                nullable,
+                ..
+            } if name.starts_with("create") => (
+                name,
+                params,
+                format!(
+                    "Promise<{result}{}>",
+                    if *nullable { " | null" } else { "" }
+                ),
+                None,
+            ),
+            _ => continue,
+        };
+        let parameters = params
+            .iter()
+            .map(|param| format!("{}: {}", param.name, param.api_type))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let comment = if name == "hasFeature" {
+            "Returns whether the device enables the named feature."
+        } else {
+            "Creates a resource from the descriptor."
+        };
+        out.push_str(&format!(
+            "  /** {comment} */\n  {name}({parameters}): {result};\n"
+        ));
+        if let Some(variant) = default_variant {
+            out.push_str(&format!(
+                "  /** Creates a resource with the default descriptor. */\n  {}(): {result};\n",
+                variant.name
+            ));
+        }
+    }
+    out.push_str("}\n\n");
+}
+
 /// Renders one public class: its fields, its constructor, its methods, and its disposal (J7).
 ///
 /// `host_owned` emits the wrapper form, which holds its handles privately, drops `destroy`, and
-/// declares no disposal. An attribute with a wrapper result caches that wrapper in a field, so
-/// a property read allocates nothing.
+/// releases only its cached queue reference. An attribute with a wrapper result caches that wrapper in a field.
+/// A property read allocates nothing.
 fn render_interface_class(
     out: &mut String,
     interface: &InterfacePlan,
@@ -6444,16 +6526,22 @@ fn render_interface_class(
     } else {
         interface.name.as_str()
     };
-    out.push_str(&format!("export class {class_name} {{\n"));
+    out.push_str(&format!(
+        "export class {class_name}{} {{\n",
+        if interface.host_owned {
+            " implements GPUDeviceCreation"
+        } else {
+            ""
+        }
+    ));
     let parameter_properties = !interface.idempotent_dispose
         && !interface.methods.iter().any(|method| {
             matches!(
                 method,
                 MethodPlan::Attribute {
-                    name,
                     result_class: Some(_),
                     ..
-                } if !(host_owned && interface.name == "GPUDevice" && name == "queue")
+                }
             )
         });
     let field_visibility = if interface.host_owned {
@@ -6489,10 +6577,10 @@ fn render_interface_class(
             ..
         } = method
         {
-            if host_owned && interface.name == "GPUDevice" && name == "queue" {
-                continue;
-            }
-            out.push_str(&format!("  {name}Value: {result};\n"));
+            out.push_str(&format!(
+                "  {}{name}Value: {result};\n",
+                if host_owned { "private " } else { "" }
+            ));
         }
     }
     out.push('\n');
@@ -6538,9 +6626,6 @@ fn render_interface_class(
             ..
         } = method
         {
-            if host_owned && interface.name == "GPUDevice" && name == "queue" {
-                continue;
-            }
             let constructor = if needs.get(result.as_str()).copied().unwrap_or(false) {
                 format!(
                     "new {result}(this.instance, {getter}(this.{}))",
@@ -6597,19 +6682,8 @@ fn render_interface_class(
                 result_class,
                 enum_conversion,
             } => {
-                let host_owned_queue =
-                    host_owned && interface.name == "GPUDevice" && name == "queue";
-                if host_owned_queue {
-                    out.push_str(&format!("  {name}(): {return_type} {{\n"));
-                } else {
-                    out.push_str(&format!("  get {name}(): {return_type} {{\n"));
-                }
-                if host_owned_queue {
-                    out.push_str(&format!(
-                        "    return new GPUQueue(this.instance, {getter}(this.{}));\n",
-                        interface.raw_field
-                    ));
-                } else if result_class.is_some() {
+                out.push_str(&format!("  get {name}(): {return_type} {{\n"));
+                if result_class.is_some() {
                     out.push_str(&format!("    return this.{name}Value;\n"));
                 } else {
                     let value = format!("{getter}(this.{})", interface.raw_field);
@@ -6712,9 +6786,9 @@ fn render_interface_class(
             ),
         }
     }
-    // The host-owned wrapper declares no disposal. The host owns the device handle, so the
-    // script must not release it (J13).
+    // The host-owned wrapper releases its queue reference only (J13).
     if host_owned {
+        out.push_str("  /** Releases the cached queue reference and leaves the host device alive. */\n  dispose(): void {\n    this.queueValue.dispose();\n  }\n");
     } else if interface.host_owned {
         out.push_str(&format!(
             "  dispose(): void {{\n    this.queueValue.dispose();\n    subscript_typegpu_{}_release(this.{});\n  }}\n",
@@ -6732,9 +6806,10 @@ fn render_interface_class(
             interface.raw_field
         ));
     }
-    if !host_owned {
-        out.push_str("\n  [Symbol.dispose](): void {\n    this.dispose();\n  }\n");
+    if host_owned {
+        out.push_str("\n  /** Releases the cached queue reference at the end of a using scope. */");
     }
+    out.push_str("\n  [Symbol.dispose](): void {\n    this.dispose();\n  }\n");
     out.push_str("}\n\n");
     Ok(())
 }

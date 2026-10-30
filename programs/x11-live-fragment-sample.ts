@@ -116,7 +116,7 @@ export async function main(): Promise<void> {
       new FragmentVertex(new Vec2f(1.0, -1.0), new Vec2f(0.9375, 0.9375)),
       new FragmentVertex(new Vec2f(1.0, 1.0), new Vec2f(0.9375, -0.0625)),
     ];
-    using vertexBuffer: Buffer<FragmentVertex> = createBuffer<FragmentVertex>(
+    using vertexBuffer: Buffer<FragmentVertex> = createBuffer<FragmentVertex, GPUDevice>(
       device, FragmentVertex_STRIDE, 6,
       GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST, "x11-vertices",
     );

@@ -35,7 +35,7 @@ fn red(policy: &str, expected: &str) {
 }
 
 fn constructor_row() -> &'static str {
-    "[[api.deviations]]\nmember = \"GPUDevice.@constructor\"\npattern = \"host-owned-wrapper\"\nreason = \"JavaScript exposes no GPUDevice constructor. This API keeps a public owning constructor that accepts private raw-handle fields. It acquires and caches one queue reference through subscript_typegpu_device_get_queue. GPUHostOwnedDevice.create returns GPUHostOwnedDevice, which wraps a host-owned device and exposes the same creation methods but neither dispose nor destroy. Each queue call returns a new owned queue wrapper.\"\n\n"
+    "[[api.deviations]]\nmember = \"GPUDevice.@constructor\"\npattern = \"host-owned-wrapper\"\nreason = \"JavaScript exposes no GPUDevice constructor. The owning constructor and GPUHostOwnedDevice.create each acquire and cache one queue reference. Both classes implement GPUDeviceCreation and lend their cached queue. GPUHostOwnedDevice.dispose releases only the queue reference. The host owns the device and destroys it.\"\n\n"
 }
 
 #[test]
@@ -69,4 +69,88 @@ fn device_ownership_deviation_rejects_unconsumed_controls() {
         &policy,
         "api policy error (invalid): `GPUDevice.@constructor`: host-owned-wrapper accepts only member, pattern, and reason",
     );
+}
+
+#[test]
+fn creation_interface_requires_a_policy_row() {
+    let policy = repo_file("crates/webgpu-gen/policy.toml");
+    let start = policy
+        .find("[[api.deviations]]\nmember = \"GPUDeviceCreation.@interface\"")
+        .expect("interface row");
+    let end = start + policy[start..].find("\n\n").expect("row end") + 2;
+    let policy = format!("{}{}", &policy[..start], &policy[end..]);
+    red(&policy, "api policy error (unpoliced): `GPUDeviceCreation.@interface` is reachable from the selected IDL subset but is neither generated, deviation-rowed, nor excluded");
+}
+
+#[test]
+fn creation_interface_rejects_shape_controls() {
+    let policy = repo_file("crates/webgpu-gen/policy.toml").replace(
+        "pattern = \"device-creation-interface\"\nreason =",
+        "pattern = \"device-creation-interface\"\nnullable_return = true\nreason =",
+    );
+    red(&policy, "api policy error (invalid): `GPUDeviceCreation.@interface`: device-creation-interface accepts only member, pattern, and reason");
+}
+
+#[test]
+fn device_wrappers_share_creation_signatures_and_cache_their_queues() {
+    let api = subscript_typegpu_webgpu_gen::generate_api(
+        &gpuweb(),
+        &support::require_base_mirror!(),
+        &repo_file("crates/webgpu-gen/policy.toml"),
+    )
+    .expect("generate device wrappers")
+    .source;
+    let creation = api
+        .split("export interface GPUDeviceCreation {")
+        .nth(1)
+        .expect("creation interface")
+        .split("\n}")
+        .next()
+        .expect("interface body");
+    for name in ["GPUDevice", "GPUHostOwnedDevice"] {
+        let class = api
+            .split(&format!(
+                "export class {name} implements GPUDeviceCreation {{"
+            ))
+            .nth(1)
+            .expect("implementing class")
+            .split("\n}\n")
+            .next()
+            .expect("class body");
+        for signature in creation
+            .lines()
+            .map(str::trim)
+            .filter(|line| line.ends_with(';'))
+        {
+            let signature = signature.trim_end_matches(';');
+            let concrete = signature
+                .replace(
+                    "GPUSamplerDescriptor | null)",
+                    "GPUSamplerDescriptor | null = null)",
+                )
+                .replace(
+                    "GPUCommandEncoderDescriptor | null)",
+                    "GPUCommandEncoderDescriptor | null = null)",
+                );
+            assert!(
+                class.contains(&format!("{concrete} {{"))
+                    || class.contains(&format!("async {concrete} {{")),
+                "{name} lacks {signature}"
+            );
+        }
+        assert_eq!(
+            class
+                .matches("subscript_typegpu_device_get_queue(this.device)")
+                .count(),
+            1
+        );
+        assert!(class.contains("get queue(): GPUQueue {\n    return this.queueValue;"));
+        assert!(class.contains("[Symbol.dispose](): void {\n    this.dispose();"));
+        if name == "GPUHostOwnedDevice" {
+            assert!(class.contains("private queueValue: GPUQueue;"));
+            assert!(class.contains("dispose(): void {\n    this.queueValue.dispose();\n  }"));
+            assert!(!class.contains("subscript_typegpu_device_release"));
+            assert!(!class.contains("destroy():"));
+        }
+    }
 }

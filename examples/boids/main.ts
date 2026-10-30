@@ -16,9 +16,9 @@ import {
   VertexInvocation,
   bufferResource,
   computePipeline,
-  createBindGroupHost,
-  createComputePipelineHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createComputePipeline,
+  createRenderPipeline,
   renderPipelineInstanced,
 } from "./typegpu";
 import {
@@ -201,8 +201,8 @@ export function init(
     print(`FAIL format expected=${boidRender_TARGET_FORMAT} actual=${format}`);
     return;
   }
-  // The wrapper adapts the host handles to the API layer. It carries no `dispose`, because
-  // the host owns the device.
+  // The wrapper adapts the host handles and caches a queue reference.
+  // Its disposal releases that queue reference. The host owns the device.
   const hostDevice = GPUHostOwnedDevice.create(instance, device);
   // One narrow triangle points along +y in local space. The vertex stage turns it onto the
   // velocity of each boid.
@@ -229,7 +229,7 @@ export function init(
     size: (Boid_STRIDE * BOID_COUNT) as u64,
     usage: GPUBufferUsage.STORAGE + GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
   });
-  using queue = hostDevice.queue();
+  const queue = hostDevice.queue;
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>(vertexValues));
   // A fixed grid seed replaces the upstream random start, so every run shows the same flock.
   // Both buffers take the same bytes, so neither one starts with undefined content.
@@ -252,7 +252,7 @@ export function init(
   hostDevice.pushErrorScope("validation");
   // The call takes the generated WGSL, the entry name, the bind group layout, and the
   // workgroup size that the declaration above names.
-  const computePipeline = createComputePipelineHost(
+  const computePipeline = createComputePipeline(
     hostDevice,
     boidUpdate_WGSL,
     boidUpdate_ENTRY,
@@ -261,7 +261,7 @@ export function init(
   );
   // The empty layout list matches a pipeline with no bind group. The two vertex layouts cover
   // slot 0 per vertex and slot 1 per instance.
-  const renderPipeline = createRenderPipelineHost(
+  const renderPipeline = createRenderPipeline(
     hostDevice,
     boidRender_WGSL,
     boidRender_VERTEX_ENTRY,
@@ -279,6 +279,7 @@ export function init(
     boidsB.dispose();
     boidsA.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -287,7 +288,7 @@ export function init(
   using computeBindLayout = computePipeline.bindGroupLayout(0);
   // The guard buffer carries the dispatched thread count. It gives the kernel the bound
   // that TypeGPU's createGuardedComputePipeline applies for the caller.
-  const groupAB = createBindGroupHost(
+  const groupAB = createBindGroup(
     hostDevice,
     computeBindLayout,
     boidUpdate_LAYOUT0,
@@ -296,7 +297,7 @@ export function init(
   );
   // The second group swaps the two buffers. Both groups exist once, so no frame builds a bind
   // group.
-  const groupBA = createBindGroupHost(
+  const groupBA = createBindGroup(
     hostDevice,
     computeBindLayout,
     boidUpdate_LAYOUT0,
@@ -381,7 +382,7 @@ export function frame(
   // `finishDefault` closes the encoder, and `submit` hands the command buffer to the queue.
   // The host presents the surface after `frame` returns.
   using command = encoder.finishDefault();
-  using queue = device.queue();
+  const queue = device.queue;
   queue.submit([command]);
 }
 
@@ -403,5 +404,6 @@ export function shutdown(): void {
   activeVertices = null;
   activeRender = null;
   activeCompute = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
 }

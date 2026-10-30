@@ -24,9 +24,9 @@ import {
   WriteStorageTexture2dArray,
   bufferResource,
   computePipeline,
-  createBindGroupHost,
-  createComputePipelineHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createComputePipeline,
+  createRenderPipeline,
   renderPipelineL,
   samplerResource,
   textureResource,
@@ -894,9 +894,9 @@ export function init(
   const samplerDescriptor: GPUSamplerDescriptor = { minFilter: "linear", magFilter: "linear" };
   const sampler = hostDevice.createSampler(samplerDescriptor);
 
-  // The queue handle is borrowed for this block, and `using` releases it at the end of `init`.
+  // The device lends its cached queue until shutdown.
   // The buffers it writes stay.
-  using queue = hostDevice.queue();
+  const queue = hostDevice.queue;
   // `Context.bytesOf<T>` produces the exact bytes of the value in the generated layout.
   // TypeGPU converts a JavaScript object to buffer bytes at run time instead.
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>([
@@ -949,42 +949,42 @@ export function init(
   hostDevice.pushErrorScope("validation");
   // Each pipeline takes generated WGSL text, a generated entry name, and a generated layout
   // spec. This file holds no shader text.
-  const editPipeline = createComputePipelineHost(
+  const editPipeline = createComputePipeline(
     hostDevice,
     sceneEdit_WGSL,
     sceneEdit_ENTRY,
     [sceneEdit_LAYOUT0],
     [8, 8, 1],
   );
-  const seedPipeline = createComputePipelineHost(
+  const seedPipeline = createComputePipeline(
     hostDevice,
     floodSeed_WGSL,
     floodSeed_ENTRY,
     [floodSeed_LAYOUT0],
     [8, 8, 1],
   );
-  const stepPipeline = createComputePipelineHost(
+  const stepPipeline = createComputePipeline(
     hostDevice,
     floodStep_WGSL,
     floodStep_ENTRY,
     [floodStep_LAYOUT0],
     [8, 8, 1],
   );
-  const derivePipeline = createComputePipelineHost(
+  const derivePipeline = createComputePipeline(
     hostDevice,
     floodDerive_WGSL,
     floodDerive_ENTRY,
     [floodDerive_LAYOUT0],
     [8, 8, 1],
   );
-  const cascadePipeline = createComputePipelineHost(
+  const cascadePipeline = createComputePipeline(
     hostDevice,
     cascadePass_WGSL,
     cascadePass_ENTRY,
     [cascadePass_LAYOUT0],
     [16, 16, 1],
   );
-  const fieldPipeline = createComputePipelineHost(
+  const fieldPipeline = createComputePipeline(
     hostDevice,
     fieldBuild_WGSL,
     fieldBuild_ENTRY,
@@ -992,7 +992,7 @@ export function init(
     [16, 16, 1],
   );
   // The render pipeline also takes the vertex layout the generator derived from `Vertex`.
-  const renderPipeline = createRenderPipelineHost(
+  const renderPipeline = createRenderPipeline(
     hostDevice,
     radianceDrawingRender_WGSL,
     radianceDrawingRender_VERTEX_ENTRY,
@@ -1043,6 +1043,7 @@ export function init(
     }
     brushParams.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -1056,11 +1057,11 @@ export function init(
   using cascadeLayout = cascadePipeline.bindGroupLayout(0);
   using fieldLayout = fieldPipeline.bindGroupLayout(0);
   using renderLayout = renderPipeline.bindGroupLayout(0);
-  const editGroup = createBindGroupHost(hostDevice, editLayout, sceneEdit_LAYOUT0, [
+  const editGroup = createBindGroup(hostDevice, editLayout, sceneEdit_LAYOUT0, [
     textureResource(sceneView),
     bufferResource(brushParams),
   ]);
-  const seedGroup = createBindGroupHost(hostDevice, seedLayout, floodSeed_LAYOUT0, [
+  const seedGroup = createBindGroup(hostDevice, seedLayout, floodSeed_LAYOUT0, [
     textureResource(sceneView),
     textureResource(floodArrayA),
   ]);
@@ -1071,7 +1072,7 @@ export function init(
   while (index < stepParams.length) {
     const source: GPUTextureView = index % 2 == 0 ? floodArrayA : floodArrayB;
     const target: GPUTextureView = index % 2 == 0 ? floodArrayB : floodArrayA;
-    stepGroups.push(createBindGroupHost(hostDevice, stepLayout, floodStep_LAYOUT0, [
+    stepGroups.push(createBindGroup(hostDevice, stepLayout, floodStep_LAYOUT0, [
       textureResource(source),
       textureResource(target),
       bufferResource(stepParams[index]),
@@ -1079,7 +1080,7 @@ export function init(
     index += 1;
   }
   // FLOOD_STEPS is odd, so the A-to-B first step leaves the final payload on side B.
-  const deriveGroup = createBindGroupHost(hostDevice, deriveLayout, floodDerive_LAYOUT0, [
+  const deriveGroup = createBindGroup(hostDevice, deriveLayout, floodDerive_LAYOUT0, [
     textureResource(floodArrayB),
     textureResource(sceneView),
     textureResource(sdfView),
@@ -1095,7 +1096,7 @@ export function init(
     // The top layer has no layer above it, so it binds its own view. The kernel skips the merge
     // there, and the binding stays valid.
     const upperLayer: u32 = layer + 1 < CASCADE_COUNT ? layer + 1 : layer;
-    cascadeGroups.push(createBindGroupHost(
+    cascadeGroups.push(createBindGroup(
       hostDevice,
       cascadeLayout,
       cascadePass_LAYOUT0,
@@ -1112,7 +1113,7 @@ export function init(
   }
   // Layer 0 writes one of the two sides. The gather group reads layer 0 of that side.
   const cascade0Side: u32 = cascadeWriteSide(CASCADE_COUNT, 0);
-  const fieldGroup = createBindGroupHost(hostDevice, fieldLayout, fieldBuild_LAYOUT0, [
+  const fieldGroup = createBindGroup(hostDevice, fieldLayout, fieldBuild_LAYOUT0, [
     textureResource(cascadeViews[(cascade0Side * CASCADE_COUNT) as i32]),
     samplerResource(sampler),
     textureResource(fieldView),
@@ -1122,7 +1123,7 @@ export function init(
   const renderGroups: GPUBindGroup[] = [];
   index = 0;
   while (index < renderParams.length) {
-    renderGroups.push(createBindGroupHost(
+    renderGroups.push(createBindGroup(
       hostDevice,
       renderLayout,
       radianceDrawingRender_LAYOUT0,
@@ -1204,7 +1205,7 @@ export function frame(
   }
 
   // The queue and the encoder live for this frame only.
-  using queue = active.device.queue();
+  const queue = active.device.queue;
   using encoder = active.device.createCommandEncoderDefault();
   // The light chain runs only after an edit. A frame with no edit costs one render pass.
   if (mode != 0) {
@@ -1362,6 +1363,7 @@ export function shutdown(): void {
   }
   // The cleared binding makes a later `frame` call return at its guard, and the next `init`
   // starts from an empty stroke state.
+  active.device.dispose();
   activeState = null;
   wasDrawing = false;
   displayMode = DISPLAY_LIT;

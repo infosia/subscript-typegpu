@@ -155,7 +155,7 @@ export async function main(): Promise<void> {
       new Vertex(new Vec2f(b.x - offset.x, b.y - offset.y)),
       new Vertex(new Vec2f(c.x - offset.x, c.y - offset.y)),
     ];
-    using vertices: Buffer<Vertex> = createBuffer<Vertex>(
+    using vertices: Buffer<Vertex> = createBuffer<Vertex, GPUDevice>(
       device,
       Vertex_STRIDE,
       3,

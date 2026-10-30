@@ -6,7 +6,7 @@ import {
   FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
-  createRenderPipelineHost,
+  createRenderPipeline,
   renderPipeline,
   VertexInvocation,
 } from "./typegpu";
@@ -98,7 +98,7 @@ export function init(
   });
   // One queue write uploads all three vertices. `Context.bytesOf` produces exactly the bytes
   // the generated vertex layout expects.
-  using queue = deviceWrapper.queue();
+  const queue = deviceWrapper.queue;
   queue.writeBuffer(
     vertices,
     0,
@@ -107,7 +107,7 @@ export function init(
   // The scope catches a validation error from the pipeline creation. The host-owned device
   // pumps the event loop itself, so the error arrives without an await.
   deviceWrapper.pushErrorScope("validation");
-  const createdPipeline = createRenderPipelineHost(
+  const createdPipeline = createRenderPipeline(
     deviceWrapper,
     tri_WGSL,
     tri_VERTEX_ENTRY,
@@ -117,11 +117,12 @@ export function init(
     tri,
   );
   const validationError = deviceWrapper.popErrorScope();
-  // Both handles belong to the script here, so it releases them before it reports the
+  // The script releases its resources and queue reference before it reports the
   // failure and leaves the module state empty.
   if (validationError != null) {
     createdPipeline.dispose();
     vertices.dispose();
+    deviceWrapper.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -190,7 +191,7 @@ export function frame(
   // The GPU runs nothing until the queue receives the command buffer. The host presents the
   // surface after this call returns.
   using command = encoder.finishDefault();
-  using queue = activeDevice.queue();
+  const queue = activeDevice.queue;
   queue.submit([command]);
 }
 
@@ -201,5 +202,6 @@ export function shutdown(): void {
   vertexBuffer = null;
   pipeline?.dispose();
   pipeline = null;
+  if (ownedDevice != null) ownedDevice.dispose();
   ownedDevice = null;
 }

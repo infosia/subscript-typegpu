@@ -11,8 +11,8 @@ import {
   Uniform,
   VertexInvocation,
   bufferResource,
-  createBindGroupHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createRenderPipeline,
   renderPipelineL,
 } from "./typegpu";
 import {
@@ -165,8 +165,8 @@ export function init(
     size: FrameData_SIZE as u64,
     usage: GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
   });
-  // A host-owned device returns a new queue wrapper from each call, so this block frees it.
-  using queue = hostDevice.queue();
+  // The device lends its cached queue until shutdown.
+  const queue = hostDevice.queue;
   // The triangle covers most of the surface. Context.bytesOf packs the array with the layout
   // rules the shader uses, so the host never counts offsets.
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>([
@@ -181,7 +181,7 @@ export function init(
   // layout into a value the code below tests.
   hostDevice.pushErrorScope("validation");
   // The generated WGSL, the entry names, and the layout constants build the pipeline.
-  const pipeline = createRenderPipelineHost(
+  const pipeline = createRenderPipeline(
     hostDevice,
     smoke_WGSL,
     smoke_VERTEX_ENTRY,
@@ -197,6 +197,7 @@ export function init(
     pipeline.dispose();
     frameBuffer.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -204,7 +205,7 @@ export function init(
   // disagree about group 0.
   using bindLayout = pipeline.bindGroupLayout(0);
   // The resource list follows the field order of SmokeLayout. One uniform buffer fills binding 0.
-  const group = createBindGroupHost(
+  const group = createBindGroup(
     hostDevice,
     bindLayout,
     smoke_LAYOUT0,
@@ -245,7 +246,7 @@ export function frame(
   // The window host carries no clock. The frame count divided by 60.0 gives seconds at the
   // nominal present rate, which drives the noise drift.
   frameCount += 1;
-  using queue = device.queue();
+  const queue = device.queue;
   // The uniform write enters the queue before the submit below. The queue keeps that order,
   // so the draw reads this frame's time.
   queue.writeBuffer(
@@ -292,5 +293,6 @@ export function shutdown(): void {
   activeVertices = null;
   activePipeline = null;
   activeGroup = null;
+  if (activeDevice != null) activeDevice.dispose();
   activeDevice = null;
 }

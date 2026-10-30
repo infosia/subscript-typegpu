@@ -111,7 +111,7 @@ fn emit_bind_group_factory(
 ) {
     let factory = bind_group_factory_name(declaration, layout.group);
     out.push_str(&format!(
-        "export function {factory}(\n  device: GPUDevice,\n  pipeline: {pipeline_type},\n  resources: {}Resources,\n): GPUBindGroup {{\n  using layout = pipeline.bindGroupLayout({});\n  return createBindGroup(device, layout, {declaration}_LAYOUT{}, [\n",
+        "/** Creates a bind group for the pipeline from the named resources. */\nexport function {factory}<D extends GPUDeviceCreation>(\n  device: D,\n  pipeline: {pipeline_type},\n  resources: {}Resources,\n): GPUBindGroup {{\n  using layout = pipeline.bindGroupLayout({});\n  return createBindGroup(device, layout, {declaration}_LAYOUT{}, [\n",
         layout.name, layout.group, layout.group,
     ));
     for binding in layout
@@ -416,9 +416,9 @@ pub(crate) fn support_module(
     // The arms differ only in the imported names. Every name the text below writes must appear in
     // the arm this program takes, and a program with no declaration imports nothing.
     match (pipelines.is_empty(), render_pipelines.is_empty(), has_layouts) {
-        (false, false, true) => out.push_str("import { BindGroupLayoutSpec, COMPUTE_VISIBILITY, ComputePipeline, FRAGMENT_VISIBILITY, RenderPipeline, VERTEX_VISIBILITY, VertexBufferLayoutSpec, bufferResource, createBindGroup, samplerResource, textureResource } from \"./typegpu\";\nimport { GPUBuffer, GPUDevice, GPUBindGroup, GPUSampler, GPUTextureView } from \"./webgpu\";\n\n"),
-        (false, true, true) => out.push_str("import { BindGroupLayoutSpec, COMPUTE_VISIBILITY, ComputePipeline, bufferResource, createBindGroup, samplerResource, textureResource } from \"./typegpu\";\nimport { GPUBuffer, GPUDevice, GPUBindGroup, GPUSampler, GPUTextureView } from \"./webgpu\";\n\n"),
-        (true, false, true) => out.push_str("import { BindGroupLayoutSpec, FRAGMENT_VISIBILITY, RenderPipeline, VERTEX_VISIBILITY, VertexBufferLayoutSpec, bufferResource, createBindGroup, samplerResource, textureResource } from \"./typegpu\";\nimport { GPUBuffer, GPUDevice, GPUBindGroup, GPUSampler, GPUTextureView } from \"./webgpu\";\n\n"),
+        (false, false, true) => out.push_str("import { BindGroupLayoutSpec, COMPUTE_VISIBILITY, ComputePipeline, FRAGMENT_VISIBILITY, RenderPipeline, VERTEX_VISIBILITY, VertexBufferLayoutSpec, bufferResource, createBindGroup, samplerResource, textureResource } from \"./typegpu\";\nimport { GPUBuffer, GPUDeviceCreation, GPUBindGroup, GPUSampler, GPUTextureView } from \"./webgpu\";\n\n"),
+        (false, true, true) => out.push_str("import { BindGroupLayoutSpec, COMPUTE_VISIBILITY, ComputePipeline, bufferResource, createBindGroup, samplerResource, textureResource } from \"./typegpu\";\nimport { GPUBuffer, GPUDeviceCreation, GPUBindGroup, GPUSampler, GPUTextureView } from \"./webgpu\";\n\n"),
+        (true, false, true) => out.push_str("import { BindGroupLayoutSpec, FRAGMENT_VISIBILITY, RenderPipeline, VERTEX_VISIBILITY, VertexBufferLayoutSpec, bufferResource, createBindGroup, samplerResource, textureResource } from \"./typegpu\";\nimport { GPUBuffer, GPUDeviceCreation, GPUBindGroup, GPUSampler, GPUTextureView } from \"./webgpu\";\n\n"),
         (false, false, false) => out.push_str("import { BindGroupLayoutSpec, COMPUTE_VISIBILITY, FRAGMENT_VISIBILITY, VERTEX_VISIBILITY, VertexBufferLayoutSpec } from \"./typegpu\";\n\n"),
         (false, true, false) => out.push_str("import { BindGroupLayoutSpec, COMPUTE_VISIBILITY } from \"./typegpu\";\n\n"),
         (true, false, false) => out.push_str("import { BindGroupLayoutSpec, FRAGMENT_VISIBILITY, VERTEX_VISIBILITY, VertexBufferLayoutSpec } from \"./typegpu\";\n\n"),

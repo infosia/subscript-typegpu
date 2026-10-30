@@ -74,7 +74,7 @@ export async function main(): Promise<void> {
   {
     using adapter = adapterResult;
     using device = deviceResult;
-    using stateBuffer: Buffer<State> = createBuffer<State>(
+    using stateBuffer: Buffer<State> = createBuffer<State, GPUDevice>(
       device,
       State_STRIDE,
       1,

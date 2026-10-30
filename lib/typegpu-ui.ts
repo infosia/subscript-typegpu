@@ -5,12 +5,12 @@ import {
 } from "./typegpu-ui-atlas.generated";
 import { Vec2f, Vec4f } from "./typegpu-types";
 import {
-  Buffer, createBuffer, createBufferHost, Uniform, Texture2d, Sampler, VertexInvocation, FragmentInvocation,
-  RenderPipeline, RenderPipelineSpec, BindGroupLayoutSpec, VertexBufferLayoutSpec, createRenderPipeline, createRenderPipelineHost,
-  createBindGroup, createBindGroupHost, bufferResource, textureResource, samplerResource, writeTextureBytes,
+  Buffer, createBuffer, Uniform, Texture2d, Sampler, VertexInvocation, FragmentInvocation,
+  RenderPipeline, RenderPipelineSpec, BindGroupLayoutSpec, VertexBufferLayoutSpec, createRenderPipeline,
+  createBindGroup, bufferResource, textureResource, samplerResource, writeTextureBytes,
 } from "./typegpu";
 import {
-  GPUBlendState, GPUDevice, GPUHostOwnedDevice, GPUQueue, GPUTexture, GPUTextureView, GPUSampler, GPUBindGroup,
+  GPUBlendState, GPUDeviceCreation, GPUQueue, GPUTexture, GPUTextureView, GPUSampler, GPUBindGroup,
   GPURenderPassEncoder, GPUBufferUsage, GPUTextureUsage,
 } from "./webgpu";
 
@@ -1151,7 +1151,7 @@ class UiRendererLayout {
 }
 
 // Turns a `UiContext` command list into one indexed draw per clip rect.
-// `create` and `createHost` are the only creation path, and `dispose()` releases
+// `create` is the only creation path, and `dispose()` releases
 // every resource the renderer owns.
 export class UiRenderer {
   // `build` refreshes these. `vertexBytes` can keep a tail from a longer earlier frame,
@@ -1163,7 +1163,6 @@ export class UiRenderer {
   vertexBytes: u8[] = [];
   ranges: UiDrawRange[] = [];
   private queue: GPUQueue;
-  private ownsQueue: boolean;
   private vertices: Buffer<UiVertex>;
   private indices: Buffer<u16>;
   private atlas: GPUTexture;
@@ -1174,20 +1173,19 @@ export class UiRenderer {
   private pipeline: RenderPipeline;
   private clip: UiRect = uiCopy(UI_UNCLIPPED);
 
-  private constructor(queue: GPUQueue, ownsQueue: boolean, capacity: u32,
+  private constructor(queue: GPUQueue, capacity: u32,
     vertices: Buffer<UiVertex>, indices: Buffer<u16>, atlas: GPUTexture,
     atlasView: GPUTextureView, nearest: GPUSampler, viewport: Buffer<UiViewport>,
     group: GPUBindGroup, pipeline: RenderPipeline) {
-    this.queue = queue; this.ownsQueue = ownsQueue; this.capacity = capacity;
+    this.queue = queue; this.capacity = capacity;
     this.vertices = vertices; this.indices = indices; this.atlas = atlas;
     this.atlasView = atlasView; this.nearest = nearest; this.viewport = viewport;
     this.group = group; this.pipeline = pipeline;
   }
 
-  // Creates a renderer over a device the script owns. `capacity` counts quads.
-  // A capacity of 0 or above 16,384, or a spec that is not `triangle-list` with
-  // `uint16`, traps `UIT1`.
-  static create(device: GPUDevice, facts: UiPipelineFacts, capacity: u32 = 16384): UiRenderer {
+  /** Creates a renderer and borrows the device queue. `capacity` counts quads.
+   * A capacity of 0 or above 16,384, or an incompatible spec, traps UIT1. */
+  static create<D extends GPUDeviceCreation>(device: D, facts: UiPipelineFacts, capacity: u32 = 16384): UiRenderer {
     uiValidateRenderer(facts, capacity);
     const queue: GPUQueue = device.queue;
     const atlas: GPUTexture = device.createTexture({
@@ -1198,48 +1196,19 @@ export class UiRenderer {
     const vertexUsage: u64 = GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST;
     const indexUsage: u64 = GPUBufferUsage.INDEX + GPUBufferUsage.COPY_DST;
     const viewportUsage: u64 = GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST;
-    const vertices = createBuffer<UiVertex>(device, resources.vertexStride, capacity * 4, vertexUsage, "ui-vertices");
-    const indices = createBuffer<u16>(device, 2, capacity * 6, indexUsage, "ui-indices");
+    const vertices = createBuffer<UiVertex, D>(device, resources.vertexStride, capacity * 4, vertexUsage, "ui-vertices");
+    const indices = createBuffer<u16, D>(device, 2, capacity * 6, indexUsage, "ui-indices");
     uiUploadRenderer(queue, indices, atlas, capacity);
     const atlasView: GPUTextureView = resources.atlasView;
     const nearest: GPUSampler = device.createSampler({ minFilter: "nearest", magFilter: "nearest" });
-    const viewport = createBuffer<UiViewport>(device, resources.viewportStride, 1, viewportUsage, "ui-viewport");
+    const viewport = createBuffer<UiViewport, D>(device, resources.viewportStride, 1, viewportUsage, "ui-viewport");
     const pipeline: RenderPipeline = createRenderPipeline(device, facts.wgsl, facts.vertexEntry,
       facts.fragmentEntry, [facts.layout], [facts.vertexLayout], facts.spec);
     using layout = pipeline.bindGroupLayout(0);
     const group: GPUBindGroup = createBindGroup(device, layout, facts.layout, [
       bufferResource(viewport.handle()), textureResource(atlasView), samplerResource(nearest),
     ]);
-    return new UiRenderer(queue, false, capacity, vertices, indices, atlas, atlasView,
-      nearest, viewport, group, pipeline);
-  }
-
-  // Creates a renderer over the window host's device. The renderer owns the queue it
-  // takes here and disposes it.
-  static createHost(device: GPUHostOwnedDevice, facts: UiPipelineFacts, capacity: u32 = 16384): UiRenderer {
-    uiValidateRenderer(facts, capacity);
-    const queue: GPUQueue = device.queue();
-    const atlas: GPUTexture = device.createTexture({
-      label: "ui-atlas", size: { width: UI_ATLAS_WIDTH as u32, height: UI_ATLAS_HEIGHT as u32 },
-      format: "rgba8unorm", usage: GPUTextureUsage.TEXTURE_BINDING + GPUTextureUsage.COPY_DST,
-    });
-    const resources = new UiRendererLayout(atlas);
-    const vertexUsage: u64 = GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST;
-    const indexUsage: u64 = GPUBufferUsage.INDEX + GPUBufferUsage.COPY_DST;
-    const viewportUsage: u64 = GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST;
-    const vertices = createBufferHost<UiVertex>(device, resources.vertexStride, capacity * 4, vertexUsage, "ui-vertices");
-    const indices = createBufferHost<u16>(device, 2, capacity * 6, indexUsage, "ui-indices");
-    uiUploadRenderer(queue, indices, atlas, capacity);
-    const atlasView: GPUTextureView = resources.atlasView;
-    const nearest: GPUSampler = device.createSampler({ minFilter: "nearest", magFilter: "nearest" });
-    const viewport = createBufferHost<UiViewport>(device, resources.viewportStride, 1, viewportUsage, "ui-viewport");
-    const pipeline: RenderPipeline = createRenderPipelineHost(device, facts.wgsl, facts.vertexEntry,
-      facts.fragmentEntry, [facts.layout], [facts.vertexLayout], facts.spec);
-    using layout = pipeline.bindGroupLayout(0);
-    const group: GPUBindGroup = createBindGroupHost(device, layout, facts.layout, [
-      bufferResource(viewport.handle()), textureResource(atlasView), samplerResource(nearest),
-    ]);
-    return new UiRenderer(queue, true, capacity, vertices, indices, atlas, atlasView,
+    return new UiRenderer(queue, capacity, vertices, indices, atlas, atlasView,
       nearest, viewport, group, pipeline);
   }
 
@@ -1342,11 +1311,10 @@ export class UiRenderer {
     pass.setScissorRect(0, 0, width, height);
   }
 
-  // Releases every GPU resource, and the queue too when `createHost` produced it.
+  // Releases every GPU resource that the renderer owns.
   dispose(): void {
     this.group.dispose(); this.pipeline.dispose(); this.viewport.dispose(); this.nearest.dispose();
     this.atlasView.dispose(); this.atlas.dispose(); this.indices.dispose(); this.vertices.dispose();
-    if (this.ownsQueue) this.queue.dispose();
   }
   [Symbol.dispose](): void { this.dispose(); }
 }

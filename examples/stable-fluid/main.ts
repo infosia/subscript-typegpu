@@ -25,9 +25,9 @@ import {
   VertexInvocation,
   bufferResource,
   computePipeline,
-  createBindGroupHost,
-  createComputePipelineHost,
-  createRenderPipelineHost,
+  createBindGroup,
+  createComputePipeline,
+  createRenderPipeline,
   renderPipelineL,
   samplerResource,
   textureResource,
@@ -761,7 +761,7 @@ function bindCompute(
   resources: BindingResource[],
 ): GPUBindGroup {
   using layout = pipeline.bindGroupLayout(0);
-  return createBindGroupHost(device, layout, spec, resources);
+  return createBindGroup(device, layout, spec, resources);
 }
 
 function bindRender(
@@ -771,7 +771,7 @@ function bindRender(
   resources: BindingResource[],
 ): GPUBindGroup {
   using layout = pipeline.bindGroupLayout(0);
-  return createBindGroupHost(device, layout, spec, resources);
+  return createBindGroup(device, layout, spec, resources);
 }
 
 // The release helpers give `shutdown` and the `init` failure path one shape.
@@ -883,9 +883,9 @@ export function init(
   };
   const linearSampler = hostDevice.createSampler(samplerDescriptor);
 
-  // The queue handle is borrowed for this block, and `using` releases it at the end of `init`.
+  // The device lends its cached queue until shutdown.
   // The resources it fills stay.
-  using queue = hostDevice.queue();
+  const queue = hostDevice.queue;
   // `Context.bytesOf<T>` produces the exact bytes of the value in the generated layout.
   // TypeGPU converts a JavaScript object to buffer bytes at run time instead.
   queue.writeBuffer(vertices, 0, Context.bytesOf<FixedArray<Vertex, 3>>([
@@ -924,70 +924,70 @@ export function init(
   // Each pipeline takes generated WGSL text, a generated entry name, and a generated layout
   // spec. This file holds no shader text.
   const compute: ComputePipeline[] = [
-    createComputePipelineHost(
+    createComputePipeline(
       hostDevice,
       brushSplat_WGSL,
       brushSplat_ENTRY,
       [brushSplat_LAYOUT0],
       [WORKGROUP_N, WORKGROUP_N, 1],
     ),
-    createComputePipelineHost(
+    createComputePipeline(
       hostDevice,
       inkAdd_WGSL,
       inkAdd_ENTRY,
       [inkAdd_LAYOUT0],
       [WORKGROUP_N, WORKGROUP_N, 1],
     ),
-    createComputePipelineHost(
+    createComputePipeline(
       hostDevice,
       forceAdd_WGSL,
       forceAdd_ENTRY,
       [forceAdd_LAYOUT0],
       [WORKGROUP_N, WORKGROUP_N, 1],
     ),
-    createComputePipelineHost(
+    createComputePipeline(
       hostDevice,
       advectVelocity_WGSL,
       advectVelocity_ENTRY,
       [advectVelocity_LAYOUT0],
       [WORKGROUP_N, WORKGROUP_N, 1],
     ),
-    createComputePipelineHost(
+    createComputePipeline(
       hostDevice,
       viscosityJacobi_WGSL,
       viscosityJacobi_ENTRY,
       [viscosityJacobi_LAYOUT0],
       [WORKGROUP_N, WORKGROUP_N, 1],
     ),
-    createComputePipelineHost(
+    createComputePipeline(
       hostDevice,
       divergence_WGSL,
       divergence_ENTRY,
       [divergence_LAYOUT0],
       [WORKGROUP_N, WORKGROUP_N, 1],
     ),
-    createComputePipelineHost(
+    createComputePipeline(
       hostDevice,
       clearPressure_WGSL,
       clearPressure_ENTRY,
       [clearPressure_LAYOUT0],
       [WORKGROUP_N, WORKGROUP_N, 1],
     ),
-    createComputePipelineHost(
+    createComputePipeline(
       hostDevice,
       pressureJacobi_WGSL,
       pressureJacobi_ENTRY,
       [pressureJacobi_LAYOUT0],
       [WORKGROUP_N, WORKGROUP_N, 1],
     ),
-    createComputePipelineHost(
+    createComputePipeline(
       hostDevice,
       gradientSubtract_WGSL,
       gradientSubtract_ENTRY,
       [gradientSubtract_LAYOUT0],
       [WORKGROUP_N, WORKGROUP_N, 1],
     ),
-    createComputePipelineHost(
+    createComputePipeline(
       hostDevice,
       advectInk_WGSL,
       advectInk_ENTRY,
@@ -997,7 +997,7 @@ export function init(
   ];
   // A render pipeline also takes the vertex layout the generator derived from `Vertex`.
   const render: RenderPipeline[] = [
-    createRenderPipelineHost(
+    createRenderPipeline(
       hostDevice,
       inkRender_WGSL,
       inkRender_VERTEX_ENTRY,
@@ -1006,7 +1006,7 @@ export function init(
       [inkRender_VERTEX_LAYOUT0],
       inkRender,
     ),
-    createRenderPipelineHost(
+    createRenderPipeline(
       hostDevice,
       velocityRender_WGSL,
       velocityRender_VERTEX_ENTRY,
@@ -1015,7 +1015,7 @@ export function init(
       [velocityRender_VERTEX_LAYOUT0],
       velocityRender,
     ),
-    createRenderPipelineHost(
+    createRenderPipeline(
       hostDevice,
       imageRender_WGSL,
       imageRender_VERTEX_ENTRY,
@@ -1179,6 +1179,7 @@ export function init(
     disposeTextures(textures);
     brushParams.dispose();
     vertices.dispose();
+    hostDevice.dispose();
     print(`FAIL validation ${validationError.message.split("\n")[0]}`);
     return;
   }
@@ -1254,7 +1255,7 @@ export function frame(
   wasDrawing = drawing;
 
   // The queue and the encoder live for this frame only.
-  using queue = active.device.queue();
+  const queue = active.device.queue;
   queue.writeBuffer(
     active.brushParams,
     0,
@@ -1467,6 +1468,7 @@ export function shutdown(): void {
   disposeCompute(active.compute);
   // The cleared binding makes a later `frame` call return at its guard, and the ping-pong
   // state starts over.
+  active.device.dispose();
   activeState = null;
   velocityAIsCurrent = true;
   inkAIsCurrent = true;

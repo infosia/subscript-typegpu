@@ -161,21 +161,21 @@ export async function main(): Promise<void> {
     );
     // `Matrix_SIZE` is a generated constant, so each buffer follows the schema layout. The two
     // inputs need STORAGE and COPY_DST, and the product adds COPY_SRC for the readback.
-    using left: Buffer<Matrix> = createBuffer<Matrix>(
+    using left: Buffer<Matrix> = createBuffer<Matrix, GPUDevice>(
       device,
       Matrix_SIZE,
       1,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
       "matrix-left",
     );
-    using right: Buffer<Matrix> = createBuffer<Matrix>(
+    using right: Buffer<Matrix> = createBuffer<Matrix, GPUDevice>(
       device,
       Matrix_SIZE,
       1,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
       "matrix-right",
     );
-    using product: Buffer<Matrix> = createBuffer<Matrix>(
+    using product: Buffer<Matrix> = createBuffer<Matrix, GPUDevice>(
       device,
       Matrix_SIZE,
       1,

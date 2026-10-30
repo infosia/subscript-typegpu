@@ -141,7 +141,7 @@ fn webgpu_api_is_current() {
     let api = read(&regeneration.scratch.0.join("lib/webgpu.ts"));
     for expected in [
         "constructor(public instance: SubscriptTypegpuInstance, public buffer: SubscriptTypegpuBuffer) {}",
-        "private constructor(private instance: SubscriptTypegpuInstance, private device: SubscriptTypegpuDevice) {}",
+        "private constructor(instance: SubscriptTypegpuInstance, device: SubscriptTypegpuDevice) {",
         "constructor(readonly vendor: string, readonly architecture: string, readonly device: string, readonly description: string) {}",
         "readonly maxUniformBufferBindingSize: u64",
         "readonly maxStorageBufferBindingSize: u64",
