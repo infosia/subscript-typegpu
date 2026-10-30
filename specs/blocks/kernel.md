@@ -10,7 +10,8 @@ Rev 6 literal suffixes), 2026-08-24. Rev 11 (K14 Rev 6 logic
 parentheses), 2026-08-24. Rev 12 (K5 Rev 1 `using`, absence test),
 2026-08-30. Rev 13 (K14 Rev 7 bitwise parentheses), 2026-09-01. Rev 14 (K14 Rev 8 bitwise pairs), 2026-09-01. Rev 15 (K7 `throw` and `try`, K14 Rev 9 source names), 2026-09-29. Rev 16 (K7 updates and
 assignments used as values, `let x: T;`), 2026-10-05. Rev 17 (K7 `for` step shape, generator
-`for...of`), 2026-10-11. Plan §3 D2, D3, D7, D9 and §4
+`for...of`), 2026-10-11. Rev 18 (K7 `do…while`, K9 sequence
+expressions), 2026-10-30. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -78,6 +79,7 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   subscript lowering expands to several statements, for example
   `res.out[k + 0]++`, is a diagnostic under this rule. A `for...of`
   over a generator (subscript §176) is a diagnostic under this rule.
+  A `do…while` (subscript §203) is a diagnostic under this rule.
 - **K8 — `let` and `const` map to `var` and `let`.** A subscript
   `const` binding emits a WGSL `let`. A subscript `let` binding emits
   a WGSL `var`. A value class local is always `var`, because the
@@ -99,7 +101,9 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   its constructor, and the `vec3f` family of factories. Any other
   expression is a diagnostic: a template string, an array literal,
   a lambda, `await`, `yield`, a `Math` call outside K11, a
-  `JSON`/`Date`/`RegExp` call, `Length` of a `T[]`.
+  `JSON`/`Date`/`RegExp` call, `Length` of a `T[]`, and a sequence
+  expression (subscript §201 lowers a `push` of several values to
+  one).
 - **K10 — Library methods map to WGSL.** Rev 1. The generator
   carries one table from (receiver type, method) to an emission:
   `Vec*f.add` → `a + b`, `sub` → `-`, `mul` → `*` (componentwise),

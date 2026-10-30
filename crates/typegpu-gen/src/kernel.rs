@@ -110,6 +110,7 @@ fn statement_pos(statement: &Stmt) -> Option<&Pos> {
         | Stmt::Return { pos, .. }
         | Stmt::If { pos, .. }
         | Stmt::While { pos, .. }
+        | Stmt::DoWhile { pos, .. }
         | Stmt::For { pos, .. }
         | Stmt::ForOf { pos, .. }
         | Stmt::GeneratorForOf { pos, .. }
@@ -238,6 +239,11 @@ fn global_names_expr(expr: &Expr, out: &mut BTreeSet<Symbol>) {
         out.insert(name.clone());
     }
     match &expr.kind {
+        ExprKind::Seq { effects, value } => {
+            for item in effects.iter().chain(std::iter::once(value.as_ref())) {
+                global_names_expr(item, out);
+            }
+        }
         ExprKind::AbsenceTest { value: operand, .. }
         | ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
@@ -307,7 +313,7 @@ fn global_names_stmt(statement: &Stmt, out: &mut BTreeSet<Symbol>) {
                 }
             }
         }
-        Stmt::While { cond, body, .. } => {
+        Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
             global_names_expr(cond, out);
             for statement in body {
                 global_names_stmt(statement, out);
@@ -607,6 +613,10 @@ pub(crate) fn reached_render_global_names(
 /// If a receiver type names a class the module does not hold, returns an internal diagnostic.
 fn expression_blocks_host(module: &Module, expression: &Expr) -> Result<bool, Diagnostic> {
     Ok(match &expression.kind {
+        ExprKind::Seq { effects, value } => effects
+            .iter()
+            .chain(std::iter::once(value.as_ref()))
+            .try_any(|item| expression_blocks_host(module, item))?,
         ExprKind::AbsenceTest { value: operand, .. }
         | ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
@@ -682,7 +692,7 @@ fn statements_block_host(module: &Module, statements: &[Stmt]) -> Result<bool, D
                         .into_iter()
                         .try_any(|items| statements_block_host(module, items))?
             }
-            Stmt::While { cond, body, .. } => {
+            Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
                 expression_blocks_host(module, cond)? || statements_block_host(module, body)?
             }
             Stmt::For {
@@ -1740,7 +1750,7 @@ fn validate_statement_subset(statements: &[Stmt]) -> Result<(), Diagnostic> {
                     pos.clone(),
                 ));
             }
-            Stmt::GeneratorForOf { pos, .. } => {
+            Stmt::GeneratorForOf { pos, .. } | Stmt::DoWhile { pos, .. } => {
                 return Err(diagnostic(
                     "K7",
                     "statement is outside the current kernel subset",
@@ -1806,7 +1816,7 @@ fn local_declarations(statements: &[Stmt], out: &mut Vec<String>) {
                     local_declarations(els, out);
                 }
             }
-            Stmt::While { body, .. } => {
+            Stmt::While { body, .. } | Stmt::DoWhile { body, .. } => {
                 local_declarations(body, out);
             }
             Stmt::ForOf { name, body, .. } | Stmt::GeneratorForOf { name, body, .. } => {
@@ -2474,6 +2484,11 @@ impl<'a> Emitter<'a> {
                     prelude,
                 })
             }
+            ExprKind::Seq { .. } => Err(diagnostic(
+                "K9",
+                "a sequence expression is outside K9",
+                expr.pos.clone(),
+            )),
             ExprKind::Template(_) => Err(diagnostic(
                 "K9",
                 "template string in kernel",
@@ -3402,7 +3417,9 @@ impl<'a> Emitter<'a> {
                 self.statements(body, indent + 1, out)?;
                 Self::line(out, indent, "}");
             }
-            Stmt::ForOf { pos, .. } | Stmt::GeneratorForOf { pos, .. } => {
+            Stmt::ForOf { pos, .. }
+            | Stmt::GeneratorForOf { pos, .. }
+            | Stmt::DoWhile { pos, .. } => {
                 return Err(diagnostic(
                     "K7",
                     "statement is outside the current kernel subset",
@@ -3530,6 +3547,9 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
     /// takes the taint the collect pass recorded, and an unknown local is non-uniform.
     fn expression(&self, expr: &Expr) -> UniformityTaint {
         match &expr.kind {
+            ExprKind::Seq { effects, value } => {
+                self.expressions(effects).merge(self.expression(value))
+            }
             ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) => UniformityTaint::Uniform,
             ExprKind::Local(name, _, _) => self.locals.get(name).cloned().unwrap_or_else(|| {
                 UniformityTaint::NonUniform(format!("local or parameter `{name}`"))
@@ -3714,12 +3734,13 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                     }
                     value
                 }
-                Stmt::While { cond, body, .. } => self.loop_exit_taint(
-                    body,
-                    control.clone().merge(self.expression(cond)),
-                    nested_loops + 1,
-                    switches,
-                ),
+                Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => self
+                    .loop_exit_taint(
+                        body,
+                        control.clone().merge(self.expression(cond)),
+                        nested_loops + 1,
+                        switches,
+                    ),
                 Stmt::For { cond, body, .. } => self.loop_exit_taint(
                     body,
                     control.clone().merge(
@@ -3816,7 +3837,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                         self.collect_statements(els, branch);
                     }
                 }
-                Stmt::While { cond, body, .. } => loop {
+                Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => loop {
                     let before = self.locals.clone();
                     let body_control = control.clone().merge(self.expression(cond));
                     self.collect_statements(body, body_control.clone());
@@ -3964,7 +3985,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
                         self.validate_statements(els, branch, barrier_scope_allowed, targets)?;
                     }
                 }
-                Stmt::While { cond, body, .. } => {
+                Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
                     let loop_control = control.clone().merge(self.expression(cond));
                     targets.push(UniformityTarget::Loop {
                         has_barrier: contains_barrier(self.emitter.module, body),
@@ -4119,6 +4140,7 @@ fn written_locals(statements: &[Stmt], out: &mut BTreeSet<String>) {
                 }
             }
             Stmt::While { body, .. }
+            | Stmt::DoWhile { body, .. }
             | Stmt::ForOf { body, .. }
             | Stmt::GeneratorForOf { body, .. } => {
                 written_locals(body, out);
@@ -4176,6 +4198,7 @@ fn contains_barrier(module: &Module, statements: &[Stmt]) -> bool {
                     .is_some_and(|statements| contains_barrier(module, statements))
         }
         Stmt::While { body, .. }
+        | Stmt::DoWhile { body, .. }
         | Stmt::For { body, .. }
         | Stmt::ForOf { body, .. }
         | Stmt::GeneratorForOf { body, .. } => contains_barrier(module, body),
@@ -4217,6 +4240,7 @@ fn last_barrier_position(module: &Module, statements: &[Stmt]) -> Option<(u32, u
                 )
                 .max(),
             Stmt::While { body, .. }
+            | Stmt::DoWhile { body, .. }
             | Stmt::For { body, .. }
             | Stmt::ForOf { body, .. }
             | Stmt::GeneratorForOf { body, .. } => last_barrier_position(module, body),
@@ -4249,6 +4273,11 @@ fn last_barrier_position(module: &Module, statements: &[Stmt]) -> Option<(u32, u
 /// Collects the names of the functions that `expr` calls directly.
 fn called_functions_expr(expr: &Expr, out: &mut BTreeSet<Symbol>) {
     match &expr.kind {
+        ExprKind::Seq { effects, value } => {
+            for item in effects.iter().chain(std::iter::once(value.as_ref())) {
+                called_functions_expr(item, out);
+            }
+        }
         ExprKind::Call { callee, args } => {
             if let Callee::Func(name) = callee {
                 out.insert(name.clone());
@@ -4320,7 +4349,7 @@ fn called_functions_stmt(stmt: &Stmt, out: &mut BTreeSet<Symbol>) {
                 }
             }
         }
-        Stmt::While { cond, body, .. } => {
+        Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
             called_functions_expr(cond, out);
             for stmt in body {
                 called_functions_stmt(stmt, out);
@@ -4431,6 +4460,11 @@ fn collect_schema_expr(
 ) -> Result<(), Diagnostic> {
     collect_schema_type(module, &expr.ty, seen, out, &expr.pos)?;
     match &expr.kind {
+        ExprKind::Seq { effects, value } => {
+            for item in effects.iter().chain(std::iter::once(value.as_ref())) {
+                collect_schema_expr(module, item, seen, out)?;
+            }
+        }
         ExprKind::AbsenceTest { value: operand, .. }
         | ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
@@ -4528,7 +4562,7 @@ fn collect_schema_stmt(
                 }
             }
         }
-        Stmt::While { cond, body, .. } => {
+        Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
             collect_schema_expr(module, cond, seen, out)?;
             for stmt in body {
                 collect_schema_stmt(module, stmt, seen, out)?;

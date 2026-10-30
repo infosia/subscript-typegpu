@@ -506,6 +506,10 @@ fn contains_render_call_expr(module: &Module, expr: &Expr) -> bool {
         return true;
     }
     match &expr.kind {
+        ExprKind::Seq { effects, value } => effects
+            .iter()
+            .chain(std::iter::once(value.as_ref()))
+            .any(|item| contains_render_call_expr(module, item)),
         ExprKind::Unary { operand, .. } | ExprKind::Cast(operand) | ExprKind::Length(operand) => {
             contains_render_call_expr(module, operand)
         }
@@ -565,7 +569,7 @@ fn contains_render_call_stmt(module: &Module, stmt: &Stmt) -> bool {
                         .any(|stmt| contains_render_call_stmt(module, stmt))
                 })
         }
-        Stmt::While { cond, body, .. } => {
+        Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
             contains_render_call_expr(module, cond)
                 || body
                     .iter()
@@ -879,6 +883,11 @@ fn binding_reads_expr(
         }
     }
     match &expr.kind {
+        ExprKind::Seq { effects, value } => {
+            for item in effects.iter().chain(std::iter::once(value.as_ref())) {
+                binding_reads_expr(item, layout_params, out);
+            }
+        }
         ExprKind::Unary { operand, .. } | ExprKind::Cast(operand) | ExprKind::Length(operand) => {
             binding_reads_expr(operand, layout_params, out)
         }
@@ -949,7 +958,7 @@ fn binding_reads_stmt(
                 }
             }
         }
-        Stmt::While { cond, body, .. } => {
+        Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
             binding_reads_expr(cond, layout_params, out);
             for item in body {
                 binding_reads_stmt(item, layout_params, out);
@@ -1135,6 +1144,11 @@ fn written_binding_expr(
     out: &mut Vec<(usize, String)>,
 ) {
     match &expr.kind {
+        ExprKind::Seq { effects, value } => {
+            for item in effects.iter().chain(std::iter::once(value.as_ref())) {
+                written_binding_expr(item, layout_params, out);
+            }
+        }
         ExprKind::Assign { target, value, .. } => {
             if let Some(binding) = binding_key(target, layout_params) {
                 out.push(binding);
@@ -1223,7 +1237,7 @@ fn written_binding_stmt(
                 }
             }
         }
-        Stmt::While { cond, body, .. } => {
+        Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
             written_binding_expr(cond, layout_params, out);
             for item in body {
                 written_binding_stmt(item, layout_params, out);

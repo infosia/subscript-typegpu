@@ -118,6 +118,12 @@ fn inspect_expr(
         };
     }
     match &expression.kind {
+        ExprKind::Seq { effects, value } => {
+            for effect in effects {
+                visit!(effect);
+            }
+            visit!(value);
+        }
         ExprKind::Unary { operand, .. }
         | ExprKind::Cast(operand)
         | ExprKind::Length(operand)
@@ -215,7 +221,7 @@ fn inspect_statements(
                     inspect_statements(module, source, els, source_name, display_name, failures);
                 }
             }
-            Stmt::While { cond, body, .. } => {
+            Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
                 inspect_expr(module, source, cond, source_name, display_name, failures);
                 inspect_statements(module, source, body, source_name, display_name, failures);
             }

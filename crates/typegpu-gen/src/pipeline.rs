@@ -497,6 +497,7 @@ fn statement_pos(statement: &Stmt) -> Option<Pos> {
         | Stmt::Return { pos, .. }
         | Stmt::If { pos, .. }
         | Stmt::While { pos, .. }
+        | Stmt::DoWhile { pos, .. }
         | Stmt::For { pos, .. }
         | Stmt::ForOf { pos, .. }
         | Stmt::GeneratorForOf { pos, .. }
@@ -884,6 +885,7 @@ fn compute_arity(module: &Module, name: &Symbol) -> Option<usize> {
 /// The caller runs the walk over function bodies alone, where a declaration is a PI1 violation.
 fn call_in_expr(module: &Module, expr: &Expr) -> bool {
     match &expr.kind {
+        ExprKind::Seq { effects, value } => effects.iter().chain(std::iter::once(value.as_ref())).any(|item| call_in_expr(module, item)),
         ExprKind::Call { callee: Callee::Func(name), .. } if compute_arity(module, name).is_some() => true,
         ExprKind::AbsenceTest { value: operand, .. } | ExprKind::Unary { operand, .. } | ExprKind::Cast(operand) | ExprKind::Length(operand) => call_in_expr(module, operand),
         ExprKind::Binary { left, right, .. } => call_in_expr(module, left) || call_in_expr(module, right),
@@ -921,7 +923,7 @@ fn stmt_has_compute(module: &Module, stmt: &Stmt) -> bool {
                     .as_ref()
                     .is_some_and(|items| items.iter().any(|stmt| stmt_has_compute(module, stmt)))
         }
-        Stmt::While { cond, body, .. } => {
+        Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
             call_in_expr(module, cond) || body.iter().any(|stmt| stmt_has_compute(module, stmt))
         }
         Stmt::For {

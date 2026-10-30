@@ -268,6 +268,11 @@ fn declaration_names(tokens: &[String]) -> BTreeSet<String> {
 /// so a call anywhere else is a K29 or a K30 violation. The walk descends every sub-expression.
 fn visit_expr(module: &Module, expr: &Expr, diagnostics: &mut Vec<Diagnostic>, location: &str) {
     match &expr.kind {
+        ExprKind::Seq { effects, value } => {
+            for item in effects.iter().chain(std::iter::once(value.as_ref())) {
+                visit_expr(module, item, diagnostics, location);
+            }
+        }
         ExprKind::Call { callee, args } => {
             if let Callee::Func(name) = callee {
                 if library_call(module, name, "wgslShell") {
@@ -357,7 +362,7 @@ fn visit_statements(
                     visit_statements(module, els, diagnostics, location);
                 }
             }
-            Stmt::While { cond, body, .. } => {
+            Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
                 visit_expr(module, cond, diagnostics, location);
                 visit_statements(module, body, diagnostics, location);
             }

@@ -645,3 +645,22 @@ before and after a differential run. Windows is not run.
 
 Evidence: `tools/gate.sh --require-backend` with the yawgpu library,
 `gate: green`, 295 passed, 0 failed, 1 ignored, 336.1 s wall.
+
+### Re-pin to `c560df1` (2026-10-30)
+
+The workspace pin moves from `4352687` to `c560df1`. The subscript
+range holds §201 through §209. The `swc_ecma_parser` fork stays at
+`affcb6e`.
+
+- §203: `Stmt::DoWhile` is new. A kernel rejects it with K7
+  (`kernel.md` Rev 18). The fixture `k7-do-while.ts` records the red
+  run. Every statement walker visits its body and condition.
+- §201: `ExprKind::Seq` is new. `push_sequence` in
+  `compiler/src/check/expr/multi_argument.rs` produces it for a `push`
+  of two or more values. A kernel rejects it with K9. Every expression
+  walker visits its effects and value.
+- §202, §204 through §209: no source change.
+
+Evidence at `c560df1`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 297 passed, 0 failed, 1 ignored,
+370.2 s wall. No WGSL or `.expected` golden moved.

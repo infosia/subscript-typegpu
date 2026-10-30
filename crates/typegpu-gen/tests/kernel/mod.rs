@@ -1117,6 +1117,62 @@ const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, {{ name: "
 }
 
 #[test]
+fn multi_argument_array_push_lowers_to_seq() {
+    use subscript_compiler::{
+        hir::{ExprKind, Stmt},
+        CheckOptions,
+    };
+    let files = [SourceFile::entry(
+        "push.ts",
+        "function append(values: u32[]): i32 { return values.push(1, 2); }",
+    )];
+    let module = subscript_compiler::check_program_with(&files, &CheckOptions::default())
+        .expect("check array push");
+    let append = module
+        .functions
+        .iter()
+        .find(|function| function.name == "append")
+        .expect("append");
+    let Stmt::Return {
+        value: Some(value), ..
+    } = append.body.last().expect("return")
+    else {
+        panic!("expected return");
+    };
+    let ExprKind::Seq { effects, value } = &value.kind else {
+        panic!("expected sequence");
+    };
+    assert_eq!(effects.len(), 1);
+    for expression in [&effects[0], value.as_ref()] {
+        assert!(
+            matches!(&expression.kind, ExprKind::Call { callee: subscript_compiler::hir::Callee::Method { name, .. }, .. } if name.source_name() == "push")
+        );
+    }
+}
+
+#[test]
+fn k7_rejects_do_while() {
+    use subscript_compiler::{hir::Stmt, CheckOptions};
+    let source = support::read(
+        &support::root().join("crates/typegpu-gen/tests/fixtures/reject/k7-do-while.ts"),
+    );
+    let files = support::source_files(SourceFile::entry("do-while.ts", &source));
+    let module = subscript_compiler::check_program_with(&files, &CheckOptions::default())
+        .expect("check do while loop");
+    let kernel = module
+        .functions
+        .iter()
+        .find(|function| function.name == "kernel")
+        .expect("kernel");
+    assert!(matches!(kernel.body[0], Stmt::DoWhile { .. }));
+    let diagnostic = reject(&source);
+    assert_eq!(
+        diagnostic.message,
+        "K7: statement is outside the current kernel subset (author)"
+    );
+}
+
+#[test]
 fn k7_rejects_generator_for_of_before_helper_validation() {
     use subscript_compiler::{hir::Stmt, CheckOptions};
     let source = support::read(
