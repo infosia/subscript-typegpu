@@ -432,7 +432,7 @@ fn collect_type_reachable(
 ///
 /// Returns every violation of the reachable classes. SC1 names a class that is not a schema, and
 /// SC3 or SC5 names an illegal field type. SC9 names a layout mismatch, SC10 a uniform
-/// violation, and SC11 a field name that holds `_`.
+/// violation, and SC11 a field name that holds `_` or starts with `#`.
 pub(crate) fn discover(
     module: &Module,
     intended: &BTreeSet<Symbol>,
@@ -492,7 +492,13 @@ pub(crate) fn discover(
         }
         for field in &class.fields {
             // `X_OFFSET_a_b` must name one field, so a field name with `_` is ambiguous (SC11).
-            if field.name.contains('_') {
+            if field.name.starts_with('#') {
+                diagnostics.push(diagnostic(
+                    "SC11",
+                    format!("schema `{}` field `{}` is a private name, which cannot name a layout constant", class.name, field.name),
+                    field.pos.clone(),
+                ));
+            } else if field.name.contains('_') {
                 diagnostics.push(diagnostic(
                     "SC11",
                     format!(

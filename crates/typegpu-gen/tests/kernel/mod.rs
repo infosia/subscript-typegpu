@@ -1218,3 +1218,109 @@ fn k7_rejects_a_for_step_with_synthetic_statements() {
         "K7: a `for` step must be one expression statement (author)"
     );
 }
+
+#[test]
+fn k7_loop_form_for_runs_step_in_continuing() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { out: MutStorage<u32>; constructor(out: MutStorage<u32>) { this.out = out; } }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  for (let i: u32 = 0; i < (ctx.localIndex > (2 as u32) ? (4 as u32) : (8 as u32)); i++) {
+    if (i == 1) { continue; }
+    res.out[i] = i;
+  }
+}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(
+        wgsl.contains("continuing {\n        i += 1u;\n      }"),
+        "{wgsl}"
+    );
+    validate(wgsl);
+}
+
+#[test]
+fn k9_constructor_emits_arguments_in_field_order() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+@ValueType class P { a: f32; b: f32; constructor(b: f32, a: f32) { this.a = a; this.b = b; } }
+class Layout { out: MutStorage<P>; constructor(out: MutStorage<P>) { this.out = out; } }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  res.out[ctx.localIndex] = new P(1.0, 5.0);
+}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(wgsl.contains("P(5.0f, 1.0f)"), "{wgsl}");
+    validate(wgsl);
+}
+
+#[test]
+fn k9_constructor_body() {
+    let source = include_str!("../fixtures/reject/k9-constructor-body.ts");
+    let diagnostic = reject(source);
+    assert!(diagnostic.message.starts_with("K9:"), "{diagnostic:?}");
+    assert!(diagnostic.message.contains("`P`"));
+}
+
+#[test]
+fn k9_constructor_missing_field() {
+    let source = include_str!("../fixtures/reject/k9-constructor-missing-field.ts");
+    let diagnostic = reject(source);
+    assert!(diagnostic.message.starts_with("K9:"), "{diagnostic:?}");
+    assert!(diagnostic.message.contains("`P`"));
+}
+
+#[test]
+fn sc11_private_name() {
+    let source = include_str!("../fixtures/reject/sc11-private-name.ts");
+    let diagnostic = reject(source);
+    assert!(diagnostic.message.starts_with("SC11:"), "{diagnostic:?}");
+    assert!(diagnostic.message.contains("`P`"));
+}
+
+#[test]
+fn k9_parameter_properties_emit_arguments_in_field_order() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+@ValueType class P { constructor(public a: f32, public b: f32) {} }
+class Layout { out: MutStorage<P>; constructor(out: MutStorage<P>) { this.out = out; } }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  res.out[ctx.localIndex] = new P(1.0, 5.0);
+}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    assert!(wgsl.contains("P(1.0f, 5.0f)"), "{wgsl}");
+    validate(wgsl);
+}
+
+#[test]
+fn k7_loop_form_for_keeps_step_prelude_in_continuing() {
+    let generated = generate(
+        r#"
+import { ComputeInvocation, ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { out: MutStorage<u32>; constructor(out: MutStorage<u32>) { this.out = out; } }
+function kernel(res: Layout, ctx: ComputeInvocation): void {
+  for (let i: u32 = 0; i < (ctx.localIndex > (2 as u32) ? (4 as u32) : (8 as u32)); i += (ctx.localIndex > (2 as u32) ? (1 as u32) : (2 as u32))) {
+    if (i == 1) { continue; }
+    res.out[i] = i;
+  }
+}
+const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    let continuing = wgsl.split_once("continuing {").expect("continuing block").1;
+    assert!(continuing.contains("var _g_conditional_1: u32;"), "{wgsl}");
+    assert!(continuing.contains("i += _g_conditional_1;"), "{wgsl}");
+    assert!(!wgsl.contains("break if"), "{wgsl}");
+    validate(wgsl);
+}

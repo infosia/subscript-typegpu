@@ -16,6 +16,94 @@ use crate::pipeline::{
 use crate::render::RenderPipeline;
 use crate::schema::Schema;
 
+/// Returns constructor argument indices in field order (K9).
+fn constructor_order(
+    class: &subscript_compiler::hir::ClassDef,
+    argument_count: usize,
+    pos: &Pos,
+) -> Result<Vec<usize>, Diagnostic> {
+    if class.pos.file == "typegpu-types.ts" {
+        return Ok((0..argument_count).collect());
+    }
+    let invalid = || {
+        diagnostic(
+            "K9",
+            format!(
+                "constructor of `{}` must assign each field from one distinct parameter and contain no other statements",
+                class.name
+            ),
+            pos.clone(),
+        )
+    };
+    let ctor = class.ctor.as_ref().ok_or_else(invalid)?;
+    if ctor.params.len() != class.fields.len()
+        || ctor.body.len() != class.fields.len()
+        || argument_count != ctor.params.len()
+    {
+        return Err(invalid());
+    }
+    let mut order = vec![None; class.fields.len()];
+    let mut used = BTreeSet::new();
+    for statement in &ctor.body {
+        let Stmt::Expr(expr) = statement else {
+            return Err(invalid());
+        };
+        let ExprKind::Assign {
+            op: None,
+            target,
+            value,
+            ..
+        } = &expr.kind
+        else {
+            return Err(invalid());
+        };
+        let ExprKind::Field { obj, name } = &target.kind else {
+            return Err(invalid());
+        };
+        let ExprKind::Local(parameter, _, _) = &value.kind else {
+            return Err(invalid());
+        };
+        if !matches!(obj.kind, ExprKind::This) {
+            return Err(invalid());
+        }
+        let field = class
+            .fields
+            .iter()
+            .position(|field| field.name == *name)
+            .ok_or_else(invalid)?;
+        let parameter = ctor
+            .params
+            .iter()
+            .position(|param| param.name == *parameter)
+            .ok_or_else(invalid)?;
+        let slot = order.get_mut(field).ok_or_else(invalid)?;
+        if slot.is_some() || !used.insert(parameter) {
+            return Err(invalid());
+        }
+        *slot = Some(parameter);
+    }
+    order
+        .into_iter()
+        .map(|index| index.ok_or_else(invalid))
+        .collect()
+}
+
+/// Reorders constructor arguments after the constructor check.
+fn constructor_arguments<T: Clone>(
+    args: &[T],
+    order: &[usize],
+    pos: &Pos,
+) -> Result<Vec<T>, Diagnostic> {
+    order
+        .iter()
+        .map(|index| {
+            args.get(*index).cloned().ok_or_else(|| {
+                generator_diagnostic("constructor argument index is absent", pos.clone())
+            })
+        })
+        .collect()
+}
+
 /// Statements that must run before an expression, each with its indent relative to the statement.
 ///
 /// A lowered conditional puts its `if`/`else` here, so both sides keep short-circuit evaluation
@@ -1393,12 +1481,17 @@ fn fold_constant_expr(
                     expr.pos.clone(),
                 ));
             }
+            let order = constructor_order(class, args.len(), &expr.pos)?;
             Ok(FoldedConstant::Construct {
                 constructor: wgsl_type(module, &expr.ty, &expr.pos)?,
-                args: args
-                    .iter()
-                    .map(|arg| fold_constant_expr(module, globals, cache, visiting, arg))
-                    .collect::<Result<Vec<_>, _>>()?,
+                args: constructor_arguments(
+                    &args
+                        .iter()
+                        .map(|arg| fold_constant_expr(module, globals, cache, visiting, arg))
+                        .collect::<Result<Vec<_>, _>>()?,
+                    &order,
+                    &expr.pos,
+                )?,
             })
         }
         ExprKind::ArrayLit(args) => Ok(FoldedConstant::Construct {
@@ -1598,11 +1691,13 @@ fn constant_snippet(
                     expr.pos.clone(),
                 ));
             }
+            let order = constructor_order(class, args.len(), &expr.pos)?;
             let constructor = wgsl_type(module, &expr.ty, &expr.pos)?;
             let args = args
                 .iter()
                 .map(|arg| constant_snippet(module, globals, arg).map(|value| value.text))
                 .collect::<Result<Vec<_>, _>>()?;
+            let args = constructor_arguments(&args, &order, &expr.pos)?;
             Ok(Snippet::atom(format!("{constructor}({})", args.join(", "))))
         }
         _ => Err(diagnostic(
@@ -2433,20 +2528,37 @@ impl<'a> Emitter<'a> {
                         expr.pos.clone(),
                     ));
                 }
-                let args = args
+                let order = constructor_order(class, args.len(), &expr.pos)?;
+                let reordered = order
                     .iter()
-                    .map(|arg| self.snippet(arg))
-                    .collect::<Result<Vec<_>, _>>()?;
+                    .enumerate()
+                    .any(|(index, source)| index != *source);
                 let mut prelude = Vec::new();
-                let texts = args
-                    .into_iter()
-                    .map(|arg| {
-                        prelude.extend(arg.prelude);
-                        arg.text
-                    })
-                    .collect::<Vec<_>>();
+                let mut texts = Vec::new();
+                for arg in args {
+                    let value = self.snippet(arg)?;
+                    prelude.extend(value.prelude);
+                    if reordered
+                        && !matches!(
+                            arg.kind,
+                            ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_)
+                        )
+                    {
+                        // Capture each argument before the field order changes its evaluation order.
+                        let name = format!("_g_constructor_{}", self.conditional_index);
+                        self.conditional_index += 1;
+                        prelude.push((0, format!("let {name} = {};", value.text)));
+                        texts.push(name);
+                    } else {
+                        texts.push(value.text);
+                    }
+                }
                 Ok(Snippet {
-                    text: format!("{}({})", ty, texts.join(", ")),
+                    text: format!(
+                        "{}({})",
+                        ty,
+                        constructor_arguments(&texts, &order, &expr.pos)?.join(", ")
+                    ),
                     precedence: 10,
                     prelude,
                 })
@@ -3285,8 +3397,10 @@ impl<'a> Emitter<'a> {
                     self.loop_depth -= 1;
                     result?;
                     if let Some(step) = step {
-                        Self::emit_prelude(out, indent + 2, step.prelude);
-                        Self::line(out, indent + 2, &format!("{};", step.text));
+                        Self::line(out, indent + 2, "continuing {");
+                        Self::emit_prelude(out, indent + 3, step.prelude);
+                        Self::line(out, indent + 3, &format!("{};", step.text));
+                        Self::line(out, indent + 2, "}");
                     }
                     Self::line(out, indent + 1, "}");
                     Self::line(out, indent, "}");

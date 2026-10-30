@@ -1,6 +1,7 @@
 # Block: schema (SC-rules)
 
-P1 contract. Rev 0, 2026-08-22. Plan §3 D1, D2, D4, D7 and §4 govern
+P1 contract. Rev 0, 2026-08-22. Rev 1 (SC11 `#name` fields),
+2026-10-30. Plan §3 D1, D2, D4, D7 and §4 govern
 this block. Layout arithmetic is `layout.md` (LY-rules).
 
 ## What a schema is
@@ -98,7 +99,10 @@ this block. Layout arithmetic is `layout.md` (LY-rules).
   constants in the support module, plus `X_STRIDE` for the array
   stride and `X_STRIDE_<member>` for each array-typed member. A
   nested path joins with an underscore. A field name that contains
-  an underscore is rejected, so names stay unique. A program prints
+  an underscore is rejected, so names stay unique. Rev 1, 2026-10-30: a
+  `#name` field (subscript §206) is rejected the same way, because
+  the constant name and the WGSL member name need a plain
+  identifier. A program prints
   these by name (testing.md T2), never a literal.
 - **SC12 — The WGSL struct.** The generator emits one WGSL `struct`
   per schema, fields in order, types mapped per LY12, with no

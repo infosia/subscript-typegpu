@@ -878,6 +878,41 @@ in the tracking file.
 Exit per slice: the P10 exits. The record is
 `specs/tracking/p16-texture-arrays.md`.
 
+### P17 — the current language in kernels and the device constraint (after the pin `c560df1`)
+
+Owner decisions 2026-10-30: kernels accept the subscript forms that
+lower to WGSL, and the API uses `implements` where it removes a
+deviation. Two read-only surveys at `c560df1` measured the base. The
+kernel survey also found three silent miscompiles in forms that the
+kernel already accepts. They come first.
+
+Slice 1 — the miscompiles, each with a red fixture. (A) A `for` loop
+whose condition or step has a prelude emits the step at the end of
+the body, so `continue` skips it. (B) `new P(args)` passes the
+arguments to the WGSL struct constructor in parameter order, whatever
+the constructor body does. (C) A `#name` field of a bound schema
+emits `X_OFFSET_#name` into the support module.
+
+Slice 2 — the kernel forms: `do…while` (§203), scalar `Math` calls
+in the cast form `Math.max(a as f64, b as f64) as f32` (owner choice
+2026-10-30), enums (§200), helper instances of a generic function and
+methods of a user value class as helpers, local functions (§207),
+and `&&=` / `||=` in statement position (§199). `isNaN` and
+`isFinite` stay rejected with a diagnostic that names the reason.
+
+Slice 3 — the device constraint (owner choice Q1, 2026-10-30).
+`GPUDevice` and `GPUHostOwnedDevice` implement one interface,
+`GPUDeviceCreation`. The host-owned device caches its queue behind a
+`queue` read accessor and releases only that queue in `dispose()`.
+The runtime creation functions take `D extends GPUDeviceCreation`,
+and the `*Host` variants are removed.
+
+Exit: each slice gate-green with no WGSL or `.expected` golden moved
+except where a slice names the move, every new rejection with a
+demonstrated red, a 30-frame smoke run of every window example after
+slice 3, and a phase review with no open CRITICAL or MAJOR. The
+record is `specs/tracking/p17-kernel-forms.md`.
+
 ### U0–U4 — the immediate-mode GUI (branch `imgui`, after P16)
 
 Owner decision 2026-09-05: an immediate-mode GUI authored in
