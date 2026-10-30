@@ -607,7 +607,7 @@ export class Buffer<T> {
     if (byteOffset % 4 != 0 || byteLength % 4 != 0) {
       authorTrap("BF9", "Buffer.read", `byteOffset=${byteOffset} byteLength=${byteLength}`);
     }
-    const staging: Buffer<T> = createBuffer<T, GPUDevice>(
+    const staging: Buffer<T> = createBuffer(
       device,
       this.elementSize,
       elementCount,

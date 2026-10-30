@@ -12,6 +12,6 @@ export async function main(): Promise<void> {
   if (adapter == null) { print("FAIL adapter"); return; }
   const device: GPUDevice | null = await adapter.requestDevice();
   if (device == null) { print("FAIL device"); return; }
-  using buffer: Buffer<u32> = createBuffer<u32, GPUDevice>(device, 4, 1, GPUBufferUsage.COPY_SRC, "trap-patch-usage");
+  using buffer: Buffer<u32> = createBuffer(device, 4, 1, GPUBufferUsage.COPY_SRC, "trap-patch-usage");
   buffer.patch(device.queue, 0, 0, [0]);
 }

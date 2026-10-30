@@ -115,14 +115,14 @@ export async function main(): Promise<void> {
       new Instance(new Vec2f(0.31, 0.19), new Vec3f(0.0, 0.0, 1.0)),
     ];
     const indices: FixedArray<u16, 6> = [0, 1, 2, 2, 1, 3];
-    using vertices: Buffer<Vertex> = createBuffer<Vertex, GPUDevice>(
+    using vertices: Buffer<Vertex> = createBuffer(
       device,
       Vertex_STRIDE,
       4,
       GPUBufferUsage.VERTEX + GPUBufferUsage.COPY_DST,
       "b07-vertices",
     );
-    using instances: Buffer<Instance> = createBuffer<Instance, GPUDevice>(
+    using instances: Buffer<Instance> = createBuffer(
       device,
       Instance_STRIDE,
       3,

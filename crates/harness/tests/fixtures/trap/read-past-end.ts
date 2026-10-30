@@ -18,14 +18,14 @@ export async function main(): Promise<void> {
     print("FAIL device");
     return;
   }
-  using source: Buffer<u32> = createBuffer<u32, GPUDevice>(
+  using source: Buffer<u32> = createBuffer(
     device,
     4,
     2,
     GPUBufferUsage.COPY_SRC,
     "trap-read-source",
   );
-  using readback: Buffer<u32> = createBuffer<u32, GPUDevice>(
+  using readback: Buffer<u32> = createBuffer(
     device,
     4,
     2,

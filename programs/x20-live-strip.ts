@@ -167,7 +167,7 @@ export async function main(): Promise<void> {
       new Vertex(positions[2]),
       new Vertex(positions[3]),
     ];
-    using vertices: Buffer<Vertex> = createBuffer<Vertex, GPUDevice>(
+    using vertices: Buffer<Vertex> = createBuffer(
       device,
       Vertex_STRIDE,
       4,

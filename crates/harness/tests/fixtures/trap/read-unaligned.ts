@@ -26,7 +26,7 @@ export async function main(): Promise<void> {
     print("FAIL device");
     return;
   }
-  using buffer: Buffer<u16> = createBuffer<u16, GPUDevice>(
+  using buffer: Buffer<u16> = createBuffer(
     device,
     2,
     1,

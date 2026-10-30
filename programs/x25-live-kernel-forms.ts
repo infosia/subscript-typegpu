@@ -98,14 +98,14 @@ export async function main(): Promise<void> {
     using device = deviceResult;
     const hostLayout = new FormsLayout(new MutStorage([new FormsItem(0), new FormsItem(0)]));
     simulateCompute(formsKernel, hostLayout, kernelForms, [1, 1, 1], kernelForms_HOST_RUNNABLE);
-    using output: Buffer<FormsItem> = createBuffer<FormsItem, GPUDevice>(
+    using output: Buffer<FormsItem> = createBuffer(
       device,
       FormsItem_STRIDE,
       2,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_SRC + GPUBufferUsage.COPY_DST,
       "x25-output",
     );
-    using readback: Buffer<FormsItem> = createBuffer<FormsItem, GPUDevice>(
+    using readback: Buffer<FormsItem> = createBuffer(
       device,
       FormsItem_STRIDE,
       2,

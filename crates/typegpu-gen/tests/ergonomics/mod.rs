@@ -49,10 +49,10 @@ fn creation_helpers_accept_each_declared_device_class() {
 
     let source = r#"
 import { GPUDevice, GPUHostOwnedDevice } from "./webgpu";
-import { createBuffer, createComputePipeline, createRenderPipeline, createBindGroup, createTimestampPair } from "./typegpu";
+import { Buffer, createBuffer, createComputePipeline, createRenderPipeline, createBindGroup, createTimestampPair } from "./typegpu";
 import { UiRenderer, UiPipelineFacts } from "./typegpu-ui";
 function owned(device: GPUDevice, facts: UiPipelineFacts): void {
-  using buffer = createBuffer<u32, GPUDevice>(device, 4, 1, 8, "owned");
+  using buffer: Buffer<u32> = createBuffer(device, 4, 1, 8, "owned");
   using compute = createComputePipeline(device, "", "main", [], [1, 1, 1]);
   using render = createRenderPipeline(device, "", "vertex", "fragment", [], [], facts.spec);
   using layout = compute.bindGroupLayout(0);
@@ -62,7 +62,7 @@ function owned(device: GPUDevice, facts: UiPipelineFacts): void {
   using renderer = UiRenderer.create(device, facts, 1);
 }
 function host(device: GPUHostOwnedDevice, facts: UiPipelineFacts): void {
-  using buffer = createBuffer<u32, GPUHostOwnedDevice>(device, 4, 1, 8, "host");
+  using buffer: Buffer<u32> = createBuffer(device, 4, 1, 8, "host");
   using compute = createComputePipeline(device, "", "main", [], [1, 1, 1]);
   using render = createRenderPipeline(device, "", "vertex", "fragment", [], [], facts.spec);
   using layout = compute.bindGroupLayout(0);

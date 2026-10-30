@@ -63,7 +63,7 @@ export async function main(): Promise<void> {
   {
     using adapter = adapterResult;
     using device = deviceResult;
-    using output: Buffer<u32> = createBuffer<u32, GPUDevice>(
+    using output: Buffer<u32> = createBuffer(
       device,
       4,
       8,

@@ -68,7 +68,7 @@ layout before the program runs and emits it as constants:
 count is written by hand.
 
 ```ts program=programs/b22-first-program.ts
-    using stateBuffer: Buffer<State> = createBuffer<State, GPUDevice>(
+    using stateBuffer: Buffer<State> = createBuffer(
       device,
       State_STRIDE,
       1,

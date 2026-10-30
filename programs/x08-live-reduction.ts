@@ -100,21 +100,21 @@ export async function main(): Promise<void> {
       expected += value;
       index += 1;
     }
-    using input: Buffer<ReductionValue> = createBuffer<ReductionValue, GPUDevice>(
+    using input: Buffer<ReductionValue> = createBuffer(
       device,
       ReductionValue_STRIDE,
       count,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
       "x08-input",
     );
-    using output: Buffer<ReductionCounter> = createBuffer<ReductionCounter, GPUDevice>(
+    using output: Buffer<ReductionCounter> = createBuffer(
       device,
       ReductionCounter_STRIDE,
       1,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
       "x08-output",
     );
-    using readback: Buffer<ReductionCounter> = createBuffer<ReductionCounter, GPUDevice>(
+    using readback: Buffer<ReductionCounter> = createBuffer(
       device,
       ReductionCounter_STRIDE,
       1,

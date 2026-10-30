@@ -125,7 +125,7 @@ export async function main(): Promise<void> {
       new Vertex(b, color),
       new Vertex(c, color),
     ];
-    using vertices: Buffer<Vertex> = createBuffer<Vertex, GPUDevice>(
+    using vertices: Buffer<Vertex> = createBuffer(
       device,
       Vertex_STRIDE,
       3,

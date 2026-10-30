@@ -126,7 +126,7 @@ fn owned_device_queue_survives_guarded_pipeline_disposal() {
     std::fs::create_dir_all(&directory).expect("create queue ownership test directory");
     let program = directory.join("queue-ownership.ts");
     let source = r#"
-import { BindGroupLayoutSpec, createComputePipeline, createBuffer } from "./typegpu";
+import { BindGroupLayoutSpec, Buffer, createComputePipeline, createBuffer } from "./typegpu";
 import { GPUBufferUsage, GPUDevice, GPUShaderStage, GPUHostOwnedDevice } from "./webgpu";
 export function main(): void {
   const device = new GPUDevice(test_instance(), test_device());
@@ -148,7 +148,7 @@ export function main(): void {
   print(`same-queue=${host.queue == host.queue}`);
   const hostPipeline = createComputePipeline(host, "@compute @workgroup_size(1) fn main() {}", "main", [guardLayout], [1, 1, 1]);
   hostPipeline.dispose();
-  using buffer = createBuffer<u32, GPUHostOwnedDevice>(host, 4, 2, GPUBufferUsage.COPY_DST, "host-buffer");
+  using buffer: Buffer<u32> = createBuffer(host, 4, 2, GPUBufferUsage.COPY_DST, "host-buffer");
   buffer.write(device.queue, 1, [2, 0, 0, 0]);
   print(`host=${buffer.elementSize},${buffer.count},${buffer.usage},writes=${test_queue_writes()}`);
   host.dispose();

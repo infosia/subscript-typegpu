@@ -145,7 +145,7 @@ export async function main(): Promise<void> {
       12,
       Context.bytesOf<DrawIndirectArgs>(new DrawIndirectArgs(3, 1, 0, 0)),
     );
-    using output: Buffer<u32> = createBuffer<u32, GPUDevice>(
+    using output: Buffer<u32> = createBuffer(
       device,
       4,
       1,
@@ -155,7 +155,7 @@ export async function main(): Promise<void> {
     const a = new Vec2f(-0.7, -0.6);
     const b = new Vec2f(0.7, -0.6);
     const c = new Vec2f(0.0, 0.7);
-    using vertices: Buffer<Vertex> = createBuffer<Vertex, GPUDevice>(
+    using vertices: Buffer<Vertex> = createBuffer(
       device,
       Vertex_STRIDE,
       3,

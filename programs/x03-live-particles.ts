@@ -148,21 +148,21 @@ export async function main(): Promise<void> {
       );
       step += 1;
     }
-    using params: Buffer<SimParams> = createBuffer<SimParams, GPUDevice>(
+    using params: Buffer<SimParams> = createBuffer(
       device,
       SimParams_STRIDE,
       1,
       GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
       "x03-params",
     );
-    using particlesBuffer: Buffer<Particle> = createBuffer<Particle, GPUDevice>(
+    using particlesBuffer: Buffer<Particle> = createBuffer(
       device,
       Particle_STRIDE,
       count,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
       "x03-particles",
     );
-    using readback: Buffer<Particle> = createBuffer<Particle, GPUDevice>(
+    using readback: Buffer<Particle> = createBuffer(
       device,
       Particle_STRIDE,
       count,

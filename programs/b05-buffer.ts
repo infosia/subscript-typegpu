@@ -52,14 +52,14 @@ export async function main(): Promise<void> {
       new Particle(new Vec3f(9.0, -3.0, 7.0), new Vec3f(0.0, 0.25, 1.5)),
     ];
     const bytes: u8[] = Context.bytesOf<FixedArray<Particle, 4>>(particles);
-    using source: Buffer<Particle> = createBuffer<Particle, GPUDevice>(
+    using source: Buffer<Particle> = createBuffer(
       device,
       Particle_STRIDE,
       4,
       GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
       "b05-source",
     );
-    using readback: Buffer<Particle> = createBuffer<Particle, GPUDevice>(
+    using readback: Buffer<Particle> = createBuffer(
       device,
       Particle_STRIDE,
       4,

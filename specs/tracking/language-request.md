@@ -681,3 +681,11 @@ Evidence at `1ffbb18`, before the call-site change:
 `tools/gate.sh --require-backend` with the yawgpu library,
 `gate: green`, 349 passed, 0 failed, 1 ignored, 380.8 s wall.
 `tools/regen.sh` left no diff.
+
+The 85 `createBuffer<T, GPUDevice>` and
+`createBuffer<T, GPUHostOwnedDevice>` call sites write no type
+arguments. 82 sites had a contextual type. 3 sites gain a
+`Buffer<u32>` annotation. No site needs an explicit list. Evidence:
+`tools/gate.sh --require-backend` with the yawgpu library,
+`gate: green`, 349 passed, 0 failed, 1 ignored, 354.0 s wall. No WGSL
+or `.expected` golden moved.

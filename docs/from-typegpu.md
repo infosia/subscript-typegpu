@@ -174,7 +174,7 @@ stride, a count, the WebGPU usage flags, and a label. The program
 supplies the bytes.
 
 ```ts program=programs/x08-live-reduction.ts
-    using input: Buffer<ReductionValue> = createBuffer<ReductionValue, GPUDevice>(
+    using input: Buffer<ReductionValue> = createBuffer(
       device,
       ReductionValue_STRIDE,
       count,

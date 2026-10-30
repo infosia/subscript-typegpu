@@ -137,28 +137,28 @@ export async function main(): Promise<void> {
       1,
       saxpy_HOST_RUNNABLE,
     );
-    using params: Buffer<SaxpyParams> = createBuffer<SaxpyParams, GPUDevice>(
+    using params: Buffer<SaxpyParams> = createBuffer(
       device,
       SaxpyParams_STRIDE,
       1,
       GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
       "x02-params",
     );
-    using x: Buffer<Item> = createBuffer<Item, GPUDevice>(
+    using x: Buffer<Item> = createBuffer(
       device,
       Item_STRIDE,
       count,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST,
       "x02-x",
     );
-    using y: Buffer<Item> = createBuffer<Item, GPUDevice>(
+    using y: Buffer<Item> = createBuffer(
       device,
       Item_STRIDE,
       count,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
       "x02-y",
     );
-    using readback: Buffer<Item> = createBuffer<Item, GPUDevice>(
+    using readback: Buffer<Item> = createBuffer(
       device,
       Item_STRIDE,
       count,

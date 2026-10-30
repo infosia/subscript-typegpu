@@ -69,17 +69,17 @@ export async function main(): Promise<void> {
   {
     using adapter = adapterResult;
     using device = deviceResult;
-    using params: Buffer<Params> = createBuffer<Params, GPUDevice>(
+    using params: Buffer<Params> = createBuffer(
       device, Params_STRIDE, 1,
       GPUBufferUsage.UNIFORM + GPUBufferUsage.COPY_DST,
       "x12-params",
     );
-    using output: Buffer<ShadowResult> = createBuffer<ShadowResult, GPUDevice>(
+    using output: Buffer<ShadowResult> = createBuffer(
       device, ShadowResult_STRIDE, 1,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_SRC,
       "x12-output",
     );
-    using readback: Buffer<ShadowResult> = createBuffer<ShadowResult, GPUDevice>(
+    using readback: Buffer<ShadowResult> = createBuffer(
       device, ShadowResult_STRIDE, 1,
       GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST,
       "x12-readback",

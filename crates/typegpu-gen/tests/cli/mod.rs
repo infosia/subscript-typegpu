@@ -97,7 +97,7 @@ fn gen_rejects_uninferrable_create_buffer() {
     let root = support::root();
     let scratch = TempDir::new("inference");
     let source = support::read(&root.join("programs/b05-buffer.ts")).replacen(
-        "using source: Buffer<Particle> = createBuffer<Particle, GPUDevice>(",
+        "using source: Buffer<Particle> = createBuffer(",
         "using source = createBuffer(",
         1,
     );

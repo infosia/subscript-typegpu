@@ -68,7 +68,7 @@ export async function main(): Promise<void> {
       return;
     }
     using pipeline = new ComputePipeline(nativePipeline, [1, 1, 1]);
-    using readback: Buffer<FixedArray<u64, 2>> = createBuffer<FixedArray<u64, 2>, GPUDevice>(
+    using readback: Buffer<FixedArray<u64, 2>> = createBuffer(
       device,
       16,
       1,

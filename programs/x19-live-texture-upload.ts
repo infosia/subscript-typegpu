@@ -135,7 +135,7 @@ export async function main(): Promise<void> {
       magFilter: "nearest",
     };
     using nearest = device.createSampler(nearestDescriptor);
-    using output: Buffer<Vec4f> = createBuffer<Vec4f, GPUDevice>(
+    using output: Buffer<Vec4f> = createBuffer(
       device,
       16,
       PIXEL_COUNT,

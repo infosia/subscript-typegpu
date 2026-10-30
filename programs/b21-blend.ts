@@ -92,7 +92,7 @@ export async function main(): Promise<void> {
       new Vertex(new Vec2f(0.6, -0.6)),
       new Vertex(new Vec2f(0.0, 0.7)),
     ];
-    using vertices: Buffer<Vertex> = createBuffer<Vertex, GPUDevice>(
+    using vertices: Buffer<Vertex> = createBuffer(
       device,
       Vertex_STRIDE,
       3,

@@ -155,7 +155,7 @@ function resultState(actual: Matrix, expected: Matrix): string {
 // A typed buffer of one Matrix. Matrix_SIZE is the generated element size, so the host
 // bytes and the WGSL struct always match.
 function matrixBuffer(device: GPUDevice, usage: u64, label: string): Buffer<Matrix> {
-  return createBuffer<Matrix, GPUDevice>(device, Matrix_SIZE, 1, usage, label);
+  return createBuffer(device, Matrix_SIZE, 1, usage, label);
 }
 
 export async function main(): Promise<void> {
