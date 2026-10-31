@@ -103,8 +103,24 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
+/// Runs the command on a thread with an 8 MiB stack for the subscript compiler.
+/// The Windows main thread has 1 MB, which is too small for some programs.
+///
+/// # Errors
+///
+/// Returns an error if thread spawn, thread join, or the command fails.
+fn run_on_compiler_stack() -> Result<(), String> {
+    let thread = std::thread::Builder::new()
+        .stack_size(8 * 1024 * 1024)
+        .spawn(run)
+        .map_err(|error| format!("spawn compiler thread: {error}"))?;
+    thread
+        .join()
+        .map_err(|_| "join compiler thread: compiler thread panicked".to_owned())?
+}
+
 fn main() -> ExitCode {
-    match run() {
+    match run_on_compiler_stack() {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("{error}");
