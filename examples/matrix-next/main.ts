@@ -53,13 +53,23 @@ class Matrix {
   constructor(public size: Vec2u, public body: FixedArray<f32, 16>) {}
 }
 
-// A bind group layout is a class here, not a runtime object. Field order fixes the binding
-// numbers, and both kernels take the same class, so both bind groups share one shape.
+// A layout class declares the resources for the naive kernel.
+// Field order fixes the binding numbers.
 class MatrixLayout {
   constructor(
     public left: Storage<Matrix>,
     public right: Storage<Matrix>,
     public product: MutStorage<Matrix>,
+  ) {}
+}
+
+// The tiled kernel binds output cells so each lane stores one cell
+// without overwrites from other lanes.
+class TiledMatrixLayout {
+  constructor(
+    public left: Storage<Matrix>,
+    public right: Storage<Matrix>,
+    public product: MutStorage<f32>,
   ) {}
 }
 
@@ -90,7 +100,7 @@ const rightTile: WorkgroupArray<f32> = workgroupArray<f32>(16);
 
 // TypeGPU loops over sixteen-wide tiles and bounds-checks every load. One tile covers
 // the whole matrix here, so each lane loads two values and multiplies four pairs.
-function tiledKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
+function tiledKernel(res: TiledMatrixLayout, ctx: ComputeInvocation): void {
   const left: Matrix = res.left[0];
   const right: Matrix = res.right[0];
   const lane: u32 = ctx.localId.y * 4 + ctx.localId.x;
@@ -104,7 +114,7 @@ function tiledKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
     total += leftTile[ctx.localId.y * 4 + inner]
       * rightTile[inner * 4 + ctx.localId.x];
   }
-  res.product[0].body[(ctx.globalId.y * 4 + ctx.globalId.x) as i32] = total;
+  res.product[ctx.globalId.y * 4 + ctx.globalId.x] = total;
 }
 
 // The declaration names the kernel and the workgroup size. A size of one thread suits a
@@ -137,14 +147,14 @@ function zeroMatrix(): Matrix {
 
 // An all-zero product beside a non-zero host result means the backend ran no arithmetic.
 // That case reports noop, which separates an idle backend from a wrong kernel.
-function resultState(actual: Matrix, expected: Matrix): string {
+function resultState(actual: FixedArray<f32, 16>, expected: FixedArray<f32, 16>): string {
   let allZero: boolean = true;
   let hostNonzero: boolean = false;
   let matches: boolean = true;
   for (let i: i32 = 0; i < 16; i += 1) {
-    allZero = allZero && actual.body[i] == 0.0;
-    hostNonzero = hostNonzero || expected.body[i] != 0.0;
-    matches = matches && actual.body[i] == expected.body[i];
+    allZero = allZero && actual[i] == 0.0;
+    hostNonzero = hostNonzero || expected[i] != 0.0;
+    matches = matches && actual[i] == expected[i];
   }
   if (allZero && hostNonzero) {
     return "noop";
@@ -220,17 +230,20 @@ export async function main(): Promise<void> {
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
       "matrix-next-naive",
     );
-    using tiledOutput = matrixBuffer(
+    using tiledOutput: Buffer<f32> = createBuffer(
       device,
+      4,
+      16,
       GPUBufferUsage.STORAGE + GPUBufferUsage.COPY_DST + GPUBufferUsage.COPY_SRC,
       "matrix-next-tiled",
     );
-    // Context.bytesOf packs each matrix with the layout rules the shader uses.
+    // Context.bytesOf packs the matrix records and the tiled output cells
+    // with the shader's layout rules.
     // The four writes enter the queue before the dispatch below reads the buffers.
     left.writeOne(device.queue, 0, Context.bytesOf<Matrix>(leftValue));
     right.writeOne(device.queue, 0, Context.bytesOf<Matrix>(rightValue));
     naiveOutput.writeOne(device.queue, 0, Context.bytesOf<Matrix>(zeroMatrix()));
-    tiledOutput.writeOne(device.queue, 0, Context.bytesOf<Matrix>(zeroMatrix()));
+    tiledOutput.write(device.queue, 0, Context.bytesOf<FixedArray<f32, 16>>(zeroMatrix().body));
 
     // Pipeline creation raises no exception. The error scope covers both pipelines and turns
     // a bad shader or a bad layout into a value the code below tests.
@@ -289,8 +302,8 @@ export async function main(): Promise<void> {
       using command = encoder.finishDefault();
       device.queue.submit([command]);
 
-      // The binding wrappers carry real bodies over plain arrays, so the same kernel source runs
-      // on the host. TypeGPU keeps a separate function for its host result.
+      // The binding wrappers carry real bodies over plain arrays, so the same kernel source
+      // runs on the host. TypeGPU keeps a separate function for its host result.
       const host = new MatrixLayout(
         new Storage([leftValue]),
         new Storage([rightValue]),
@@ -308,17 +321,21 @@ export async function main(): Promise<void> {
         naive_HOST_RUNNABLE,
       );
       // readOne creates a mappable staging buffer, copies into it, submits, and maps it.
+      // read does the same for several elements.
       // Context.fromBytes reads the same layout the shader wrote.
       const naiveBytes: u8[] = await naiveOutput.readOne(device, 0);
-      const tiledBytes: u8[] = await tiledOutput.readOne(device, 0);
+      const tiledBytes: u8[] = await tiledOutput.read(device, 0, 16);
       const naiveActual: Matrix = Context.fromBytes<Matrix>(naiveBytes, 0);
-      const tiledActual: Matrix = Context.fromBytes<Matrix>(tiledBytes, 0);
+      const tiledActual: FixedArray<f32, 16> = Context.fromBytes<FixedArray<f32, 16>>(
+        tiledBytes,
+        0,
+      );
       const expected: Matrix = host.product[0];
-      print(`products:first=${naiveActual.body[0]},${tiledActual.body[0]}`);
+      print(`products:first=${naiveActual.body[0]},${tiledActual[0]}`);
       // The headless backend validates every command and computes nothing, so both products
       // stay zero. resultState reports that case as noop instead of fail.
-      naiveState = resultState(naiveActual, expected);
-      tiledState = resultState(tiledActual, expected);
+      naiveState = resultState(naiveActual.body, expected.body);
+      tiledState = resultState(tiledActual, expected.body);
     }
   }
   // The instance closes last. The two check lines state the invariant this example proves:

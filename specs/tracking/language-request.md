@@ -689,3 +689,30 @@ arguments. 82 sites had a contextual type. 3 sites gain a
 `tools/gate.sh --require-backend` with the yawgpu library,
 `gate: green`, 349 passed, 0 failed, 1 ignored, 354.0 s wall. No WGSL
 or `.expected` golden moved.
+
+### Re-pin to `08a806f` (2026-11-01)
+
+The workspace pin moves from `1ffbb18` to `08a806f`. The subscript
+range holds §213 through §222. The `swc_ecma_parser` fork stays at
+`affcb6e`.
+
+- §218.1 rule 12a: a write through a value temporary is S100. It
+  rejects `res.product[0].body[i] = v` in
+  `examples/matrix-multiplication` and `examples/matrix-next`, because
+  `res.product[0]` calls `get` and gives a copy (`pipeline.md` PI5
+  Rev 3). `matrix-multiplication` has one writer and stores a changed
+  copy. The tiled kernel of `matrix-next` has several writers, so it
+  binds `MutStorage<f32>`.
+- At the old pin the same form compiled and the host write had no
+  reader, by §218.1 rule 12a. The `matrix-multiplication` host oracle
+  then stays zero, which matches Noop. This reading of the old
+  behaviour comes from the code and the rule text. It was not run.
+- §213 through §217, §219 through §222: no source change. HIR gains
+  `StrEq`, `StrNe`, and `ElementMove`. No kernel path takes them.
+
+Evidence at `08a806f`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 349 passed, 0 failed, 1 ignored,
+393.6 s wall. `tools/live.sh` on Metal: 1 passed, 148.8 s wall.
+`tools/regen.sh` left no diff. The first gate run failed 3 tests on
+the two examples above. No WGSL or `.expected` golden moved. The two
+examples have not run on a real adapter at this pin.

@@ -55,9 +55,11 @@ class MatrixLayout {
 
 // TypeGPU writes this kernel as a WGSL template and resolves it at run time.
 // The kernel is subscript source here, and the generator emits the WGSL.
+// output is a copy of the storage element, so the last statement stores the copy back.
 function multiplyKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
   const left: Matrix = res.left[0];
   const right: Matrix = res.right[0];
+  const output: Matrix = res.product[0];
   for (let row: u32 = 0; row < left.size.x; row += 1) {
     for (let column: u32 = 0; column < right.size.y; column += 1) {
       let total: f32 = 0.0;
@@ -65,9 +67,10 @@ function multiplyKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
         total += left.body[(row * left.size.y + inner) as i32]
           * right.body[(inner * right.size.y + column) as i32];
       }
-      res.product[0].body[(row * right.size.y + column) as i32] = total;
+      output.body[(row * right.size.y + column) as i32] = total;
     }
   }
+  res.product[0] = output;
 }
 
 const multiply: ComputePipelineSpec = computePipeline(

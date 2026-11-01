@@ -259,3 +259,7 @@ and typegpu-gen at 32.8 s. The previous row is 353.7 s.
 
 The `--require-backend` gate: 380.8 s. The previous row is the P17
 close at 518.7 s (`p17-kernel-forms.md`). The P17 rise did not recur.
+
+## Re-pin to `08a806f` (2026-11-01)
+
+The `--require-backend` gate: 393.6 s. The previous row is 380.8 s.

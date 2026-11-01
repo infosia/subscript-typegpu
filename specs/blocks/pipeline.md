@@ -78,6 +78,13 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   calls them by name. Rev 2, 2026-08-25: `Uniform<T>` takes the read
   accessor `$` on subscript R37 (EG11 Rev 1). Its read records as the
   method `$` with no arguments.
+  Rev 3, 2026-11-01: `res.values[i]` is a call of `get`, so its value
+  class result is a copy. subscript §218.1 rule 12a rejects
+  `res.values[i].field = v` with S100, because the host write has no
+  reader. A kernel with one writer copies the element, changes the
+  copy, and stores it with `res.values[i] = copy`. A kernel with
+  several writers binds a `MutStorage` of the cell type, so that each
+  invocation stores its own cell.
 - **PI6 — Binding access emits the variable.** `res.params.$` →
   `params` (a copy into the local the author declared, `var` for a
   value class per K8). `res.particles[i]` → `particles[i]`.
