@@ -714,5 +714,6 @@ Evidence at `08a806f`: `tools/gate.sh --require-backend` with the
 yawgpu library, `gate: green`, 349 passed, 0 failed, 1 ignored,
 393.6 s wall. `tools/live.sh` on Metal: 1 passed, 148.8 s wall.
 `tools/regen.sh` left no diff. The first gate run failed 3 tests on
-the two examples above. No WGSL or `.expected` golden moved. The two
-examples have not run on a real adapter at this pin.
+the two examples above. No WGSL or `.expected` golden moved.
+`tools/example.sh` on Metal prints `check:product pass`,
+`check:naive pass`, and `check:tiled pass`.
