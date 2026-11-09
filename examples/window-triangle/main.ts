@@ -3,12 +3,10 @@
 // This example ports no upstream program. It is the smallest windowed program.
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   createRenderPipeline,
   renderPipeline,
-  VertexInvocation,
 } from "./typegpu";
 import {
   Vec2f,
@@ -45,13 +43,13 @@ class Varyings {
 
 // The vertex kernel. It raises the two-dimensional position into clip space. A w of 1.0
 // leaves x and y unchanged after the perspective divide.
-function vert(value: Vertex, ctx: VertexInvocation): Varyings {
+function vert(value: Vertex): Varyings {
   return new Varyings(new Vec4f(value.position.x, value.position.y, 0.0, 1.0));
 }
 
 // The fragment kernel. One constant color fills the triangle, so this pipeline needs no
 // binding and no bind group.
-function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
+function frag(): Vec4f {
   return new Vec4f(0.95, 0.45, 0.15, 1.0);
 }
 

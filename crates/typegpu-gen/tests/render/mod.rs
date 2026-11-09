@@ -235,3 +235,66 @@ const render: RenderPipelineSpec = renderPipeline<Vertex, Varyings>(vert, frag, 
     );
     assert!(generated.pipelines.is_empty());
 }
+
+#[test]
+fn absent_vertex_instance_and_fragment_values_keep_declared_interfaces() {
+    for present in 0..=2 {
+        let params = ["value: Vertex", "instance: Instance"][..present].join(", ");
+        let generated = generate(&format!(
+            r#"
+import {{ renderPipelineInstanced }} from "./typegpu";
+import {{ Vec2f, Vec4f }} from "./typegpu-types";
+@ValueType class Vertex {{ constructor(public point: Vec2f) {{}} }}
+@ValueType class Instance {{ constructor(public offset: Vec2f) {{}} }}
+@ValueType class Varyings {{ constructor(public position: Vec4f) {{}} }}
+function vert({params}): Varyings {{ return new Varyings(new Vec4f(0.0, 0.0, 0.0, 1.0)); }}
+function frag(): Vec4f {{ return new Vec4f(1.0, 0.0, 0.0, 1.0); }}
+const tri = renderPipelineInstanced<Vertex, Instance, Varyings>(vert, frag, {{ format: "rgba8unorm" }});
+"#
+        ));
+        let wgsl = &generated.pipelines[0].1;
+        validate(wgsl);
+        assert!(
+            wgsl.contains("fn frag() -> @location(0u) vec4<f32>"),
+            "{wgsl}"
+        );
+        assert!(!wgsl.contains("vertex_index") && !wgsl.contains("front_facing"));
+        let expected = ["value: Vertex", "instance: Instance"][..present].join(", ");
+        assert!(wgsl.contains(&format!("fn vert({expected})")), "{wgsl}");
+        for slot in 0..2 {
+            assert!(generated
+                .support_module
+                .contains(&format!("tri_VERTEX_LAYOUT{slot}")));
+        }
+    }
+}
+
+#[test]
+fn absent_render_layout_keeps_bindings_and_stage_visibility() {
+    let generated = generate(
+        r#"
+import { renderPipelineL, Storage } from "./typegpu";
+import { Vec2f, Vec4f } from "./typegpu-types";
+class Layout { constructor(public data: Storage<u32>) {} }
+@ValueType class Vertex { constructor(public point: Vec2f) {} }
+@ValueType class Varyings { constructor(public position: Vec4f) {} }
+function vert(): Varyings { return new Varyings(new Vec4f(0.0, 0.0, 0.0, 1.0)); }
+function frag(): Vec4f { return new Vec4f(1.0, 0.0, 0.0, 1.0); }
+const tri = renderPipelineL<Layout, Vertex, Varyings>(vert, frag, { format: "rgba8unorm" });
+"#,
+    );
+    let wgsl = &generated.pipelines[0].1;
+    validate(wgsl);
+    assert!(
+        wgsl.contains("@group(0u) @binding(0u) var<storage, read> data:"),
+        "{wgsl}"
+    );
+    assert!(generated.support_module.contains("tri_LAYOUT0"));
+    assert!(
+        generated
+            .support_module
+            .contains("visibility: VERTEX_VISIBILITY + FRAGMENT_VISIBILITY"),
+        "{}",
+        generated.support_module
+    );
+}

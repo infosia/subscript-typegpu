@@ -6,11 +6,9 @@
 // Ported from TypeGPU's vaporrave example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Uniform,
-  VertexInvocation,
   bufferResource,
   createBindGroup,
   createRenderPipeline,
@@ -125,7 +123,7 @@ function retroSurface(point: Vec3f, normal: Vec3f, time: f32): Vec3f {
 
 // The vertex stage widens the corner to clip space and maps it from the -1 to 1 range
 // into the 0 to 1 uv range. It reads no binding.
-function vaporVertex(res: VaporLayout, value: Vertex, ctx: VertexInvocation): Varyings {
+function vaporVertex(res: VaporLayout, value: Vertex): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
     new Vec2f((value.position.x + 1.0) * 0.5, (value.position.y + 1.0) * 0.5),
@@ -137,7 +135,6 @@ function vaporVertex(res: VaporLayout, value: Vertex, ctx: VertexInvocation): Va
 function vaporFragment(
   res: VaporLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const frame: FrameData = res.frame.$;
   const screen = new Vec2f(

@@ -14,7 +14,8 @@ assignments used as values, `let x: T;`), 2026-10-05. Rev 17 (K7 `for` step shap
 expressions), 2026-10-30. Rev 19 (K7 the loop-form step, K9 Rev 2
 schema construction), 2026-10-30. Rev 20 (P17 slice 2: K7 Rev 20,
 K11 Rev 1, K32, K33), 2026-10-30. Rev 21 (P17 review: K18 Rev 1,
-K11 Rev 1 one argument and the domain, K33 `self_`), 2026-10-30. Plan §3 D2, D3, D7, D9 and §4
+K11 Rev 1 one argument and the domain, K33 `self_`), 2026-10-30. Rev 22 (K1 Rev 1 fewer
+parameters), 2026-11-09. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -27,6 +28,17 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `(res: L, ctx: ComputeInvocation): void` for one bind group, or
   the two-, three-, and four-layout forms PI2 names. It is not
   `async`, not a generator, and returns `void`.
+  Rev 1, 2026-11-09 (owner decision: the shape may change): a kernel,
+  a vertex entry, and a fragment entry can declare fewer parameters
+  than the pipeline form. subscript §243 rule 2 accepts the function
+  at the function-type place, and the checker records an adapter
+  lambda with no environment that calls it. The generator reads the
+  adapter as the named function. Each absent trailing parameter takes
+  its type from the pipeline form, and the body cannot read it. An
+  absent layout parameter takes its class from the type argument of
+  the declaration, and its bindings stay in the emitted layout. An
+  absent invocation parameter emits no builtin that the body does not
+  read. A lambda literal stays a K1 diagnostic.
 - **K2 — The call graph is the GPU code.** Every function the kernel
   calls, directly or through a helper, is GPU code and obeys this
   block. The graph is acyclic. A cycle is a diagnostic that names

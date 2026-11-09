@@ -11,7 +11,6 @@ import {
   ComputeInvocation,
   ComputePipeline,
   ComputePipelineSpec,
-  FragmentInvocation,
   ReadStorageTexture2dArray,
   RenderPipeline,
   RenderPipelineSpec,
@@ -20,7 +19,6 @@ import {
   StorageTexture2d,
   Texture2d,
   Uniform,
-  VertexInvocation,
   WriteStorageTexture2dArray,
   bufferResource,
   computePipeline,
@@ -542,7 +540,7 @@ function fieldKernel(res: FieldLayout, ctx: ComputeInvocation): void {
 
 // The oversized triangle covers the clip square. The uv maps clip space [-1, 1] to the
 // scene's [0, 1], and the fragment stage interpolates it.
-function drawingVertex(res: RenderLayout, vertex: Vertex, ctx: VertexInvocation): Varyings {
+function drawingVertex(res: RenderLayout, vertex: Vertex): Varyings {
   return new Varyings(
     new Vec4f(vertex.position.x, vertex.position.y, 0.0, 1.0),
     new Vec2f((vertex.position.x + 1.0) * 0.5, (vertex.position.y + 1.0) * 0.5),
@@ -576,7 +574,6 @@ function acesFilm(color: Vec3f): Vec3f {
 function drawingFragment(
   res: RenderLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const distance: f32 = res.sdf.sampleLevel(res.linear, input.uv, 0.0).x;
   if (res.params.$.mode == DISPLAY_SDF) {

@@ -12,7 +12,6 @@ import {
   ComputeInvocation,
   ComputePipeline,
   ComputePipelineSpec,
-  FragmentInvocation,
   R32float,
   ReadStorageTexture2d,
   ReadWriteStorageTexture2d,
@@ -20,7 +19,6 @@ import {
   RenderPipelineSpec,
   StorageTexture2d,
   Uniform,
-  VertexInvocation,
   bufferResource,
   computePipeline,
   createBindGroup,
@@ -170,7 +168,6 @@ function lifeEditKernel(res: LifeEditLayout, ctx: ComputeInvocation): void {
 function lifeVertex(
   res: LifeRenderLayout,
   value: Vertex,
-  ctx: VertexInvocation,
 ): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -183,7 +180,6 @@ function lifeVertex(
 function lifeFragment(
   res: LifeRenderLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   let x: u32 = (input.uv.x * (GRID_SIZE as f32)) as u32;
   let y: u32 = (input.uv.y * (GRID_SIZE as f32)) as u32;

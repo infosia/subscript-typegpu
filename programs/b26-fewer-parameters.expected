@@ -1,0 +1,10 @@
+pipelines:created
+prefix_LAYOUT1.entries=1
+triangle_VERTEX_LAYOUT0.arrayStride=8
+fewer_WGSL_LINES=7
+prefix_WGSL_LINES=8
+triangle_WGSL_LINES=19
+commands:submitted
+host:fewer workgroups=2 threads=6
+host:two-layouts=12 spare=99
+PASS

@@ -4,11 +4,9 @@
 // Ported from TypeGPU's xor-dev-centrifuge-2 example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Uniform,
-  VertexInvocation,
   WgslShellSpec,
   createRenderPipeline,
   renderPipelineL,
@@ -105,7 +103,6 @@ const tunnelBandsGpu: WgslShellSpec = wgslShell(
 function tunnelVertex(
   res: TunnelLayout,
   value: Vertex,
-  ctx: VertexInvocation,
 ): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -118,7 +115,6 @@ function tunnelVertex(
 function tunnelFragment(
   res: TunnelLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const frame: FrameData = res.frame.$;
   const centered = new Vec2f(

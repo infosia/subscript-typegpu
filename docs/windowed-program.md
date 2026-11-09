@@ -267,13 +267,13 @@ class Vertex {
 ```
 
 ```ts program=examples/window-triangle/main.ts
-function vert(value: Vertex, ctx: VertexInvocation): Varyings {
+function vert(value: Vertex): Varyings {
   return new Varyings(new Vec4f(value.position.x, value.position.y, 0.0, 1.0));
 }
 ```
 
 ```ts program=examples/window-triangle/main.ts
-function frag(input: Varyings, ctx: FragmentInvocation): Vec4f {
+function frag(): Vec4f {
   return new Vec4f(0.95, 0.45, 0.15, 1.0);
 }
 ```
@@ -296,7 +296,7 @@ fn vert(value: Vertex) -> Varyings {
 }
 
 @fragment
-fn frag(input: Varyings) -> @location(0u) vec4<f32> {
+fn frag() -> @location(0u) vec4<f32> {
   return vec4<f32>(0.95f, 0.45f, 0.15f, 1.0f);
 }
 ```

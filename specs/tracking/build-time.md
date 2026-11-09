@@ -263,3 +263,7 @@ close at 518.7 s (`p17-kernel-forms.md`). The P17 rise did not recur.
 ## Re-pin to `08a806f` (2026-11-01)
 
 The `--require-backend` gate: 393.6 s. The previous row is 380.8 s.
+
+## Re-pin to `b9bef6f` (2026-11-09)
+
+The `--require-backend` gate: 373.2 s. The previous row is 393.6 s.

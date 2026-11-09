@@ -10,7 +10,6 @@ import {
   ComputeInvocation,
   ComputePipeline,
   ComputePipelineSpec,
-  FragmentInvocation,
   ReadStorageTexture2dArray,
   RenderPipeline,
   RenderPipelineSpec,
@@ -18,7 +17,6 @@ import {
   Sampler,
   Texture2d,
   Uniform,
-  VertexInvocation,
   WriteStorageTexture2dArray,
   bufferResource,
   computePipeline,
@@ -296,7 +294,6 @@ function stepKernel(res: StepLayout, ctx: ComputeInvocation): void {
 function voronoiVertex(
   res: VoronoiRenderLayout,
   value: Vertex,
-  ctx: VertexInvocation,
 ): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -309,7 +306,6 @@ function voronoiVertex(
 function voronoiFragment(
   res: VoronoiRenderLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   return res.colors.sampleLevel(res.linear, input.uv, 0.0);
 }

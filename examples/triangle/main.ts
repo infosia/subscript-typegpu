@@ -3,7 +3,6 @@
 // Ported from TypeGPU's triangle example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   createRenderPipeline,
@@ -61,7 +60,7 @@ function triangleVertex(value: Vertex, ctx: VertexInvocation): Varyings {
 
 // The fragment kernel. The rasterizer interpolates `color` across the triangle, so three
 // corner colors produce the gradient.
-function triangleFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
+function triangleFragment(input: Varyings): Vec4f {
   return new Vec4f(input.color.x, input.color.y, input.color.z, 1.0);
 }
 

@@ -8,12 +8,10 @@ import {
   ComputeInvocation,
   ComputePipeline,
   ComputePipelineSpec,
-  FragmentInvocation,
   MutStorage,
   RenderPipelineSpec,
   RenderPipeline,
   Storage,
-  VertexInvocation,
   bufferResource,
   computePipeline,
   createBindGroup,
@@ -143,7 +141,7 @@ function updateBoids(res: BoidLayout, ctx: ComputeInvocation): void {
 
 // The rotation matches upstream. Upstream colors each triangle from a palette uniform
 // and the heading angle, and this port derives the color from speed.
-function boidVertex(value: Vertex, boid: Boid, ctx: VertexInvocation): Varyings {
+function boidVertex(value: Vertex, boid: Boid): Varyings {
   const speed: f32 = boid.velocity.length();
   let directionX: f32 = 0.0;
   let directionY: f32 = 1.0;
@@ -160,7 +158,7 @@ function boidVertex(value: Vertex, boid: Boid, ctx: VertexInvocation): Varyings 
   );
 }
 
-function boidFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
+function boidFragment(input: Varyings): Vec4f {
   return input.color;
 }
 

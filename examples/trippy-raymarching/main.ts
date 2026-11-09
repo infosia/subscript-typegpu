@@ -6,11 +6,9 @@
 // Ported from TypeGPU's trippy-raymarching example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Uniform,
-  VertexInvocation,
   bufferResource,
   createBindGroup,
   createRenderPipeline,
@@ -138,7 +136,7 @@ function trippyNormal(point: Vec3f, time: f32, pointer: Vec2f): Vec3f {
 
 // The vertex stage passes the corner through and derives the uv. TypeGPU builds the same
 // triangle from the vertex index, and this port reads it from a vertex buffer.
-function trippyVertex(res: TrippyLayout, value: Vertex, ctx: VertexInvocation): Varyings {
+function trippyVertex(res: TrippyLayout, value: Vertex): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
     new Vec2f((value.position.x + 1.0) * 0.5, (value.position.y + 1.0) * 0.5),
@@ -150,7 +148,6 @@ function trippyVertex(res: TrippyLayout, value: Vertex, ctx: VertexInvocation): 
 function trippyFragment(
   res: TrippyLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const frame: FrameData = res.frame.$;
   const uv = new Vec2f(

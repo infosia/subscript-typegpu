@@ -9,12 +9,10 @@
 // Ported from TypeGPU's box-raytracing example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Storage,
   Uniform,
-  VertexInvocation,
   bufferResource,
   createBindGroup,
   createRenderPipeline,
@@ -157,7 +155,7 @@ function intersectBox(
 
 // The vertex stage passes the corner through and derives the uv. Upstream computes the ray
 // origin here, and this port reads the camera uniform in the fragment stage.
-function boxVertex(res: BoxLayout, value: Vertex, ctx: VertexInvocation): Varyings {
+function boxVertex(res: BoxLayout, value: Vertex): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
     new Vec2f((value.position.x + 1.0) * 0.5, (value.position.y + 1.0) * 0.5),
@@ -169,7 +167,6 @@ function boxVertex(res: BoxLayout, value: Vertex, ctx: VertexInvocation): Varyin
 function boxFragment(
   res: BoxLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const camera: Camera = res.camera.$;
   // The view coordinates divide by the shorter side, so the field of view stays equal on both

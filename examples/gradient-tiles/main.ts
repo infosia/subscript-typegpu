@@ -4,11 +4,9 @@
 // Ported from TypeGPU's gradient-tiles example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   createRenderPipeline,
-  VertexInvocation,
   renderPipeline,
 } from "./typegpu";
 import {
@@ -50,7 +48,7 @@ const TILE_COUNT: f32 = 9.0;
 
 // TypeGPU draws its full-surface triangle with `common.fullScreenTriangle`. This port
 // declares the same three clip-space vertices and maps them into uv space.
-function tilesVertex(value: Vertex, ctx: VertexInvocation): Varyings {
+function tilesVertex(value: Vertex): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
     new Vec2f((value.position.x + 1.0) * 0.5, (value.position.y + 1.0) * 0.5),
@@ -59,7 +57,7 @@ function tilesVertex(value: Vertex, ctx: VertexInvocation): Varyings {
 
 // TypeGPU computes `floor(uv * span) / span`. This port adds a half-tile offset, so
 // each tile shows the color of its own center.
-function tilesFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
+function tilesFragment(input: Varyings): Vec4f {
   const cell: Vec2f = input.uv.scale(TILE_COUNT).floor();
   const red: f32 = (cell.x + 0.5) / TILE_COUNT;
   const green: f32 = (cell.y + 0.5) / TILE_COUNT;

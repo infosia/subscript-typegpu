@@ -90,6 +90,42 @@ fn is_library_simulation(module: &Module, symbol: &Symbol) -> bool {
         })
 }
 
+fn named_kernel(expression: &Expr) -> Option<&Symbol> {
+    match &expression.kind {
+        ExprKind::FuncRef(symbol) => Some(symbol),
+        ExprKind::Lambda {
+            id,
+            params,
+            captures,
+            owns_environment: false,
+            is_async: false,
+            body,
+            ..
+        } if captures.is_empty()
+            && params
+                .iter()
+                .enumerate()
+                .all(|(index, param)| param.name == format!("[[discard#{}.{index}]]", id.0)) =>
+        {
+            let [Stmt::Expr(Expr {
+                kind:
+                    ExprKind::Call {
+                        callee: Callee::Func(symbol),
+                        args,
+                    },
+                ..
+            })] = body.as_slice()
+            else {
+                return None;
+            };
+            (args.len() < params.len() && args.iter().zip(params).all(|(arg, param)| {
+                matches!(&arg.kind, ExprKind::Local(name, ..) if *name == param.name)
+            })).then_some(symbol)
+        }
+        _ => None,
+    }
+}
+
 fn assert_pair(
     program: &Path,
     module: &Module,
@@ -108,12 +144,8 @@ fn assert_pair(
         return;
     };
     let call = format!("{} {method} at {}", program.display(), expression.pos);
-    let Some(Expr {
-        kind: ExprKind::FuncRef(kernel),
-        ..
-    }) = args.first()
-    else {
-        failures.push(format!("{call} does not pass a FuncRef kernel"));
+    let Some(kernel) = args.first().and_then(named_kernel) else {
+        failures.push(format!("{call} does not pass a named kernel"));
         return;
     };
     let Some(Expr {

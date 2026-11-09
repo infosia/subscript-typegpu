@@ -10,13 +10,11 @@ import {
   ComputeInvocation,
   ComputePipeline,
   ComputePipelineSpec,
-  FragmentInvocation,
   MutStorage,
   RenderPipelineSpec,
   RenderPipeline,
   Storage,
   Uniform,
-  VertexInvocation,
   computePipeline,
   createComputePipeline,
   createRenderPipeline,
@@ -253,7 +251,6 @@ function obstacleKernel(res: FluidLayout, ctx: ComputeInvocation): void {
 function fluidVertex(
   res: FluidRenderLayout,
   value: Vertex,
-  ctx: VertexInvocation,
 ): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -266,7 +263,6 @@ function fluidVertex(
 function fluidFragment(
   res: FluidRenderLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   let x: u32 = (input.uv.x * (GRID_SIZE as f32)) as u32;
   let y: u32 = (input.uv.y * (GRID_SIZE as f32)) as u32;

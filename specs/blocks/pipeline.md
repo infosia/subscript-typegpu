@@ -256,4 +256,9 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   non-`void` return fail subscript's checker first, because the
   declaration's function type does not match. Their fixtures assert
   the checker's diagnostic. The generator never relabels a checker
-  diagnostic and never reads the program text.
+  diagnostic and never reads the program text. Rev 2, 2026-11-09:
+  subscript §240 rule 2 accepts a function with a value result at a
+  `void` function-type place, so a kernel with a non-`void` return
+  now passes the checker. The generator rejects it with K1, and the
+  text names the kernel and its result type. An `async` kernel stays
+  a checker diagnostic.

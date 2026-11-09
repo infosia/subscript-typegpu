@@ -5,11 +5,9 @@
 // Ported from TypeGPU's ray-marching example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Uniform,
-  VertexInvocation,
   bufferResource,
   createBindGroup,
   createRenderPipeline,
@@ -121,7 +119,7 @@ function softShadow(origin: Vec3f, direction: Vec3f, time: f32): f32 {
 
 // The vertex stage widens the corner to clip space and maps it from the -1 to 1 range
 // into the 0 to 1 uv range. It reads no binding.
-function sceneVertex(res: SceneLayout, value: Vertex, ctx: VertexInvocation): Varyings {
+function sceneVertex(res: SceneLayout, value: Vertex): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
     new Vec2f((value.position.x + 1.0) * 0.5, (value.position.y + 1.0) * 0.5),
@@ -133,7 +131,6 @@ function sceneVertex(res: SceneLayout, value: Vertex, ctx: VertexInvocation): Va
 function sceneFragment(
   res: SceneLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const frame: FrameData = res.frame.$;
   const screen = new Vec2f(

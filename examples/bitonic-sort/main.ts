@@ -7,11 +7,9 @@
 import {
   ComputePipeline,
   ComputePipelineSpec,
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Storage,
-  VertexInvocation,
   bufferResource,
   computePipeline,
   createBindGroup,
@@ -86,7 +84,6 @@ class BitonicDisplayResources {
 function displayVertex(
   resources: BitonicDisplayResources,
   value: FullscreenVertex,
-  invocation: VertexInvocation,
 ): DisplayVaryings {
   return new DisplayVaryings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -100,7 +97,6 @@ function displayVertex(
 function displayFragment(
   resources: BitonicDisplayResources,
   input: DisplayVaryings,
-  invocation: FragmentInvocation,
 ): Vec4f {
   let column: u32 = (input.uv.x * 64.0) as u32;
   let row: u32 = (input.uv.y * 64.0) as u32;

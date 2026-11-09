@@ -11,7 +11,6 @@ import {
   ComputeInvocation,
   ComputePipeline,
   ComputePipelineSpec,
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Rgba16float,
@@ -19,7 +18,6 @@ import {
   StorageTexture2d,
   Texture2d,
   Uniform,
-  VertexInvocation,
   bufferResource,
   computePipeline,
   createBindGroup,
@@ -329,7 +327,6 @@ function fieldKernel(res: FieldLayout, ctx: ComputeInvocation): void {
 function radianceVertex(
   res: RenderLayout,
   vertex: Vertex,
-  ctx: VertexInvocation,
 ): Varyings {
   return new Varyings(
     new Vec4f(vertex.position.x, vertex.position.y, 0.0, 1.0),
@@ -359,7 +356,6 @@ function acesFilm(color: Vec3f): Vec3f {
 function radianceFragment(
   res: RenderLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const fieldSample: Vec4f = res.field.sample(res.linear, input.uv);
   const fieldColor: Vec3f = acesFilm(new Vec3f(

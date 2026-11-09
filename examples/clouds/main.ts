@@ -6,13 +6,11 @@
 // Ported from TypeGPU's clouds example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Sampler,
   Texture2d,
   Uniform,
-  VertexInvocation,
   bufferResource,
   createBindGroup,
   createRenderPipeline,
@@ -97,7 +95,6 @@ class CloudLayout {
 function cloudVertex(
   res: CloudLayout,
   value: Vertex,
-  ctx: VertexInvocation,
 ): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -110,7 +107,6 @@ function cloudVertex(
 function cloudFragment(
   res: CloudLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const frame: CloudFrame = res.frame.$;
   // The aspect correction stretches the sample coordinates, so a cloud keeps its shape on a

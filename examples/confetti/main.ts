@@ -8,11 +8,9 @@ import {
   ComputeInvocation,
   ComputePipeline,
   ComputePipelineSpec,
-  FragmentInvocation,
   MutStorage,
   RenderPipelineSpec,
   RenderPipeline,
-  VertexInvocation,
   bufferResource,
   computePipeline,
   createBindGroup,
@@ -107,7 +105,6 @@ function updateParticles(res: ParticleLayout, ctx: ComputeInvocation): void {
 function confettiVertex(
   value: Vertex,
   particle: Particle,
-  ctx: VertexInvocation,
 ): Varyings {
   // One vector carries the angle twice, so `cos()` and `sin()` reach the WGSL builtins.
   // A scalar `Math.cos` needs an `f64` cast, and K12 rejects that cast inside a kernel.
@@ -130,7 +127,7 @@ function confettiVertex(
 }
 
 // Every corner of one card carries the same color, so the interpolated value stays flat.
-function confettiFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
+function confettiFragment(input: Varyings): Vec4f {
   return input.color;
 }
 

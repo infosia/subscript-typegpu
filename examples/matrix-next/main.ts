@@ -75,7 +75,7 @@ class TiledMatrixLayout {
 
 // One invocation computes the whole product with three nested loops.
 // output is a copy of the storage element, so the last statement stores the copy back.
-function naiveKernel(res: MatrixLayout, ctx: ComputeInvocation): void {
+function naiveKernel(res: MatrixLayout): void {
   const left: Matrix = res.left[0];
   const right: Matrix = res.right[0];
   const output: Matrix = res.product[0];

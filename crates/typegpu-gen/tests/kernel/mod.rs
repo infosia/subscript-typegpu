@@ -1946,3 +1946,90 @@ const pipeline: ComputePipelineSpec = computePipeline<Layout>(kernel, { name: "p
         "{diagnostic:?}"
     );
 }
+
+#[test]
+fn absent_compute_parameters_keep_declared_layouts_without_builtins() {
+    for count in 1..=4 {
+        for present in 0..=count {
+            let classes = (0..count)
+                .map(|index| {
+                    format!(
+                        "class L{index} {{ constructor(public data{index}: Storage<u32>) {{}} }}"
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            let types = (0..count)
+                .map(|index| format!("L{index}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let params = (0..present)
+                .map(|index| format!("res{index}: L{index}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let form = if count == 1 {
+                "computePipeline".to_owned()
+            } else {
+                format!("computePipeline{count}")
+            };
+            let generated = generate(&format!(
+                r#"
+import {{ {form}, Storage }} from "./typegpu";
+{classes}
+function kernel({params}): void {{}}
+const pipe = {form}<{types}>(kernel, {{ name: "pipe", workgroupSize: [1, 1, 1] }});
+"#
+            ));
+            let wgsl = &generated.pipelines[0].1;
+            assert!(wgsl.contains("fn kernel()"), "{wgsl}");
+            assert!(!wgsl.contains("@builtin"), "{wgsl}");
+            for group in 0..count {
+                assert!(
+                    wgsl.contains(&format!("@group({group}u) @binding(0u)")),
+                    "{wgsl}"
+                );
+                assert!(generated
+                    .support_module
+                    .contains(&format!("pipe_LAYOUT{group}")));
+            }
+            validate(wgsl);
+        }
+    }
+}
+
+#[test]
+fn source_forwarding_lambdas_keep_the_k1_diagnostic() {
+    for lambda in ["(res: Layout): void => kernel(res)", "(): void => empty()"] {
+        let error = reject(&format!(
+            r#"
+import {{ computePipeline, Storage }} from "./typegpu";
+class Layout {{ constructor(public data: Storage<u32>) {{}} }}
+function kernel(res: Layout): void {{}}
+function empty(): void {{}}
+const pipe = computePipeline<Layout>({lambda}, {{ name: "pipe", workgroupSize: [1, 1, 1] }});
+"#
+        ));
+        assert_eq!(
+            error.message,
+            "K1: pipeline kernel is not a named function (author)"
+        );
+    }
+}
+
+#[test]
+fn value_returning_kernels_name_the_function_and_result_type() {
+    for params in ["res: Layout, ctx: ComputeInvocation", "res: Layout", ""] {
+        let error = reject(&format!(
+            r#"
+import {{ ComputeInvocation, computePipeline, Storage }} from "./typegpu";
+class Layout {{ constructor(public data: Storage<u32>) {{}} }}
+function kernel({params}): f32 {{ return 0.0; }}
+const pipe = computePipeline<Layout>(kernel, {{ name: "pipe", workgroupSize: [1, 1, 1] }});
+"#
+        ));
+        assert_eq!(
+            error.message,
+            "K1: kernel `kernel` returns `f32`; a kernel returns void (author)"
+        );
+    }
+}

@@ -14,7 +14,6 @@ import {
   ComputeInvocation,
   ComputePipeline,
   ComputePipelineSpec,
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Rgba16float,
@@ -22,7 +21,6 @@ import {
   StorageTexture2d,
   Texture2d,
   Uniform,
-  VertexInvocation,
   bufferResource,
   computePipeline,
   createBindGroup,
@@ -480,7 +478,6 @@ function advectInkKernel(res: AdvectionLayout, ctx: ComputeInvocation): void {
 function fieldVertex(
   res: FieldRenderLayout,
   value: Vertex,
-  ctx: VertexInvocation,
 ): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -491,7 +488,6 @@ function fieldVertex(
 function imageVertex(
   res: ImageRenderLayout,
   value: Vertex,
-  ctx: VertexInvocation,
 ): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -503,7 +499,6 @@ function imageVertex(
 function inkFragment(
   res: FieldRenderLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   let density: f32 = res.field.sampleLevel(res.linear, input.uv, 0.0).x;
   if (density < 0.0) density = 0.0;
@@ -520,7 +515,6 @@ function inkFragment(
 function velocityFragment(
   res: FieldRenderLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const velocity: Vec4f = res.field.sampleLevel(res.linear, input.uv, 0.0);
   const speed: f32 = new Vec2f(velocity.x, velocity.y).length();
@@ -544,7 +538,6 @@ function velocityFragment(
 function imageFragment(
   res: ImageRenderLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const texel: f32 = 1.0 / (SIM_N as f32);
   const left: f32 = res.ink.sampleLevel(

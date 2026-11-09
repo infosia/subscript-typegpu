@@ -5,11 +5,9 @@
 // Ported from TypeGPU's perlin-noise example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Uniform,
-  VertexInvocation,
   bufferResource,
   createBindGroup,
   createRenderPipeline,
@@ -77,7 +75,7 @@ const SHARPNESS: f32 = 0.5;
 
 // The vertex kernel. It raises the position into clip space and maps the clip range to the
 // 0-to-1 uv range that the fragment kernel samples.
-function noiseVertex(res: NoiseLayout, value: Vertex, ctx: VertexInvocation): Varyings {
+function noiseVertex(res: NoiseLayout, value: Vertex): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
     new Vec2f((value.position.x + 1.0) * 0.5, (value.position.y + 1.0) * 0.5),
@@ -89,7 +87,6 @@ function noiseVertex(res: NoiseLayout, value: Vertex, ctx: VertexInvocation): Va
 function noiseFragment(
   res: NoiseLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const time: f32 = res.frame.$.time;
   // Bound time to DEPTH so the sampled z coordinate does not grow without limit.

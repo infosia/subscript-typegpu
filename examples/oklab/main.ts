@@ -6,11 +6,9 @@
 // Ported from TypeGPU's oklab example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Uniform,
-  VertexInvocation,
   bufferResource,
   createBindGroup,
   createRenderPipeline,
@@ -77,7 +75,7 @@ const GAMUT_CLIP_ALPHA: f32 = 0.05;
 
 // The vertex stage widens the corner to clip space and maps it from the -1 to 1 range
 // into the 0 to 1 uv range. It reads no binding.
-function oklabVertex(res: OklabLayout, value: Vertex, ctx: VertexInvocation): Varyings {
+function oklabVertex(res: OklabLayout, value: Vertex): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
     new Vec2f((value.position.x + 1.0) * 0.5, (value.position.y + 1.0) * 0.5),
@@ -89,7 +87,6 @@ function oklabVertex(res: OklabLayout, value: Vertex, ctx: VertexInvocation): Va
 function oklabFragment(
   res: OklabLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const uniforms: OklabUniforms = res.uniforms.$;
   const x: f32 = input.uv.x * 2.0 - 1.0;

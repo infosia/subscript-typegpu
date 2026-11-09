@@ -677,17 +677,12 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             ));
             continue;
         }
-        let (
-            Some(Expr {
-                kind: ExprKind::FuncRef(vertex_name),
-                ..
-            }),
-            Some(Expr {
-                kind: ExprKind::FuncRef(fragment_name),
-                ..
-            }),
-        ) = (args.first(), args.get(1))
-        else {
+        let (Some(vertex_name), Some(fragment_name)) = (
+            args.first()
+                .and_then(|expr| pipeline::named_entry(module, expr)),
+            args.get(1)
+                .and_then(|expr| pipeline::named_entry(module, expr)),
+        ) else {
             diagnostics.push(diagnostic(
                 "RN1",
                 "render kernels must be named functions",
@@ -705,63 +700,50 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
             ));
             continue;
         };
-        // Under `renderPipelineL` the layout class is the vertex kernel's first parameter, and it
-        // is group 0 (RN2, TX2).
+        let callback = pipeline::callback_type(module, callee, 0, &global.init.pos)
+            .map_err(|error| vec![error])?;
         let mut layouts = Vec::new();
         if layout_count == 1 {
-            match pipeline::layout(
-                module,
-                &vertex
-                    .params
-                    .first()
-                    .ok_or_else(|| {
-                        vec![crate::internal(
-                            "render::discover",
-                            "missing vertex parameter",
-                            &vertex.pos,
-                        )]
-                    })?
-                    .ty,
-                0,
-                &vertex.pos,
-            ) {
+            let ty = callback.params.first().ok_or_else(|| {
+                vec![generator_diagnostic(
+                    "missing declared layout type",
+                    global.pos.clone(),
+                )]
+            })?;
+            match pipeline::layout(module, ty, 0, &global.pos) {
                 Ok(layout) => layouts.push(layout),
                 Err(error) => diagnostics.push(error),
             }
         }
-        let vertex_param = vertex
+        let vertex_ty = callback
             .params
             .get(layout_count + vertex_index)
             .ok_or_else(|| {
-                vec![crate::internal(
-                    "render::discover",
-                    "missing vertex parameter",
-                    &vertex.pos,
+                vec![generator_diagnostic(
+                    "missing declared vertex type",
+                    global.pos.clone(),
                 )]
             })?;
-        let first = match vertex_buffer(module, &vertex_param.ty, 0, 0, "vertex", &vertex_param.pos)
-        {
+        let first = match vertex_buffer(module, vertex_ty, 0, 0, "vertex", &global.pos) {
             Ok(value) => value,
             Err(error) => {
                 diagnostics.push(error);
                 continue;
             }
         };
-        // The instance schema's locations continue after the vertex schema's (RN4).
         let first_location = first.attributes.len() as u32;
         let mut vertex_buffers = vec![first];
         if let Some(instance_index) = instance_index {
-            let param = vertex
+            let ty = callback
                 .params
                 .get(layout_count + instance_index)
                 .ok_or_else(|| {
-                    vec![crate::internal(
-                        "render::discover",
-                        "missing vertex parameter",
-                        &vertex.pos,
+                    vec![generator_diagnostic(
+                        "missing declared instance type",
+                        global.pos.clone(),
                     )]
                 })?;
-            match vertex_buffer(module, &param.ty, 1, first_location, "instance", &param.pos) {
+            match vertex_buffer(module, ty, 1, first_location, "instance", &global.pos) {
                 Ok(value) => vertex_buffers.push(value),
                 Err(error) => {
                     diagnostics.push(error);
@@ -769,7 +751,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
                 }
             }
         }
-        let (varyings_class, varyings) = match varyings(module, &vertex.ret, &vertex.pos) {
+        let (varyings_class, varyings) = match varyings(module, &callback.ret, &vertex.pos) {
             Ok(value) => value,
             Err(error) => {
                 diagnostics.push(error);
@@ -1025,46 +1007,40 @@ fn binding_reads_stmt(
 /// An entry point the module does not declare gives an empty set, and emission then reports the
 /// missing kernel.
 ///
-/// # Errors
-///
-/// If the kernel has fewer parameters than the declaration has layouts, returns an internal
-/// diagnostic.
+/// The result includes every binding of an omitted layout parameter (K1).
 fn stage_bindings(
     module: &Module,
     pipeline: &RenderPipeline,
     entry: &Symbol,
-) -> Result<BTreeSet<(usize, String)>, Diagnostic> {
+) -> BTreeSet<(usize, String)> {
     let Some(kernel) = pipeline::function(module, entry) else {
-        return Ok(BTreeSet::new());
+        return BTreeSet::new();
     };
-    let layout_params = pipeline
+    let layout_params = kernel
+        .params
+        .iter()
+        .take(pipeline.layouts.len())
+        .enumerate()
+        .map(|(group, param)| (param.name.clone(), group))
+        .collect();
+    // An omitted layout retains its entries and the visibility of this stage (K1).
+    let mut out = pipeline
         .layouts
         .iter()
         .enumerate()
-        .map(|(group, _)| {
-            Ok((
-                kernel
-                    .params
-                    .get(group)
-                    .ok_or_else(|| {
-                        crate::internal(
-                            "render::stage_bindings",
-                            "missing layout parameter",
-                            &kernel.pos,
-                        )
-                    })?
-                    .name
-                    .clone(),
-                group,
-            ))
+        .skip(kernel.params.len())
+        .flat_map(|(group, layout)| {
+            layout
+                .bindings
+                .iter()
+                .map(move |binding| (group, binding.name.clone()))
         })
-        .collect::<Result<BTreeMap<_, _>, Diagnostic>>()?;
-    let mut out = BTreeSet::new();
+        .collect();
     for stmt in &kernel.body {
         binding_reads_stmt(stmt, &layout_params, &mut out);
     }
 
-    Ok(out)
+    out
 }
 
 /// Reports which entry points read one binding, as `(vertex, fragment)` (RN9).
@@ -1080,8 +1056,8 @@ pub(crate) fn binding_visibility(
     let key = (group, name.to_owned());
 
     Ok((
-        stage_bindings(module, pipeline, &pipeline.vertex_entry)?.contains(&key),
-        stage_bindings(module, pipeline, &pipeline.fragment_entry)?.contains(&key),
+        stage_bindings(module, pipeline, &pipeline.vertex_entry).contains(&key),
+        stage_bindings(module, pipeline, &pipeline.fragment_entry).contains(&key),
     ))
 }
 
@@ -1090,9 +1066,6 @@ pub(crate) fn binding_visibility(
 /// The binding's visibility comes from the stages that read it, so a binding with no reader has no
 /// visibility to emit.
 ///
-/// # Errors
-///
-/// Returns the internal diagnostics of `stage_bindings`.
 fn unreached_binding(
     module: &Module,
     pipeline: &RenderPipeline,
@@ -1312,28 +1285,13 @@ pub(crate) fn reject_vertex_storage_writes(
     let Some(vertex) = pipeline::function(module, &pipeline.vertex_entry) else {
         return Ok(());
     };
-    let layout_params = pipeline
-        .layouts
+    let layout_params = vertex
+        .params
         .iter()
+        .take(pipeline.layouts.len())
         .enumerate()
-        .map(|(group, _)| {
-            Ok((
-                vertex
-                    .params
-                    .get(group)
-                    .ok_or_else(|| {
-                        crate::internal(
-                            "render::reject_vertex_storage_writes",
-                            "missing layout parameter",
-                            &vertex.pos,
-                        )
-                    })?
-                    .name
-                    .clone(),
-                group,
-            ))
-        })
-        .collect::<Result<BTreeMap<_, _>, Diagnostic>>()?;
+        .map(|(group, param)| (param.name.clone(), group))
+        .collect();
     // The walk covers the complete body, so a write in any statement reaches the check (RN16).
     let mut writes = Vec::new();
     for statement in &vertex.body {

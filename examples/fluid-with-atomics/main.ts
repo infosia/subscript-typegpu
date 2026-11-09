@@ -8,13 +8,11 @@ import {
   ComputeInvocation,
   ComputePipeline,
   ComputePipelineSpec,
-  FragmentInvocation,
   MutStorage,
   RenderPipeline,
   RenderPipelineSpec,
   Storage,
   Uniform,
-  VertexInvocation,
   bufferResource,
   computePipeline,
   createBindGroup,
@@ -248,7 +246,6 @@ function atomicBrushKernel(res: AtomicBrushLayout, ctx: ComputeInvocation): void
 function atomicFluidVertex(
   res: AtomicFluidRenderLayout,
   value: Vertex,
-  ctx: VertexInvocation,
 ): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -261,7 +258,6 @@ function atomicFluidVertex(
 function atomicFluidFragment(
   res: AtomicFluidRenderLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   let x: u32 = (input.uv.x * (GRID_SIZE as f32)) as u32;
   let y: u32 = (input.uv.y * (GRID_SIZE as f32)) as u32;

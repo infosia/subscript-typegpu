@@ -4,11 +4,9 @@
 // Ported from TypeGPU's square example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   createRenderPipeline,
-  VertexInvocation,
   renderPipeline,
 } from "./typegpu";
 import {
@@ -46,7 +44,7 @@ class Varyings {
 
 // TypeGPU keeps the four positions inside the shader and streams only the colors.
 // This port streams position and color together as one `Vertex` record.
-function squareVertex(value: Vertex, ctx: VertexInvocation): Varyings {
+function squareVertex(value: Vertex): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
     value.color,
@@ -55,7 +53,7 @@ function squareVertex(value: Vertex, ctx: VertexInvocation): Varyings {
 
 // The fragment kernel. The rasterizer interpolates the four corner colors over both
 // triangles of the quad.
-function squareFragment(input: Varyings, ctx: FragmentInvocation): Vec4f {
+function squareFragment(input: Varyings): Vec4f {
   return input.color;
 }
 

@@ -717,3 +717,37 @@ yawgpu library, `gate: green`, 349 passed, 0 failed, 1 ignored,
 the two examples above. No WGSL or `.expected` golden moved.
 `tools/example.sh` on Metal prints `check:product pass`,
 `check:naive pass`, and `check:tiled pass`.
+
+### Re-pin to `b9bef6f` (2026-11-09)
+
+The workspace pin moves from `08a806f` to `b9bef6f`. The subscript
+range holds §223 through §246. The `swc_ecma_parser` fork stays at
+`affcb6e`.
+
+- §243 rule 2: a function with fewer parameters is accepted at a
+  function-type place, through an adapter lambda in HIR. The
+  generator gave the wrong K1 text "pipeline kernel is not a named
+  function" for `k1-parameter-count.ts`, and
+  `rejections::every_fixture_is_red_with_rule_and_owner` failed.
+  Owner decision, 2026-11-09: the shape may change. A kernel, a
+  vertex entry, and a fragment entry now declare only the parameters
+  that they read (`kernel.md` K1 Rev 1). `programs/b26-fewer-parameters`
+  proves the compute, two-layout, and render forms and the host lane.
+  59 entries in 29 examples drop unread trailing parameters.
+- §240 rule 2: a kernel with a value result passes the checker. The
+  generator rejects it with K1 and names the result type
+  (`pipeline.md` PI13 Rev 2, `pi13-return-kernel.ts`, red run
+  recorded by the coding agent: 0 passed, 1 failed).
+- §223, §224: a host entry during a host entry traps. The window host
+  calls its exports from the event loop, and no facade callback calls
+  script code, so no path reaches the trap.
+- §225 through §242, §244 through §246: no source change.
+
+Evidence at `b9bef6f`: `tools/gate.sh --require-backend` with the
+yawgpu library, `gate: green`, 354 passed, 0 failed, 1 ignored,
+373.2 s wall. `tools/live.sh` on Metal: 1 passed, 151.8 s wall. The
+window smoke on Metal: 27 examples exit 0 with no FAIL line, and the
+5 examples with no `frame` export exit 1. `tools/example.sh` on
+Metal: `check:dispatch pass`, `check:product pass`,
+`check:naive pass`, `check:tiled pass`. No existing WGSL or
+`.expected` golden moved.

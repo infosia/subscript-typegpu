@@ -2185,10 +2185,7 @@ impl<'a> Emitter<'a> {
     /// for a vertex kernel, the vertex and instance values (PI2, RN2). `module_names` fixes the
     /// module-scope names before any body is emitted (K14).
     ///
-    /// # Errors
-    ///
-    /// If the kernel has fewer parameters than the declaration promises, returns an internal
-    /// diagnostic. Pipeline discovery already checked the count.
+    /// The emitter retains every layout and maps only the parameters that the entry declares.
     fn entry(
         module: &'a Module,
         layouts: &'a [crate::pipeline::Layout],
@@ -2197,27 +2194,15 @@ impl<'a> Emitter<'a> {
         invocation_kind: InvocationKind,
         globals: &[KernelGlobal],
         module_names: &BTreeSet<String>,
-    ) -> Result<Self, Diagnostic> {
-        // Pipeline discovery validates each layout parameter and the invocation parameter.
+    ) -> Self {
+        // Pipeline discovery validates the concrete parameter types.
 
         let mut layout_params = BTreeMap::new();
         let mut bindings = BTreeMap::new();
         for (group, layout) in layouts.iter().enumerate() {
-            layout_params.insert(
-                kernel
-                    .params
-                    .get(group)
-                    .ok_or_else(|| {
-                        crate::internal(
-                            "kernel::Emitter::entry",
-                            "missing layout parameter",
-                            &kernel.pos,
-                        )
-                    })?
-                    .name
-                    .clone(),
-                group,
-            );
+            if let Some(param) = kernel.params.get(group) {
+                layout_params.insert(param.name.clone(), group);
+            }
             for binding in &layout.bindings {
                 bindings.insert(
                     (group, binding.name.clone()),
@@ -2231,22 +2216,15 @@ impl<'a> Emitter<'a> {
         }
         let local_names = local_names(kernel, module_names);
 
-        Ok(Self {
+        Self {
             module,
             layout_params,
             layout_symbols: layouts.iter().map(|layout| layout.symbol.clone()).collect(),
             invocation_param: kernel
                 .params
                 .get(invocation_index)
-                .ok_or_else(|| {
-                    crate::internal(
-                        "kernel::Emitter::entry",
-                        "missing invocation parameter",
-                        &kernel.pos,
-                    )
-                })?
-                .name
-                .clone(),
+                .map(|param| param.name.clone())
+                .unwrap_or_default(),
             invocation_kind,
             bindings,
             globals: globals
@@ -2260,7 +2238,7 @@ impl<'a> Emitter<'a> {
             loop_depth: 0,
             switch_depth: 0,
             in_helper: false,
-        })
+        }
     }
 
     /// Builds the emitter of one helper body.
@@ -5578,7 +5556,7 @@ pub(crate) fn emit(
         InvocationKind::Compute,
         &globals,
         &module_names,
-    )?;
+    );
     let mut helper_text = String::new();
     for name in &helpers {
         let helper = function(module, name).ok_or_else(|| {
@@ -6059,7 +6037,7 @@ pub(crate) fn emit_render(
         InvocationKind::Vertex,
         &globals,
         &module_names,
-    )?;
+    );
     let mut fragment_emitter = Emitter::entry(
         module,
         &pipeline.layouts,
@@ -6068,7 +6046,7 @@ pub(crate) fn emit_render(
         InvocationKind::Fragment,
         &globals,
         &module_names,
-    )?;
+    );
     // Both bodies are emitted before the module text, because each walk records the builtins its
     // entry point declares (RN3).
     let mut vertex_body = String::new();
@@ -6155,15 +6133,9 @@ pub(crate) fn emit_render(
 
     let mut vertex_parameters = vertex
         .params
-        .get(layout_count..layout_count + vertex_value_count)
-        .ok_or_else(|| {
-            crate::internal(
-                "kernel::emit_render",
-                "missing vertex parameters",
-                &vertex.pos,
-            )
-        })?
         .iter()
+        .skip(layout_count)
+        .take(vertex_value_count)
         .map(|param| {
             Ok(format!(
                 "{}: {}",
@@ -6190,18 +6162,19 @@ pub(crate) fn emit_render(
     out.push_str(&vertex_body);
     out.push_str("}\n\n");
 
-    let input = fragment.params.get(layout_count).ok_or_else(|| {
-        crate::internal(
-            "kernel::emit_render",
-            "missing fragment input",
-            &fragment.pos,
-        )
-    })?;
-    let mut fragment_parameters = vec![format!(
-        "{}: {}",
-        fragment_emitter.local_name(&input.name),
-        wgsl_type(module, &input.ty, &input.pos)?
-    )];
+    let mut fragment_parameters = fragment
+        .params
+        .get(layout_count)
+        .map(|input| {
+            Ok(format!(
+                "{}: {}",
+                fragment_emitter.local_name(&input.name),
+                wgsl_type(module, &input.ty, &input.pos)?
+            ))
+        })
+        .transpose()?
+        .into_iter()
+        .collect::<Vec<_>>();
     fragment_parameters.extend(
         ["frontFacing"]
             .into_iter()

@@ -5,11 +5,9 @@
 // Ported from TypeGPU's disco example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Uniform,
-  VertexInvocation,
   bufferResource,
   createBindGroup,
   createRenderPipeline,
@@ -110,7 +108,7 @@ function discoUv(input: Varyings, resolution: Vec2f): Vec2f {
 
 // One vertex stage feeds all three fragment stages. TypeGPU builds two triangles from the
 // vertex index, and this port draws one oversized triangle from a vertex buffer.
-function discoVertex(res: DiscoLayout, value: Vertex, ctx: VertexInvocation): Varyings {
+function discoVertex(res: DiscoLayout, value: Vertex): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
     new Vec2f((value.position.x + 1.0) * 0.5, (value.position.y + 1.0) * 0.5),
@@ -121,7 +119,6 @@ function discoVertex(res: DiscoLayout, value: Vertex, ctx: VertexInvocation): Va
 function ringsFragment(
   res: DiscoLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const frame: FrameData = res.frame.$;
   let point: Vec2f = discoUv(input, frame.resolution);
@@ -153,7 +150,6 @@ function ringsFragment(
 function swirlFragment(
   res: DiscoLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const frame: FrameData = res.frame.$;
   let point: Vec2f = discoUv(input, frame.resolution);
@@ -185,7 +181,6 @@ function swirlFragment(
 function kaleidoscopeFragment(
   res: DiscoLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const frame: FrameData = res.frame.$;
   let point: Vec2f = discoUv(input, frame.resolution);

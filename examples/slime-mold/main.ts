@@ -16,7 +16,6 @@ import {
   ComputeInvocation,
   ComputePipeline,
   ComputePipelineSpec,
-  FragmentInvocation,
   MutStorage,
   R32float,
   ReadStorageTexture2d,
@@ -24,7 +23,6 @@ import {
   RenderPipeline,
   RenderPipelineSpec,
   StorageTexture2d,
-  VertexInvocation,
   bufferResource,
   computePipeline,
   createBindGroup,
@@ -230,7 +228,6 @@ function diffuseTrail(res: SlimeDiffuseLayout, ctx: ComputeInvocation): void {
 function slimeVertex(
   res: SlimeRenderLayout,
   value: Vertex,
-  ctx: VertexInvocation,
 ): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -244,7 +241,6 @@ function slimeVertex(
 function slimeFragment(
   res: SlimeRenderLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   let x: u32 = (input.uv.x * (TRAIL_SIZE as f32)) as u32;
   let y: u32 = (input.uv.y * (TRAIL_SIZE as f32)) as u32;

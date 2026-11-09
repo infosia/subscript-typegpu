@@ -5,7 +5,6 @@
 
 import {
   Buffer,
-  ComputeInvocation,
   ComputePipelineSpec,
   MutStorage,
   bufferResource,
@@ -60,7 +59,7 @@ class CounterLayout {
 
 // The kernel body of all three pipelines. The body reads no global id, so the generated
 // guard alone decides how many invocations reach the counter.
-function countKernel(res: CounterLayout, ctx: ComputeInvocation): void {
+function countKernel(res: CounterLayout): void {
   res.counter[0].value.add(1);
 }
 

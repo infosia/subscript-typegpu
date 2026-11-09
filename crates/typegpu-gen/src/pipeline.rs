@@ -860,6 +860,92 @@ pub(crate) fn function<'a>(module: &'a Module, symbol: &Symbol) -> Option<&'a Fu
         .find(|function| function.symbol == *symbol)
 }
 
+/// Returns the named entry behind a function reference or a checker adapter (K1).
+pub(crate) fn named_entry<'a>(module: &Module, expr: &'a Expr) -> Option<&'a Symbol> {
+    if let ExprKind::FuncRef(symbol) = &expr.kind {
+        return Some(symbol);
+    }
+    let ExprKind::Lambda {
+        id,
+        params,
+        captures,
+        owns_environment: false,
+        is_async: false,
+        body,
+        ret,
+        ..
+    } = &expr.kind
+    else {
+        return None;
+    };
+    // The checker reserves these names. A source lambda cannot declare them.
+    if !captures.is_empty()
+        || !params
+            .iter()
+            .enumerate()
+            .all(|(index, param)| param.name == format!("[[discard#{}.{index}]]", id.0))
+    {
+        return None;
+    }
+    let call = match body.as_slice() {
+        [Stmt::Expr(call)]
+        | [Stmt::Return {
+            value: Some(call), ..
+        }] => call,
+        _ => return None,
+    };
+    let ExprKind::Call {
+        callee: Callee::Func(symbol),
+        args,
+    } = &call.kind
+    else {
+        return None;
+    };
+    let target = function(module, symbol)?;
+    if target.is_async
+        || target.is_generator
+        || target.params.len() > params.len()
+        || (target.params.len() == params.len() && target.ret == *ret)
+        || args.len() != target.params.len()
+        || !args
+            .iter()
+            .zip(params)
+            .zip(&target.params)
+            .all(|((arg, param), own)| {
+                matches!(&arg.kind, ExprKind::Local(name, ty, false)
+                if *name == param.name && *ty == own.ty && arg.ty == own.ty)
+            })
+    {
+        return None;
+    }
+    Some(symbol)
+}
+
+/// Reads concrete callback types from the monomorphized declaration, including inferred types.
+///
+/// # Errors
+///
+/// If the HIR lacks a concrete callback type, returns a generator diagnostic.
+pub(crate) fn callback_type<'a>(
+    module: &'a Module,
+    callee: &Symbol,
+    index: usize,
+    pos: &Pos,
+) -> Result<&'a subscript_compiler::types::FuncType, Diagnostic> {
+    let ty = function(module, callee)
+        .and_then(|function| function.params.get(index))
+        .map(|param| &param.ty);
+    if let Some(Type::Func(callback)) = ty {
+        return Ok(callback);
+    }
+    Err(generator_diagnostic(
+        format!(
+            "declaration `{callee}` callback {index} has no concrete function type in HIR: {ty:?}"
+        ),
+        pos.clone(),
+    ))
+}
+
 /// Returns the layout count of a `computePipeline` declaration function, and `None` for every
 /// other call.
 ///
@@ -1018,11 +1104,7 @@ pub(crate) fn discover(
             ));
             continue;
         }
-        let Some(Expr {
-            kind: ExprKind::FuncRef(entry),
-            ..
-        }) = args.first()
-        else {
+        let Some(entry) = args.first().and_then(|expr| named_entry(module, expr)) else {
             diagnostics.push(diagnostic(
                 "K1",
                 "pipeline kernel is not a named function",
@@ -1030,8 +1112,6 @@ pub(crate) fn discover(
             ));
             continue;
         };
-        // The checker typed the call against the library signature, so the kernel exists and its
-        // parameter count matches the form. Either failure here is a generator defect.
         let Some(kernel) = function(module, entry) else {
             diagnostics.push(generator_diagnostic(
                 format!("kernel `{}` disappeared from typed HIR", entry),
@@ -1039,7 +1119,22 @@ pub(crate) fn discover(
             ));
             continue;
         };
-        if kernel.params.len() != arity + 1 {
+        if kernel.ret != Type::Void {
+            let result =
+                type_name(module, &kernel.ret, &kernel.pos).map_err(|error| vec![error])?;
+            diagnostics.push(diagnostic(
+                "K1",
+                format!(
+                    "kernel `{}` returns `{result}`; a kernel returns void",
+                    kernel.name
+                ),
+                kernel.pos.clone(),
+            ));
+            continue;
+        }
+        let callback =
+            callback_type(module, callee, 0, &global.init.pos).map_err(|error| vec![error])?;
+        if callback.params.len() != arity + 1 || kernel.params.len() > callback.params.len() {
             diagnostics.push(generator_diagnostic(
                 format!("kernel `{}` has an impossible parameter count", kernel.name),
                 kernel.pos.clone(),
@@ -1047,30 +1142,25 @@ pub(crate) fn discover(
             continue;
         }
         let mut layouts = Vec::new();
-        for (group, param) in kernel.params.iter().take(arity).enumerate() {
-            match layout(module, &param.ty, group as u32, &param.pos) {
+        for (group, ty) in callback.params.iter().take(arity).enumerate() {
+            match layout(module, ty, group as u32, &global.init.pos) {
                 Ok(layout) => layouts.push(layout),
                 Err(error) => diagnostics.push(error),
             }
         }
-        // The parameter count check includes the invocation after all layouts.
-        let invocation = kernel.params.get(arity).ok_or_else(|| {
-            vec![crate::internal(
-                "pipeline::discover",
-                "missing invocation parameter",
-                &kernel.pos,
+        let invocation = callback.params.get(arity).ok_or_else(|| {
+            vec![generator_diagnostic(
+                "missing declared invocation type",
+                global.pos.clone(),
             )]
         })?;
-        let invocation_ok = class_name(module, &invocation.ty)
+        let invocation_ok = class_name(module, invocation)
             .is_some_and(|name| name == "ComputeInvocation")
-            && library_class(module, &invocation.ty).is_some();
+            && library_class(module, invocation).is_some();
         if !invocation_ok {
             diagnostics.push(generator_diagnostic(
-                format!(
-                    "kernel `{}` lost its ComputeInvocation parameter",
-                    kernel.name
-                ),
-                invocation.pos.clone(),
+                format!("kernel `{}` lost its ComputeInvocation type", kernel.name),
+                global.init.pos.clone(),
             ));
             continue;
         }

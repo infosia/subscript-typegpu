@@ -5,11 +5,9 @@
 // Ported from TypeGPU's smoky-triangle example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Uniform,
-  VertexInvocation,
   bufferResource,
   createBindGroup,
   createRenderPipeline,
@@ -93,7 +91,7 @@ function smokeField(uv: Vec2f, time: f32): f32 {
 
 // The vertex stage passes the vertex buffer values through. It widens the position to
 // four components with w at 1.0, so the triangle needs no projection matrix.
-function smokeVertex(res: SmokeLayout, value: Vertex, ctx: VertexInvocation): Varyings {
+function smokeVertex(res: SmokeLayout, value: Vertex): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
     value.uv,
@@ -106,7 +104,6 @@ function smokeVertex(res: SmokeLayout, value: Vertex, ctx: VertexInvocation): Va
 function smokeFragment(
   res: SmokeLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const frame: FrameData = res.frame.$;
   const field: f32 = smokeField(input.uv, frame.motion.x) * frame.motion.y;

@@ -6,11 +6,9 @@
 // Ported from TypeGPU's caustics example (https://github.com/software-mansion/TypeGPU).
 
 import {
-  FragmentInvocation,
   RenderPipeline,
   RenderPipelineSpec,
   Uniform,
-  VertexInvocation,
   bufferResource,
   createBindGroup,
   createRenderPipeline,
@@ -99,7 +97,6 @@ function causticIntensity(point: Vec2f, time: f32): f32 {
 function causticVertex(
   res: CausticLayout,
   value: Vertex,
-  ctx: VertexInvocation,
 ): Varyings {
   return new Varyings(
     new Vec4f(value.position.x, value.position.y, 0.0, 1.0),
@@ -113,7 +110,6 @@ function causticVertex(
 function causticFragment(
   res: CausticLayout,
   input: Varyings,
-  ctx: FragmentInvocation,
 ): Vec4f {
   const frame: FrameData = res.frame.$;
   const point = new Vec2f(
