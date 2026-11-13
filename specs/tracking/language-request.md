@@ -786,3 +786,8 @@ parameter on `ComputePipeline`.
 function in a `void` callback place is now S013, not S100. The reject fixture
 `pi13-async-kernel` changes its expected rule and message. No other source changes.
 Evidence: `tools/gate.sh --require-backend` green, 395 s, 359 passed, 1 ignored (live).
+
+### Re-pin to `8a36c8c` (2026-11-14)
+
+Four subscript commits, §275: a Worker Context spawns no Worker. No source change here.
+Evidence: `tools/gate.sh --require-backend` green, 414 s, 358 passed, 1 ignored (live).
