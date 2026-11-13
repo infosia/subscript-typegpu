@@ -173,6 +173,10 @@ export class Texture2d<T> {
     return this.pixels[pixel as i32];
   }
 
+  /**
+   * Samples level zero with nearest filtering and the sampler's U and V address modes.
+   * Unsupported filters, comparison samplers, and other levels trap with TX3.
+   */
   sampleLevel(sampler: Sampler, uv: Vec2f, level: f32): Vec4f {
     if (!sampler.isNearest()) {
       authorTrap("TX3", "sampleLevel", "filterMode is not nearest");
@@ -185,10 +189,8 @@ export class Texture2d<T> {
     }
     let x: i32 = Math.floor((uv.x * (this.width as f32)) as f64) as i32;
     let y: i32 = Math.floor((uv.y * (this.height as f32)) as f64) as i32;
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-    if ((x as u32) >= this.width) x = (this.width - 1) as i32;
-    if ((y as u32) >= this.height) y = (this.height - 1) as i32;
+    x = addressTexel(x, this.width as i32, sampler.addressModeU);
+    y = addressTexel(y, this.height as i32, sampler.addressModeV);
     return this.load(new Vec2i(x, y), 0);
   }
 
@@ -204,13 +206,29 @@ export class Texture2d<T> {
   }
 }
 
+/** Applies an address mode to an integer texel coordinate. */
+function addressTexel(t: i32, extent: i32, mode: GPUAddressMode): i32 {
+  if (mode == "repeat") return ((t % extent) + extent) % extent;
+  if (mode == "mirror-repeat") {
+    const period: i32 = 2 * extent;
+    const m: i32 = ((t % period) + period) % period;
+    return m < extent ? m : period - 1 - m;
+  }
+  if (t < 0) return 0;
+  return t >= extent ? extent - 1 : t;
+}
+
 /**
  * A sampler binding. In WGSL it becomes `sampler`.
- * The host body carries the filter mode and implements `nearest` only, and any other mode
- * traps with TX3 inside a sample call.
+ * The host sampler carries its filter and U and V address modes, which default to clamp-to-edge.
+ * Unsupported filters and comparison samplers trap with TX3 inside a sample call.
  */
 export class Sampler {
-  constructor(private filterMode: string) {}
+  constructor(
+    private filterMode: string,
+    public addressModeU: GPUAddressMode = "clamp-to-edge",
+    public addressModeV: GPUAddressMode = "clamp-to-edge",
+  ) {}
 
   isNearest(): boolean {
     return this.filterMode == "nearest";
@@ -218,15 +236,15 @@ export class Sampler {
 }
 
 /**
- * Builds the host `Sampler` that matches a GPU sampler descriptor, so both lanes filter alike.
- * A descriptor with `minFilter` and `magFilter` of `nearest` gives a nearest sampler.
- * Every other descriptor gives one that traps with TX3 on a sample call.
+ * Creates a host sampler with the descriptor's U and V address modes.
+ * Nearest minification and magnification filters permit level-zero samples.
+ * Other filters or a compare descriptor produce a sampler that traps with TX3 on a sample call.
  */
 export function samplerFromDescriptor(descriptor: GPUSamplerDescriptor): Sampler {
-  if (descriptor.minFilter == "nearest" && descriptor.magFilter == "nearest") {
-    return new Sampler("nearest");
+  if (descriptor.compare == undefined && descriptor.minFilter == "nearest" && descriptor.magFilter == "nearest") {
+    return new Sampler("nearest", descriptor.addressModeU, descriptor.addressModeV);
   }
-  return new Sampler("non-nearest");
+  return new Sampler("non-nearest", descriptor.addressModeU, descriptor.addressModeV);
 }
 
 /**

@@ -55,6 +55,18 @@ run P7.
   `Sampler` carries its filter mode, `sampleLevel` and `sample`
   implement `nearest` and trap with `TX3` for any other mode. A
   host golden never models a resource the pipeline does not bind.
+  Rev 1, 2026-11-13: the host `Sampler` also carries `addressModeU`
+  and `addressModeV`. `samplerFromDescriptor` copied only the filter,
+  so a `repeat` descriptor sampled as `clamp-to-edge` on the host
+  (review R3, 2026-11-13, static analysis at `3afd663`). Rule: on the
+  texel coordinate `t = floor(u * width)`, `clamp-to-edge` clamps to
+  `[0, width - 1]`, `repeat` gives `t mod width`, and `mirror-repeat`
+  gives `m = t mod (2 * width)`, then `m` when `m < width`, else
+  `2 * width - 1 - m`. Each `mod` is non-negative. The V axis uses the
+  same rules with `height`. A descriptor with `compare` gives a host
+  sampler that traps with `TX3` on a sample call. No descriptor field
+  that changes a level-zero nearest sample becomes a different host
+  behavior without a trap.
 - **CL6 — The analysis has a red per branch.** Emitter tests assert
   `<name>_HOST_RUNNABLE` false for a kernel that reaches only a
   barrier, only an atomic on a storage schema, only a written

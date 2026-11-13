@@ -342,26 +342,36 @@ fn unsupported_host_texture_sampling_traps_at_each_method() {
     ));
     std::fs::create_dir_all(&directory).expect("create sampler trap directory");
     let program = directory.join("sampler-trap.ts");
-    for (filters, call, expected) in [
+    for (descriptor, call, expected) in [
         (
-            "linear",
+            "minFilter: \"linear\", magFilter: \"linear\"",
             "texture.sampleLevel(sampler, new Vec2f(0.5, 0.5), 0.0)",
             "TX3 sampleLevel filterMode is not nearest",
         ),
         (
-            "linear",
+            "minFilter: \"linear\", magFilter: \"linear\"",
             "texture.sample(sampler, new Vec2f(0.5, 0.5))",
             "TX3 sample filterMode is not nearest",
         ),
         (
-            "nearest",
+            "minFilter: \"nearest\", magFilter: \"nearest\"",
             "texture.load(new Vec2i(0, 0), 1)",
             "TX3 load level=1 is not supported",
         ),
         (
-            "nearest",
+            "minFilter: \"nearest\", magFilter: \"nearest\"",
             "texture.sampleLevel(sampler, new Vec2f(0.5, 0.5), 1.0)",
             "TX3 sampleLevel level=1 is not supported",
+        ),
+        (
+            "compare: \"less\"",
+            "texture.sample(sampler, new Vec2f(0.5, 0.5))",
+            "TX3 sample filterMode is not nearest",
+        ),
+        (
+            "compare: \"less\"",
+            "texture.sampleLevel(sampler, new Vec2f(0.5, 0.5), 0.0)",
+            "TX3 sampleLevel filterMode is not nearest",
         ),
     ] {
         let source = r#"
@@ -369,13 +379,13 @@ import { Texture2d, samplerFromDescriptor } from "./typegpu";
 import { Vec2f, Vec2i, Vec4f } from "./typegpu-types";
 import { GPUSamplerDescriptor } from "./webgpu";
 export function main(): void {
-  const descriptor: GPUSamplerDescriptor = { minFilter: "$FILTERS", magFilter: "$FILTERS" };
+  const descriptor: GPUSamplerDescriptor = { $DESCRIPTOR };
   const sampler = samplerFromDescriptor(descriptor);
   const texture = new Texture2d<f32>([new Vec4f(1.0, 0.0, 0.0, 1.0)], 1, 1);
   $CALL;
 }
 "#
-        .replace("$FILTERS", filters)
+        .replace("$DESCRIPTOR", descriptor)
         .replace("$CALL", call);
         std::fs::write(&program, source).expect("write sampler trap program");
         let files =

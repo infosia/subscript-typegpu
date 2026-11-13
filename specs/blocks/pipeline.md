@@ -201,6 +201,28 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   `ComputePipeline` always borrows the queue, never disposes it, and
   holds no ownership flag. `createComputePipelineHost` is removed
   (ergonomics.md EG10 Rev 2).
+
+  Rev 4, 2026-11-13: each guarded dispatch records its own guard
+  upload. The Rev 1 queue write was not part of the encoder, so two
+  encoders recorded before one submit both read the last bounds
+  (review R1, 2026-11-13, static analysis at `3afd663`). The wrapper
+  check rejected only the same encoder twice in a row and did not see
+  the sequence A, B, A. Rule: a guarded `dispatch`, `dispatchThreads`,
+  or `dispatchTimed` creates a 16-byte `COPY_SRC + COPY_DST` staging
+  buffer, writes `[x, y, z, 0]` to it through the queue, and records
+  `copyBufferToBuffer(staging, 0, guard, 0, 16)` for every guard
+  buffer before it records the pass. Then it releases the staging
+  wrapper. A release is not a destroy, so the recorded command keeps
+  the staging buffer alive until execution *(docs: the WebGPU object
+  model)*. Each staging buffer receives one write, so no later queue
+  write overwrites the bounds of a recorded dispatch. The commands of
+  one encoder execute in record order, so one encoder can carry any
+  number of guarded dispatches. The `PI15` encoder trap and the
+  remembered wrapper are removed. `ComputePipeline` borrows the device
+  for the staging buffers and never disposes it.
+  Status: not implemented. `ComputePipeline` cannot hold the device
+  at this pin (language-request.md R41). The Rev 1 behavior and its
+  trap stay until R41 lands.
 - **PI16 — Indirect dispatch.** `ComputePipeline` gains
   `dispatchIndirect(encoder, groups, buffer: GPUBuffer, offset:
   u64)`, which records `dispatchWorkgroupsIndirect`. On a guarded

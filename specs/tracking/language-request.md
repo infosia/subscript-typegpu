@@ -751,3 +751,30 @@ window smoke on Metal: 27 examples exit 0 with no FAIL line, and the
 Metal: `check:dispatch pass`, `check:product pass`,
 `check:naive pass`, `check:tiled pass`. No existing WGSL or
 `.expected` golden moved.
+
+## R41 — a stored device for the guard staging buffers (2026-11-13)
+
+Status: open, escalated to the owner on 2026-11-13.
+
+PI15 Rev 4 needs `ComputePipeline` to create one staging buffer per guarded dispatch. The
+pipeline has no device. `createComputePipeline<D extends GPUDeviceCreation>(device: D, ...)`
+accepts both device classes through a type parameter. At pin `b9bef6f`, three forms fail:
+
+- A `GPUDevice` parameter rejects `D`: `error[S100]: type mismatch: the argument expects
+  `GPUDevice`, got `D``.
+- A `GPUDeviceCreation | null` field: `error[S100]: interface `GPUDeviceCreation` is a
+  constraint only; write a type parameter `T extends GPUDeviceCreation`` (collisions.md C24).
+- A stored lambda that captures a `const` copy of the device: `error[S009]: value of type
+  `ComputePipeline` may capture at return` (collisions.md C5).
+
+Consequence: the only library-side form is a generic `ComputePipeline<D>`. That changes every
+annotation of the public type in programs, examples, and generated code. The owner chose the
+language route on 2026-11-13.
+
+Requested change, either one is sufficient:
+
+1. A value of an interface type in a field, with a run-time class dispatch (C24).
+2. A stored capturing lambda whose captures are owned handles or values copied at creation (C5).
+
+Acceptance: PI15 Rev 4 compiles with the pipeline holding the device, with no generic
+parameter on `ComputePipeline`.

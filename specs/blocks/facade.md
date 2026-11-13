@@ -117,6 +117,15 @@ collide.
 - **L11 — Create owns.** A creation export records the created
   handle's owning instance. `*_release` exports are the only path
   that frees. No finalizer exists.
+  Rev 1, 2026-11-13: the ownership index counts references. Before
+  this revision only instance release removed an entry, so a released
+  child kept its entry for the instance lifetime (review R2,
+  2026-11-13, static analysis at `3afd663`). Rule: an entry holds the
+  owning instance and a count. Each recorded owned acquisition of a
+  handle adds one. Each `*_release` export of that handle subtracts
+  one before the backend release and removes the entry at zero. A
+  release of a handle with no entry changes nothing. Instance release
+  removes every entry of that instance, whatever its count.
 - **L12 — The header is the contract.** `subscript-typegpu.h` is
   generated with the facade and committed. Every construct in it is
   mapped by `subscript bind` without loss (CLAUDE.md invariant 1).
