@@ -754,7 +754,8 @@ Metal: `check:dispatch pass`, `check:product pass`,
 
 ## R41 — a stored device for the guard staging buffers (2026-11-13)
 
-Status: open, escalated to the owner on 2026-11-13.
+Status: landed in subscript as §274 (`8638c8d`, option 2: a capturing lambda that escapes owns
+its environment). A field of interface type stays rejected (C24).
 
 PI15 Rev 4 needs `ComputePipeline` to create one staging buffer per guarded dispatch. The
 pipeline has no device. `createComputePipeline<D extends GPUDeviceCreation>(device: D, ...)`
@@ -778,3 +779,10 @@ Requested change, either one is sufficient:
 
 Acceptance: PI15 Rev 4 compiles with the pipeline holding the device, with no generic
 parameter on `ComputePipeline`.
+
+### Re-pin to `8638c8d` (2026-11-13)
+
+59 subscript commits, §247–§274. §274 closes R41. §247 names the dropped handle: an async
+function in a `void` callback place is now S013, not S100. The reject fixture
+`pi13-async-kernel` changes its expected rule and message. No other source changes.
+Evidence: `tools/gate.sh --require-backend` green, 395 s, 359 passed, 1 ignored (live).
