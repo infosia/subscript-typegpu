@@ -490,11 +490,18 @@ fn dispatch_threads_rounds_all_three_axes() {
             "dispatchThreads lacks workgroup axis {axis}"
         );
     }
+    let timed = source
+        .split("  dispatchTimed(")
+        .nth(1)
+        .expect("dispatchTimed method")
+        .split("  dispose():")
+        .next()
+        .expect("dispatchTimed body");
     assert!(
-        source.contains(
-            "\"ComputePipeline.dispatchTimed\",\n      x * this.workgroup[0],\n      y * this.workgroup[1],\n      z * this.workgroup[2],"
+        timed.contains(
+            "this.recordGuard(\n      encoder,\n      x * this.workgroup[0],\n      y * this.workgroup[1],\n      z * this.workgroup[2],"
         ),
-        "dispatchTimed does not write three-axis guard bounds",
+        "dispatchTimed does not record three-axis guard bounds",
     );
 }
 

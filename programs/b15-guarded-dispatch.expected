@@ -2,4 +2,6 @@ guard.group=0
 guard.binding=1
 layout.entries=2
 host:out=100,105,999,999
+same-encoder:dispatches=2
+two-encoders:dispatches=2
 PASS

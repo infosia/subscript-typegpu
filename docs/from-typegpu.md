@@ -459,7 +459,8 @@ Differences:
   timestamps around the dispatch.
 - A declaration with `guarded: true` gets a generated bounds guard
   on all three axes and one hidden uniform binding that the runtime
-  owns. `dispatchThreads` writes the thread count before the pass.
+  owns. Each dispatch records its own bounds upload before the pass.
+  One encoder can contain multiple guarded dispatches of the same pipeline.
   TypeGPU's `createGuardedComputePipeline` is the counterpart.
 - `dispatchIndirect(encoder, groups, buffer, offset)` records an
   indirect dispatch. The argument blocks are the schemas

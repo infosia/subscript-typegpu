@@ -1467,8 +1467,8 @@ export class BindGroupLayoutSpec {
 /**
  * The compute pipeline a program dispatches.
  * It owns the WebGPU pipeline and every guard buffer, and `dispose()` releases them.
- * A guarded pipeline writes its bounds through the queue, so one command encoder carries at most
- * one guarded dispatch (PI15).
+ * Each guarded dispatch records its own bounds upload before the compute pass.
+ * The pipeline borrows the device and its queue for these uploads and never disposes them.
  */
 export class ComputePipeline {
   private pipeline: GPUComputePipeline;
@@ -1477,7 +1477,7 @@ export class ComputePipeline {
   private guarded: boolean;
   private guardGroups: u32[];
   private guardBuffers: GPUBuffer[];
-  private guardEncoder: GPUCommandEncoder | null;
+  private createGuardStaging: (() => GPUBuffer) | null;
 
   constructor(
     pipeline: GPUComputePipeline,
@@ -1486,6 +1486,7 @@ export class ComputePipeline {
     guarded: boolean = false,
     guardGroups: u32[] = [],
     guardBuffers: GPUBuffer[] = [],
+    createGuardStaging: (() => GPUBuffer) | null = null,
   ) {
     this.pipeline = pipeline;
     this.guardQueue = guardQueue;
@@ -1493,7 +1494,7 @@ export class ComputePipeline {
     this.guarded = guarded;
     this.guardGroups = guardGroups;
     this.guardBuffers = guardBuffers;
-    this.guardEncoder = null;
+    this.createGuardStaging = createGuardStaging;
   }
 
   bindGroupLayout(group: u32): GPUBindGroupLayout {
@@ -1511,30 +1512,30 @@ export class ComputePipeline {
     return null;
   }
 
-  private writeGuard(
+  /** Records a separate staging buffer upload to every guard buffer before the pass. */
+  private recordGuard(
     encoder: GPUCommandEncoder,
-    method: string,
     x: u32,
     y: u32,
     z: u32,
   ): void {
     if (!this.guarded) return;
-    if (this.guardEncoder != null) {
-      if (this.guardEncoder == encoder) {
-        authorTrap("PI15", method, `x=${x} y=${y} z=${z}`);
-        return;
-      }
-    }
     const queue: GPUQueue | null = this.guardQueue;
     if (queue == null) {
       authorTrap("PI15", "ComputePipeline.guard", "queue=missing");
       return;
     }
-    this.guardEncoder = encoder;
+    const createStaging: (() => GPUBuffer) | null = this.createGuardStaging;
+    if (createStaging == null) {
+      authorTrap("PI15", "ComputePipeline.guard", "staging=missing");
+      return;
+    }
+    using staging = createStaging();
     const bytes: u8[] = Context.bytesOf<FixedArray<u32, 4>>([x, y, z, 0]);
+    queue.writeBuffer(staging, 0, bytes);
     let index: i32 = 0;
     while (index < this.guardBuffers.length) {
-      queue.writeBuffer(this.guardBuffers[index], 0, bytes);
+      encoder.copyBufferToBuffer(staging, 0, this.guardBuffers[index], 0, 16);
       index += 1;
     }
   }
@@ -1564,9 +1565,8 @@ export class ComputePipeline {
     y: u32,
     z: u32,
   ): void {
-    this.writeGuard(
+    this.recordGuard(
       encoder,
-      "ComputePipeline.dispatch",
       x * this.workgroup[0],
       y * this.workgroup[1],
       z * this.workgroup[2],
@@ -1581,7 +1581,7 @@ export class ComputePipeline {
     y: u32,
     z: u32,
   ): void {
-    this.writeGuard(encoder, "ComputePipeline.dispatchThreads", x, y, z);
+    this.recordGuard(encoder, x, y, z);
     this.recordDispatch(
       encoder,
       groups,
@@ -1620,9 +1620,8 @@ export class ComputePipeline {
     z: u32,
     pair: TimestampPair,
   ): void {
-    this.writeGuard(
+    this.recordGuard(
       encoder,
-      "ComputePipeline.dispatchTimed",
       x * this.workgroup[0],
       y * this.workgroup[1],
       z * this.workgroup[2],
@@ -1651,6 +1650,7 @@ export class ComputePipeline {
       index += 1;
     }
     this.guardQueue = null;
+    this.createGuardStaging = null;
     this.pipeline.dispose();
   }
 
@@ -1912,6 +1912,7 @@ function finishComputePipeline(
   guardGroups: u32[],
   guardBuffers: GPUBuffer[],
   guardQueue: GPUQueue | null,
+  createGuardStaging: () => GPUBuffer,
 ): ComputePipeline {
   return new ComputePipeline(
     pipeline,
@@ -1920,6 +1921,7 @@ function finishComputePipeline(
     guardBuffers.length > 0,
     guardGroups,
     guardBuffers,
+    createGuardStaging,
   );
 }
 
@@ -1934,6 +1936,8 @@ function finishRenderPipeline(
  * Creates a `ComputePipeline` from the generated WGSL, entry name, layouts, and workgroup size.
  * The call runs inside the caller's validation error scope and does not await.
  * It creates one guard buffer per `guard` layout entry, and the pipeline disposes them.
+ * A stored function captures the device to create a staging buffer for each guarded dispatch.
+ * The caller keeps the device and its queue alive until the pipeline is disposed.
  */
 export function createComputePipeline<D extends GPUDeviceCreation>(
   device: D,
@@ -1971,12 +1975,21 @@ export function createComputePipeline<D extends GPUDeviceCreation>(
     group += 1;
   }
   const guardQueue: GPUQueue | null = guardBuffers.length > 0 ? device.queue : null;
+  const guardDevice = device;
+  const createGuardStaging = (): GPUBuffer => {
+    return guardDevice.createBuffer({
+      label: "typegpu-dispatch-guard-staging",
+      size: 16,
+      usage: GPUBufferUsage.COPY_SRC + GPUBufferUsage.COPY_DST,
+    });
+  };
   return finishComputePipeline(
     pipeline,
     workgroup,
     guardGroups,
     guardBuffers,
     guardQueue,
+    createGuardStaging,
   );
 }
 

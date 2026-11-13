@@ -167,8 +167,7 @@ export async function main(): Promise<void> {
         firstLayout,
         count1d_LAYOUT0,
         // The guard uniform is a hidden layout entry, so the author's resource list stays
-        // unchanged. Each pipeline owns its guard buffer, so one encoder carries all three
-        // dispatches.
+        // unchanged. Each dispatch records its own guard upload before its compute pass.
         [bufferResource(first.handle())],
         firstPipeline.guardBuffer(0),
       );

@@ -220,9 +220,9 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   number of guarded dispatches. The `PI15` encoder trap and the
   remembered wrapper are removed. `ComputePipeline` borrows the device
   for the staging buffers and never disposes it.
-  Status: not implemented. `ComputePipeline` cannot hold the device
-  at this pin (language-request.md R41). The Rev 1 behavior and its
-  trap stay until R41 lands.
+  The pipeline holds the device through a stored function that
+  captures it (subscript §274, language-request.md R41), so
+  `ComputePipeline` has no type parameter.
 - **PI16 — Indirect dispatch.** `ComputePipeline` gains
   `dispatchIndirect(encoder, groups, buffer: GPUBuffer, offset:
   u64)`, which records `dispatchWorkgroupsIndirect`. On a guarded

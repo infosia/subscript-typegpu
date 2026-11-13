@@ -58,16 +58,6 @@ fn assert_accept_export(fixture: &Path, export: &str) {
 }
 
 #[test]
-fn guarded_dispatch_accepts_fresh_encoder_each_frame() {
-    if !super::differential::backend_is_available() {
-        return;
-    }
-    let fixture =
-        repository_root().join("crates/harness/tests/fixtures/trap/guarded-second-dispatch.ts");
-    assert_accept_export(&fixture, "accept");
-}
-
-#[test]
 fn runtime_traps_are_named_and_numbered() {
     if !super::differential::backend_is_available() {
         return;
@@ -156,10 +146,6 @@ fn runtime_traps_are_named_and_numbered() {
         (
             "guarded-indirect.ts",
             "PI16 ComputePipeline.dispatchIndirect guarded=true",
-        ),
-        (
-            "guarded-second-dispatch.ts",
-            "PI15 ComputePipeline.dispatch x=2 y=1 z=1",
         ),
         (
             "index-buffer-without-format.ts",

@@ -112,6 +112,20 @@ export async function main(): Promise<void> {
     print(`guard.binding=${guard.binding}`);
     print(`layout.entries=${guardedPipeline_LAYOUT0.entries.length}`);
     print(`host:out=${host.output[0]},${host.output[5]},${host.output[6]},${host.output[7]}`);
+    using repeatedEncoder = device.createCommandEncoderDefault();
+    pipeline.dispatchThreads(repeatedEncoder, [bindGroup], 2, 1, 1);
+    pipeline.dispatchThreads(repeatedEncoder, [bindGroup], 5, 1, 1);
+    using repeatedCommand = repeatedEncoder.finishDefault();
+    device.queue.submit([repeatedCommand]);
+    using encoderA = device.createCommandEncoderDefault();
+    using encoderB = device.createCommandEncoderDefault();
+    pipeline.dispatchThreads(encoderA, [bindGroup], 3, 1, 1);
+    pipeline.dispatchThreads(encoderB, [bindGroup], 7, 1, 1);
+    using commandA = encoderA.finishDefault();
+    using commandB = encoderB.finishDefault();
+    device.queue.submit([commandA, commandB]);
+    print("same-encoder:dispatches=2");
+    print("two-encoders:dispatches=2");
   }
   gpu.dispose();
   print("PASS");
