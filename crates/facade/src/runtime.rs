@@ -83,8 +83,14 @@ pub(crate) struct OwnedHandle {
 static FUTURES: Mutex<BTreeMap<u64, Slot>> = Mutex::new(BTreeMap::new());
 /// The owned handles of results that no script can take. The next pump releases them (L8).
 static DEFERRED_HANDLES: Mutex<Vec<OwnedHandle>> = Mutex::new(Vec::new());
-/// The owning instance of every live handle (L11). An instance maps to itself.
-static HANDLE_INSTANCES: Mutex<BTreeMap<usize, usize>> = Mutex::new(BTreeMap::new());
+/// The instance and recorded owned references of one handle.
+struct HandleInstance {
+    instance: usize,
+    references: usize,
+}
+
+/// Each recorded handle has an instance and a reference count. An instance maps to itself.
+static HANDLE_INSTANCES: Mutex<BTreeMap<usize, HandleInstance>> = Mutex::new(BTreeMap::new());
 static DEVICE_EVENTS: Mutex<DeviceEventTable> = Mutex::new(DeviceEventTable {
     by_id: BTreeMap::new(),
     by_device: BTreeMap::new(),
@@ -173,7 +179,7 @@ fn deferred_handles() -> std::sync::MutexGuard<'static, Vec<OwnedHandle>> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-fn handle_instances() -> std::sync::MutexGuard<'static, BTreeMap<usize, usize>> {
+fn handle_instances() -> std::sync::MutexGuard<'static, BTreeMap<usize, HandleInstance>> {
     HANDLE_INSTANCES
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -223,11 +229,12 @@ pub(crate) fn release_adapter_info_strings(parent: usize) {
 
 /// Returns the instance that owns `handle`, or 0 when no instance owns it.
 pub(crate) fn instance_for_handle(handle: usize) -> usize {
-    handle_instances().get(&handle).copied().unwrap_or(0)
+    handle_instances()
+        .get(&handle)
+        .map_or(0, |owner| owner.instance)
 }
 
-/// Gives `child` the instance that owns `parent`, so instance release reaches the child too
-/// (L11).
+/// Adds one owned reference to `child` under the instance that owns `parent`.
 ///
 /// Ignores a null child and a parent with no recorded owner.
 pub(crate) fn inherit_handle_instance(parent: usize, child: usize) {
@@ -235,16 +242,53 @@ pub(crate) fn inherit_handle_instance(parent: usize, child: usize) {
         return;
     }
     let mut owners = handle_instances();
-    let Some(instance) = owners.get(&parent).copied() else {
+    let Some(instance) = owners.get(&parent).map(|owner| owner.instance) else {
         return;
     };
-    owners.insert(child, instance);
+    acquire_handle_instance(&mut owners, instance, child);
+}
+
+fn acquire_handle_instance(
+    owners: &mut BTreeMap<usize, HandleInstance>,
+    instance: usize,
+    handle: usize,
+) {
+    let owner = owners.entry(handle).or_insert(HandleInstance {
+        instance,
+        references: 0,
+    });
+    if owner.instance != instance {
+        owner.instance = instance;
+        owner.references = 0;
+    }
+    owner.references = owner.references.saturating_add(1);
+}
+
+/// Removes one owned reference. Unknown handles and instance entries remain unchanged.
+pub(crate) fn release_handle_instance(handle: usize) {
+    let mut owners = handle_instances();
+    let Some(owner) = owners.get_mut(&handle) else {
+        return;
+    };
+    if owner.instance == handle {
+        return;
+    }
+    owner.references -= 1;
+    if owner.references == 0 {
+        owners.remove(&handle);
+    }
 }
 
 /// Records a created instance as its own owner. Ignores a null instance.
 pub(crate) fn register_instance(instance: usize) {
     if instance != 0 {
-        handle_instances().insert(instance, instance);
+        handle_instances().insert(
+            instance,
+            HandleInstance {
+                instance,
+                references: 1,
+            },
+        );
     }
 }
 
@@ -423,7 +467,7 @@ pub(crate) fn take_handle(instance: usize, future: u64, kind: u32) -> usize {
     drop(table);
     if handle != 0 {
         // The instance that requested the handle owns it from here (L11).
-        handle_instances().insert(handle, instance);
+        acquire_handle_instance(&mut handle_instances(), instance, handle);
     }
     handle
 }
@@ -518,9 +562,9 @@ pub(crate) fn release_all_slots(instance: usize) -> Vec<OwnedHandle> {
     let mut owners = handle_instances();
     let released_handles: Vec<usize> = owners
         .iter()
-        .filter_map(|(handle, owner)| (*owner == instance).then_some(*handle))
+        .filter_map(|(handle, owner)| (owner.instance == instance).then_some(*handle))
         .collect();
-    owners.retain(|_, owner| *owner != instance);
+    owners.retain(|_, owner| owner.instance != instance);
     drop(owners);
     for handle in released_handles {
         // Instance release also drops the per-handle state of every handle it owns.
@@ -650,6 +694,12 @@ pub(crate) fn release_device_events(device: usize) {
     table.by_id.remove(&event_id);
 }
 
+/// Returns the number of recorded handle entries for tests.
+#[cfg(test)]
+pub(crate) fn handle_instance_count() -> usize {
+    handle_instances().len()
+}
+
 /// Test-only observability for the F8 leak assertion.
 #[doc(hidden)]
 #[cfg(test)]
@@ -678,8 +728,93 @@ mod tests {
 
     use super::*;
 
+    static SLOT_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn take_test_handle(instance: usize, handle: usize) {
+        let (future, userdata) = new_pending_slot(instance, 1);
+        // SAFETY: this callback consumes the unique userdata pointer exactly once.
+        unsafe { complete_from_callback(userdata, 1, true, 1, handle, String::new()) };
+        assert_eq!(take_handle(instance, future, 1), handle);
+        assert_eq!(take_handle(instance, future, 1), 0);
+    }
+
+    #[test]
+    fn owned_acquisitions_keep_the_owner_until_the_last_release() {
+        let _guard = SLOT_TEST_LOCK.lock().expect("slot test lock");
+        const INSTANCE: usize = 100_001;
+        const HANDLE: usize = 100_002;
+        register_instance(INSTANCE);
+        for acquire in [inherit_handle_instance, take_test_handle] {
+            acquire(INSTANCE, HANDLE);
+            acquire(INSTANCE, HANDLE);
+            assert_eq!(instance_for_handle(HANDLE), INSTANCE);
+            release_handle_instance(HANDLE);
+            assert_eq!(instance_for_handle(HANDLE), INSTANCE);
+            release_handle_instance(HANDLE);
+            assert_eq!(instance_for_handle(HANDLE), 0);
+        }
+        assert!(release_all_slots(INSTANCE).is_empty());
+    }
+
+    #[test]
+    fn an_acquisition_under_another_instance_replaces_the_count() {
+        let _guard = SLOT_TEST_LOCK.lock().expect("slot test lock");
+        const FIRST: usize = 100_003;
+        const SECOND: usize = 100_004;
+        const HANDLE: usize = 100_005;
+        register_instance(FIRST);
+        register_instance(SECOND);
+        for acquire in [inherit_handle_instance, take_test_handle] {
+            acquire(FIRST, HANDLE);
+            acquire(FIRST, HANDLE);
+            acquire(SECOND, HANDLE);
+            assert_eq!(instance_for_handle(HANDLE), SECOND);
+            release_handle_instance(HANDLE);
+            assert_eq!(instance_for_handle(HANDLE), 0);
+        }
+        assert!(release_all_slots(FIRST).is_empty());
+        assert!(release_all_slots(SECOND).is_empty());
+    }
+
+    #[test]
+    fn unregistered_and_instance_releases_leave_the_owner_unchanged() {
+        const INSTANCE: usize = 100_006;
+        const HANDLE: usize = 100_007;
+        const UNKNOWN: usize = 100_008;
+        register_instance(INSTANCE);
+        inherit_handle_instance(INSTANCE, HANDLE);
+        release_handle_instance(UNKNOWN);
+        release_handle_instance(0);
+        release_handle_instance(INSTANCE);
+        assert_eq!(instance_for_handle(UNKNOWN), 0);
+        assert_eq!(instance_for_handle(0), 0);
+        assert_eq!(instance_for_handle(INSTANCE), INSTANCE);
+        assert_eq!(instance_for_handle(HANDLE), INSTANCE);
+        release_handle_instance(HANDLE);
+        assert_eq!(instance_for_handle(HANDLE), 0);
+        assert!(release_all_slots(INSTANCE).is_empty());
+    }
+
+    #[test]
+    fn instance_release_removes_children_with_multiple_references() {
+        const INSTANCE: usize = 100_009;
+        const HANDLE: usize = 100_010;
+        register_instance(INSTANCE);
+        inherit_handle_instance(INSTANCE, HANDLE);
+        inherit_handle_instance(INSTANCE, HANDLE);
+        inherit_handle_instance(INSTANCE, 0);
+        inherit_handle_instance(0, 100_011);
+        assert_eq!(instance_for_handle(0), 0);
+        assert_eq!(instance_for_handle(100_011), 0);
+        assert!(release_all_slots(INSTANCE).is_empty());
+        assert_eq!(instance_for_handle(INSTANCE), 0);
+        assert_eq!(instance_for_handle(HANDLE), 0);
+        release_handle_instance(HANDLE);
+    }
+
     #[test]
     fn map_error_and_aborted_statuses_remain_distinct() {
+        let _guard = SLOT_TEST_LOCK.lock().expect("slot test lock");
         const INSTANCE: usize = 41;
         let _ = release_all_slots(INSTANCE);
         let (error_id, error_userdata) = new_pending_slot(INSTANCE, 7);

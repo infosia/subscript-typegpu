@@ -123,6 +123,11 @@ pub(crate) fn rust_release_export(object: &str, device_events: bool) -> String {
     let pascal = naming::pascal(object);
     let snake = naming::snake(object);
     let param = naming::camel(object);
+    let release_owner = if object == "instance" {
+        String::new()
+    } else {
+        format!("    runtime::release_handle_instance({param} as usize);\n")
+    };
     let cleanup = match (device_events, object) {
         (true, "device") => "    runtime::release_device_events(device as usize);\n    runtime::release_adapter_info_strings(device as usize);\n",
         (true, "adapter") => {
@@ -137,6 +142,7 @@ pub(crate) fn rust_release_export(object: &str, device_events: bool) -> String {
          \x20   if {param}.is_null() {{\n\
          \x20       return;\n\
          \x20   }}\n\
+         {release_owner}\
          \x20   // SAFETY: non-null handle owned by the caller.\n\
          \x20   unsafe {{ wgpu{pascal}Release({param}.cast()) }}\n\
          {cleanup}\

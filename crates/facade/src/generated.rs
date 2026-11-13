@@ -7032,7 +7032,9 @@ pub extern "C" fn subscript_typegpu_device_get_queue(device: SubscriptTypegpuDev
         return std::ptr::null_mut();
     }
     // SAFETY: non-null handle owned by the caller.
-    unsafe { wgpuDeviceGetQueue(device.cast()).cast() }
+    let acquired = unsafe { wgpuDeviceGetQueue(device.cast()).cast() };
+    runtime::inherit_handle_instance(device as usize, acquired as usize);
+    acquired
 }
 
 /// `subscript-typegpu.h`: forwards to `wgpuDeviceDestroy`.
@@ -8112,7 +8114,9 @@ pub extern "C" fn subscript_typegpu_compute_pipeline_get_bind_group_layout(compu
         return std::ptr::null_mut();
     }
     // SAFETY: non-null handle owned by the caller.
-    unsafe { wgpuComputePipelineGetBindGroupLayout(computePipeline.cast(), groupIndex).cast() }
+    let acquired = unsafe { wgpuComputePipelineGetBindGroupLayout(computePipeline.cast(), groupIndex).cast() };
+    runtime::inherit_handle_instance(computePipeline as usize, acquired as usize);
+    acquired
 }
 
 /// `subscript-typegpu.h`: forwards a borrowed label string view.
@@ -8133,7 +8137,9 @@ pub extern "C" fn subscript_typegpu_render_pipeline_get_bind_group_layout(render
         return std::ptr::null_mut();
     }
     // SAFETY: non-null handle owned by the caller.
-    unsafe { wgpuRenderPipelineGetBindGroupLayout(renderPipeline.cast(), groupIndex).cast() }
+    let acquired = unsafe { wgpuRenderPipelineGetBindGroupLayout(renderPipeline.cast(), groupIndex).cast() };
+    runtime::inherit_handle_instance(renderPipeline as usize, acquired as usize);
+    acquired
 }
 
 /// `subscript-typegpu.h`: forwards a borrowed label string view.
@@ -8942,6 +8948,7 @@ pub extern "C" fn subscript_typegpu_query_set_release(querySet: SubscriptTypegpu
     if querySet.is_null() {
         return;
     }
+    runtime::release_handle_instance(querySet as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuQuerySetRelease(querySet.cast()) }
 }
@@ -8952,6 +8959,7 @@ pub extern "C" fn subscript_typegpu_render_bundle_release(renderBundle: Subscrip
     if renderBundle.is_null() {
         return;
     }
+    runtime::release_handle_instance(renderBundle as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuRenderBundleRelease(renderBundle.cast()) }
 }
@@ -8962,6 +8970,7 @@ pub extern "C" fn subscript_typegpu_render_bundle_encoder_release(renderBundleEn
     if renderBundleEncoder.is_null() {
         return;
     }
+    runtime::release_handle_instance(renderBundleEncoder as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuRenderBundleEncoderRelease(renderBundleEncoder.cast()) }
 }
@@ -8972,6 +8981,7 @@ pub extern "C" fn subscript_typegpu_command_buffer_release(commandBuffer: Subscr
     if commandBuffer.is_null() {
         return;
     }
+    runtime::release_handle_instance(commandBuffer as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuCommandBufferRelease(commandBuffer.cast()) }
 }
@@ -8982,6 +8992,7 @@ pub extern "C" fn subscript_typegpu_render_pass_encoder_release(renderPassEncode
     if renderPassEncoder.is_null() {
         return;
     }
+    runtime::release_handle_instance(renderPassEncoder as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuRenderPassEncoderRelease(renderPassEncoder.cast()) }
 }
@@ -8992,6 +9003,7 @@ pub extern "C" fn subscript_typegpu_compute_pass_encoder_release(computePassEnco
     if computePassEncoder.is_null() {
         return;
     }
+    runtime::release_handle_instance(computePassEncoder as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuComputePassEncoderRelease(computePassEncoder.cast()) }
 }
@@ -9002,6 +9014,7 @@ pub extern "C" fn subscript_typegpu_command_encoder_release(commandEncoder: Subs
     if commandEncoder.is_null() {
         return;
     }
+    runtime::release_handle_instance(commandEncoder as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuCommandEncoderRelease(commandEncoder.cast()) }
 }
@@ -9012,6 +9025,7 @@ pub extern "C" fn subscript_typegpu_render_pipeline_release(renderPipeline: Subs
     if renderPipeline.is_null() {
         return;
     }
+    runtime::release_handle_instance(renderPipeline as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuRenderPipelineRelease(renderPipeline.cast()) }
 }
@@ -9022,6 +9036,7 @@ pub extern "C" fn subscript_typegpu_compute_pipeline_release(computePipeline: Su
     if computePipeline.is_null() {
         return;
     }
+    runtime::release_handle_instance(computePipeline as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuComputePipelineRelease(computePipeline.cast()) }
 }
@@ -9032,6 +9047,7 @@ pub extern "C" fn subscript_typegpu_shader_module_release(shaderModule: Subscrip
     if shaderModule.is_null() {
         return;
     }
+    runtime::release_handle_instance(shaderModule as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuShaderModuleRelease(shaderModule.cast()) }
 }
@@ -9042,6 +9058,7 @@ pub extern "C" fn subscript_typegpu_pipeline_layout_release(pipelineLayout: Subs
     if pipelineLayout.is_null() {
         return;
     }
+    runtime::release_handle_instance(pipelineLayout as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuPipelineLayoutRelease(pipelineLayout.cast()) }
 }
@@ -9052,6 +9069,7 @@ pub extern "C" fn subscript_typegpu_bind_group_release(bindGroup: SubscriptTypeg
     if bindGroup.is_null() {
         return;
     }
+    runtime::release_handle_instance(bindGroup as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuBindGroupRelease(bindGroup.cast()) }
 }
@@ -9062,6 +9080,7 @@ pub extern "C" fn subscript_typegpu_bind_group_layout_release(bindGroupLayout: S
     if bindGroupLayout.is_null() {
         return;
     }
+    runtime::release_handle_instance(bindGroupLayout as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuBindGroupLayoutRelease(bindGroupLayout.cast()) }
 }
@@ -9072,6 +9091,7 @@ pub extern "C" fn subscript_typegpu_sampler_release(sampler: SubscriptTypegpuSam
     if sampler.is_null() {
         return;
     }
+    runtime::release_handle_instance(sampler as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuSamplerRelease(sampler.cast()) }
 }
@@ -9082,6 +9102,7 @@ pub extern "C" fn subscript_typegpu_texture_view_release(textureView: SubscriptT
     if textureView.is_null() {
         return;
     }
+    runtime::release_handle_instance(textureView as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuTextureViewRelease(textureView.cast()) }
 }
@@ -9092,6 +9113,7 @@ pub extern "C" fn subscript_typegpu_texture_release(texture: SubscriptTypegpuTex
     if texture.is_null() {
         return;
     }
+    runtime::release_handle_instance(texture as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuTextureRelease(texture.cast()) }
 }
@@ -9102,6 +9124,7 @@ pub extern "C" fn subscript_typegpu_buffer_release(buffer: SubscriptTypegpuBuffe
     if buffer.is_null() {
         return;
     }
+    runtime::release_handle_instance(buffer as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuBufferRelease(buffer.cast()) }
 }
@@ -9112,6 +9135,7 @@ pub extern "C" fn subscript_typegpu_queue_release(queue: SubscriptTypegpuQueue) 
     if queue.is_null() {
         return;
     }
+    runtime::release_handle_instance(queue as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuQueueRelease(queue.cast()) }
 }
@@ -9122,6 +9146,7 @@ pub extern "C" fn subscript_typegpu_device_release(device: SubscriptTypegpuDevic
     if device.is_null() {
         return;
     }
+    runtime::release_handle_instance(device as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuDeviceRelease(device.cast()) }
     runtime::release_device_events(device as usize);
@@ -9134,6 +9159,7 @@ pub extern "C" fn subscript_typegpu_adapter_release(adapter: SubscriptTypegpuAda
     if adapter.is_null() {
         return;
     }
+    runtime::release_handle_instance(adapter as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuAdapterRelease(adapter.cast()) }
     runtime::release_adapter_info_strings(adapter as usize);

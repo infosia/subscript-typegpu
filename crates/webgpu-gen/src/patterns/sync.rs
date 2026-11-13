@@ -343,7 +343,10 @@ pub(crate) fn rust_sync_export(op: &SyncOp, drain_callbacks: bool) -> String {
         ),
         SyncRet::Handle(target) => (
             format!(" -> {}", naming::subscript_typegpu_type(target)),
-            format!("    unsafe {{ {}({call_args}).cast() }}\n", op.wgpu_fn),
+            format!(
+                "    let acquired = unsafe {{ {}({call_args}).cast() }};\n    runtime::inherit_handle_instance({recv} as usize, acquired as usize);\n    acquired\n",
+                op.wgpu_fn
+            ),
         ),
         SyncRet::Scalar(s) => (
             format!(" -> {}", s.rust_name()),

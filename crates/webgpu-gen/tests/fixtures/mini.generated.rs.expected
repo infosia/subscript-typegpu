@@ -539,6 +539,7 @@ pub extern "C" fn subscript_typegpu_part_release(part: SubscriptTypegpuPart) {
     if part.is_null() {
         return;
     }
+    runtime::release_handle_instance(part as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuPartRelease(part.cast()) }
 }
@@ -549,6 +550,7 @@ pub extern "C" fn subscript_typegpu_gizmo_release(gizmo: SubscriptTypegpuGizmo) 
     if gizmo.is_null() {
         return;
     }
+    runtime::release_handle_instance(gizmo as usize);
     // SAFETY: non-null handle owned by the caller.
     unsafe { wgpuGizmoRelease(gizmo.cast()) }
 }
