@@ -791,3 +791,10 @@ Evidence: `tools/gate.sh --require-backend` green, 395 s, 359 passed, 1 ignored 
 
 Four subscript commits, §275: a Worker Context spawns no Worker. No source change here.
 Evidence: `tools/gate.sh --require-backend` green, 414 s, 358 passed, 1 ignored (live).
+
+### Re-pin to `f8e6d15` (2026-11-15)
+
+36 subscript commits, §276–§293: test and gate scheduling (§276–§283) and lambda rules
+(§284–§293: self-calls, void result inference, async void lambdas, defaults, one environment
+per group). No source change here.
+Evidence: `tools/gate.sh --require-backend` green, 418 s, 358 passed, 1 ignored (live).
