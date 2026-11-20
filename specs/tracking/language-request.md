@@ -798,3 +798,19 @@ Evidence: `tools/gate.sh --require-backend` green, 414 s, 358 passed, 1 ignored 
 (§284–§293: self-calls, void result inference, async void lambdas, defaults, one environment
 per group). No source change here.
 Evidence: `tools/gate.sh --require-backend` green, 418 s, 358 passed, 1 ignored (live).
+
+### Re-pin to `9db9f08e` (2026-11-20)
+
+105 subscript commits, §294–§341. §341 moves the subscript front end
+from `swc_ecma_parser` to the `oxc` fork
+https://github.com/infosia/oxc (`43ad6ed`); subscript no longer pins
+`serde`, so this workspace drops its exact `serde` pin. Source changes
+here: `hir::ExprKind::Global` carries a shared-storage flag (§304,
+§322), so seven patterns in `crates/typegpu-gen/src/kernel.rs` and two
+in `crates/harness/tests/simulate/mod.rs` take `, _`; the bindgen
+output gains `order=count-first` on each `const=true` member and one
+new `bindGroupLayouts` annotation (§324, §325), so
+`lib/subscript-typegpu.generated.d.ts` is regenerated
+(`tools/regen.sh`).
+Evidence: `tools/gate.sh --require-backend` green, 636 s, 358 passed,
+1 ignored (live).

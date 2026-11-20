@@ -439,7 +439,7 @@ struct KernelGlobal {
 
 /// Collects the declaration symbols of the module-level declarations that `expr` reads.
 fn global_names_expr(expr: &Expr, out: &mut BTreeSet<Symbol>) {
-    if let ExprKind::Global(name) = &expr.kind {
+    if let ExprKind::Global(name, _) = &expr.kind {
         out.insert(name.clone());
     }
     match &expr.kind {
@@ -1560,7 +1560,7 @@ fn fold_constant_expr(
             }
         }
         ExprKind::Bool(value) => Ok(FoldedConstant::Bool(*value)),
-        ExprKind::Global(name) => fold_global_constant(module, globals, cache, visiting, name),
+        ExprKind::Global(name, _) => fold_global_constant(module, globals, cache, visiting, name),
         ExprKind::Unary { op, operand } => {
             let operand = fold_constant_expr(module, globals, cache, visiting, operand)?;
             match (op, operand) {
@@ -1732,7 +1732,7 @@ fn constant_snippet(
         ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) => {
             Ok(Snippet::atom(literal(expr)?))
         }
-        ExprKind::Global(symbol) => {
+        ExprKind::Global(symbol, _) => {
             let global = globals.get(symbol).ok_or_else(|| {
                 generator_diagnostic(
                     format!(
@@ -2336,7 +2336,7 @@ impl<'a> Emitter<'a> {
     /// of a private or workgroup variable (K20).
     fn global_root(&self, expr: &Expr) -> Option<KernelGlobal> {
         match &expr.kind {
-            ExprKind::Global(name) => self.globals.get(name).cloned(),
+            ExprKind::Global(name, _) => self.globals.get(name).cloned(),
             ExprKind::Field { obj, .. } | ExprKind::Index { obj, .. } => self.global_root(obj),
             ExprKind::Call {
                 callee: Callee::Method { recv, name },
@@ -2354,7 +2354,7 @@ impl<'a> Emitter<'a> {
     ///
     /// A module constant gives `None`, because a constant carries no accessor methods.
     fn wrapper_ref(&self, expr: &Expr) -> Option<KernelGlobal> {
-        let ExprKind::Global(name) = &expr.kind else {
+        let ExprKind::Global(name, _) = &expr.kind else {
             return None;
         };
         self.globals.get(name).and_then(|global| {
@@ -2577,7 +2577,7 @@ impl<'a> Emitter<'a> {
                 Ok(Snippet::atom(name.clone()))
             }
             ExprKind::Local(name, _, _) => Ok(Snippet::atom(self.local_name(name))),
-            ExprKind::Global(symbol) => {
+            ExprKind::Global(symbol, _) => {
                 let Some(global) = self.globals.get(symbol) else {
                     return Err(generator_diagnostic(
                         format!(
@@ -4009,7 +4009,7 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
             ExprKind::Local(name, _, _) => self.locals.get(name).cloned().unwrap_or_else(|| {
                 UniformityTaint::NonUniform(format!("local or parameter `{name}`"))
             }),
-            ExprKind::Global(name) => match self.emitter.globals.get(name) {
+            ExprKind::Global(name, _) => match self.emitter.globals.get(name) {
                 Some(KernelGlobal {
                     kind: KernelGlobalKind::Constant(_),
                     ..

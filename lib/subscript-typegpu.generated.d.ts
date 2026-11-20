@@ -41,24 +41,25 @@
 // @subscript-c-cenum typedef="SubscriptTypegpuErrorFilter" alias="GPUErrorFilter"
 // @subscript-c-cenum typedef="SubscriptTypegpuDeviceLostReason" alias="GPUDeviceLostReason"
 // @subscript-c-cenum typedef="SubscriptTypegpuFeatureName" alias="GPUFeatureName"
-// @subscript-c-member aggregate="SubscriptTypegpuTextureDescriptor" member="viewFormats" const=true
-// @subscript-c-member aggregate="SubscriptTypegpuBindGroupLayoutDescriptor" member="entries" const=true
-// @subscript-c-member aggregate="SubscriptTypegpuBindGroupDescriptor" member="entries" const=true
-// @subscript-c-member aggregate="SubscriptTypegpuComputeState" member="constants" const=true
-// @subscript-c-member aggregate="SubscriptTypegpuVertexBufferLayout" member="attributes" const=true
-// @subscript-c-member aggregate="SubscriptTypegpuVertexState" member="constants" const=true
-// @subscript-c-member aggregate="SubscriptTypegpuVertexState" member="buffers" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuTextureDescriptor" member="viewFormats" const=true order=count-first
+// @subscript-c-member aggregate="SubscriptTypegpuBindGroupLayoutDescriptor" member="entries" const=true order=count-first
+// @subscript-c-member aggregate="SubscriptTypegpuBindGroupDescriptor" member="entries" const=true order=count-first
+// @subscript-c-member aggregate="SubscriptTypegpuPipelineLayoutDescriptor" member="bindGroupLayouts" const=true order=count-first
+// @subscript-c-member aggregate="SubscriptTypegpuComputeState" member="constants" const=true order=count-first
+// @subscript-c-member aggregate="SubscriptTypegpuVertexBufferLayout" member="attributes" const=true order=count-first
+// @subscript-c-member aggregate="SubscriptTypegpuVertexState" member="constants" const=true order=count-first
+// @subscript-c-member aggregate="SubscriptTypegpuVertexState" member="buffers" const=true order=count-first
 // @subscript-c-member aggregate="SubscriptTypegpuColorTargetState" member="blend" const=true
-// @subscript-c-member aggregate="SubscriptTypegpuFragmentState" member="constants" const=true
-// @subscript-c-member aggregate="SubscriptTypegpuFragmentState" member="targets" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuFragmentState" member="constants" const=true order=count-first
+// @subscript-c-member aggregate="SubscriptTypegpuFragmentState" member="targets" const=true order=count-first
 // @subscript-c-member aggregate="SubscriptTypegpuRenderPipelineDescriptor" member="depthStencil" const=true
 // @subscript-c-member aggregate="SubscriptTypegpuRenderPipelineDescriptor" member="fragment" const=true
-// @subscript-c-member aggregate="SubscriptTypegpuRenderBundleEncoderDescriptor" member="colorFormats" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuRenderBundleEncoderDescriptor" member="colorFormats" const=true order=count-first
 // @subscript-c-member aggregate="SubscriptTypegpuComputePassDescriptor" member="timestampWrites" const=true
-// @subscript-c-member aggregate="SubscriptTypegpuRenderPassDescriptor" member="colorAttachments" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuRenderPassDescriptor" member="colorAttachments" const=true order=count-first
 // @subscript-c-member aggregate="SubscriptTypegpuRenderPassDescriptor" member="depthStencilAttachment" const=true
 // @subscript-c-member aggregate="SubscriptTypegpuRenderPassDescriptor" member="timestampWrites" const=true
-// @subscript-c-member aggregate="SubscriptTypegpuDeviceDescriptor" member="requiredFeatures" const=true
+// @subscript-c-member aggregate="SubscriptTypegpuDeviceDescriptor" member="requiredFeatures" const=true order=count-first
 // @subscript-c-member aggregate="SubscriptTypegpuDeviceDescriptor" member="requiredLimits" const=true
 // @subscript-c-parameter function="subscript_typegpu_adapter_get_limits" parameter="out" const=false
 // @subscript-c-parameter function="subscript_typegpu_adapter_get_info" parameter="out" const=false

@@ -149,7 +149,7 @@ fn assert_pair(
         return;
     };
     let Some(Expr {
-        kind: ExprKind::Global(declaration),
+        kind: ExprKind::Global(declaration, _),
         ..
     }) = args.get(spec_index)
     else {
@@ -171,7 +171,7 @@ fn assert_pair(
     };
     let expected = format!("{}_HOST_RUNNABLE", pipeline.declaration);
     let Some(Expr {
-        kind: ExprKind::Global(constant),
+        kind: ExprKind::Global(constant, _),
         ..
     }) = args.last()
     else {
