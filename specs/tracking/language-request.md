@@ -814,3 +814,10 @@ new `bindGroupLayouts` annotation (§324, §325), so
 (`tools/regen.sh`).
 Evidence: `tools/gate.sh --require-backend` green, 636 s, 358 passed,
 1 ignored (live).
+
+### Re-pin to `ca3fc9ed` (2026-11-20)
+
+One subscript commit: two Windows path defects in the §276 and §340 tests.
+The only crate change is a JIT error message in `codegen/src/jit/output.rs`.
+No source change here. The `oxc` and `regress` fork revisions are unchanged.
+Evidence: `tools/gate.sh --require-backend` green, 477 s, 358 passed, 1 ignored (live).
