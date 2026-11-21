@@ -9,6 +9,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use facade::surface;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use subscript_typegpu_harness::{native as facade, EntryArg, ProgramLoadError, ReloadSession};
 use winit::application::ApplicationHandler;
