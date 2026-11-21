@@ -821,3 +821,11 @@ One subscript commit: two Windows path defects in the §276 and §340 tests.
 The only crate change is a JIT error message in `codegen/src/jit/output.rs`.
 No source change here. The `oxc` and `regress` fork revisions are unchanged.
 Evidence: `tools/gate.sh --require-backend` green, 477 s, 358 passed, 1 ignored (live).
+
+### Re-pin to `072bfb54` (2026-11-22)
+
+Sixteen subscript commits, §342–§346. A `Context` collects automatically by
+default (§342). W001 is retired (§343). §344–§346 correct the collection.
+`Expr::flow_leaves` is removed. This repository does not call it.
+No source change here. The subscript `Cargo.lock` is unchanged.
+Evidence: `tools/gate.sh --require-backend` green, 468 s, 358 passed, 1 ignored (live).
