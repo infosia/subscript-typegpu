@@ -829,3 +829,12 @@ default (§342). W001 is retired (§343). §344–§346 correct the collection.
 `Expr::flow_leaves` is removed. This repository does not call it.
 No source change here. The subscript `Cargo.lock` is unchanged.
 Evidence: `tools/gate.sh --require-backend` green, 468 s, 358 passed, 1 ignored (live).
+
+### Re-pin to `bd817069` (2026-11-22)
+
+Sixteen subscript commits, §347–§350. A collection reclaims a completed
+task that only unreachable objects hold (§348). A Worker has an awaitable
+receive (§349). `Promise.race` lands (§350). `ExprKind::AsyncAll` gains a
+`mode` field and `WorkerFn` gains `Receive`. This repository reads neither.
+No source change here. The subscript `Cargo.lock` is unchanged.
+Evidence: `tools/gate.sh --require-backend` green, 512 s, 358 passed, 1 ignored (live).
