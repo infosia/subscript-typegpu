@@ -838,3 +838,13 @@ receive (§349). `Promise.race` lands (§350). `ExprKind::AsyncAll` gains a
 `mode` field and `WorkerFn` gains `Receive`. This repository reads neither.
 No source change here. The subscript `Cargo.lock` is unchanged.
 Evidence: `tools/gate.sh --require-backend` green, 512 s, 358 passed, 1 ignored (live).
+
+### Re-pin to `31e14f1c` (2026-11-23)
+
+Eleven subscript commits, §351–§353. A return into a recursion reaches a
+poll before it allocates (§351). A generator resume is a call in the poll
+graph (§352). A host reads the count and the time of collections (§353).
+`ReloadSession` gains `live_bytes`, `collection_stats`, and
+`reset_collection_stats`. This repository calls none of them.
+No source change here. The subscript `Cargo.lock` is unchanged.
+Evidence: `tools/gate.sh --require-backend` green, 497 s, 358 passed, 1 ignored (live).
