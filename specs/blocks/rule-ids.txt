@@ -321,19 +321,25 @@ W3 Rev 2
 W13 Rev 2
 W3 Rev 3
 W13 Rev 3
+W2 Rev 6
+W13 Rev 4
 EX2 Rev 2
 UI20
+UI1 Rev 1
+UI2 Rev 3
 UI4 Rev 2
 UI4 Rev 3
 UI6 Rev 1
 UI8 Rev 1
 UI9 Rev 1
+UI10 Rev 1
 UI11 Rev 1
 UI12 Rev 1
 UI12 Rev 2
 UI13 Rev 1
 UI14 Rev 1
 UI14 Rev 2
+UI14 Rev 3
 UI15 Rev 1
 UI15 Rev 2
 UI15 Rev 3
@@ -341,7 +347,10 @@ UI15 Rev 4
 UI15 Rev 5
 UI15 Rev 6
 UI15 Rev 7
+UI15 Rev 8
+UI15 Rev 9
 UI17 Rev 1
+UI17 Rev 2
 UI18 Rev 1
 EG10 Rev 1
 LB1

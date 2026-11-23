@@ -246,3 +246,16 @@ tier, 480 frames of 512 rects: median 66 ms before, 29 ms after, with
 identical bytes. Phase review: 1 MAJOR (the evidence), closed, and
 4 MINOR (1 fixed, 3 accepted). Evidence: gate green, 380 passed,
 1 ignored, 479 s. Record: `specs/tracking/p20-ui-quad-bytes.md`.
+
+## P21 — sharp UI text (2026-11-23)
+
+The window host passes the scale factor through the optional `scale`
+entry (W2 Rev 6). The UI lays out in logical pixels, and `uiScissor`
+maps clips to physical pixels (UI15 Rev 8). `crates/ui-atlas`
+rasterizes Roboto Medium at twice the logical size into a 4-bit run
+encoded atlas, sampled with a linear filter (UI2 Rev 3). The atlas
+string has no measurable compile cost. Phase review: 2 MAJOR and
+7 MINOR, the MAJOR findings closed. Evidence: gate green, 384 passed,
+1 ignored, 499 s; live green on Metal, 196 s; the owner's window run
+on a scale-2 display. Open: scale 1 visual check, Windows
+regeneration. Record: `specs/tracking/p21-sharp-ui-text.md`.

@@ -973,6 +973,38 @@ Exit:
 The record is
 `specs/tracking/p20-ui-quad-bytes.md`.
 
+### P21 — sharp UI text (after P20)
+
+Owner report (2026-11-23): UI text looks coarse. The code at `d9a7582`
+shows two causes. The window host configures the surface in
+physical pixels and the UI lays out in those pixels, so on a scale-2
+display the text is half its intended size. The font is microui's
+128x128 bitmap atlas, with glyphs 17 pixels high. Owner decision
+(2026-11-23): fix both, with Roboto (Apache-2.0) as the font. The
+survey is `specs/tracking/p21-sharp-ui-text.md`.
+
+Slice 1 — logical pixels (`window.md` W2 Rev 6, `ui.md` UI15 Rev 8,
+UI17 Rev 2). The host passes the scale factor through an optional
+`scale` entry. The renderer maps the logical layout to the physical
+target.
+
+Slice 2 — the TTF atlas (`ui.md` UI1 Rev 1, UI2 Rev 3, UI10 Rev 1,
+UI14 Rev 3, UI15 Rev 9). A generator crate rasterizes Roboto at twice the logical
+size with `ab_glyph`, which `Cargo.lock` already holds. The atlas
+stays a compiled constant in a compact encoding.
+
+Exit:
+
+- slice 1: gate-green with no golden moved, a `b24` check of
+  `uiScissor` at scale 2, a W13 red for a wrong `scale` signature,
+  and a 30-frame `ui-demo` run on a scale-2 display;
+- slice 2: the regeneration gate byte-identical, `b23` and `b24`
+  goldens moved only on lines that a glyph width or the vertex
+  checksum decides, `x24` green on Metal, and the per-program
+  compile time of `b24` recorded against the P20 value;
+- the owner's visual check of `ui-demo` at scale 1 and 2;
+- a phase review with no open CRITICAL or MAJOR.
+
 ### U0–U4 — the immediate-mode GUI (branch `imgui`, after P16)
 
 Owner decision 2026-09-05: an immediate-mode GUI authored in

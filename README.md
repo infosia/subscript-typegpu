@@ -135,8 +135,10 @@ tools/window.sh examples/boids/main.ts
 A windowed program exports three functions the host calls: `init`
 once, `frame` once per displayed frame (with the size, one key
 scalar, and the pointer), and `shutdown` once. A program that also
-exports `wheel`, `keyDown`, `keyUp`, or `textInput` receives those
-events before each frame.
+exports `wheel`, `keyDown`, `keyUp`, or `textInput` receives queued
+input before each frame. The fifth optional entry, `scale`, receives
+the window's scale factor after `init` and any change before the next
+frame's queued input.
 
 ## Examples
 
@@ -146,7 +148,8 @@ and more. Each file states what it shows and where it differs from
 the TypeGPU original. `examples/ui-demo` is a port of
 [microui](https://github.com/rxi/microui)'s demo: an immediate-mode
 GUI authored in subscript (`lib/typegpu-ui.ts`) and drawn through
-one TypeGPU render pipeline.
+one TypeGPU render pipeline. The renderer draws text from a Roboto
+Medium atlas at two texels per logical pixel on each axis.
 
 ## Documents
 

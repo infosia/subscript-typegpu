@@ -1,18 +1,14 @@
 //! The command-line driver of the TypeGPU generator.
 //!
 //! `gen <program.ts> --lib <dir> -o <dir>` writes the support module and one `.wgsl` file per
-//! pipeline declaration. `ui-atlas <repo-root>` writes the generated atlas module. The harness
-//! calls the library instead, in process.
+//! pipeline declaration. The harness calls the library in process.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use subscript_compiler::SourceFile;
 
-/// Runs one subcommand and writes its output files.
-///
-/// `ui-atlas` writes the atlas module (UI2). `gen` writes the support module and one `.wgsl` file
-/// per pipeline declaration (SC13, K16).
+/// Writes the support module and one WGSL file per pipeline declaration (SC13, K16).
 ///
 /// # Errors
 ///
@@ -22,19 +18,6 @@ fn run() -> Result<(), String> {
     const USAGE: &str = "usage: subscript-typegpu-gen gen <program.ts> --lib <dir> -o <dir>";
     let mut arguments = std::env::args_os().skip(1);
     let command = arguments.next();
-    if command.as_deref() == Some(std::ffi::OsStr::new("ui-atlas")) {
-        let root = arguments
-            .next()
-            .map(PathBuf::from)
-            .ok_or("usage: subscript-typegpu-gen ui-atlas <repo-root>")?;
-        if arguments.next().is_some() {
-            return Err("usage: subscript-typegpu-gen ui-atlas <repo-root>".to_owned());
-        }
-        let module = subscript_typegpu_gen::generate_ui_atlas(&root)?;
-        let destination = root.join("lib/typegpu-ui-atlas.generated.ts");
-        return std::fs::write(&destination, module)
-            .map_err(|error| format!("write {}: {error}", destination.display()));
-    }
     if command.as_deref() != Some(std::ffi::OsStr::new("gen")) {
         return Err(USAGE.to_owned());
     }

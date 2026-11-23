@@ -8,7 +8,8 @@ Rev 2, W13 Rev 2 optional input entries), 2026-09-05. Rev 6 (W3 Rev 3, W13
 Rev 3 from the U3 review), 2026-09-05. Rev 7 (W5 Rev 1, W9 Rev 2 from the
 comment pass), 2026-09-07. Rev 8 (W2 Rev 4: the static factory
 `GPUHostOwnedDevice.create`), 2026-10-27. Rev 9 (W2 Rev 5: the
-host-owned device caches its queue), 2026-10-30. Plan §8 P9 and
+host-owned device caches its queue), 2026-10-30. Rev 10 (W2 Rev 6,
+W13 Rev 4: the scale entry), 2026-11-23. Plan §8 P9 and
 §8 U3 govern this block. The
 facade side is `facade.md` L14 and `facade-generator.md` F23. The
 script side is the API layer (`api-layer.md`) and the TypeGPU layer.
@@ -52,6 +53,14 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   as before. The signature test accepts the three required entries
   plus any subset of the four optional ones, each with its exact
   signature, and no other export.
+  Rev 6, 2026-11-23 (P21): a fifth optional entry,
+  `scale(factor: f32): void`. If the script exports it, the host
+  calls it once after `init` and before the first `frame`, with the
+  window's scale factor (physical pixels per logical pixel). If the
+  factor changes, the host calls it again before the next `frame`
+  and before the queued input of that frame. The `frame` size and the
+  pointer position stay in surface pixels. A script that draws in
+  logical pixels divides them by the factor.
 - **W3 — The host translates input, the script decides.** Rev 1.
   The host handles five window events: close ends the loop, resize
   reconfigures the surface, a key press stores the key's Unicode
@@ -167,7 +176,8 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   Rev 3: a headless example exports `main` and nothing else, and the
   test carries a demonstrated red for an unexpected export, a
   missing required entry, a wrong `frame` signature, a zero-arity
-  optional entry, and an `async` optional entry), a harness test that compiles the example on the
+  optional entry, and an `async` optional entry; Rev 4: `scale` by
+  its exact signature, with a red for a wrong `scale` signature), a harness test that compiles the example on the
   dev tier through the same path the host uses (support module
   generated in memory, every `lib/` file loaded) without a device,
   `cargo build --offline -p subscript-typegpu-window`, and `cargo

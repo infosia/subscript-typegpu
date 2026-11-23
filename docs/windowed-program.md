@@ -129,7 +129,7 @@ is this host's choice, and the three lists below separate the two.
 - `winit`, a 960 by 640 window, and the Fifo present mode.
 - The format preference, `bgra8unorm` before the first listed format.
 - One key scalar per frame, three button bits, and 30 pixels per wheel line.
-- The four optional input entries, the `--frames` limit, and the
+- The five optional entries for input and scale, the `--frames` limit, and the
   `window:frames=<n>` line.
 
 ### Six steps for a host of your own
@@ -509,8 +509,8 @@ holds.
 
 The host stores one Unicode scalar for the last key press and clears the slot
 after each presented frame. 32 is the space scalar. This is the whole keyboard
-surface of the required entries. The section on input below names the four
-optional entries that carry more.
+surface of the required entries. The optional `keyDown`, `keyUp`, and
+`textInput` entries deliver individual keyboard events.
 
 ### The pass
 
@@ -640,7 +640,8 @@ flowchart TD
     I --> J["mark the run initialized"]
     J --> K["call init"]
     K --> L["drain the async work"]
-    L --> M["request the first redraw"]
+    L --> S["call scale with the window factor if exported"]
+    S --> M["request the first redraw"]
 ```
 
 Two details in that flow explain script code you read earlier.
@@ -720,6 +721,7 @@ returns.
 |---|---|
 | `CloseRequested` | records success and asks the loop to exit |
 | `Resized` with a non-zero size | reconfigures the surface at the new size |
+| `ScaleFactorChanged` | stores the latest factor for delivery before the next frame's queued input |
 | `KeyboardInput`, press | stores the key scalar, queues a modifier bit and the produced text |
 | `KeyboardInput`, release | queues the modifier bit for `keyUp` |
 | `MouseWheel` | queues a wheel delta, 30 pixels per line |
@@ -748,7 +750,8 @@ flowchart TD
     B -->|Outdated| D["reconfigure at the current size, skip the frame"]
     B -->|Lost or Error| E["one message, exit with a non-zero code"]
     B -->|SuccessOptimal or SuccessSuboptimal| F["create the default view"]
-    F --> G["deliver the queued input events"]
+    F --> S["deliver the latest scale change if present"]
+    S --> G["deliver the queued input events"]
     G --> H["call frame with the view, the size, and the input"]
     H --> I["wgpuSurfacePresent"]
     I --> J["release the view and the texture"]
@@ -819,10 +822,10 @@ code. A compile failure prints the compiler's diagnostics first. The host never
 prints per frame, so a run's output is the script's own output plus at most one
 host line.
 
-### Input beyond one key
+### Optional entries for input and scale
 
-The three entries are required. A script can also export four optional entries,
-and the host calls each one before `frame` for every queued event.
+A script can export any of five optional entries. Before each `frame`, the host
+delivers queued wheel, key, and text events in order through their respective entries.
 
 | Entry | Signature | Carries |
 |---|---|---|
@@ -830,10 +833,18 @@ and the host calls each one before `frame` for every queued event.
 | `keyDown` | `(key: u32): void` | shift 1, control 2, alt 4, backspace 8, return 16 |
 | `keyUp` | `(key: u32): void` | the same bits on release |
 | `textInput` | `(codePoint: u32): void` | one Unicode scalar of produced text |
+| `scale` | `(factor: f32): void` | surface pixels per logical pixel |
 
-A script that exports none of them behaves as this example does. The host drops
-an event whose entry the script does not export. `examples/ui-demo` exports all
-four and feeds them to an immediate-mode GUI.
+If a script exports `scale`, the host calls it after `init` and before the first
+`frame`. When the factor changes, the host delivers the latest value before the
+next frame's queued input. The `frame` width, height, and pointer coordinates
+use surface pixels. A script that lays out in logical pixels divides each of
+those values by the factor.
+
+`examples/ui-demo` exports all five entries. It passes the surface size and the
+factor to `UiRenderer.render`, which computes the logical viewport. The renderer
+draws text from a Roboto Medium atlas with two texels per logical pixel on each
+axis and linear minification and magnification filters.
 
 ## Five rules that shape every line
 
@@ -883,8 +894,7 @@ six. The stride constant carries the arithmetic, so only the counts change.
 - `docs/tutorial.md` walks a compute program with a schema, a layout class, and
   a dispatch.
 - `docs/from-typegpu.md` compares this library with TypeGPU, topic by topic.
-- `examples/ui-demo` drives an immediate-mode GUI through the four optional
-  input entries.
+- `examples/ui-demo` uses all five optional entries for its immediate-mode GUI.
 - `crates/window/src/main.rs` is the host itself. Every function carries a
   comment, and the file reads top to bottom in the order this chapter walks.
 - `specs/blocks/window.md` is the contract this document describes in prose.

@@ -7,3 +7,7 @@
 [submodule "third_party/microui"]
 	path = third_party/microui
 	url = https://github.com/rxi/microui
+[submodule "third_party/imgui"]
+	path = third_party/imgui
+	url = https://github.com/ocornut/imgui
+	shallow = true

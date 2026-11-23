@@ -173,12 +173,22 @@ fn ui_runtime_traps_are_named_and_numbered() {
         "outsideFrame",
         "UIT2 currentContainer frame=0 (author)",
     );
+    assert_trap_export(
+        &directory.join("ui-quad-capacity.ts"),
+        "zeroScissorScale",
+        "UIT1 uiScissor scale=0 (author)",
+    );
     if super::differential::backend_is_available() {
         assert_trap(
             &directory.join("ui-quad-capacity.ts"),
             "UIT1 UiRenderer.build capacity=1 count=2 (author)",
         );
         for (export, expected) in [
+            ("zeroScale", "UIT1 UiRenderer.render scale=0 (author)"),
+            (
+                "nonFiniteScale",
+                "UIT1 UiRenderer.render scale=NaN (author)",
+            ),
             (
                 "zeroCapacity",
                 "UIT1 UiRenderer capacity=0 maximum=16384 (author)",

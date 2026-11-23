@@ -1,7 +1,7 @@
 // Immediate-mode UI state, layout, and draw commands.
 import {
   UI_ATLAS_FONT, UI_ATLAS_RECT_W, UI_ATLAS_RECT_X, UI_ATLAS_RECT_Y, UI_ATLAS_RECT_H,
-  UI_ATLAS_WIDTH, UI_ATLAS_HEIGHT, UI_ATLAS_WHITE, UI_TEXT_HEIGHT, uiAtlasAlpha,
+  UI_ATLAS_WIDTH, UI_ATLAS_HEIGHT, UI_ATLAS_SCALE, UI_ATLAS_WHITE, UI_TEXT_HEIGHT, uiAtlasAlpha,
 } from "./typegpu-ui-atlas.generated";
 import { Vec2f, Vec4f } from "./typegpu-types";
 import {
@@ -464,12 +464,12 @@ export class UiContext {
   drawRect(rect: UiRect, color: u32): void { this.emit(2, rect, color); }
   // Appends an icon command. The renderer centers the atlas glyph inside `rect`.
   drawIcon(icon: i32, rect: UiRect, color: u32): void { this.emit(4, rect, color, icon); }
-  // Returns the pixel width of `text`. A byte outside 32 to 126 adds nothing.
+  // Returns the logical pixel width of `text`. A byte outside 32 to 126 adds nothing.
   textWidth(text: string): i32 {
     let width: i32 = 0;
     for (let i: i32 = 0; i < text.length; i += 1) {
       const byte: i32 = text.charCodeAt(i);
-      if (byte >= 32 && byte <= 126) width += UI_ATLAS_RECT_W[UI_ATLAS_FONT + byte];
+      if (byte >= 32 && byte <= 126) width += UI_ATLAS_RECT_W[UI_ATLAS_FONT + byte] / UI_ATLAS_SCALE;
     }
     return width;
   }
@@ -1044,10 +1044,9 @@ export class UiViewport {
   constructor(public width: f32, public height: f32) {}
 }
 
-// The bind group of the UI pipeline: the viewport uniform, the atlas texture, and
-// the nearest-filter sampler.
+// The UI pipeline binds the logical viewport, the atlas texture, and its linear sampler.
 export class UiRenderLayout {
-  constructor(public viewport: Uniform<UiViewport>, public atlas: Texture2d<f32>, public nearest: Sampler) {}
+  constructor(public viewport: Uniform<UiViewport>, public atlas: Texture2d<f32>, public atlasSampler: Sampler) {}
 }
 
 // The vertex kernel's output and the fragment kernel's input. `color` carries the
@@ -1074,7 +1073,7 @@ export function uiVertex(res: UiRenderLayout, vertex: UiVertex, ctx: VertexInvoc
 // The fragment kernel. It multiplies the vertex alpha by the atlas sample's red
 // channel, so a glyph and a filled rect share one pipeline.
 export function uiFragment(res: UiRenderLayout, input: UiVarying, ctx: FragmentInvocation): Vec4f {
-  const alpha: f32 = res.atlas.sample(res.nearest, input.uv).x;
+  const alpha: f32 = res.atlas.sample(res.atlasSampler, input.uv).x;
   return new Vec4f(input.color.x, input.color.y, input.color.z, input.color.w * alpha);
 }
 
@@ -1104,6 +1103,27 @@ export class UiDrawRange {
   count: u32 = 0;
   clip: UiRect;
   constructor(first: u32, clip: UiRect) { this.first = first; this.clip = uiCopy(clip); }
+}
+
+function uiValidateScale(scale: f32, method: string): void {
+  if (!Number.isFinite(scale as f64) || scale <= 0) uiTrap("UIT1", method, `scale=${scale}`);
+}
+
+function uiTargetEdge(edge: f64, limit: u32): i32 {
+  return Math.max(0.0, Math.min(edge, limit as f64)) as i32;
+}
+
+// Maps a logical clip to whole physical pixels inside the target.
+export function uiScissor(clip: UiRect, width: u32, height: u32, scale: f32): UiRect {
+  uiValidateScale(scale, "uiScissor");
+  const factor: f64 = scale as f64;
+  const x: f64 = clip.x as f64;
+  const y: f64 = clip.y as f64;
+  const left: i32 = uiTargetEdge(Math.floor(x * factor), width);
+  const top: i32 = uiTargetEdge(Math.floor(y * factor), height);
+  const right: i32 = uiTargetEdge(Math.ceil((x + (clip.w as f64)) * factor), width);
+  const bottom: i32 = uiTargetEdge(Math.ceil((y + (clip.h as f64)) * factor), height);
+  return new UiRect(left, top, clip.w > 0 ? right - left : 0, clip.h > 0 ? bottom - top : 0);
 }
 
 function uiValidateRenderer(facts: UiPipelineFacts, capacity: u32): void {
@@ -1167,7 +1187,7 @@ export class UiRenderer {
   private indices: Buffer<u16>;
   private atlas: GPUTexture;
   private atlasView: GPUTextureView;
-  private nearest: GPUSampler;
+  private atlasSampler: GPUSampler;
   private viewport: Buffer<UiViewport>;
   private group: GPUBindGroup;
   private pipeline: RenderPipeline;
@@ -1175,11 +1195,11 @@ export class UiRenderer {
 
   private constructor(queue: GPUQueue, capacity: u32, quadBytes: u32,
     vertices: Buffer<UiVertex>, indices: Buffer<u16>, atlas: GPUTexture,
-    atlasView: GPUTextureView, nearest: GPUSampler, viewport: Buffer<UiViewport>,
+    atlasView: GPUTextureView, atlasSampler: GPUSampler, viewport: Buffer<UiViewport>,
     group: GPUBindGroup, pipeline: RenderPipeline) {
     this.queue = queue; this.capacity = capacity; this.quadBytes = quadBytes;
     this.vertices = vertices; this.indices = indices; this.atlas = atlas;
-    this.atlasView = atlasView; this.nearest = nearest; this.viewport = viewport;
+    this.atlasView = atlasView; this.atlasSampler = atlasSampler; this.viewport = viewport;
     this.group = group; this.pipeline = pipeline;
   }
 
@@ -1200,30 +1220,40 @@ export class UiRenderer {
     const indices = createBuffer<u16, D>(device, 2, capacity * 6, indexUsage, "ui-indices");
     uiUploadRenderer(queue, indices, atlas, capacity);
     const atlasView: GPUTextureView = resources.atlasView;
-    const nearest: GPUSampler = device.createSampler({ minFilter: "nearest", magFilter: "nearest" });
+    const atlasSampler: GPUSampler = device.createSampler({ minFilter: "linear", magFilter: "linear" });
     const viewport = createBuffer<UiViewport, D>(device, resources.viewportStride, 1, viewportUsage, "ui-viewport");
     const pipeline: RenderPipeline = createRenderPipeline(device, facts.wgsl, facts.vertexEntry,
       facts.fragmentEntry, [facts.layout], [facts.vertexLayout], facts.spec);
     using layout = pipeline.bindGroupLayout(0);
     const group: GPUBindGroup = createBindGroup(device, layout, facts.layout, [
-      bufferResource(viewport.handle()), textureResource(atlasView), samplerResource(nearest),
+      bufferResource(viewport.handle()), textureResource(atlasView), samplerResource(atlasSampler),
     ]);
     return new UiRenderer(queue, capacity, 4 * resources.vertexStride, vertices, indices, atlas, atlasView,
-      nearest, viewport, group, pipeline);
+      atlasSampler, viewport, group, pipeline);
   }
 
   private quad(x: i32, y: i32, w: i32, h: i32, atlas: i32, color: u32): void {
     const count: u32 = this.quadCount + 1;
     if (count > this.capacity) uiTrap("UIT1", "UiRenderer.build", `capacity=${this.capacity} count=${count}`);
-    const u: f32 = (UI_ATLAS_RECT_X[atlas] as f32) / (UI_ATLAS_WIDTH as f32);
-    const v: f32 = (UI_ATLAS_RECT_Y[atlas] as f32) / (UI_ATLAS_HEIGHT as f32);
-    const right: f32 = ((UI_ATLAS_RECT_X[atlas] + UI_ATLAS_RECT_W[atlas]) as f32) / (UI_ATLAS_WIDTH as f32);
-    const bottom: f32 = ((UI_ATLAS_RECT_Y[atlas] + UI_ATLAS_RECT_H[atlas]) as f32) / (UI_ATLAS_HEIGHT as f32);
+    let left: i32 = UI_ATLAS_RECT_X[atlas];
+    let top: i32 = UI_ATLAS_RECT_Y[atlas];
+    let right: i32 = left + UI_ATLAS_RECT_W[atlas];
+    let bottom: i32 = top + UI_ATLAS_RECT_H[atlas];
+    if (atlas == UI_ATLAS_WHITE) {
+      left += UI_ATLAS_RECT_W[atlas] / 2;
+      top += UI_ATLAS_RECT_H[atlas] / 2;
+      right = left;
+      bottom = top;
+    }
+    const u: f32 = (left as f32) / (UI_ATLAS_WIDTH as f32);
+    const v: f32 = (top as f32) / (UI_ATLAS_HEIGHT as f32);
+    const uRight: f32 = (right as f32) / (UI_ATLAS_WIDTH as f32);
+    const vBottom: f32 = (bottom as f32) / (UI_ATLAS_HEIGHT as f32);
     const values: FixedArray<UiVertex, 4> = [
       new UiVertex(new Vec2f(x as f32, y as f32), new Vec2f(u, v), color),
-      new UiVertex(new Vec2f((x + w) as f32, y as f32), new Vec2f(right, v), color),
-      new UiVertex(new Vec2f((x + w) as f32, (y + h) as f32), new Vec2f(right, bottom), color),
-      new UiVertex(new Vec2f(x as f32, (y + h) as f32), new Vec2f(u, bottom), color),
+      new UiVertex(new Vec2f((x + w) as f32, y as f32), new Vec2f(uRight, v), color),
+      new UiVertex(new Vec2f((x + w) as f32, (y + h) as f32), new Vec2f(uRight, vBottom), color),
+      new UiVertex(new Vec2f(x as f32, (y + h) as f32), new Vec2f(u, vBottom), color),
     ];
     const offset: u32 = this.quadCount * this.quadBytes;
     const end: i32 = (offset + this.quadBytes) as i32;
@@ -1255,8 +1285,8 @@ export class UiRenderer {
       if (command.kind == 2) {
         this.quad(command.x, command.y, command.w, command.h, UI_ATLAS_WHITE, command.color);
       } else if (command.kind == 4) {
-        const w: i32 = UI_ATLAS_RECT_W[command.id];
-        const h: i32 = UI_ATLAS_RECT_H[command.id];
+        const w: i32 = UI_ATLAS_RECT_W[command.id] / UI_ATLAS_SCALE;
+        const h: i32 = UI_ATLAS_RECT_H[command.id] / UI_ATLAS_SCALE;
         this.quad(command.x + (command.w - w) / 2, command.y + (command.h - h) / 2,
           w, h, command.id, command.color);
       } else if (command.kind == 3) {
@@ -1265,8 +1295,8 @@ export class UiRenderer {
           const byte: i32 = command.text.charCodeAt(j);
           if (byte >= 32 && byte <= 126) {
             const glyph: i32 = UI_ATLAS_FONT + byte;
-            const w: i32 = UI_ATLAS_RECT_W[glyph];
-            this.quad(x, command.y, w, UI_ATLAS_RECT_H[glyph], glyph, command.color);
+            const w: i32 = UI_ATLAS_RECT_W[glyph] / UI_ATLAS_SCALE;
+            this.quad(x, command.y, w, UI_ATLAS_RECT_H[glyph] / UI_ATLAS_SCALE, glyph, command.color);
             x += w;
           }
         }
@@ -1290,18 +1320,20 @@ export class UiRenderer {
   }
 
   // Builds the frame, writes the buffers, and records one scissored draw per range into
-  // `pass`. `width` and `height` are the render target size in pixels. It restores the
-  // full-viewport scissor before it returns.
-  render(context: UiContext, pass: GPURenderPassEncoder, width: u32, height: u32): void {
+  // `pass`. The target size is in physical pixels. The viewport is in logical pixels.
+  // The method restores the full-target scissor before it returns.
+  render(context: UiContext, pass: GPURenderPassEncoder, width: u32, height: u32, scale: f32 = 1): void {
+    uiValidateScale(scale, "UiRenderer.render");
     this.build(context);
-    this.viewport.write(this.queue, 0, Context.bytesOf<UiViewport>(new UiViewport(width as f32, height as f32)));
+    const viewport = new UiViewport((width as f32) / scale, (height as f32) / scale);
+    this.viewport.write(this.queue, 0, Context.bytesOf<UiViewport>(viewport));
     if (this.quadCount == 0) { pass.setScissorRect(0, 0, width, height); return; }
     this.vertices.write(this.queue, 0, this.vertexBytes);
     this.pipeline.bind(pass, [this.group], [this.vertices.handle()]);
     this.pipeline.setIndexBuffer(pass, this.indices.handle());
     for (let i: i32 = 0; i < this.rangeCount; i += 1) {
       const range: UiDrawRange = this.ranges[i];
-      const clip: UiRect = uiIntersection(range.clip, new UiRect(0, 0, width as i32, height as i32));
+      const clip: UiRect = uiScissor(range.clip, width, height, scale);
       if (clip.w == 0 || clip.h == 0) continue;
       pass.setScissorRect(clip.x as u32, clip.y as u32, clip.w as u32, clip.h as u32);
       pass.drawIndexed(range.count, 1, range.first, 0, 0);
@@ -1311,7 +1343,7 @@ export class UiRenderer {
 
   // Releases every GPU resource that the renderer owns.
   dispose(): void {
-    this.group.dispose(); this.pipeline.dispose(); this.viewport.dispose(); this.nearest.dispose();
+    this.group.dispose(); this.pipeline.dispose(); this.viewport.dispose(); this.atlasSampler.dispose();
     this.atlasView.dispose(); this.atlas.dispose(); this.indices.dispose(); this.vertices.dispose();
   }
   [Symbol.dispose](): void { this.dispose(); }

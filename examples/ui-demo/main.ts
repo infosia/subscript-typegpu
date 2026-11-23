@@ -38,6 +38,7 @@ let logUpdated: boolean = false;
 let wheelX: f32 = 0;
 let wheelY: f32 = 0;
 let previousButtons: u32 = 0;
+let scaleFactor: f32 = 1;
 let ownedDevice: GPUHostOwnedDevice | null = null;
 let renderer: UiRenderer | null = null;
 
@@ -80,7 +81,7 @@ function demoWindow(): void {
   window.rect = new UiRect(window.rect.x, window.rect.y,
     window.rect.w < 240 ? 240 : window.rect.w, window.rect.h < 300 ? 300 : window.rect.h);
   if (ui.header("Window Info") != 0) {
-    // A row of item widths in pixels. A negative width reaches to that many pixels from the
+    // A row of item widths in logical pixels. A negative width reaches to that many pixels from the
     // right edge, and a height of 0 takes the style height.
     ui.layoutRow([54, -1], 0);
     ui.label("Position:");
@@ -210,6 +211,8 @@ export function init(
   renderer = UiRenderer.create(deviceWrapper, facts);
 }
 
+export function scale(factor: f32): void { scaleFactor = factor; }
+
 export function wheel(deltaX: f32, deltaY: f32): void {
   // Host wheel deltas describe motion. The UI scroll offset moves in the opposite direction.
   wheelX -= deltaX;
@@ -243,9 +246,9 @@ export function frame(
   const activeRenderer: UiRenderer | null = renderer;
   if (activeDevice == null) return;
   if (activeRenderer == null) return;
-  const x: i32 = pointerX as i32;
-  const y: i32 = pointerY as i32;
-  // The host reports the pointer in surface pixels, the space the UI layout uses.
+  // The host reports surface pixels. All mouse input uses logical layout coordinates.
+  const x: i32 = Math.floor((pointerX / scaleFactor) as f64) as i32;
+  const y: i32 = Math.floor((pointerY / scaleFactor) as f64) as i32;
   ui.inputMouseMove(x, y);
   // The host reports buttons as level state. microui's SDL loop receives press
   // and release events, so this loop derives the edges.
@@ -270,7 +273,7 @@ export function frame(
   }] });
   // The renderer writes its vertex and index buffers, then records one scissored indexed draw
   // per clip rect. microui's demo walks the same command list in its own renderer.
-  activeRenderer.render(ui, pass, width, height);
+  activeRenderer.render(ui, pass, width, height, scaleFactor);
   pass.end();
   // The GPU runs nothing until the queue receives the command buffer. The host presents the
   // surface after this call returns.

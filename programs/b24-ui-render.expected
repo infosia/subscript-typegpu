@@ -2,7 +2,7 @@ quads 31
 indices 186
 range 0 180 clip 0 0 16777216 16777216
 range 180 6 clip 13 85 88 28
-vertices fnv1a 1253674997
+vertices fnv1a 3079871005
 empty render true
 clip commands true
 clip exit counts true
@@ -20,4 +20,8 @@ frame storage reuse true
 grown frame length true
 grown frame last vertex true
 short frame reuse true
+scissor inner 8 12 20 16
+scissor odd edges 6 10 16 24
+scissor target edge 0 70 101 9
+scissor fractional scale 4 7 13 19
 PASS

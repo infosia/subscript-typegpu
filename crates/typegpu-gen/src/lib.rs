@@ -20,12 +20,9 @@ mod pipeline;
 mod render;
 mod schema;
 mod shell;
-mod ui_atlas;
 
 /// `load_program_files` and its library loader `read_libraries` report failures through `LibraryLoadError`.
 pub use library::{load_program_files, registered_library, support_module_key, LibraryLoadError};
-/// Atlas module generation for the ui library.
-pub use ui_atlas::generate_ui_atlas;
 
 use std::collections::{BTreeMap, BTreeSet};
 

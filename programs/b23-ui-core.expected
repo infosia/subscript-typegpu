@@ -30,7 +30,7 @@ rect 42 86 8 1 #191919ff
 rect 42 107 8 1 #191919ff
 rect 41 86 1 22 #191919ff
 rect 50 86 1 22 #191919ff
-text 140 88 #e6e6e6ff "10.00"
+text 134 88 #e6e6e6ff "10.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -78,7 +78,7 @@ rect 43 86 8 1 #191919ff
 rect 43 107 8 1 #191919ff
 rect 42 86 1 22 #191919ff
 rect 51 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "10.00"
+text 140 88 #e6e6e6ff "10.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -126,7 +126,7 @@ rect 43 86 8 1 #191919ff
 rect 43 107 8 1 #191919ff
 rect 42 86 1 22 #191919ff
 rect 51 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "10.00"
+text 140 88 #e6e6e6ff "10.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -174,7 +174,7 @@ rect 43 86 8 1 #191919ff
 rect 43 107 8 1 #191919ff
 rect 42 86 1 22 #191919ff
 rect 51 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "10.00"
+text 140 88 #e6e6e6ff "10.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -222,7 +222,7 @@ rect 43 86 8 1 #191919ff
 rect 43 107 8 1 #191919ff
 rect 42 86 1 22 #191919ff
 rect 51 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "10.00"
+text 140 88 #e6e6e6ff "10.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -270,7 +270,7 @@ rect 43 86 8 1 #191919ff
 rect 43 107 8 1 #191919ff
 rect 42 86 1 22 #191919ff
 rect 51 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "10.00"
+text 140 88 #e6e6e6ff "10.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -318,7 +318,7 @@ rect 51 86 8 1 #191919ff
 rect 51 107 8 1 #191919ff
 rect 50 86 1 22 #191919ff
 rect 59 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "13.00"
+text 140 88 #e6e6e6ff "13.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -366,7 +366,7 @@ rect 62 86 8 1 #191919ff
 rect 62 107 8 1 #191919ff
 rect 61 86 1 22 #191919ff
 rect 70 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "17.00"
+text 140 88 #e6e6e6ff "17.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -414,7 +414,7 @@ rect 62 86 8 1 #191919ff
 rect 62 107 8 1 #191919ff
 rect 61 86 1 22 #191919ff
 rect 70 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "17.00"
+text 140 88 #e6e6e6ff "17.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -462,7 +462,7 @@ rect 62 86 8 1 #191919ff
 rect 62 107 8 1 #191919ff
 rect 61 86 1 22 #191919ff
 rect 70 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "17.00"
+text 140 88 #e6e6e6ff "17.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -510,7 +510,7 @@ rect 62 86 8 1 #191919ff
 rect 62 107 8 1 #191919ff
 rect 61 86 1 22 #191919ff
 rect 70 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "17.00"
+text 140 88 #e6e6e6ff "17.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -559,7 +559,7 @@ rect 62 86 8 1 #191919ff
 rect 62 107 8 1 #191919ff
 rect 61 86 1 22 #191919ff
 rect 70 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "17.00"
+text 140 88 #e6e6e6ff "17.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -608,7 +608,7 @@ rect 62 86 8 1 #191919ff
 rect 62 107 8 1 #191919ff
 rect 61 86 1 22 #191919ff
 rect 70 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "17.00"
+text 140 88 #e6e6e6ff "17.00"
 text 20 112 #e6e6e6ff "Label"
 icon 2 15 135 20 20 #e6e6e6ff
 text 35 136 #e6e6e6ff "Tree"
@@ -623,7 +623,7 @@ rect 20 184 280 1 #191919ff
 rect 19 163 1 22 #191919ff
 rect 300 163 1 22 #191919ff
 text 25 165 #e6e6e6ff "A"
-rect 32 165 1 18 #e6e6e6ff
+rect 35 165 1 18 #e6e6e6ff
 container 1569369246 10 10 300 400 0 0 3
 state button=0 checkbox=true slider=17.00 text="A" tree=0 checkboxResponse=0 sliderResponse=0 textboxResponse=4
 frame 14
@@ -658,7 +658,7 @@ rect 62 86 8 1 #191919ff
 rect 62 107 8 1 #191919ff
 rect 61 86 1 22 #191919ff
 rect 70 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "17.00"
+text 140 88 #e6e6e6ff "17.00"
 text 20 112 #e6e6e6ff "Label"
 rect 15 135 290 20 #5f5f5fff
 rect 15 134 290 1 #191919ff
@@ -678,7 +678,7 @@ rect 20 184 280 1 #191919ff
 rect 19 163 1 22 #191919ff
 rect 300 163 1 22 #191919ff
 text 25 165 #e6e6e6ff "A"
-rect 32 165 1 18 #e6e6e6ff
+rect 35 165 1 18 #e6e6e6ff
 container 1569369246 10 10 300 400 0 0 3
 state button=0 checkbox=true slider=17.00 text="A" tree=0 checkboxResponse=0 sliderResponse=0 textboxResponse=0
 frame 15
@@ -713,7 +713,7 @@ rect 62 86 8 1 #191919ff
 rect 62 107 8 1 #191919ff
 rect 61 86 1 22 #191919ff
 rect 70 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "17.00"
+text 140 88 #e6e6e6ff "17.00"
 text 20 112 #e6e6e6ff "Label"
 rect 15 135 290 20 #5f5f5fff
 rect 15 134 290 1 #191919ff
@@ -767,7 +767,7 @@ rect 62 86 8 1 #191919ff
 rect 62 107 8 1 #191919ff
 rect 61 86 1 22 #191919ff
 rect 70 86 1 22 #191919ff
-text 146 88 #e6e6e6ff "17.00"
+text 140 88 #e6e6e6ff "17.00"
 text 20 112 #e6e6e6ff "Label"
 rect 15 135 290 20 #5f5f5fff
 rect 15 134 290 1 #191919ff
@@ -859,7 +859,7 @@ rect 198 34 12 114 #2b2b2bff
 rect 198 51 12 41 #1e1e1eff
 rect 10 148 188 12 #2b2b2bff
 rect 17 148 135 12 #1e1e1eff
-clip 10 133 25 15
+clip 10 133 34 15
 text 10 133 #e6e6e6ff "large"
 clip 0 0 16777216 16777216
 container 3106357726 10 10 200 150 10 47 1
@@ -876,7 +876,7 @@ rect 198 34 12 114 #2b2b2bff
 rect 198 51 12 41 #1e1e1eff
 rect 10 148 188 12 #2b2b2bff
 rect 17 148 135 12 #1e1e1eff
-clip 10 133 25 15
+clip 10 133 34 15
 text 10 133 #e6e6e6ff "large"
 clip 0 0 16777216 16777216
 container 3106357726 10 10 200 150 10 47 1

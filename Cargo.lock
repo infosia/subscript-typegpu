@@ -2206,6 +2206,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "subscript-typegpu-ui-atlas"
+version = "0.0.0"
+dependencies = [
+ "ab_glyph",
+]
+
+[[package]]
 name = "subscript-typegpu-webgpu-gen"
 version = "0.0.0"
 dependencies = [

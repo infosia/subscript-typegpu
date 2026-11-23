@@ -6,9 +6,9 @@
 import { uiNumberText, UiContext, UiRect, UiRoot, UiCommand, UiState, UiStyle,
   UI_OPT_ALIGN_CENTER, UI_OPT_ALIGN_RIGHT, UI_OPT_HOLD_FOCUS, UI_OPT_NO_INTERACT, UI_MOUSE_LEFT, UI_MOUSE_RIGHT,
   UI_KEY_SHIFT, UI_KEY_RETURN, UI_ICON_CHECK, UI_COLOR_TEXT } from "./typegpu-ui";
-import { uiAtlasAlpha, UI_ATLAS_ALPHA_HEX, UI_ATLAS_WIDTH, UI_ATLAS_HEIGHT,
+import { uiAtlasAlpha, UI_ATLAS_ALPHA_CODE, UI_ATLAS_WIDTH, UI_ATLAS_HEIGHT,
   UI_ATLAS_RECT_X, UI_ATLAS_RECT_Y, UI_ATLAS_RECT_W, UI_ATLAS_RECT_H,
-  UI_ATLAS_FONT, UI_ATLAS_WHITE, UI_TEXT_HEIGHT } from "./typegpu-ui-atlas.generated";
+  UI_ATLAS_FONT, UI_ATLAS_WHITE, UI_ATLAS_SCALE, UI_TEXT_HEIGHT } from "./typegpu-ui-atlas.generated";
 
 
 export function main(): void {
@@ -78,16 +78,16 @@ function rect(r: UiRect, x: i32, y: i32, w: i32, h: i32): boolean {
 }
 function verifyCore(): void {
   const alpha: u8[] = uiAtlasAlpha();
-  const hex: string = UI_ATLAS_ALPHA_HEX;
-  check(alpha.length == UI_ATLAS_WIDTH * UI_ATLAS_HEIGHT && hex.length == 32768, "atlas size");
+  check(alpha.length == UI_ATLAS_WIDTH * UI_ATLAS_HEIGHT && UI_ATLAS_ALPHA_CODE.length == 21560, "atlas size");
   check(UI_ATLAS_RECT_X.length == 100 && UI_ATLAS_RECT_Y.length == 100
     && UI_ATLAS_RECT_W.length == 100 && UI_ATLAS_RECT_H.length == 100, "atlas rects");
-  check(UI_ATLAS_RECT_X[UI_ATLAS_WHITE] == 125 && UI_ATLAS_RECT_Y[UI_ATLAS_WHITE] == 68
-    && alpha[68 * 128 + 125] == 255 && alpha[16383] == 0, "atlas pixels");
-  check(UI_ATLAS_RECT_W[UI_ATLAS_FONT + 65] == 7 && UI_TEXT_HEIGHT == 18, "glyph A");
+  const white: i32 = UI_ATLAS_RECT_Y[UI_ATLAS_WHITE] * UI_ATLAS_WIDTH + UI_ATLAS_RECT_X[UI_ATLAS_WHITE];
+  check(UI_ATLAS_RECT_W[UI_ATLAS_WHITE] == 6 && UI_ATLAS_RECT_H[UI_ATLAS_WHITE] == 6
+    && alpha[white] == 255 && alpha[alpha.length - 1] == 0, "atlas pixels");
+  check(UI_ATLAS_SCALE == 2 && UI_ATLAS_RECT_W[UI_ATLAS_FONT + 65] == 20 && UI_TEXT_HEIGHT == 18, "glyph A");
   let checksum: u32 = 2166136261;
   for (let i: i32 = 0; i < alpha.length; i += 1) checksum = (checksum ^ (alpha[i] as u32)) * 16777619;
-  check(checksum == 4088512439, "atlas checksum");
+  check(checksum == 1351637657, "atlas checksum");
   const context: UiContext = new UiContext();
   const holder: UiState<i32> = new UiState(7);
   holder.value += 1;
@@ -157,7 +157,7 @@ function verifyCore(): void {
   context.drawRect(new UiRect(5, 5, 10, 10), 0x44332211);
   context.drawIcon(UI_ICON_CHECK, new UiRect(10, 10, 5, 5), 0xffffffff);
   context.drawText("A\n", 17, 10, 0xff0000ff);
-  check(context.textWidth("A\nB") == 14, "text width");
+  check(context.textWidth("A\nB") == 20, "text width");
   context.popClip(); context.popClip(); context.end();
   const lines: string[] = context.dumpCommands();
   check(lines.length == 7 && lines[0] == "clip 10 10 5 5" && lines[1] == "rect 5 5 10 10 #11223344"
@@ -271,7 +271,7 @@ function verifyWidgets(): void {
   ui.inputKeyUp(8); ui.inputKeyUp(UI_KEY_RETURN);
   ui.begin(); ui.beginRoot(root); ui.pushLayout(root.rect);
   check(ui.header("expanded", 4096) == 1, "expanded header");
-  ui.layoutRow([50], 0); ui.text("one two three\nfour");
+  ui.layoutRow([55], 0); ui.text("one two three\nfour");
   ui.drawControlText("A", new UiRect(0, 0, 100, 20), UI_COLOR_TEXT, 1);
   ui.drawControlText("A", new UiRect(0, 0, 100, 20), UI_COLOR_TEXT, 2);
   ui.popLayout(); ui.endRoot(); ui.end();
@@ -280,8 +280,8 @@ function verifyWidgets(): void {
   let right: boolean = false;
   let wrapped: i32 = 0;
   for (let i: i32 = 0; i < lines.length; i += 1) {
-    if (lines[i] == "text 46 1 #e6e6e6ff \"A\"") center = true;
-    if (lines[i] == "text 88 1 #e6e6e6ff \"A\"") right = true;
+    if (lines[i] == "text 45 1 #e6e6e6ff \"A\"") center = true;
+    if (lines[i] == "text 85 1 #e6e6e6ff \"A\"") right = true;
     if (lines[i].includes("\"one two\"") || lines[i].includes("\"three\"") || lines[i].includes("\"four\"")) wrapped += 1;
   }
   check(center && right && wrapped == 3, "aligned and wrapped text");
@@ -291,11 +291,11 @@ function verifyWidgets(): void {
     ui.layoutSetNext(new UiRect(0, 0, 100, 20), false);
     ui.number("aligned number", value, 0.5, opt);
     const numberText: UiCommand = ui.commands[ui.commandCount - 1];
-    check(numberText.kind == 3 && numberText.x == (alignment == 2 ? 74 : 39), "number alignment");
+    check(numberText.kind == 3 && numberText.x == (alignment == 2 ? 64 : 34), "number alignment");
     ui.layoutSetNext(new UiRect(0, 0, 100, 20), false);
     ui.slider("aligned slider", value, 0, 100, 0, opt);
     const sliderText: UiCommand = ui.commands[ui.commandCount - 1];
-    check(sliderText.kind == 3 && sliderText.x == (alignment == 2 ? 74 : 39), "slider alignment");
+    check(sliderText.kind == 3 && sliderText.x == (alignment == 2 ? 64 : 34), "slider alignment");
   }
   ui.popLayout(); ui.endRoot(); ui.end();
   const commands: UiCommand[] = ui.commands;

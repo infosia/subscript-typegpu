@@ -3,7 +3,7 @@
 // exercises: UI14, UI15, UI19, BF1, BF2, RN11, RN18, RN21, TX9
 // questions: none
 
-import { UiContext, UiRoot, UiRect, UiRenderer, UiPipelineFacts, UiRenderLayout, UiVertex, UiVarying, uiVertex, uiFragment, UI_BLEND } from "./typegpu-ui";
+import { UiContext, UiRoot, UiRect, UiRenderer, UiPipelineFacts, UiRenderLayout, UiVertex, UiVarying, uiVertex, uiFragment, uiScissor, UI_BLEND } from "./typegpu-ui";
 import { gpu, GPUAdapter, GPUDevice, GPUTextureUsage } from "./webgpu";
 
 import { Vec2f } from "./typegpu-types";
@@ -18,6 +18,11 @@ const uiPipeline: RenderPipelineSpec = renderPipelineL(
 );
 
 function check(name: string, value: boolean): void { print(`${name} ${value}`); }
+
+function printScissor(name: string, clip: UiRect, scale: f32): void {
+  const rect: UiRect = uiScissor(clip, 101, 79, scale);
+  print(`scissor ${name} ${rect.x} ${rect.y} ${rect.w} ${rect.h}`);
+}
 
 function checkColorClip(renderer: UiRenderer, name: string, color: u32, x: i32, y: i32): void {
   const stride: u32 = Context.bytesOf<UiVertex>(new UiVertex(new Vec2f(0, 0), new Vec2f(0, 0), 0)).length as u32;
@@ -183,6 +188,10 @@ export async function main(): Promise<void> {
     device.queue.submit([command]);
     if (!await device.queue.onSubmittedWorkDone()) { print("FAIL submit"); return; }
     checkFrames(renderer, stride);
+    printScissor("inner", new UiRect(4, 6, 10, 8), 2);
+    printScissor("odd edges", new UiRect(3, 5, 8, 12), 2);
+    printScissor("target edge", new UiRect(-2, 35, 60, 8), 2);
+    printScissor("fractional scale", new UiRect(3, 5, 8, 12), 1.5);
   }
   gpu.dispose();
   print("PASS");

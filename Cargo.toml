@@ -4,6 +4,7 @@ members = [
     "crates/facade",
     "crates/webgpu-gen",
     "crates/typegpu-gen",
+    "crates/ui-atlas",
     "crates/harness",
     "crates/window",
 ]

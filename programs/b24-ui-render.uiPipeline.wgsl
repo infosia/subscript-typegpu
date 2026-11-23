@@ -17,7 +17,7 @@ struct UiVarying {
 
 @group(0u) @binding(0u) var<uniform> viewport: UiViewport;
 @group(0u) @binding(1u) var atlas: texture_2d<f32>;
-@group(0u) @binding(2u) var nearest: sampler;
+@group(0u) @binding(2u) var atlasSampler: sampler;
 
 @vertex
 fn uiVertex(vertex: UiVertex) -> UiVarying {
@@ -26,6 +26,6 @@ fn uiVertex(vertex: UiVertex) -> UiVarying {
 
 @fragment
 fn uiFragment(input: UiVarying) -> @location(0u) vec4<f32> {
-  let alpha = textureSample(atlas, nearest, input.uv).x;
+  let alpha = textureSample(atlas, atlasSampler, input.uv).x;
   return vec4<f32>(input.color.x, input.color.y, input.color.z, input.color.w * alpha);
 }

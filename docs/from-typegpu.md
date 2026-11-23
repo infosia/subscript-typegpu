@@ -833,8 +833,10 @@ These subscript-typegpu properties have no equivalent.
   owns the window, the surface, and the loop. `frame` carries the
   size, one key scalar, the pointer position, and the button bits,
   and a script that exports `wheel`, `keyDown`, `keyUp`, or
-  `textInput` receives those events before each frame. TypeGPU draws
-  into a canvas through `GPUCanvasContext` and reads DOM events.
+  `textInput` receives those events before each frame. The optional
+  `scale` entry receives the window's scale factor after `init` and
+  any change before the next frame's queued input. TypeGPU draws into
+  a canvas through `GPUCanvasContext` and reads DOM events.
 - An immediate-mode GUI: `lib/typegpu-ui.ts` is a port of
   [microui](https://github.com/rxi/microui). Widget calls between
   `begin()` and `end()` produce a command list, and `UiRenderer`

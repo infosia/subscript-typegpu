@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Rev 9 (branch review: UI4 Rev 3, UI9 Rev 1, UI11, UI12 Rev 2, UI15 Rev 5, UI18, UI20), 2026-09-05. Rev 10 (UI2 Rev 1: the alpha is an array of hex chunks, W8), 2026-09-05. Rev 11 (UI6, UI20 from the comment pass), 2026-09-06. Rev 12 (UI2 Rev 2: one string again), 2026-09-10. Rev 13 (UI15: the checker enforces the private constructor), 2026-10-05. Rev 14 (UI15 Rev 6, UI20: one generic factory), 2026-10-30. Rev 15 (UI15 Rev 7: quads write in place), 2026-11-23. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Rev 9 (branch review: UI4 Rev 3, UI9 Rev 1, UI11, UI12 Rev 2, UI15 Rev 5, UI18, UI20), 2026-09-05. Rev 10 (UI2 Rev 1: the alpha is an array of hex chunks, W8), 2026-09-05. Rev 11 (UI6, UI20 from the comment pass), 2026-09-06. Rev 12 (UI2 Rev 2: one string again), 2026-09-10. Rev 13 (UI15: the checker enforces the private constructor), 2026-10-05. Rev 14 (UI15 Rev 6, UI20: one generic factory), 2026-10-30. Rev 15 (UI15 Rev 7: quads write in place), 2026-11-23. Rev 16 (UI15 Rev 8, UI17 Rev 2, UI20: logical pixels and the scale), 2026-11-23. Rev 17 (UI1 Rev 1, UI2 Rev 3, UI10 Rev 1, UI14 Rev 3, UI15 Rev 9: the Roboto atlas), 2026-11-23. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -20,6 +20,8 @@ tiers with no GPU. The renderer is the only GPU code.
   (EX6). Where this block states a number or a rule, microui's
   `src/microui.c` at the pin is the reference. Where this block is
   silent, the pin decides.
+  Rev 1 (2026-11-23, P21): the font is not microui's. UI2 Rev 3
+  names its source. Every other microui number stays.
 - **UI2 — The atlas module is generated.** `subscript-typegpu-gen
   ui-atlas <repo-root>` reads `third_party/microui/demo/atlas.inl`
   and writes `lib/typegpu-ui-atlas.generated.ts` with:
@@ -44,6 +46,50 @@ tiers with no GPU. The renderer is the only GPU code.
   subcommand. A generator test regenerates the module in memory and
   compares it byte for byte with the committed file (core principle
   7).
+  Rev 3 (2026-11-23, P21): the atlas comes from a TrueType font.
+  1. **Source.** `third_party/imgui/misc/fonts/Roboto-Medium.ttf`
+     (Apache-2.0), from the submodule `third_party/imgui`
+     (https://github.com/ocornut/imgui). The module header names the
+     font path, the license, and the pinned commit.
+  2. **The tool.** The crate `crates/ui-atlas`, binary
+     `subscript-typegpu-ui-atlas <repo-root>`, writes the module. It
+     depends on `ab_glyph` with default features off and `std` on.
+     `subscript-typegpu-gen` loses the `ui-atlas` subcommand, so the
+     gate builds no rasterizer into the generator. `tools/regen.sh`
+     runs the new binary. The regeneration test moves to the new
+     crate.
+  3. **Scale.** `UI_ATLAS_SCALE` is 2. The atlas holds every glyph
+     and icon at twice its logical size. `UI_TEXT_HEIGHT` stays 18
+     logical pixels. The font size makes the ascent minus the
+     descent equal to `UI_TEXT_HEIGHT * UI_ATLAS_SCALE` texels.
+  4. **Glyph cells.** A glyph's logical cell is its advance width,
+     rounded to the nearest integer, by `UI_TEXT_HEIGHT`. Its atlas
+     rect is the cell times `UI_ATLAS_SCALE`. The glyph outline sits
+     at its pen origin on the baseline inside the cell, and ink
+     outside the cell is clipped. No kerning applies.
+  5. **Icons.** The four icons keep microui's logical sizes (16x16,
+     18x18, 5x7, 7x5). The tool draws them as outlines at twice that
+     size: a cross for close, a check mark for check, a triangle that
+     points right for collapsed, and a triangle that points down for
+     expanded.
+  6. **The white rect.** A solid block of 6x6 texels. The renderer
+     samples it at its center (UI15 Rev 9).
+  7. **Packing.** The rects keep microui's table order. Each rect has
+     at least two zero texels to every neighbor and to the atlas
+     edge. The atlas is 256 texels wide, and its height is the
+     smallest multiple of 4 that holds every row.
+  8. **Encoding.** Coverage is quantized to 4 bits as
+     `round(coverage * 15)`, and the texel alpha is that value times
+     17. `UI_ATLAS_ALPHA_CODE: string` holds the texels in row order.
+     A hex digit `0` to `f` is one texel with that value. A letter
+     `g` to `z` is a run of 2 to 21 zero texels (`g` is 2). The tool
+     writes a longer zero run as letters for 21 texels and one code
+     for the remainder. `uiAtlasAlpha(): u8[]` decodes the string to
+     `UI_ATLAS_WIDTH * UI_ATLAS_HEIGHT` bytes.
+  9. **Determinism.** The tool uses no hash map and no clock, and the
+     output depends only on the font bytes. The regeneration test is
+     byte-identical on macOS. Windows is open until a Windows run
+     records it.
 - **UI3 — Ids.** An id is a `u32`, FNV-1a over the label's bytes:
   the seed is the id stack's top, or 2166136261 when the stack is
   empty, and each byte `b` from `charCodeAt` applies
@@ -169,6 +215,9 @@ tiers with no GPU. The renderer is the only GPU code.
   is rounded half away from zero to an integer, and the digits come
   from integer arithmetic, with a leading minus sign for a negative
   value.
+  Rev 1 (2026-11-23, P21): a glyph's width is its logical cell width,
+  `UI_ATLAS_RECT_W` divided by `UI_ATLAS_SCALE` (UI2 Rev 3). An icon
+  quad has its logical size in the same way.
 
 ## The command list
 
@@ -244,6 +293,10 @@ tiers with no GPU. The renderer is the only GPU code.
   `rgba8unorm`, every channel the alpha byte, uploaded once through
   `writeTextureBytes`. No library module imports a generated support
   module.
+  Rev 3 (2026-11-23, P21): the sampler field is `atlasSampler: Sampler`,
+  and the renderer creates it with `linear` minification and
+  magnification. A linear sample at scale 1 averages the 2x2 texels
+  of the double-size atlas.
 - **UI15 — The frame builder.** Rev 6. `UiRenderer` is created by
   the static factory with the program's pipeline facts and a quad
   capacity, default 16,384 (Rev 6, 2026-10-30, P17):
@@ -294,6 +347,23 @@ tiers with no GPU. The renderer is the only GPU code.
   the quad capacity traps `UIT1` with the capacity and the count.
   The unbounded rect that the core and the renderer share is one
   named constant.
+  Rev 8 (2026-11-23, P21): the layout space is logical pixels.
+  `render(context, pass, width, height, scale: f32 = 1)` takes the
+  render target size in physical pixels and the scale factor. The
+  viewport uniform holds `width / scale` and `height / scale`, so the
+  vertex kernel maps logical positions to the whole target. The
+  exported function `uiScissor(clip: UiRect, width: u32, height: u32,
+  scale: f32): UiRect` maps a logical clip rect to physical pixels:
+  the left and top edges are `floor(edge * scale)`, the right and
+  bottom edges are `ceil(edge * scale)`, and the result is
+  intersected with the target `0, 0, width, height`. `render` uses
+  it for every range. A scale that is not finite or not above 0
+  traps `UIT1`. At scale 1, every viewport value and every scissor
+  rect equals the Rev 7 value.
+  Rev 9 (2026-11-23, P21): a quad's logical size is its atlas rect
+  divided by `UI_ATLAS_SCALE`. A rect quad uses the center of the
+  white rect as the UV of all four vertices, so a linear sample
+  reads alpha 255.
 - **UI16 — The pixel oracle.** A live program draws one window
   with microui's default colors into an offscreen `rgba8unorm`
   target and reads back pixels inside filled rects, where alpha is
@@ -309,13 +379,17 @@ tiers with no GPU. The renderer is the only GPU code.
   their UI5 twins: `wheel` to `inputScroll`, `keyDown` and `keyUp` to
   `inputKeyDown` and `inputKeyUp`, and `textInput` to `inputText`.
   The example exports the four optional entries and ignores the
-  `key` parameter of `frame`.
+  `key` parameter of `frame`. Rev 2 (2026-11-23, P21): the example also exports `scale` (W2
+  Rev 6). It divides the pointer position by the factor before
+  `inputMouseMove`, `inputMouseDown`, and `inputMouseUp`, and passes
+  the factor to `render`.
 
 ## Traps
 
 - **UI18 — The trap table** (LB3). Rev 1. `UIT1` — the
   renderer's capacity, pipeline spec, or frame is outside its domain
-  (a frame over the quad capacity, a capacity of 0 or above 16,384, a
+  (a frame over the quad capacity, a scale that is not finite or not
+  above 0 (UI15 Rev 8), a capacity of 0 or above 16,384, a
   topology other than `triangle-list`, an index format other than
   `uint16`). `UIT2` — a widget or layout
   call outside `begin()` and `end()`, an `end*` call without its
@@ -347,7 +421,7 @@ tiers with no GPU. The renderer is the only GPU code.
   `scrollbarSize`, `thumbSize`, `colors: u32[]`), `UiVertex`,
   `UiViewport`, `UiVarying`, `UiRenderLayout`, `UiPipelineFacts`,
   `UiDrawRange`, `UiRenderer`. Functions: `uiVertex`, `uiFragment`,
-  `uiNumberText`. The custom-widget surface of `UiContext` is the set
+  `uiNumberText`, `uiScissor` (UI15 Rev 8). The custom-widget surface of `UiContext` is the set
   microui exposes for the same purpose: `getId`, `pushId`, `popId`,
   `setFocus`,
   `mouseOver`, `updateControl`, `getClip`, `pushClip`, `popClip`,

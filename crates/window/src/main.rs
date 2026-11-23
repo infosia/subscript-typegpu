@@ -251,10 +251,10 @@ enum InputEvent {
 /// The state of one windowed run.
 ///
 /// `key`, `pointer_x`, `pointer_y`, and `buttons` are the input that every `frame` call reads
-/// (W3). `input_exports` holds the entry names that the script exports, so the host drops an
-/// event whose optional entry is absent (W2 Rev 3).
+/// (W3). `exports` holds the script entry names for optional calls (W2).
 struct Host {
-    input_exports: Vec<String>,
+    exports: Vec<String>,
+    pending_scale: Option<f32>,
     input_events: Vec<InputEvent>,
     session: ReloadSession,
     instance: facade::SubscriptTypegpuInstance,
@@ -283,12 +283,13 @@ impl Host {
     /// window (W2 Rev 2). With a `frame_limit` of `None`, the run ends when the window closes.
     fn new(
         session: ReloadSession,
-        input_exports: Vec<String>,
+        exports: Vec<String>,
         instance: facade::SubscriptTypegpuInstance,
         frame_limit: Option<u64>,
     ) -> Self {
         Self {
-            input_exports,
+            exports,
+            pending_scale: None,
             input_events: Vec::new(),
             session,
             instance,
@@ -406,6 +407,8 @@ impl Host {
             ],
         )?;
         self.drain_async()?;
+        let factor = self.window.as_ref().expect("window stored").scale_factor();
+        self.call_optional("scale", &[EntryArg::F32(factor as f32)])?;
         self.window
             .as_ref()
             .expect("window stored")
@@ -486,10 +489,18 @@ impl Host {
         output
     }
 
-    /// Delivers the queued input events in event order, then leaves the queue empty (W3 Rev 2).
-    ///
-    /// An event whose optional entry the script does not export is dropped.
+    fn call_optional(&mut self, name: &str, args: &[EntryArg]) -> Result<(), String> {
+        if self.exports.iter().any(|entry| entry == name) {
+            self.call_entry(name, args)?;
+        }
+        Ok(())
+    }
+
+    /// Delivers the latest scale before the queued input events (W2, W3).
     fn deliver_input(&mut self) -> Result<(), String> {
+        if let Some(factor) = self.pending_scale.take() {
+            self.call_optional("scale", &[EntryArg::F32(factor)])?;
+        }
         for event in std::mem::take(&mut self.input_events) {
             let (name, args) = match event {
                 InputEvent::Wheel(x, y) => ("wheel", vec![EntryArg::F32(x), EntryArg::F32(y)]),
@@ -497,9 +508,7 @@ impl Host {
                 InputEvent::KeyUp(key) => ("keyUp", vec![EntryArg::U32(key)]),
                 InputEvent::Text(point) => ("textInput", vec![EntryArg::U32(point)]),
             };
-            if self.input_exports.iter().any(|entry| entry == name) {
-                self.call_entry(name, &args)?;
-            }
+            self.call_optional(name, &args)?;
         }
         Ok(())
     }
@@ -681,6 +690,9 @@ impl ApplicationHandler for Host {
         }
         match event {
             WindowEvent::CloseRequested => self.finish(event_loop, Ok(())),
+            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                self.pending_scale = Some(scale_factor as f32);
+            }
             WindowEvent::Resized(size) if size.width != 0 && size.height != 0 => {
                 if let Err(error) = self.configure() {
                     self.fail(event_loop, error);

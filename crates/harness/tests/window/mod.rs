@@ -74,6 +74,7 @@ fn check_host_signatures(module: &hir::Module) {
             ],
         ),
         ("shutdown", Vec::new()),
+        ("scale", vec![("factor", "f32")]),
         ("wheel", vec![("deltaX", "f32"), ("deltaY", "f32")]),
         ("keyDown", vec![("key", "u32")]),
         ("keyUp", vec![("key", "u32")]),
@@ -128,6 +129,7 @@ fn window_example_has_exact_host_entry_signatures() {
                     .unwrap_or_else(|error| panic!("compile {}: {error}", program.display()));
             let expected = [
                 "init",
+                "scale",
                 "wheel",
                 "keyDown",
                 "keyUp",
@@ -161,6 +163,7 @@ fn host_signature_rejections_name_the_invalid_entry() {
         ("keyDown", 0, false),
         ("keyUp", 0, false),
         ("textInput", 0, false),
+        ("scale", 0, false),
         ("wheel", 2, true),
     ]
     .into_iter()
