@@ -873,3 +873,14 @@ Evidence: `tools/gate.sh --require-backend` ran 513 s. Every test
 passed: 364 passed, 1 ignored (live). The final hygiene step failed on
 the uncommitted P19 spec text, which spelled two `..` segments in a
 row. After the spec fix, `tools/hygiene.sh` alone exits 0.
+
+### Re-pin to `d7ecb78a` (2026-11-23)
+
+One crate-changing subscript commit, §355: a garbage-collection mark
+finds the block of a word in constant time. The change is in
+`runtime/src/context` only, and no public API changes. No source
+change is needed here. The `Cargo.lock` diff moves only the five
+subscript packages.
+Evidence: `tools/gate.sh --require-backend` green, 521 s, 384 passed,
+1 ignored (live). The `api/mod.rs` panics are the expected panics of
+the trap tests.
