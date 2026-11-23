@@ -851,7 +851,7 @@ Evidence: `tools/gate.sh --require-backend` green, 497 s, 358 passed, 1 ignored 
 
 ## R42 — module imports across directories (2026-11-23)
 
-Open. A module specifier is a name in one flat namespace, so
+Closed by subscript §354 at `ddc0f0e2` (see the re-pin below). A module specifier is a name in one flat namespace, so
 `./sub/x` and `../sub/x` are S100 even when the file exists
 (measured with the subscript CLI at `75f49b2a`). The request asks for
 importer-relative specifiers, the entry-relative path as the module
@@ -859,3 +859,17 @@ key, and one public resolver for the checker, the CLI, and downstream
 loaders. The request text is `REPORT-import.md` in the subscript
 repository. The evidence and the P18 consequence are in
 `specs/tracking/p18-game-integration.md`.
+
+### Re-pin to `ddc0f0e2` (2026-11-23)
+
+Three subscript commits, §354: a module is keyed by its path, a
+relative specifier resolves against the importer, and the compiler
+exports `module_key` and `resolve_module_specifier`. This closes R42.
+A program whose files share one directory keeps its keys, names, and
+output, so no source change is needed here. P19 adopts the resolver
+(`specs/tracking/p19-module-paths.md`). The subscript `Cargo.lock` is
+unchanged.
+Evidence: `tools/gate.sh --require-backend` ran 513 s. Every test
+passed: 364 passed, 1 ignored (live). The final hygiene step failed on
+the uncommitted P19 spec text, which spelled two `..` segments in a
+row. After the spec fix, `tools/hygiene.sh` alone exits 0.

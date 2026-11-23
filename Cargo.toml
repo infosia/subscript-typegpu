@@ -15,9 +15,9 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/infosia/subscript-typegpu"
 
 [workspace.dependencies]
-subscript-bindgen = { git = "https://github.com/infosia/subscript.git", rev = "31e14f1c" }
-subscript-compiler = { git = "https://github.com/infosia/subscript.git", rev = "31e14f1c" }
-subscript-codegen = { git = "https://github.com/infosia/subscript.git", rev = "31e14f1c" }
+subscript-bindgen = { git = "https://github.com/infosia/subscript.git", rev = "ddc0f0e2" }
+subscript-compiler = { git = "https://github.com/infosia/subscript.git", rev = "ddc0f0e2" }
+subscript-codegen = { git = "https://github.com/infosia/subscript.git", rev = "ddc0f0e2" }
 libloading = "0.8"
 serde = { version = "1", features = ["derive"] }
 winit = "=0.30.13"
