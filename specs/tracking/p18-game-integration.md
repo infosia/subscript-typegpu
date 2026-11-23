@@ -73,4 +73,29 @@ for `ui-demo` exit 0 with no `FAIL` line.
 
 ## Slice 2 — depth state
 
-Open.
+Round 1 (Codex, 2026-11-23): `RenderPipelineSpec` gains
+`depthStencil`, the three declaration functions copy it, and
+`renderPipelineDescriptor` passes it. `b29-depth` prints the depth
+format, write flag, and compare function on both tiers.
+
+Claude review of round 1, two findings. MAJOR: `x27-live-depth`
+passed a hand-written WGSL string and vertex layout to
+`createRenderPipeline`, so the live lane did not run the declaration
+path that RN22 changes. MINOR: `b29-depth.ts` used `===`, and scripts
+write `==` and `!=` only. Round 2 fixed both: `x27` declares the
+pipeline through `renderPipeline` with subscript kernels and uses the
+generated support module, and its WGSL golden is committed.
+
+`x27-live-depth`: triangle A at z 0.25 in red, triangle B at z 0.75 in
+blue, 144 overlap pixel centers. The host expects red in the overlap
+for both draw orders.
+
+Evidence: `tools/gate.sh --require-backend` green, 657 s, 361 passed,
+1 ignored (live). The report's depth reproduction prints `bgra8unorm`
+on `dev` and `ship`. `tools/live.sh` on Metal (yawgpu with
+`--features metal`): `every_x_program_passes_on_a_real_adapter` ok,
+344 s. A direct `x27-live-depth` run prints `PASS` on both tiers.
+
+The gate wall time grew from 590 s to 657 s. The differential module
+took 537 s against 489 s, with one new program on each tier. The
+increase is under the red line.

@@ -1,0 +1,5 @@
+depthStencil.format=depth24plus
+depthStencil.depthWriteEnabled=true
+depthStencil.depthCompare=less
+render:submitted
+PASS

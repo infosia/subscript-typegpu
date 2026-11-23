@@ -12,6 +12,7 @@ import {
   GPUCommandEncoder,
   GPUComputePipeline,
   GPUComputePipelineDescriptor,
+  GPUDepthStencilState,
   GPUDevice,
   GPUDeviceCreation,
   GPUPipelineLayout,
@@ -1255,8 +1256,7 @@ export function simulateCompute4<L0, L1, L2, L3>(
 /**
  * The descriptor of a render pipeline declaration.
  * The generator reads `format` and `indexFormat`.
- * The runtime passes `topology`, `cullMode`, `frontFace`, and `blend` into the pipeline
- * descriptor.
+ * The runtime passes `topology`, `cullMode`, `frontFace`, `blend`, and `depthStencil` to the pipeline descriptor.
  */
 @Descriptor
 export class RenderPipelineSpec {
@@ -1266,6 +1266,7 @@ export class RenderPipelineSpec {
   frontFace?: GPUFrontFace = "ccw";
   indexFormat?: GPUIndexFormat = "undefined";
   blend?: GPUBlendState | null = null;
+  depthStencil?: GPUDepthStencilState | null = null;
 }
 
 function hostBlendComponent(
@@ -1359,6 +1360,7 @@ export function renderPipeline<V, O>(
     frontFace: spec.frontFace,
     indexFormat: spec.indexFormat,
     blend: spec.blend,
+    depthStencil: spec.depthStencil,
   };
 }
 
@@ -1379,6 +1381,7 @@ export function renderPipelineL<L, V, O>(
     frontFace: spec.frontFace,
     indexFormat: spec.indexFormat,
     blend: spec.blend,
+    depthStencil: spec.depthStencil,
   };
 }
 
@@ -1399,6 +1402,7 @@ export function renderPipelineInstanced<V, I, O>(
     frontFace: spec.frontFace,
     indexFormat: spec.indexFormat,
     blend: spec.blend,
+    depthStencil: spec.depthStencil,
   };
 }
 
@@ -1898,6 +1902,7 @@ function renderPipelineDescriptor(
       cullMode: spec.cullMode,
       frontFace: spec.frontFace,
     },
+    depthStencil: spec.depthStencil,
     fragment: {
       module: shader,
       entryPoint: fragmentEntry,
