@@ -551,24 +551,7 @@ fn ship_facade_library() -> Result<NativeLibrary, String> {
     })
 }
 
-/// Loads the `lib/` modules that `program` reaches through its imports.
-///
-/// A read failure becomes a summary error. A parse failure becomes a rejection that carries the
-/// library file's own diagnostics.
-fn library_files(program: &SourceFile) -> Result<Vec<SourceFile>, ProgramLoadError> {
-    subscript_typegpu_gen::load_library_files(&repository_root().join("lib"), program).map_err(
-        |error| match error {
-            subscript_typegpu_gen::LibraryLoadError::Read(message) => {
-                ProgramLoadError::message(message)
-            }
-            subscript_typegpu_gen::LibraryLoadError::Parse { file, diagnostics } => {
-                ProgramLoadError::rejected(&[file], diagnostics)
-            }
-        },
-    )
-}
-
-/// Builds the source set of one program: the library modules, the program, and its support module.
+/// Loads the program and its dependencies and generates its support module.
 ///
 /// The support module `./<stem>.typegpu` never exists on disk, so the first check marks that one
 /// import poisoned instead of missing. The generator then produces the module in memory.
@@ -579,12 +562,16 @@ fn prepare_program(program: &Path) -> Result<Vec<SourceFile>, ProgramLoadError> 
     let stem = program.file_stem().and_then(OsStr::to_str).ok_or_else(|| {
         ProgramLoadError::message(format!("program has no UTF-8 stem: {}", program.display()))
     })?;
-    let program_source = std::fs::read_to_string(program).map_err(|error| {
-        ProgramLoadError::message(format!("read {}: {error}", program.display()))
-    })?;
-    let program_file = SourceFile::entry(format!("{stem}.ts"), program_source);
-    let mut files = library_files(&program_file)?;
-    files.push(program_file);
+    let mut files =
+        subscript_typegpu_gen::load_program_files(&repository_root().join("lib"), program)
+            .map_err(|error| match error {
+                subscript_typegpu_gen::LibraryLoadError::Read(message) => {
+                    ProgramLoadError::message(message)
+                }
+                subscript_typegpu_gen::LibraryLoadError::Parse { file, diagnostics } => {
+                    ProgramLoadError::rejected(&[file], diagnostics)
+                }
+            })?;
     let support_module = format!("./{stem}.typegpu");
     let mut options = subscript_compiler::CheckOptions::default();
     options.poison_missing_modules = vec![support_module.clone()];
@@ -606,7 +593,7 @@ fn prepare_program(program: &Path) -> Result<Vec<SourceFile>, ProgramLoadError> 
     Ok(files)
 }
 
-/// Loads the core sources, import-reachable library modules, the program, and its generated support module.
+/// Loads the library and application modules, the entry, and its generated support module.
 pub fn program_files(program: &Path) -> Result<Vec<SourceFile>, String> {
     prepare_program(program).map_err(|error| error.to_string())
 }

@@ -28,6 +28,12 @@ while IFS= read -r file; do
             echo "hygiene: generated support module exists: $file" >&2
             failed=1
             ;;
+        programs/*.ts)
+            if ! printf '%s\n' "$file" | grep -Eq '^programs/[abmx][0-9]{2}-[a-z0-9-]+\.ts$'; then
+                echo "hygiene: invalid program or module name: $file" >&2
+                failed=1
+            fi
+            ;;
     esac
 
     if grep -nE '/(Users|home|Documents|workspace|Projects|repos)/|~/|\.\./\.\.|\.\./(subscript|subscript-gpu|yawgpu|gpuweb|webgpu-native-cts|webgpu-headers|TypeGPU)|(^|[^[:alnum:]])[A-Za-z]:[\\/]' "$file"; then

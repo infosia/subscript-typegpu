@@ -19,11 +19,8 @@ pub(crate) fn b01_files() -> Vec<SourceFile> {
 }
 
 pub(crate) fn program_files(program: &Path) -> Vec<SourceFile> {
-    let name = program
-        .file_name()
-        .expect("program file name")
-        .to_string_lossy();
-    source_files(SourceFile::entry(name, read(program)))
+    subscript_typegpu_gen::load_program_files(&root().join("lib"), program)
+        .expect("load program files")
 }
 
 pub(crate) fn source_files(program: SourceFile) -> Vec<SourceFile> {

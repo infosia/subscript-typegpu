@@ -7,6 +7,67 @@ use subscript_compiler::SourceFile;
 use crate::support;
 
 #[test]
+fn application_dependencies_follow_libraries_and_precede_their_importers() {
+    let directory = std::env::temp_dir().join(format!(
+        "subscript-typegpu-app-order-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&directory).expect("create application directory");
+    let entry = directory.join("main.ts");
+    std::fs::write(
+        &entry,
+        r#"
+        import { tile } from "./tile";
+        import { size } from "./size";
+        import { tile_ENTRY } from "./main.typegpu";
+    "#,
+    )
+    .expect("write entry");
+    std::fs::write(
+        directory.join("tile.ts"),
+        r#"import { size } from "./size";"#,
+    )
+    .expect("write tile");
+    std::fs::write(
+        directory.join("size.ts"),
+        r#"import { UiContext } from "./typegpu-ui";"#,
+    )
+    .expect("write size");
+    for name in ["typegpu-ui.ts", "main.typegpu.ts"] {
+        std::fs::write(directory.join(name), [0xff]).expect("write unreadable source text");
+    }
+    let files = subscript_typegpu_gen::load_program_files(&support::root().join("lib"), &entry)
+        .expect("load the registered UI module and skip the support file on disk");
+    std::fs::remove_dir_all(directory).expect("remove application directory");
+    assert_eq!(
+        files
+            .iter()
+            .map(|file| file.name.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "subscript-typegpu.generated.d.ts",
+            "wire-enum-aliases.generated.d.ts",
+            "webgpu.ts",
+            "typegpu-types.ts",
+            "typegpu.ts",
+            "typegpu-ui-atlas.generated.ts",
+            "typegpu-ui.ts",
+            "size.ts",
+            "tile.ts",
+            "main.ts",
+        ]
+    );
+    assert_eq!(
+        files
+            .iter()
+            .filter(|file| file.entry)
+            .map(|file| file.name.as_str())
+            .collect::<Vec<_>>(),
+        ["main.ts"]
+    );
+}
+
+#[test]
 fn ui_import_reaches_the_atlas_in_library_order() {
     let program = SourceFile::new("ui-import.ts", "import { UiContext } from './typegpu-ui';");
     let files = subscript_typegpu_gen::load_library_files(&support::root().join("lib"), &program)

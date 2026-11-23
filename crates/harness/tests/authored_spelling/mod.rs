@@ -33,6 +33,11 @@ fn authored_sources() -> Vec<PathBuf> {
     let root = repository_root();
     let mut files = Vec::new();
     collect_ts_files(&root.join("programs"), false, &mut files);
+    files.retain(|path| {
+        !path
+            .file_name()
+            .is_some_and(|name| name.as_encoded_bytes().starts_with(b"m"))
+    });
     collect_ts_files(&root.join("examples"), true, &mut files);
     files.sort();
     assert!(!files.is_empty(), "authored source list is empty");

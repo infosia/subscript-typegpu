@@ -10,7 +10,10 @@ principles" govern this block.
   `programs/b<nn>-<slug>.ts`. Each has a golden
   `programs/<stem>.expected`. Live programs are
   `programs/x<nn>-<slug>.ts` with no golden. Ids are stable and never
-  renumbered.
+  renumbered. Rev 1, 2026-11-23: an application module that a
+  program imports (`library.md` LB5) is `programs/m<nn>-<slug>.ts`,
+  where `<nn>` is the id of the importing program. It is not a
+  program, has no golden, and no suite runs it.
 - **T2 — Determinism.** Programs never print backend-reported
   values. A printed value is a generated constant read by name, a
   host-computed result, or a plain marker. A value read back from a

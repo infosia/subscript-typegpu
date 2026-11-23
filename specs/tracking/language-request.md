@@ -848,3 +848,14 @@ graph (§352). A host reads the count and the time of collections (§353).
 `reset_collection_stats`. This repository calls none of them.
 No source change here. The subscript `Cargo.lock` is unchanged.
 Evidence: `tools/gate.sh --require-backend` green, 497 s, 358 passed, 1 ignored (live).
+
+## R42 — module imports across directories (2026-11-23)
+
+Open. A module specifier is a name in one flat namespace, so
+`./sub/x` and `../sub/x` are S100 even when the file exists
+(measured with the subscript CLI at `75f49b2a`). The request asks for
+importer-relative specifiers, the entry-relative path as the module
+key, and one public resolver for the checker, the CLI, and downstream
+loaders. The request text is `REPORT-import.md` in the subscript
+repository. The evidence and the P18 consequence are in
+`specs/tracking/p18-game-integration.md`.

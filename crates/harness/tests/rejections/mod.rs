@@ -14,19 +14,36 @@ fn root() -> PathBuf {
         .to_path_buf()
 }
 
-fn read(path: &Path) -> String {
-    std::fs::read_to_string(path).unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
+fn files(fixture: &Path) -> Vec<SourceFile> {
+    subscript_typegpu_gen::load_program_files(&root().join("lib"), fixture)
+        .unwrap_or_else(|error| panic!("load {}: {error}", fixture.display()))
 }
 
-fn files(fixture: &Path) -> Vec<SourceFile> {
-    let program = SourceFile::entry(
-        fixture.file_name().expect("fixture name").to_string_lossy(),
-        read(fixture),
+fn assert_missing_import(entry: &str, specifier: &str) {
+    let program = root()
+        .join("crates/harness/tests/fixtures/app-modules")
+        .join(entry);
+    let error = subscript_typegpu_harness::load_program(&program)
+        .expect_err("the compiler must reject the unresolved import");
+    let diagnostics = error.diagnostics().expect("compiler diagnostic");
+    assert!(
+        diagnostics.contains(&format!("error[S100]: imported module `{specifier}`")),
+        "{diagnostics}"
     );
-    let mut files = subscript_typegpu_gen::load_library_files(&root().join("lib"), &program)
-        .unwrap_or_else(|error| panic!("load {}: {error}", fixture.display()));
-    files.push(program);
-    files
+    assert!(
+        diagnostics.contains(&format!(" --> {entry}:2:")),
+        "{diagnostics}"
+    );
+}
+
+#[test]
+fn missing_application_module_reports_the_import_site() {
+    assert_missing_import("missing.ts", "./absent");
+}
+
+#[test]
+fn subdirectory_import_reports_the_import_site() {
+    assert_missing_import("nested.ts", "./sub/tile");
 }
 
 #[test]

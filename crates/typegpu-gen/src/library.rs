@@ -1,5 +1,6 @@
-//! Registered library sources in compiler load order.
+//! Library and application sources in compiler load order.
 
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use subscript_compiler::{parse_import_specifiers, render_diagnostics, Diagnostic, SourceFile};
@@ -82,42 +83,125 @@ pub fn load_library_files(
     directory: &Path,
     program: &SourceFile,
 ) -> Result<Vec<SourceFile>, LibraryLoadError> {
-    // One slot per `LIBRARY_ORDER` entry. The slots keep load order whatever order the imports
-    // reach the modules in.
-    let mut files: [Option<SourceFile>; LIBRARY_ORDER.len()] = std::array::from_fn(|_| None);
-    let mut pending = vec![program.clone()];
-    // The core set loads unconditionally. Every other module waits for an import that reaches it.
-    for (slot, name) in files.iter_mut().zip(LIBRARY_ORDER).take(CORE_COUNT) {
-        let file = read_library_file(directory, name).map_err(LibraryLoadError::Read)?;
-        pending.push(file.clone());
-        *slot = Some(file);
-    }
-    while let Some(file) = pending.pop() {
-        let imports =
-            parse_import_specifiers(&file).map_err(|diagnostics| LibraryLoadError::Parse {
-                file: file.clone(),
-                diagnostics,
-            })?;
-        for specifier in imports {
-            let Some(module) = specifier.strip_prefix("./") else {
-                continue;
-            };
-            // A specifier that names no registered module belongs to the program's own files. The
-            // compiler reports it when it cannot resolve it.
-            let Some((slot, name)) = files
-                .iter_mut()
-                .zip(LIBRARY_ORDER)
-                .find(|(_, name)| name.strip_suffix(".ts") == Some(module))
-            else {
-                continue;
-            };
-            if slot.is_none() {
-                let dependency =
-                    read_library_file(directory, name).map_err(LibraryLoadError::Read)?;
-                pending.push(dependency.clone());
-                *slot = Some(dependency);
-            }
+    read_libraries(
+        directory,
+        imports(program)?
+            .iter()
+            .filter_map(|s| registered(s))
+            .collect(),
+    )
+}
+
+fn imports(file: &SourceFile) -> Result<Vec<String>, LibraryLoadError> {
+    parse_import_specifiers(file).map_err(|diagnostics| LibraryLoadError::Parse {
+        file: file.clone(),
+        diagnostics,
+    })
+}
+
+fn registered(specifier: &str) -> Option<&'static str> {
+    let stem = specifier.strip_prefix("./")?;
+    LIBRARY_ORDER
+        .into_iter()
+        .find(|name| name.strip_suffix(".ts") == Some(stem))
+}
+
+fn read_libraries(
+    directory: &Path,
+    mut pending: Vec<&'static str>,
+) -> Result<Vec<SourceFile>, LibraryLoadError> {
+    pending.extend(LIBRARY_ORDER.iter().take(CORE_COUNT));
+    let mut loaded = HashMap::new();
+    while let Some(name) = pending.pop() {
+        if let std::collections::hash_map::Entry::Vacant(slot) = loaded.entry(name) {
+            let file = read_library_file(directory, name).map_err(LibraryLoadError::Read)?;
+            pending.extend(imports(&file)?.iter().filter_map(|s| registered(s)));
+            slot.insert(file);
         }
     }
-    Ok(files.into_iter().flatten().collect())
+    Ok(LIBRARY_ORDER
+        .iter()
+        .filter_map(|name| loaded.remove(name))
+        .collect())
+}
+
+struct ApplicationModules<'a> {
+    directory: &'a Path,
+    support: String,
+    seen: HashSet<String>,
+    libraries: Vec<&'static str>,
+    files: Vec<SourceFile>,
+}
+
+impl ApplicationModules<'_> {
+    fn visit(&mut self, file: SourceFile) -> Result<(), LibraryLoadError> {
+        for specifier in imports(&file)? {
+            if let Some(name) = registered(&specifier) {
+                self.libraries.push(name);
+                continue;
+            }
+            let Some(stem) = specifier.strip_prefix("./") else {
+                continue;
+            };
+            if stem.is_empty() || stem.contains('/') || specifier == self.support {
+                continue;
+            }
+            let name = format!("{stem}.ts");
+            if Path::new(&name).file_name() != Some(name.as_ref())
+                || !self.seen.insert(name.clone())
+            {
+                continue;
+            }
+            let path = self.directory.join(&name);
+            match std::fs::read_to_string(&path) {
+                Ok(source) => self.visit(SourceFile::new(name, source))?,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => {
+                    return Err(LibraryLoadError::Read(format!(
+                        "read {}: {error}",
+                        path.display()
+                    )))
+                }
+            }
+        }
+        self.files.push(file);
+        Ok(())
+    }
+}
+
+/// Loads the registered libraries, flat application modules, and entry in compiler order (LB5).
+///
+/// # Errors
+///
+/// Returns an error for unreadable sources, invalid syntax, or an invalid entry file name.
+pub fn load_program_files(
+    library: &Path,
+    entry: &Path,
+) -> Result<Vec<SourceFile>, LibraryLoadError> {
+    let name = entry
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            LibraryLoadError::Read(format!(
+                "program has no UTF-8 file name: {}",
+                entry.display()
+            ))
+        })?;
+    let source = std::fs::read_to_string(entry)
+        .map_err(|error| LibraryLoadError::Read(format!("read {}: {error}", entry.display())))?;
+    let stem = entry
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or(name);
+    let mut application = ApplicationModules {
+        directory: entry.parent().unwrap_or(Path::new("")),
+        support: format!("./{stem}.typegpu"),
+        seen: HashSet::from([name.to_owned()]),
+        libraries: Vec::new(),
+        files: Vec::new(),
+    };
+    application.visit(SourceFile::entry(name, source))?;
+    let mut files = read_libraries(library, application.libraries)?;
+    files.extend(application.files);
+    Ok(files)
 }

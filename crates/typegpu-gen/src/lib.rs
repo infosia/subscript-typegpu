@@ -22,8 +22,7 @@ mod schema;
 mod shell;
 mod ui_atlas;
 
-/// The loader for the library sources that a program reaches, and its error type.
-pub use library::{load_library_files, LibraryLoadError};
+pub use library::{load_library_files, load_program_files, LibraryLoadError};
 /// Atlas module generation for the ui library.
 pub use ui_atlas::generate_ui_atlas;
 
@@ -271,16 +270,20 @@ fn is_library_file(name: &str) -> bool {
 
 /// Builds the check options that let the program import a support module that does not exist yet.
 ///
-/// The program's own `.ts` file is the one file that is neither ambient, nor a library module, nor
-/// a support module. Its `./<stem>.typegpu` specifier becomes a poisoned module (SC1a).
+/// The entry selects the support specifier (SC1a). Without an explicit entry, use the sole
+/// ordinary program source.
 ///
 /// # Errors
 ///
 /// If `files` holds more than one program, returns an SC1 diagnostic. One run generates for one
 /// program.
 fn discovery_options(files: &[SourceFile]) -> Result<CheckOptions, Vec<Diagnostic>> {
+    let explicit_entry = files.iter().any(|file| file.entry);
     let mut modules = Vec::new();
     for file in files {
+        if explicit_entry && !file.entry {
+            continue;
+        }
         if file.dts || is_library_file(&file.name) || file.name.ends_with(".typegpu.ts") {
             continue;
         }

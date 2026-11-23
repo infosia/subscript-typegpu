@@ -1,7 +1,7 @@
 # Block: render (RN-rules)
 
 P3 contract. Rev 0, 2026-08-22. Rev 3 (RN18–RN19 index format,
-cull), 2026-08-23. Rev 4 (RN20 strip), 2026-08-24. Rev 5 (RN21 blending), 2026-08-24. Rev 6 (RN1, RN2 inferred type arguments), 2026-10-27. Plan §8 P3 governs this block.
+cull), 2026-08-23. Rev 4 (RN20 strip), 2026-08-24. Rev 5 (RN21 blending), 2026-08-24. Rev 6 (RN1, RN2 inferred type arguments), 2026-10-27. Rev 7 (RN22 depth state), 2026-11-23. Plan §8 P3 governs this block.
 Kernels are `kernel.md` (K-rules) and apply to vertex and fragment
 kernels. Pipelines are `pipeline.md` (PI-rules) where this block
 does not say otherwise. Schemas are `schema.md`.
@@ -209,6 +209,34 @@ does not say otherwise. Schemas are `schema.md`.
   destination.
 
   T19 gates the source-color rule.
+
+- **RN22 — Depth state.** Rev 0, 2026-11-23. `RenderPipelineSpec`
+  gains `depthStencil?: GPUDepthStencilState | null = null`. The
+  three declaration functions copy it into their result, and the
+  runtime passes it into the pipeline descriptor. The generator does
+  not read it. A spec without it keeps a pipeline with no depth
+  state, so every color-only declaration stays valid. The depth
+  attachment of a pass stays with the API layer (RN11).
+
+  `b29-depth` declares the spec below, creates a `depth24plus`
+  texture, clears it to 1.0 in a render pass, draws, and prints the
+  spec's depth format, write flag, and compare function by name on
+  both tiers.
+
+  ```ts
+  { format: "rgba8unorm",
+    depthStencil: { format: "depth24plus",
+      depthWriteEnabled: true, depthCompare: "less" } }
+  ```
+
+  `x27-live-depth` draws two opaque triangles that overlap. All three
+  vertices of one triangle share one depth value, and the two values
+  differ. The program draws the pair in both orders, each into a
+  cleared color target and a depth attachment cleared to 1.0. The
+  host rasterizer (RN14) keeps one depth value per pixel and applies
+  the `less` test. The program compares every pixel of both images
+  with the host rasterizer and prints `PASS`. Inside the overlap,
+  both images hold the color of the nearer triangle.
 
 ## Rejections
 

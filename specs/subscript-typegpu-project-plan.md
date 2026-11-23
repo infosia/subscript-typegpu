@@ -913,6 +913,28 @@ demonstrated red, a 30-frame smoke run of every window example after
 slice 3, and a phase review with no open CRITICAL or MAJOR. The
 record is `specs/tracking/p17-kernel-forms.md`.
 
+### P18 — application modules and typed depth state (after the pin `31e14f1c`)
+
+A downstream game report (2026-11-23) measured two blocks at
+`3761363`, both before device creation. The record of the
+reproduction is `specs/tracking/p18-game-integration.md`.
+
+Slice 1 — application modules (`library.md` LB5). The loaders read
+the application modules that the program imports from disk,
+relative to the importing file. A pipeline in the entry module can
+call a K2 helper from an application module. A missing module stays
+a diagnostic at the import site.
+
+Slice 2 — depth state in the typed render declaration (`render.md`
+RN22). `RenderPipelineSpec` gains `depthStencil`, and the runtime
+passes it into the pipeline descriptor. A color-only declaration
+stays valid.
+
+Exit: each slice gate-green with no WGSL or `.expected` golden moved,
+every new rejection with a demonstrated red, the live program of
+slice 2 green on Metal, a 30-frame smoke run of one window example
+after slice 1, and a phase review with no open CRITICAL or MAJOR.
+
 ### U0–U4 — the immediate-mode GUI (branch `imgui`, after P16)
 
 Owner decision 2026-09-05: an immediate-mode GUI authored in

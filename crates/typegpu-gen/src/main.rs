@@ -4,19 +4,10 @@
 //! pipeline declaration. `ui-atlas <repo-root>` writes the generated atlas module. The harness
 //! calls the library instead, in process.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use subscript_compiler::SourceFile;
-
-/// Reads one source file into a string.
-///
-/// # Errors
-///
-/// If the read fails, returns a message that names the path and the cause.
-fn read(path: &Path) -> Result<String, String> {
-    std::fs::read_to_string(path).map_err(|error| format!("read {}: {error}", path.display()))
-}
 
 /// Runs one subcommand and writes its output files.
 ///
@@ -68,19 +59,12 @@ fn run() -> Result<(), String> {
     if arguments.next().is_some() {
         return Err(USAGE.to_owned());
     }
-    let program_name = program
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| format!("program has no UTF-8 file name: {}", program.display()))?;
     let stem = program
         .file_stem()
         .and_then(|stem| stem.to_str())
         .ok_or_else(|| format!("program has no UTF-8 stem: {}", program.display()))?;
-    let program_file = SourceFile::entry(program_name, read(&program)?);
-    let mut files = subscript_typegpu_gen::load_library_files(&library, &program_file)
+    let mut files = subscript_typegpu_gen::load_program_files(&library, &program)
         .map_err(|error| error.to_string())?;
-    // The program goes last. A module resolves against the files before it in load order (LB1).
-    files.push(program_file);
     let generated = subscript_typegpu_gen::generate(&files)
         .map_err(|diagnostics| subscript_compiler::render_diagnostics(&files, &diagnostics))?;
     // Discovery permits absent support facts. Check the complete source set before any write.
