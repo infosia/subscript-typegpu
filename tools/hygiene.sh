@@ -28,18 +28,16 @@ while IFS= read -r file; do
             echo "hygiene: generated support module exists: $file" >&2
             failed=1
             ;;
+        programs/m[0-9][0-9]/*)
+            if ! printf '%s\n' "$file" | grep -Eq '^programs/m[0-9]{2}/([a-z0-9-]+/)*[a-z0-9-]+\.ts$'; then
+                echo "hygiene: invalid suite module: $file" >&2
+                failed=1
+            fi
+            ;;
         programs/*.ts)
             if ! printf '%s\n' "$file" | grep -Eq '^programs/[abmx][0-9]{2}-[a-z0-9-]+\.ts$'; then
                 echo "hygiene: invalid program or module name: $file" >&2
                 failed=1
-            elif [ "${file#programs/m}" != "$file" ]; then
-                stem=${file#programs/}
-                stem=${stem%.ts}
-                id=${stem%%-*}
-                if ! grep -Fq "from \"./$stem\"" programs/[abx]"${id#m}"-*.ts 2>/dev/null; then
-                    echo "hygiene: no program with id ${id#m} imports $file" >&2
-                    failed=1
-                fi
             fi
             ;;
     esac

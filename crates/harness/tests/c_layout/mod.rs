@@ -48,9 +48,11 @@ fn programs() -> Vec<PathBuf> {
 
 fn checked(program: &Path) -> (Generated, hir::Module) {
     let files = subscript_typegpu_harness::program_files(program).expect("load program files");
+    let entry = files.iter().find(|file| file.entry).expect("program entry");
+    let support = subscript_typegpu_gen::support_module_key(&entry.name);
     let inputs = files
         .iter()
-        .filter(|file| !file.name.ends_with(".typegpu.ts"))
+        .filter(|file| subscript_compiler::module_key(&file.name) != support)
         .cloned()
         .collect::<Vec<SourceFile>>();
     let generated = subscript_typegpu_gen::generate(&inputs).expect("generate schema support");

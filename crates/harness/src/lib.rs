@@ -559,9 +559,6 @@ fn ship_facade_library() -> Result<NativeLibrary, String> {
 /// Returns a rejection that carries the rendered diagnostics when a check or the generation
 /// fails.
 fn prepare_program(program: &Path) -> Result<Vec<SourceFile>, ProgramLoadError> {
-    let stem = program.file_stem().and_then(OsStr::to_str).ok_or_else(|| {
-        ProgramLoadError::message(format!("program has no UTF-8 stem: {}", program.display()))
-    })?;
     let mut files =
         subscript_typegpu_gen::load_program_files(&repository_root().join("lib"), program)
             .map_err(|error| match error {
@@ -572,21 +569,23 @@ fn prepare_program(program: &Path) -> Result<Vec<SourceFile>, ProgramLoadError> 
                     ProgramLoadError::rejected(&[file], diagnostics)
                 }
             })?;
-    let support_module = format!("./{stem}.typegpu");
+    let entry = files
+        .last()
+        .ok_or_else(|| ProgramLoadError::message("missing program entry"))?;
+    let support_module = subscript_typegpu_gen::support_module_key(&entry.name);
     let mut options = subscript_compiler::CheckOptions::default();
     options.poison_missing_modules = vec![support_module.clone()];
     let discovery = subscript_compiler::check_program_with(&files, &options)
         .map_err(|diagnostics| ProgramLoadError::rejected(&files, diagnostics))?;
     // A program with no kernel imports no support module, so the generator stays unused.
-    if discovery
-        .poisoned_imports
-        .iter()
-        .any(|import| import.module == support_module)
-    {
+    if discovery.poisoned_imports.iter().any(|import| {
+        subscript_compiler::resolve_module_specifier(&import.pos.file, &import.module).as_deref()
+            == Some(support_module.as_str())
+    }) {
         let generated = subscript_typegpu_gen::generate(&files)
             .map_err(|diagnostics| ProgramLoadError::rejected(&files, diagnostics))?;
         files.push(SourceFile::new(
-            format!("{stem}.typegpu.ts"),
+            format!("{support_module}.ts"),
             generated.support_module,
         ));
     }

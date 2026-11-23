@@ -1,5 +1,6 @@
 //! Typed-HIR to WGSL kernel emission.
 
+use crate::registered_library;
 use crate::TryAny;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -18,11 +19,12 @@ use crate::schema::Schema;
 
 /// Returns constructor argument indices in field order (K9).
 fn constructor_order(
+    module: &Module,
     class: &subscript_compiler::hir::ClassDef,
     argument_count: usize,
     pos: &Pos,
 ) -> Result<Vec<usize>, Diagnostic> {
-    if class.pos.file == "typegpu-types.ts" {
+    if registered_library(module, &class.pos.file) == Some("typegpu-types.ts") {
         return Ok((0..argument_count).collect());
     }
     let invalid = || {
@@ -336,13 +338,16 @@ fn statement_pos(statement: &Stmt) -> Option<&Pos> {
 /// first statement's file both count.
 fn function_declared_in(module: &Module, name: &Symbol, file: &str) -> bool {
     function(module, name).is_some_and(|function| {
-        function.pos.file == file
-            || function.params.iter().any(|param| param.pos.file == file)
+        registered_library(module, &function.pos.file) == Some(file)
+            || function
+                .params
+                .iter()
+                .any(|param| registered_library(module, &param.pos.file) == Some(file))
             || function
                 .body
                 .first()
                 .and_then(statement_pos)
-                .is_some_and(|pos| pos.file == file)
+                .is_some_and(|pos| registered_library(module, &pos.file) == Some(file))
     })
 }
 
@@ -360,7 +365,7 @@ fn atomic_scalar(
         return Ok(None);
     };
     let class = crate::class(module, id.0, "kernel::atomic_scalar", pos)?;
-    if class.pos.file != "typegpu-types.ts" {
+    if registered_library(module, &class.pos.file) != Some("typegpu-types.ts") {
         return Ok(None);
     }
 
@@ -1059,7 +1064,7 @@ pub(crate) fn wgsl_type(module: &Module, ty: &Type, pos: &Pos) -> Result<String,
                     pos.clone(),
                 ));
             }
-            if class.pos.file != "typegpu-types.ts" {
+            if registered_library(module, &class.pos.file) != Some("typegpu-types.ts") {
                 return Ok(mapping::ident(&class.name));
             }
             match class.name.as_str() {
@@ -1334,7 +1339,7 @@ fn constant_type(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnost
         Type::FixedArray(item, _) => constant_type(module, item, pos)?,
         Type::Class(id) => {
             let class = crate::class(module, id.0, "kernel::constant_type", pos)?;
-            class.pos.file == "typegpu-types.ts"
+            registered_library(module, &class.pos.file) == Some("typegpu-types.ts")
                 && (class.name.starts_with("Vec") || class.name.starts_with("Mat"))
                 && atomic_scalar(module, ty, pos)?.is_none()
         }
@@ -1629,7 +1634,7 @@ fn fold_constant_expr(
                     expr.pos.clone(),
                 ));
             }
-            let order = constructor_order(class, args.len(), &expr.pos)?;
+            let order = constructor_order(module, class, args.len(), &expr.pos)?;
             Ok(FoldedConstant::Construct {
                 constructor: wgsl_type(module, &expr.ty, &expr.pos)?,
                 args: constructor_arguments(
@@ -1839,7 +1844,7 @@ fn constant_snippet(
                     expr.pos.clone(),
                 ));
             }
-            let order = constructor_order(class, args.len(), &expr.pos)?;
+            let order = constructor_order(module, class, args.len(), &expr.pos)?;
             let constructor = wgsl_type(module, &expr.ty, &expr.pos)?;
             let args = args
                 .iter()
@@ -2138,8 +2143,82 @@ fn local_names(function: &Function, module_names: &BTreeSet<String>) -> BTreeMap
     names
 }
 
+/// Names shared by the declarations and call sites of one WGSL module.
+struct ModuleNames {
+    /// WGSL identifiers that a parameter or local must avoid.
+    reserved: BTreeSet<String>,
+    /// Each reached function's name before WGSL identifier mapping.
+    functions: BTreeMap<Symbol, String>,
+}
+
+impl ModuleNames {
+    /// Returns the selected helper name for a declaration or call site.
+    fn function_name(&self, symbol: &Symbol) -> String {
+        self.functions
+            .get(symbol)
+            .cloned()
+            .unwrap_or_else(|| helper_name(symbol))
+    }
+}
+
+/// Selects the WGSL names of the functions in one pipeline.
+/// Ordinary helpers with the same name in separate application modules get their module keys as suffixes.
+fn module_function_names(
+    module: &Module,
+    helpers: &[Symbol],
+    entries: &[&Symbol],
+    shells: &crate::shell::ShellProgram,
+    globals: &[KernelGlobal],
+) -> Result<BTreeMap<Symbol, String>, Diagnostic> {
+    let mut groups = BTreeMap::<String, Vec<&Symbol>>::new();
+    for symbol in helpers.iter().chain(entries.iter().copied()) {
+        groups.entry(helper_name(symbol)).or_default().push(symbol);
+    }
+    let mut names = BTreeMap::new();
+    for (name, group) in groups {
+        if group.len() > 1 && !globals.iter().any(|global| global.name == name) {
+            let modules: Option<Vec<_>> = group
+                .iter()
+                .map(|symbol| {
+                    let helper = crate::pipeline::function(module, symbol)?;
+                    let key = subscript_compiler::module_key(&helper.pos.file);
+                    (symbol.source_name() == name
+                        && !entries.contains(symbol)
+                        && helper.pos.file != module.entry_pos.file
+                        && registered_library(module, &helper.pos.file).is_none()
+                        && !crate::shell::function_is_shell(shells, symbol))
+                    .then_some(key)
+                })
+                .collect();
+            if let Some(keys) = modules {
+                for (symbol, key) in group.into_iter().zip(keys) {
+                    let alias = format!("{name}_{key}");
+                    if let Some(raw) = &shells.declarations {
+                        if raw.names.contains(&mapping::ident(&alias)) {
+                            return Err(alias_collision(&name, &key, &raw.pos));
+                        }
+                    }
+                    names.insert(symbol.clone(), alias);
+                }
+                continue;
+            }
+        }
+        for symbol in group {
+            names.insert(symbol.clone(), name.clone());
+        }
+    }
+    Ok(names)
+}
+
+/// Reports the source helper and both module keys for an alias collision.
+fn alias_collision(name: &str, key: &str, other: &Pos) -> Diagnostic {
+    let other_key = subscript_compiler::module_key(&other.file);
+    diagnostic("K14", format!("helper `{name}` in module `{key}` collides with a WGSL declaration from module `{other_key}`"), other.clone())
+}
+
 /// Emits the WGSL of one function body, entry point or helper.
 struct Emitter<'a> {
+    names: &'a ModuleNames,
     module: &'a Module,
     /// Each layout parameter name and its group index, so a field access on one is a binding.
     layout_params: BTreeMap<String, usize>,
@@ -2193,7 +2272,7 @@ impl<'a> Emitter<'a> {
         invocation_index: usize,
         invocation_kind: InvocationKind,
         globals: &[KernelGlobal],
-        module_names: &BTreeSet<String>,
+        module_names: &'a ModuleNames,
     ) -> Self {
         // Pipeline discovery validates the concrete parameter types.
 
@@ -2214,9 +2293,10 @@ impl<'a> Emitter<'a> {
                 );
             }
         }
-        let local_names = local_names(kernel, module_names);
+        let local_names = local_names(kernel, &module_names.reserved);
 
         Self {
+            names: module_names,
             module,
             layout_params,
             layout_symbols: layouts.iter().map(|layout| layout.symbol.clone()).collect(),
@@ -2249,9 +2329,9 @@ impl<'a> Emitter<'a> {
         module: &'a Module,
         helper: &Function,
         globals: &[KernelGlobal],
-        module_names: &BTreeSet<String>,
+        module_names: &'a ModuleNames,
     ) -> Self {
-        let mut reserved = module_names.clone();
+        let mut reserved = module_names.reserved.clone();
         let receiver_name = receiver_class(module, helper).map(|_| {
             let mut name = mapping::ident("self");
             while !reserved.insert(name.clone()) {
@@ -2260,6 +2340,7 @@ impl<'a> Emitter<'a> {
             name
         });
         Self {
+            names: module_names,
             module,
             layout_params: BTreeMap::new(),
             layout_symbols: BTreeSet::new(),
@@ -2741,7 +2822,7 @@ impl<'a> Emitter<'a> {
                         expr.pos.clone(),
                     ));
                 }
-                let order = constructor_order(class, args.len(), &expr.pos)?;
+                let order = constructor_order(self.module, class, args.len(), &expr.pos)?;
                 let reordered = order
                     .iter()
                     .enumerate()
@@ -2969,12 +3050,13 @@ impl<'a> Emitter<'a> {
                         expr.pos.clone(),
                     ));
                 }
-                let is_library = function(self.module, name)
-                    .is_some_and(|function| function.pos.file == "typegpu-types.ts");
+                let is_library = function(self.module, name).is_some_and(|function| {
+                    registered_library(self.module, &function.pos.file) == Some("typegpu-types.ts")
+                });
                 let mapped = is_library.then(|| mapping::free_function(&base)).flatten();
                 let called = match mapped {
                     Some(mapped) => mapped.to_owned(),
-                    None => mapping::ident(&helper_name(name)),
+                    None => mapping::ident(&self.names.function_name(name)),
                 };
                 let (args, prelude) = self.snippets(args)?;
                 Ok(Snippet {
@@ -2985,17 +3067,17 @@ impl<'a> Emitter<'a> {
             }
             Callee::Method { recv, name } => {
                 if let Type::Class(id) = recv.ty {
-                    if let Some(class) = self
-                        .module
-                        .classes
-                        .get(id.0)
-                        .filter(|class| class.is_value && class.pos.file != "typegpu-types.ts")
-                    {
+                    if let Some(class) = self.module.classes.get(id.0).filter(|class| {
+                        class.is_value
+                            && registered_library(self.module, &class.pos.file)
+                                != Some("typegpu-types.ts")
+                    }) {
                         if let Some(method) =
                             class.methods.iter().find(|method| method.symbol == *name)
                         {
-                            let called =
-                                mapping::ident(&helper_name(&method_symbol(class, method)));
+                            let called = mapping::ident(
+                                &self.names.function_name(&method_symbol(class, method)),
+                            );
                             let receiver = self.snippet(recv)?;
                             let (mut texts, prelude) = self.snippets(args)?;
                             texts.insert(0, receiver.text);
@@ -3293,7 +3375,7 @@ impl<'a> Emitter<'a> {
                         expr.pos.clone(),
                     )
                 })?;
-                let library = matches!(&recv.ty, Type::Class(id) if crate::class(self.module, id.0, "kernel::call", &expr.pos)?.pos.file == "typegpu-types.ts");
+                let library = matches!(&recv.ty, Type::Class(id) if registered_library(self.module, &crate::class(self.module, id.0, "kernel::call", &expr.pos)?.pos.file) == Some("typegpu-types.ts"));
                 if !library {
                     return Err(diagnostic(
                         "K10",
@@ -4750,11 +4832,11 @@ fn called_functions_expr(module: &Module, expr: &Expr, out: &mut BTreeSet<Symbol
             }
             if let Callee::Method { recv, name } = callee {
                 if let Type::Class(id) = recv.ty {
-                    if let Some(class) = module
-                        .classes
-                        .get(id.0)
-                        .filter(|class| class.is_value && class.pos.file != "typegpu-types.ts")
-                    {
+                    if let Some(class) = module.classes.get(id.0).filter(|class| {
+                        class.is_value
+                            && registered_library(module, &class.pos.file)
+                                != Some("typegpu-types.ts")
+                    }) {
                         if let Some(method) =
                             class.methods.iter().find(|method| method.symbol == *name)
                         {
@@ -4907,8 +4989,8 @@ fn collect_schema_type(
         Type::Class(id) => {
             let class = crate::class(module, id.0, "kernel::collect_schema_type", pos)?;
             if class.is_value
-                && class.pos.file != "typegpu-types.ts"
-                && class.pos.file != "typegpu.ts"
+                && registered_library(module, &class.pos.file) != Some("typegpu-types.ts")
+                && registered_library(module, &class.pos.file) != Some("typegpu.ts")
                 && seen.insert(class.symbol.clone())
             {
                 out.push(class.symbol.clone());
@@ -5174,65 +5256,86 @@ fn source_order(symbols: BTreeSet<Symbol>) -> Vec<Symbol> {
 
 /// Rejects two program declarations that one WGSL module would declare under one name (K14).
 ///
-/// The emitted WGSL names a function or a module-level declaration by its source name. A
-/// program of several files can declare one source name in two modules, and the WGSL module then
-/// has no name for the second declaration.
-///
 /// # Errors
 ///
 /// Returns a K14 diagnostic that names the shared source name.
 fn validate_unique_sources(
-    entries: &[&Symbol],
-    dependencies: &[Symbol],
+    module: &Module,
+    functions: &BTreeMap<Symbol, String>,
     globals: &[KernelGlobal],
     structs: &[(String, String)],
     layouts: &[crate::pipeline::Layout],
     interface_names: &[String],
     pos: &Pos,
 ) -> Result<(), Diagnostic> {
-    let mut owners = BTreeMap::<String, &Symbol>::new();
-    let functions = entries
-        .iter()
-        .copied()
-        .chain(dependencies)
-        .map(|symbol| (helper_name(symbol), symbol));
+    let mut owners = BTreeMap::new();
     let declarations = globals
         .iter()
-        .map(|global| (global.name.clone(), &global.symbol));
-    for (name, symbol) in functions.chain(declarations) {
-        let emitted = mapping::ident(&name);
-        match owners.get(&emitted) {
-            Some(owner) if *owner != symbol => {
-                return Err(diagnostic(
-                    "K14",
-                    format!("two program declarations share the source name `{name}` in one WGSL module"),
-                    pos.clone(),
-                ));
-            }
-            Some(_) => {}
-            None => {
-                owners.insert(emitted, symbol);
+        .map(|global| (&global.name, &global.symbol, &global.pos));
+    let helpers = functions.iter().map(|(symbol, name)| {
+        (
+            name,
+            symbol,
+            function(module, symbol).map_or(pos, |helper| &helper.pos),
+        )
+    });
+    let collision = |name: &str| {
+        diagnostic(
+            "K14",
+            format!("two program declarations share the source name `{name}` in one WGSL module"),
+            pos.clone(),
+        )
+    };
+    for (name, symbol, origin) in helpers.chain(declarations) {
+        let alias = functions.contains_key(symbol) && *name != helper_name(symbol);
+        if let Some((previous, previous_pos, previous_alias)) =
+            owners.insert(mapping::ident(name), (symbol, origin, alias))
+        {
+            if previous != symbol {
+                if alias {
+                    return Err(alias_collision(
+                        &symbol.source_name(),
+                        &subscript_compiler::module_key(&origin.file),
+                        previous_pos,
+                    ));
+                }
+                if previous_alias {
+                    return Err(alias_collision(
+                        &previous.source_name(),
+                        &subscript_compiler::module_key(&previous_pos.file),
+                        origin,
+                    ));
+                }
+                return Err(collision(name));
             }
         }
     }
-    for name in structs
+    let classes = structs
         .iter()
         .map(|(name, _)| name)
-        .chain(
-            layouts
-                .iter()
-                .flat_map(|layout| layout.bindings.iter().map(|binding| &binding.name)),
-        )
         .chain(interface_names)
-    {
-        if owners.contains_key(&mapping::ident(name)) {
-            return Err(diagnostic(
-                "K14",
-                format!(
-                    "two program declarations share the source name `{name}` in one WGSL module"
-                ),
-                pos.clone(),
-            ));
+        .map(|name| {
+            let origin = module
+                .classes
+                .iter()
+                .find(|class| &class.name == name)
+                .map_or(pos, |class| &class.pos);
+            (name, origin)
+        });
+    let bindings = layouts
+        .iter()
+        .flat_map(|layout| &layout.bindings)
+        .map(|binding| (&binding.name, &binding.pos));
+    for (name, origin) in classes.chain(bindings) {
+        if let Some((symbol, helper_pos, alias)) = owners.get(&mapping::ident(name)) {
+            if *alias {
+                return Err(alias_collision(
+                    &symbol.source_name(),
+                    &subscript_compiler::module_key(&helper_pos.file),
+                    origin,
+                ));
+            }
+            return Err(collision(name));
         }
     }
     Ok(())
@@ -5288,8 +5391,8 @@ fn dependencies(
             return Ok(());
         };
         if matches!(
-            function.pos.file.as_str(),
-            "typegpu-types.ts" | "typegpu.ts"
+            registered_library(module, &function.pos.file),
+            Some("typegpu-types.ts" | "typegpu.ts")
         ) {
             return Ok(());
         }
@@ -5350,13 +5453,12 @@ fn builtin_parameter(name: &str) -> &'static str {
 /// gains a `_` and shadows nothing. The builtin parameter names join the set, because an entry
 /// point declares them beside the module declarations.
 fn module_scope_names(
+    functions: BTreeMap<Symbol, String>,
     structs: &[(String, String)],
     layouts: &[crate::pipeline::Layout],
     globals: &[KernelGlobal],
-    helpers: &[Symbol],
-    entries: &[&Symbol],
     declaration_names: Option<&BTreeSet<String>>,
-) -> BTreeSet<String> {
+) -> ModuleNames {
     let mut names = structs
         .iter()
         .map(|(name, _)| mapping::ident(name))
@@ -5368,16 +5470,7 @@ fn module_scope_names(
             .map(|binding| mapping::ident(&binding.name)),
     );
     names.extend(globals.iter().map(|global| mapping::ident(&global.name)));
-    names.extend(
-        helpers
-            .iter()
-            .map(|name| mapping::ident(&helper_name(name))),
-    );
-    names.extend(
-        entries
-            .iter()
-            .map(|name| mapping::ident(&helper_name(name))),
-    );
+    names.extend(functions.values().map(|name| mapping::ident(name)));
     names.extend(declaration_names.into_iter().flatten().cloned());
     names.extend(
         [
@@ -5393,7 +5486,10 @@ fn module_scope_names(
         .into_iter()
         .map(str::to_owned),
     );
-    names
+    ModuleNames {
+        reserved: names,
+        functions,
+    }
 }
 
 /// Returns the one-based line number that the next appended character starts on.
@@ -5525,11 +5621,10 @@ pub(crate) fn emit(
         .collect::<Vec<_>>();
     let globals = kernel_globals(module, kernel, shells)?;
     let module_names = module_scope_names(
+        module_function_names(module, &dependencies, &[&pipeline.entry], shells, &globals)?,
         structs,
         &pipeline.layouts,
         &globals,
-        &helpers,
-        &[&pipeline.entry],
         shells.declarations.as_ref().map(|item| &item.names),
     );
     validate_statement_subset(&kernel.body)?;
@@ -5615,7 +5710,7 @@ pub(crate) fn emit(
         };
         helper_text.push_str(&format!(
             "fn {}({}){result} {{\n",
-            mapping::ident(&helper_name(name)),
+            mapping::ident(&module_names.function_name(name)),
             params.join(", ")
         ));
         helper_emitter.statements(&helper.body, 1, &mut helper_text)?;
@@ -5655,8 +5750,8 @@ pub(crate) fn emit(
     // emitted text did (K22).
     BarrierValidator::new(&emitter, kernel).validate(kernel)?;
     validate_unique_sources(
-        &[&pipeline.entry],
-        &dependencies,
+        module,
+        &module_names.functions,
         &globals,
         structs,
         &pipeline.layouts,
@@ -5893,7 +5988,7 @@ fn render_helpers(
     pipeline: &RenderPipeline,
     kernels: [&Function; 2],
     globals: &[KernelGlobal],
-    module_names: &BTreeSet<String>,
+    module_names: &ModuleNames,
     shells: &crate::shell::ShellProgram,
 ) -> Result<String, Diagnostic> {
     let mut names = Vec::new();
@@ -5970,7 +6065,7 @@ fn render_helpers(
         };
         out.push_str(&format!(
             "fn {}({}){result} {{\n",
-            mapping::ident(&helper_name(&name)),
+            mapping::ident(&module_names.function_name(&name)),
             params.join(", ")
         ));
         emitter.statements(&helper.body, 1, &mut out)?;
@@ -6013,11 +6108,16 @@ pub(crate) fn emit_render(
         }
     }
     let mut module_names = module_scope_names(
+        module_function_names(
+            module,
+            &helper_names,
+            &[&pipeline.vertex_entry, &pipeline.fragment_entry],
+            shells,
+            &globals,
+        )?,
         structs,
         &pipeline.layouts,
         &globals,
-        &helper_names,
-        &[&pipeline.vertex_entry, &pipeline.fragment_entry],
         shells.declarations.as_ref().map(|item| &item.names),
     );
     let interface_names = pipeline
@@ -6026,7 +6126,9 @@ pub(crate) fn emit_render(
         .map(|buffer| buffer.schema.clone())
         .chain(std::iter::once(pipeline.varyings_name.clone()))
         .collect::<Vec<_>>();
-    module_names.extend(interface_names.iter().map(|name| mapping::ident(name)));
+    module_names
+        .reserved
+        .extend(interface_names.iter().map(|name| mapping::ident(name)));
     let layout_count = pipeline.layouts.len();
     let vertex_value_count = pipeline.vertex_buffers.len();
     let mut vertex_emitter = Emitter::entry(
@@ -6122,8 +6224,8 @@ pub(crate) fn emit_render(
         shells,
     )?);
     validate_unique_sources(
-        &[&pipeline.vertex_entry, &pipeline.fragment_entry],
-        &helper_names,
+        module,
+        &module_names.functions,
         &globals,
         structs,
         &pipeline.layouts,

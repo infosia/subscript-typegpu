@@ -1,33 +1,13 @@
 //! EG11 gate for binding-wrapper method calls in authored programs.
 
-use std::ffi::OsStr;
+use crate::{collect_ts_files, repository_root};
 use std::path::{Path, PathBuf};
 
 use subscript_compiler::hir::{
     AsyncCallee, Callee, Expr, ExprKind, Function, Module, Stmt, TplPart,
 };
 use subscript_compiler::{CheckOptions, Type};
-
-fn repository_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(2)
-        .expect("harness crate is under the repository root")
-        .to_path_buf()
-}
-
-fn collect_ts_files(directory: &Path, recursive: bool, files: &mut Vec<PathBuf>) {
-    let entries = std::fs::read_dir(directory)
-        .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()));
-    for entry in entries {
-        let path = entry.expect("read source entry").path();
-        if recursive && path.is_dir() {
-            collect_ts_files(&path, true, files);
-        } else if path.is_file() && path.extension() == Some(OsStr::new("ts")) {
-            files.push(path);
-        }
-    }
-}
+use subscript_typegpu_gen::registered_library;
 
 fn authored_sources() -> Vec<PathBuf> {
     let root = repository_root();
@@ -49,7 +29,7 @@ fn wrapper_name<'a>(module: &'a Module, receiver: &Expr) -> Option<&'a str> {
         return None;
     };
     let class = module.classes.get(id.0)?;
-    if class.pos.file != "typegpu.ts"
+    if registered_library(module, &class.pos.file) != Some("typegpu.ts")
         || !matches!(
             class.name.split_once('<').map(|(name, _)| name),
             Some("Storage" | "MutStorage" | "WorkgroupArray")
@@ -390,14 +370,20 @@ fn failures(source: &Path) -> Vec<String> {
     let root = repository_root();
     let relative = source.strip_prefix(&root).unwrap_or(source);
     let mut failures = Vec::new();
+    let prefix = Path::new(&module.entry_pos.file)
+        .parent()
+        .expect("entry directory");
     for file in &files {
+        let Ok(name) = Path::new(&file.name).strip_prefix(prefix) else {
+            continue;
+        };
         if file.entry
             || matches!(
-                file.name.as_bytes(),
-                [b'm', b'0'..=b'9', b'0'..=b'9', b'-', ..]
+                name.as_os_str().as_encoded_bytes(),
+                [b'm', b'0'..=b'9', b'0'..=b'9', b'-' | b'/', ..]
             )
         {
-            let path = relative.with_file_name(&file.name);
+            let path = relative.with_file_name(name);
             inspect_module(
                 &module,
                 &file.source,

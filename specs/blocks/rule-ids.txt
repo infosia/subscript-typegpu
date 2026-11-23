@@ -236,6 +236,7 @@ SC8
 SC9
 T1
 T1 Rev 1
+T1 Rev 2
 T10
 T11
 T12
@@ -347,6 +348,7 @@ LB3
 LB4
 LB5
 LB5 Rev 1
+LB5 Rev 2
 LB1 Rev 1
 LB1 Rev 2
 LB3 Rev 1

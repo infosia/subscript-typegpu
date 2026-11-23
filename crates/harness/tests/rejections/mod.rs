@@ -19,7 +19,7 @@ fn files(fixture: &Path) -> Vec<SourceFile> {
         .unwrap_or_else(|error| panic!("load {}: {error}", fixture.display()))
 }
 
-fn assert_missing_import(entry: &str, specifier: &str) {
+fn assert_missing_import(entry: &str, importer: &str, specifier: &str) {
     let program = root()
         .join("crates/harness/tests/fixtures/app-modules")
         .join(entry);
@@ -31,19 +31,19 @@ fn assert_missing_import(entry: &str, specifier: &str) {
         "{diagnostics}"
     );
     assert!(
-        diagnostics.contains(&format!(" --> {entry}:2:")),
+        diagnostics.contains(&format!(" --> {importer}:2:")),
         "{diagnostics}"
     );
 }
 
 #[test]
 fn missing_application_module_reports_the_import_site() {
-    assert_missing_import("missing.ts", "./absent");
+    assert_missing_import("missing.ts", "missing.ts", "./sub/missing");
 }
 
 #[test]
-fn subdirectory_import_reports_the_import_site() {
-    assert_missing_import("nested.ts", "./sub/tile");
+fn subdirectory_library_import_reports_the_import_site() {
+    assert_missing_import("wrong-library.ts", "sub/wrong-library.ts", "./typegpu");
 }
 
 #[test]

@@ -1,7 +1,7 @@
 # Block: testing (T-rules)
 
 P0 contract. Rev 0, 2026-08-22. Rev 1 (T1: application modules),
-2026-11-23. CLAUDE.md "Build time" and "Core
+2026-11-23. Rev 2 (T1: module directories), 2026-11-23. CLAUDE.md "Build time" and "Core
 principles" govern this block.
 
 ## Programs
@@ -16,7 +16,10 @@ principles" govern this block.
   where `<nn>` is the id of the importing program. It is not a
   program, has no golden, and no suite runs it as an entry. Its
   header follows T3 with `module:` in place of `program:`. A program
-  with the id `<nn>` imports it.
+  with the id `<nn>` imports it. Rev 2, 2026-11-23: the modules of
+  program `<nn>` can also sit below the directory `programs/m<nn>/`.
+  Each file there carries the same header, and a program with the id
+  `<nn>` reaches each file through its imports.
 - **T2 — Determinism.** Programs never print backend-reported
   values. A printed value is a generated constant read by name, a
   host-computed result, or a plain marker. A value read back from a

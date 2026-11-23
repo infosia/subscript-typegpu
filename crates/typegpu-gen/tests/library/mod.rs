@@ -10,18 +10,29 @@ use crate::support::{self, TempDir};
 #[test]
 fn application_dependencies_follow_libraries_and_precede_their_importers() {
     let directory = TempDir::new("app-order");
+    std::fs::create_dir_all(directory.0.join("app/sub")).expect("create module directory");
     let entry = directory.write(
-        "main.ts",
+        "app/main.ts",
         r#"
-        import { tile } from "./tile";
-        import { size } from "./size";
-        import { tile_ENTRY } from "./main.typegpu";
+        import { tile } from "./sub/tile";
+        import { size } from "./sub/../size.ts";
     "#,
     );
-    directory.write("tile.ts", r#"import { size } from "./size";"#);
-    directory.write("size.ts", r#"import { UiContext } from "./typegpu-ui";"#);
-    for name in ["typegpu-ui.ts", "main.typegpu.ts"] {
-        std::fs::write(directory.0.join(name), [0xff]).expect("write unreadable source text");
+    directory.write(
+        "app/sub/tile.ts",
+        r#"
+        import { UiContext } from "../typegpu-ui.ts";
+        import { size } from "../size";
+        import { tile_ENTRY } from "../main.typegpu";
+        import { MutStorage } from "../typegpu";
+    "#,
+    );
+    directory.write("app/size.ts", r#"import { width } from "../width";"#);
+    directory.write("width.ts", r#"import { unit } from "./unit";"#);
+    directory.write("unit.ts", "");
+    for name in ["typegpu.ts", "typegpu-ui.ts", "main.typegpu.ts"] {
+        std::fs::write(directory.0.join("app").join(name), [0xff])
+            .expect("write invalid source text");
     }
     let files = load_program_files(&support::root().join("lib"), &entry)
         .expect("load the registered UI module and skip the support file on disk");
@@ -31,16 +42,18 @@ fn application_dependencies_follow_libraries_and_precede_their_importers() {
             .map(|file| file.name.as_str())
             .collect::<Vec<_>>(),
         [
-            "subscript-typegpu.generated.d.ts",
-            "wire-enum-aliases.generated.d.ts",
-            "webgpu.ts",
-            "typegpu-types.ts",
-            "typegpu.ts",
-            "typegpu-ui-atlas.generated.ts",
-            "typegpu-ui.ts",
-            "size.ts",
-            "tile.ts",
-            "main.ts",
+            "app/subscript-typegpu.generated.d.ts",
+            "app/wire-enum-aliases.generated.d.ts",
+            "app/webgpu.ts",
+            "app/typegpu-types.ts",
+            "app/typegpu.ts",
+            "app/typegpu-ui-atlas.generated.ts",
+            "app/typegpu-ui.ts",
+            "unit.ts",
+            "width.ts",
+            "app/size.ts",
+            "app/sub/tile.ts",
+            "app/main.ts",
         ]
     );
     assert_eq!(
@@ -49,8 +62,107 @@ fn application_dependencies_follow_libraries_and_precede_their_importers() {
             .filter(|file| file.entry)
             .map(|file| file.name.as_str())
             .collect::<Vec<_>>(),
-        ["main.ts"]
+        ["app/main.ts"]
     );
+}
+
+#[test]
+fn outside_module_reaches_the_entry_once() {
+    let directory = TempDir::new("outside-cycle");
+    for name in ["sub", "shared"] {
+        std::fs::create_dir(directory.0.join(name)).expect("create source directory");
+    }
+    let entry = directory.write("sub/main.ts", r#"import { x } from "../shared/x";"#);
+    directory.write("shared/x.ts", r#"import { main } from "../sub/main";"#);
+    let files = support::program_files(&entry);
+    let names: Vec<_> = files
+        .iter()
+        .skip(4)
+        .map(|file| file.name.as_str())
+        .collect();
+    assert_eq!(names, ["sub/typegpu.ts", "shared/x.ts", "sub/main.ts"]);
+    assert!(files.last().expect("entry").entry);
+}
+
+#[test]
+fn registered_and_support_keys_use_the_entry_directory() {
+    let entry = SourceFile::entry("sub/main.ts", "");
+    assert_eq!(
+        subscript_typegpu_gen::support_module_key(&entry.name),
+        "sub/main.typegpu"
+    );
+    let module = subscript_compiler::check_program(&[entry]).expect("check entry");
+    for (file, expected) in [
+        ("sub/typegpu.ts", Some("typegpu.ts")),
+        ("sub/./typegpu.ts", Some("typegpu.ts")),
+        ("typegpu.ts", None),
+        ("elsewhere/typegpu.ts", None),
+    ] {
+        assert_eq!(
+            subscript_typegpu_gen::registered_library(&module, file),
+            expected
+        );
+    }
+}
+
+#[test]
+fn transitive_parent_import_moves_the_root_again() {
+    let directory = TempDir::new("transitive-parent");
+    std::fs::create_dir_all(directory.0.join("sub/deep")).expect("create source directories");
+    let entry = directory.write("sub/deep/main.ts", r#"import { x } from "../x";"#);
+    directory.write("sub/x.ts", r#"import { y } from "../y";"#);
+    directory.write("y.ts", r#"import { Uniform } from "./sub/deep/typegpu";"#);
+    let files = support::program_files(&entry);
+    let names: Vec<_> = files
+        .iter()
+        .skip(4)
+        .map(|file| file.name.as_str())
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "sub/deep/typegpu.ts",
+            "y.ts",
+            "sub/x.ts",
+            "sub/deep/main.ts"
+        ]
+    );
+}
+
+#[test]
+fn parent_import_can_reach_only_virtual_modules() {
+    let directory = TempDir::new("virtual-parent");
+    std::fs::create_dir(directory.0.join("sub")).expect("create entry directory");
+    let entry = directory.write(
+        "sub/main.ts",
+        r#"
+        import { UiContext } from "../sub/typegpu-ui";
+        import { Cell_SIZE } from "../sub/main.typegpu";
+    "#,
+    );
+    let files = support::program_files(&entry);
+    assert!(files.iter().any(|file| file.name == "sub/typegpu-ui.ts"));
+    assert_eq!(files.last().expect("entry").name, "sub/main.ts");
+}
+
+#[test]
+fn directory_keys_do_not_load_similarly_named_files() {
+    let directory = TempDir::new("directory-keys");
+    for name in [".ts", "...ts"] {
+        directory.write(name, "invalid source!");
+    }
+    let entry = directory.write(
+        "main.ts",
+        r#"import { x } from "./"; import { y } from "../";"#,
+    );
+    let files = support::program_files(&entry);
+    let diagnostics = subscript_compiler::check_program(&files).expect_err("directory imports");
+    for specifier in ["./", "../"] {
+        assert!(diagnostics.iter().any(|item| item.code.as_str() == "S100"
+            && item
+                .message
+                .contains(&format!("imported module `{specifier}`"))));
+    }
 }
 
 #[test]
@@ -58,9 +170,9 @@ fn application_module_read_error_names_the_path() {
     let directory = TempDir::new("app-read");
     let entry = directory.write("main.ts", r#"import { x } from "./x";"#);
     let path = directory.0.join("x.ts");
-    std::fs::create_dir(&path).expect("create directory in place of module");
+    std::fs::write(&path, [0xff]).expect("write invalid UTF-8");
     let error = load_program_files(&support::root().join("lib"), &entry)
-        .expect_err("a directory cannot supply module source");
+        .expect_err("invalid UTF-8 source must fail");
     let LibraryLoadError::Read(message) = error else {
         panic!("expected a read error: {error}");
     };
@@ -68,6 +180,49 @@ fn application_module_read_error_names_the_path() {
         message.contains(path.to_string_lossy().as_ref()),
         "{message}"
     );
+}
+
+#[test]
+fn only_resolved_root_keys_select_registered_and_support_modules() {
+    let directory = TempDir::new("reserved-keys");
+    std::fs::create_dir(directory.0.join("sub")).expect("create module directory");
+    let entry = directory.write("main.ts", r#"import { value } from "./sub/entry";"#);
+    directory.write(
+        "sub/entry.ts",
+        r#"
+        import { value } from "./typegpu";
+        import { fact } from "./main.typegpu";
+    "#,
+    );
+    directory.write("sub/typegpu.ts", "");
+    directory.write("sub/main.typegpu.ts", "");
+    let files = support::program_files(&entry);
+    let names: Vec<_> = files
+        .iter()
+        .skip(5)
+        .map(|file| file.name.as_str())
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "sub/typegpu.ts",
+            "sub/main.typegpu.ts",
+            "sub/entry.ts",
+            "main.ts"
+        ]
+    );
+}
+
+#[test]
+fn a_directory_at_the_module_path_leaves_the_import_unresolved() {
+    let directory = TempDir::new("app-directory");
+    let entry = directory.write("main.ts", r#"import { x } from "./x";"#);
+    std::fs::create_dir(directory.0.join("x.ts")).expect("create directory at module path");
+    let files = support::program_files(&entry);
+    let diagnostics = subscript_compiler::check_program(&files).expect_err("directory import");
+    assert!(diagnostics.iter().any(|item| item.code.as_str() == "S100"
+        && item.pos.file == "main.ts"
+        && item.message.contains("imported module `./x`")));
 }
 
 #[test]

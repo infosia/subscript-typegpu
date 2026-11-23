@@ -23,11 +23,11 @@ mod shell;
 mod ui_atlas;
 
 /// `load_program_files` and its library loader `read_libraries` report failures through `LibraryLoadError`.
-pub use library::{load_program_files, LibraryLoadError};
+pub use library::{load_program_files, registered_library, support_module_key, LibraryLoadError};
 /// Atlas module generation for the ui library.
 pub use ui_atlas::generate_ui_atlas;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use subscript_compiler::hir::{Expr, ExprKind, Module, Symbol};
 use subscript_compiler::{CheckOptions, Diagnostic, Pos, RuleCode, SourceFile};
@@ -137,15 +137,6 @@ pub struct Generated {
     pub compute_pipelines: Vec<GeneratedComputePipeline>,
     /// Recorded author-WGSL ranges for K31 attribution.
     pub wgsl_spans: Vec<GeneratedWgslSpan>,
-}
-
-/// The program's import of its own support module, which does not exist during discovery (SC1a).
-#[derive(Debug)]
-struct SupportImport {
-    /// The names the program imports.
-    names: BTreeSet<String>,
-    /// The import declaration's position, which carries every diagnostic about a missing name.
-    pos: Pos,
 }
 
 /// Builds the diagnostic for a broken generator invariant.
@@ -264,11 +255,6 @@ fn validate_unique_layouts(
     Ok(())
 }
 
-/// Reports whether `name` is a registered library module (LB1).
-fn is_library_file(name: &str) -> bool {
-    library::LIBRARY_ORDER.contains(&name)
-}
-
 /// Builds the check options that let the program import a support module that does not exist yet.
 ///
 /// An explicit entry selects the support specifier (SC1a). Without one, the sole ordinary source selects it.
@@ -277,19 +263,33 @@ fn is_library_file(name: &str) -> bool {
 ///
 /// If no file is the entry and more than one ordinary source exists, returns an SC1 diagnostic.
 fn discovery_options(files: &[SourceFile]) -> Result<CheckOptions, Vec<Diagnostic>> {
-    let explicit_entry = files.iter().any(|file| file.entry);
+    let ordinary: Vec<_> = files
+        .iter()
+        .filter(|file| !file.dts && file.name.ends_with(".ts"))
+        .map(|file| (file, subscript_compiler::module_key(&file.name)))
+        .collect();
+    let explicit = ordinary.iter().find(|(file, _)| file.entry);
+    // Without an explicit entry, its registered siblings and generated support can accompany it.
+    let candidate = explicit.or_else(|| {
+        ordinary.iter().find(|(_, key)| {
+            library::registered(library::directory_prefix(key), key).is_none()
+                && !ordinary
+                    .iter()
+                    .any(|(_, other)| key.strip_suffix(".typegpu") == Some(other))
+        })
+    });
     let mut modules = Vec::new();
-    for file in files {
-        if explicit_entry && !file.entry {
-            continue;
+    if let Some((entry, key)) = candidate {
+        let prefix = library::directory_prefix(key);
+        let support = support_module_key(&entry.name);
+        for (file, key) in &ordinary {
+            if explicit.is_some() && !file.entry {
+                continue;
+            }
+            if library::registered(prefix, key).is_none() && *key != support {
+                modules.push((file.name.as_str(), support_module_key(&file.name)));
+            }
         }
-        if file.dts || is_library_file(&file.name) || file.name.ends_with(".typegpu.ts") {
-            continue;
-        }
-        let Some(stem) = file.name.strip_suffix(".ts") else {
-            continue;
-        };
-        modules.push((file.name.as_str(), format!("./{stem}.typegpu")));
     }
     if let Some((file, _)) = modules.get(1) {
         return Err(vec![diagnostic(
@@ -303,33 +303,24 @@ fn discovery_options(files: &[SourceFile]) -> Result<CheckOptions, Vec<Diagnosti
     Ok(options)
 }
 
-/// Reads the program's support-module import from the discovery HIR (SC1a).
-///
-/// The result is `None` when the program imports no support module, which a program with no schema
-/// and no pipeline does.
-///
-/// # Errors
-///
-/// If the module carries a second poisoned import, returns an SC1 diagnostic.
-fn support_import(
-    module: &subscript_compiler::hir::Module,
-) -> Result<Option<SupportImport>, Vec<Diagnostic>> {
-    match module.poisoned_imports.as_slice() {
-        [] => Ok(None),
-        [support] => Ok(Some(SupportImport {
-            names: support
-                .names
-                .iter()
-                .map(|(imported, _)| imported.clone())
-                .collect(),
-            pos: support.pos.clone(),
-        })),
-        [_, second, ..] => Err(vec![diagnostic(
-            "SC1",
-            "one generator run found more than one support-module import",
-            second.pos.clone(),
-        )]),
+/// Merges imports of the entry's support module and keeps the import site for each name (SC1a).
+fn support_imports(module: &Module, support_key: Option<&String>) -> BTreeMap<String, Pos> {
+    let mut names = BTreeMap::new();
+    let Some(key) = support_key else {
+        return names;
+    };
+    for import in &module.poisoned_imports {
+        if subscript_compiler::resolve_module_specifier(&import.pos.file, &import.module).as_ref()
+            == Some(key)
+        {
+            for (name, _) in &import.names {
+                names
+                    .entry(name.clone())
+                    .or_insert_with(|| import.pos.clone());
+            }
+        }
     }
+    names
 }
 
 /// Recovers the schema name from one imported constant name (SC11).
@@ -357,15 +348,14 @@ fn schema_name(export: &str) -> Option<&str> {
 /// A pipeline declaration produces constants with the same suffixes as a schema (PI8), so the
 /// declaration names drop out. The result seeds schema discovery, which adds the reachable classes.
 fn intended_schemas(
-    support: Option<&SupportImport>,
+    support: &BTreeMap<String, Pos>,
     pipeline_declarations: &BTreeSet<String>,
-) -> BTreeSet<String> {
+) -> BTreeMap<String, Pos> {
     support
-        .into_iter()
-        .flat_map(|support| &support.names)
-        .filter_map(|name| schema_name(name))
-        .filter(|name| !pipeline_declarations.contains(*name))
-        .map(str::to_owned)
+        .iter()
+        .filter_map(|(fact, pos)| Some((schema_name(fact)?, pos)))
+        .filter(|(name, _)| !pipeline_declarations.contains(*name))
+        .map(|(name, pos)| (name.to_owned(), pos.clone()))
         .collect()
 }
 
@@ -403,7 +393,7 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     // Every emitted struct name and layout constant name below is a source name, so the check
     // runs before the first one.
     validate_unique_classes(&module).map_err(|item| vec![item])?;
-    let support = support_import(&module)?;
+    let support = support_imports(&module, options.poison_missing_modules.first());
     let shell_program = shell::discover(&module)?;
     let pipeline_definitions = pipeline::discover(&module, &shell_program)?;
     let render_definitions = render::discover(&module)?;
@@ -453,7 +443,7 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         .collect::<BTreeSet<_>>();
     // A class is a schema when a schema use reaches it (SC1). The uses are the program's import,
     // the binding items, the vertex and instance schemas, and the kernel call graph.
-    let imported = intended_schemas(support.as_ref(), &pipeline_declarations);
+    let imported = intended_schemas(&support, &pipeline_declarations);
     let mut intended = pipeline::schema_classes(&module, &pipeline_definitions);
     intended.extend(render::schema_classes(&render_definitions));
     for pipeline in &pipeline_definitions {
@@ -468,12 +458,7 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
                 .map_err(|item| vec![item])?,
         );
     }
-    let schemas = schema::discover(
-        &module,
-        &intended,
-        &imported,
-        support.as_ref().map(|item| &item.pos),
-    )?;
+    let schemas = schema::discover(&module, &intended, &imported)?;
     // The support module names each layout's exports by the layout's source name, so the check
     // runs before the first export.
     let layout_symbols = all_layouts
@@ -665,25 +650,20 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     .map_err(|diagnostic| vec![diagnostic])?;
     // The check runs on the finished support module. An imported name that no schema and no
     // pipeline produces reaches here, and the author sees one diagnostic per name (SC1a).
-    if let Some(support) = &support {
-        let exports = support_export_names(&support_module);
-        let missing = support
-            .names
-            .iter()
-            .filter(|name| !exports.contains(name.as_str()))
-            .collect::<Vec<_>>();
-        if !missing.is_empty() {
-            return Err(missing
-                .into_iter()
-                .map(|name| {
-                    diagnostic(
-                        "SC1",
-                        format!("imported `{name}` is not a schema or pipeline fact"),
-                        support.pos.clone(),
-                    )
-                })
-                .collect());
-        }
+    let exports = support_export_names(&support_module);
+    let missing: Vec<_> = support
+        .into_iter()
+        .filter(|(name, _)| !exports.contains(name.as_str()))
+        .map(|(name, pos)| {
+            diagnostic(
+                "SC1",
+                format!("imported `{name}` is not a schema or pipeline fact"),
+                pos,
+            )
+        })
+        .collect();
+    if !missing.is_empty() {
+        return Err(missing);
     }
     let layouts = schemas
         .iter()

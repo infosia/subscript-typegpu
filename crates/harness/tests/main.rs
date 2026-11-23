@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 mod api;
 mod authored_spelling;
@@ -15,6 +15,7 @@ mod rejections;
 mod runtime;
 mod scopes;
 mod simulate;
+mod suite_structure;
 mod traps;
 mod uniformity;
 mod wgsl_goldens;
@@ -30,6 +31,19 @@ fn repository_root() -> PathBuf {
         .nth(2)
         .expect("harness crate is under the repository root")
         .to_path_buf()
+}
+
+fn collect_ts_files(directory: &Path, recursive: bool, files: &mut Vec<PathBuf>) {
+    let entries = std::fs::read_dir(directory)
+        .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()));
+    for entry in entries {
+        let path = entry.expect("read source entry").path();
+        if recursive && path.is_dir() {
+            collect_ts_files(&path, true, files);
+        } else if path.is_file() && path.extension() == Some(std::ffi::OsStr::new("ts")) {
+            files.push(path);
+        }
+    }
 }
 
 fn generated_exports() -> BTreeSet<String> {

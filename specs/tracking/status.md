@@ -221,3 +221,17 @@ change request R42. Slice 2 (RN22): `RenderPipelineSpec` carries
 review: 2 MAJOR and 11 MINOR, all closed. Evidence: gate green, 364
 passed, 1 ignored, 555 s; live lane green on Metal; `triangle` and
 `ui-demo` smoke-green. Record: `specs/tracking/p18-game-integration.md`.
+
+## P19 — module paths (2026-11-23)
+
+Subscript §354 keys a module by its path (R42). LB5 Rev 2 adopts the
+subscript resolver: `./` and `../` specifiers resolve against the
+importer, the root moves up as `subscript run` does, and the library
+and the support module sit in the entry's directory. Two application
+helpers with one name get `<name>_<key>` WGSL names, and other name
+clashes are K14. `b30-module-paths` with `m30/` covers subdirectories.
+Phase review: 5 MAJOR and 10 MINOR, all closed. From this phase on,
+the coding agent runs targeted tests only, and one full gate runs at
+phase end. Evidence: gate green, 380 passed, 1 ignored, 494 s;
+`triangle` and `ui-demo` smoke-green. Record:
+`specs/tracking/p19-module-paths.md`.

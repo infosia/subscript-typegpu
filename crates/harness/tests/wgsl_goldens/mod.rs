@@ -41,7 +41,9 @@ fn first_differing_line(actual: &str, expected: &str) -> usize {
 
 fn generated(program: &Path) -> subscript_typegpu_gen::Generated {
     let mut files = subscript_typegpu_harness::program_files(program).expect("load program files");
-    files.retain(|file| !file.name.ends_with(".typegpu.ts"));
+    let entry = files.iter().find(|file| file.entry).expect("program entry");
+    let support = subscript_typegpu_gen::support_module_key(&entry.name);
+    files.retain(|file| subscript_compiler::module_key(&file.name) != support);
     subscript_typegpu_gen::generate(&files).unwrap_or_else(|diagnostics| {
         panic!(
             "{} generation failed:\n{}",

@@ -100,3 +100,51 @@ fn gen_rejects_uninferrable_create_buffer() {
     );
     assert!(!output.exists(), "invalid program produced output");
 }
+
+#[test]
+fn moved_entry_writes_support_and_wgsl_in_its_directory() {
+    let root = support::root();
+    let scratch = TempDir::new("cli-paths");
+    let entry = root.join("crates/typegpu-gen/tests/fixtures/module-paths/sub/render.ts");
+    let output = Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-gen"))
+        .arg("gen")
+        .arg(&entry)
+        .arg("--lib")
+        .arg(root.join("lib"))
+        .arg("-o")
+        .arg(&scratch.0)
+        .output()
+        .expect("run generator CLI");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let generated = subscript_typegpu_gen::generate(&support::program_files(&entry))
+        .expect("generate render fixture");
+    assert_eq!(
+        support::read(&scratch.0.join("sub/render.typegpu.ts")),
+        generated.support_module
+    );
+    assert_eq!(
+        support::read(&scratch.0.join("sub/render.tri.wgsl")),
+        generated.pipelines[0].1
+    );
+}
+
+#[test]
+fn entry_without_ts_suffix_reports_usage() {
+    let scratch = TempDir::new("cli-suffix");
+    let entry = scratch.write("main", "export function main(): void {}");
+    let result = Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-gen"))
+        .arg("gen")
+        .arg(entry)
+        .arg("--lib")
+        .arg(support::root().join("lib"))
+        .arg("-o")
+        .arg(&scratch.0)
+        .output()
+        .expect("run generator CLI");
+    assert_eq!(result.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&result.stderr).starts_with("usage:"));
+}

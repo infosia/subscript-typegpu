@@ -59,12 +59,13 @@ fn run() -> Result<(), String> {
     if arguments.next().is_some() {
         return Err(USAGE.to_owned());
     }
-    let stem = program
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .ok_or_else(|| format!("program has no UTF-8 stem: {}", program.display()))?;
+    if program.extension() != Some(std::ffi::OsStr::new("ts")) {
+        return Err(USAGE.to_owned());
+    }
     let mut files = subscript_typegpu_gen::load_program_files(&library, &program)
         .map_err(|error| error.to_string())?;
+    let entry = files.last().ok_or("missing program entry")?;
+    let stem = subscript_compiler::module_key(&entry.name);
     let generated = subscript_typegpu_gen::generate(&files)
         .map_err(|diagnostics| subscript_compiler::render_diagnostics(&files, &diagnostics))?;
     // Discovery permits absent support facts. Check the complete source set before any write.
@@ -74,9 +75,10 @@ fn run() -> Result<(), String> {
     ));
     subscript_compiler::check_program(&files)
         .map_err(|diagnostics| subscript_compiler::render_diagnostics(&files, &diagnostics))?;
-    std::fs::create_dir_all(&output)
-        .map_err(|error| format!("create {}: {error}", output.display()))?;
     let destination = output.join(format!("{stem}.typegpu.ts"));
+    let directory = destination.parent().ok_or("missing output directory")?;
+    std::fs::create_dir_all(directory)
+        .map_err(|error| format!("create {}: {error}", directory.display()))?;
     std::fs::write(&destination, generated.support_module)
         .map_err(|error| format!("write {}: {error}", destination.display()))?;
     for (pipeline, source) in generated.pipelines {

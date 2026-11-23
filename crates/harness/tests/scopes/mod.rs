@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use subscript_compiler::hir::{AsyncCallee, Callee, Expr, ExprKind, Module, Stmt, Symbol, TplPart};
 use subscript_compiler::CheckOptions;
 use subscript_compiler::Type;
+use subscript_typegpu_gen::registered_library;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ProgramCall {
@@ -78,11 +79,11 @@ fn is_library_creation(module: &Module, symbol: &Symbol) -> bool {
     // Generic instances carry the call position. Their parameters retain declaration positions.
     module.functions.iter().any(|function| {
         function.symbol == *symbol
-            && (function.pos.file == file
+            && (registered_library(module, &function.pos.file) == Some(file)
                 || function
                     .params
                     .iter()
-                    .any(|parameter| parameter.pos.file == file))
+                    .any(|parameter| registered_library(module, &parameter.pos.file) == Some(file)))
     })
 }
 
@@ -99,7 +100,7 @@ fn is_device_creation(module: &Module, receiver: &Expr, name: &str) -> bool {
     }
     matches!(&receiver.ty, Type::Class(id)
         if module.classes[id.0].name == "GPUDevice"
-            && module.classes[id.0].pos.file == "webgpu.ts")
+            && registered_library(module, &module.classes[id.0].pos.file) == Some("webgpu.ts"))
 }
 
 fn visit_expr(
@@ -308,10 +309,7 @@ fn scope_failure(program: &Path) -> Option<String> {
         .unwrap_or_else(|error| panic!("load {}: {error}", program.display()));
     let module = subscript_compiler::check_program_with(&files, &CheckOptions::default())
         .unwrap_or_else(|diagnostics| panic!("check {}: {diagnostics:?}", program.display()));
-    let program_name = program
-        .file_name()
-        .and_then(|name| name.to_str())
-        .expect("UTF-8 program name");
+    let program_name = module.entry_pos.file.as_str();
     let mut program_calls = Vec::new();
     for function in &module.functions {
         visit_statements(&module, &function.body, program_name, &mut program_calls);

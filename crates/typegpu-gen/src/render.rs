@@ -6,6 +6,7 @@ use subscript_compiler::hir::{Callee, Expr, ExprKind, Module, Stmt, Symbol};
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 use crate::pipeline::{self, BindingKind, Layout};
+use crate::registered_library;
 
 /// One attribute of a vertex buffer layout (RN6).
 #[derive(Debug, Clone)]
@@ -101,7 +102,7 @@ fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
 /// `None`. The declaring file identifies the library function, never the name alone.
 fn render_shape(module: &Module, name: &Symbol) -> Option<(usize, usize, Option<usize>)> {
     let declaration = pipeline::function(module, name)?;
-    if declaration.params.first()?.pos.file != "typegpu.ts" {
+    if registered_library(module, &declaration.params.first()?.pos.file) != Some("typegpu.ts") {
         return None;
     }
     Some(match crate::base_name(name).as_str() {
@@ -122,7 +123,7 @@ fn render_shape(module: &Module, name: &Symbol) -> Option<(usize, usize, Option<
 /// If the type names a class the module does not hold, returns an internal diagnostic.
 fn library_named(module: &Module, ty: &Type, name: &str, pos: &Pos) -> Result<bool, Diagnostic> {
     Ok(
-        matches!(ty, Type::Class(id) if matches!(crate::class(module, id.0, "render::library_named", pos)?.pos.file.as_str(), "typegpu-types.ts" | "typegpu.ts") && crate::class(module, id.0, "render::library_named", pos)?.name == name),
+        matches!(ty, Type::Class(id) if matches!(registered_library(module, &crate::class(module, id.0, "render::library_named", pos)?.pos.file), Some("typegpu-types.ts" | "typegpu.ts")) && crate::class(module, id.0, "render::library_named", pos)?.name == name),
     )
 }
 
@@ -143,7 +144,7 @@ fn value_class<'a>(
         return Ok(None);
     };
     let class = crate::class(module, id.0, "render::value_class", pos)?;
-    if !class.is_value || class.pos.file == "typegpu-types.ts" {
+    if !class.is_value || registered_library(module, &class.pos.file) == Some("typegpu-types.ts") {
         return Ok(None);
     }
 
@@ -168,10 +169,12 @@ fn vertex_format(
         Type::U32 => "uint32",
         Type::I32 => "sint32",
         Type::Class(id)
-            if crate::class(module, id.0, "render::vertex_format", pos)?
-                .pos
-                .file
-                == "typegpu-types.ts" =>
+            if registered_library(
+                module,
+                &crate::class(module, id.0, "render::vertex_format", pos)?
+                    .pos
+                    .file,
+            ) == Some("typegpu-types.ts") =>
         {
             match crate::class(module, id.0, "render::vertex_format", pos)?
                 .name
@@ -304,7 +307,7 @@ fn varyings<'a>(
             location += 1;
         }
         let flat = matches!(field.ty, Type::I32 | Type::U32)
-            || matches!(&field.ty, Type::Class(id) if crate::class(module, id.0, "render::varyings", &field.pos)?.pos.file == "typegpu-types.ts" && matches!(crate::class(module, id.0, "render::varyings", &field.pos)?.name.as_str(), "Vec2i" | "Vec3i" | "Vec4i" | "Vec2u" | "Vec3u" | "Vec4u"));
+            || matches!(&field.ty, Type::Class(id) if registered_library(module, &crate::class(module, id.0, "render::varyings", &field.pos)?.pos.file) == Some("typegpu-types.ts") && matches!(crate::class(module, id.0, "render::varyings", &field.pos)?.name.as_str(), "Vec2i" | "Vec3i" | "Vec4i" | "Vec2u" | "Vec3u" | "Vec4u"));
         fields.push(Varying {
             name: field.name.clone(),
             ty: field.ty.clone(),
@@ -328,10 +331,12 @@ fn varying_type(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnosti
     Ok(match ty {
         Type::F32 | Type::I32 | Type::U32 => true,
         Type::Class(id)
-            if crate::class(module, id.0, "render::varying_type", pos)?
-                .pos
-                .file
-                == "typegpu-types.ts" =>
+            if registered_library(
+                module,
+                &crate::class(module, id.0, "render::varying_type", pos)?
+                    .pos
+                    .file,
+            ) == Some("typegpu-types.ts") =>
         {
             matches!(
                 crate::class(module, id.0, "render::varying_type", pos)?
@@ -358,7 +363,7 @@ fn varying_type(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnosti
 /// Reports whether the type is `f16` or an `f16` vector, which puts `enable f16;` on the module.
 pub(crate) fn type_uses_f16(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnostic> {
     Ok(matches!(ty, Type::F16)
-        || matches!(ty, Type::Class(id) if crate::class(module, id.0, "render::type_uses_f16", pos)?.pos.file == "typegpu-types.ts" && matches!(crate::class(module, id.0, "render::type_uses_f16", pos)?.name.as_str(), "Vec2h" | "Vec3h" | "Vec4h")))
+        || matches!(ty, Type::Class(id) if registered_library(module, &crate::class(module, id.0, "render::type_uses_f16", pos)?.pos.file) == Some("typegpu-types.ts") && matches!(crate::class(module, id.0, "render::type_uses_f16", pos)?.name.as_str(), "Vec2h" | "Vec3h" | "Vec4h")))
 }
 
 /// Reads one string-valued member of a `RenderPipelineSpec` literal (RN12).
@@ -643,7 +648,7 @@ pub(crate) fn discover(module: &Module) -> Result<Vec<RenderPipeline>, Vec<Diagn
     // A declaration is a module-level `const`, because the generator reads it at compile time. A
     // call inside a function body reaches no generated constant (RN1).
     for function in &module.functions {
-        if function.pos.file != "typegpu.ts"
+        if registered_library(module, &function.pos.file) != Some("typegpu.ts")
             && function
                 .body
                 .iter()

@@ -6,6 +6,7 @@ use subscript_compiler::hir::{ClassDef, Module, Symbol};
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
 use crate::layout::{self, Matrix, Member, Scalar, Struct, TypeTree, Vector};
+use crate::registered_library;
 
 /// One schema class and the layout tree that the layout engine measures.
 #[derive(Debug, Clone)]
@@ -36,15 +37,15 @@ fn diagnostic(rule: &str, message: impl Into<String>, pos: Pos) -> Diagnostic {
 /// WGSL gives `bool` no host-shareable layout, so a bool vector is never a schema field.
 pub(crate) fn is_bool_vector(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, Diagnostic> {
     Ok(matches!(ty, Type::Class(id)
-        if crate::class(module, id.0, "schema::is_bool_vector", pos)?.pos.file == "typegpu-types.ts"
+        if registered_library(module, &crate::class(module, id.0, "schema::is_bool_vector", pos)?.pos.file) == Some("typegpu-types.ts")
             && matches!(crate::class(module, id.0, "schema::is_bool_vector", pos)?.name.as_str(), "Vec2b" | "Vec3b" | "Vec4b")))
 }
 
 /// Reports whether the class is one of the indirect argument schemas of `typegpu-types.ts` (PI17).
 ///
 /// A program writes these into a buffer, so the layout engine sizes them like any schema.
-fn is_indirect_schema(class: &ClassDef) -> bool {
-    class.pos.file == "typegpu-types.ts"
+fn is_indirect_schema(module: &Module, class: &ClassDef) -> bool {
+    registered_library(module, &class.pos.file) == Some("typegpu-types.ts")
         && matches!(
             class.name.as_str(),
             "DispatchIndirectArgs" | "DrawIndirectArgs" | "DrawIndexedIndirectArgs"
@@ -55,11 +56,11 @@ fn is_indirect_schema(class: &ClassDef) -> bool {
 ///
 /// A library class is a vector, a matrix, or a runtime type, never a schema. The indirect argument
 /// schemas are the one exception.
-fn is_schema_candidate(class: &ClassDef) -> bool {
+fn is_schema_candidate(module: &Module, class: &ClassDef) -> bool {
     !matches!(
-        class.pos.file.as_str(),
-        "webgpu.ts" | "typegpu-types.ts" | "typegpu.ts"
-    ) || is_indirect_schema(class)
+        registered_library(module, &class.pos.file),
+        Some("webgpu.ts" | "typegpu-types.ts" | "typegpu.ts")
+    ) || is_indirect_schema(module, class)
 }
 
 /// Returns the component scalar and the lane count of a library vector class name (SC5).
@@ -101,7 +102,7 @@ fn class_alignment(class: &ClassDef) -> Option<u32> {
 /// A class that another file declares gives `None`, so a name alone never makes a library type.
 /// A matrix reads its column alignment from the `Vec<rows>f` class of the same file.
 pub(crate) fn library_tree(module: &Module, class: &ClassDef) -> Option<TypeTree> {
-    if class.pos.file != "typegpu-types.ts" {
+    if registered_library(module, &class.pos.file) != Some("typegpu-types.ts") {
         return None;
     }
     if let Some((scalar, lanes)) = vector_shape(&class.name) {
@@ -122,7 +123,10 @@ pub(crate) fn library_tree(module: &Module, class: &ClassDef) -> Option<TypeTree
     let column_alignment = module
         .classes
         .iter()
-        .find(|candidate| candidate.pos.file == "typegpu-types.ts" && candidate.name == column_name)
+        .find(|candidate| {
+            registered_library(module, &candidate.pos.file) == Some("typegpu-types.ts")
+                && candidate.name == column_name
+        })
         .and_then(class_alignment);
     Some(TypeTree::Matrix(Matrix {
         columns,
@@ -341,7 +345,10 @@ fn uniform_violation(tree: &TypeTree, path: &str) -> Option<String> {
 fn uniform_schema_classes(module: &Module) -> Result<BTreeSet<Symbol>, Diagnostic> {
     let mut classes = BTreeSet::new();
     for class in &module.classes {
-        if class.pos.file != "typegpu.ts" || class.is_value || !class.name.starts_with("Uniform<") {
+        if registered_library(module, &class.pos.file) != Some("typegpu.ts")
+            || class.is_value
+            || !class.name.starts_with("Uniform<")
+        {
             continue;
         }
         // The host body stores the value in `values`, so that field's type names `T` (PI5).
@@ -425,7 +432,7 @@ fn collect_type_reachable(
 /// `intended` holds the declaration symbols of the classes that the bindings, the vertex buffers,
 /// and the kernels require. `imported` holds the schema names that the support-module import
 /// requires. An import carries only a name, so a name resolves to the schema candidate of that
-/// name. `import_pos` positions a diagnostic about a use that no schema candidate matches. The
+/// name. Each imported name keeps its import position. The
 /// result follows the module's class declaration order, not the order of the uses.
 ///
 /// # Errors
@@ -436,8 +443,7 @@ fn collect_type_reachable(
 pub(crate) fn discover(
     module: &Module,
     intended: &BTreeSet<Symbol>,
-    imported: &BTreeSet<String>,
-    import_pos: Option<&Pos>,
+    imported: &std::collections::BTreeMap<String, Pos>,
 ) -> Result<Vec<Schema>, Vec<Diagnostic>> {
     let uniform_classes = uniform_schema_classes(module).map_err(|error| vec![error])?;
     let mut schemas = Vec::new();
@@ -449,10 +455,10 @@ pub(crate) fn discover(
         module
             .classes
             .iter()
-            .position(|class| matches(class) && is_schema_candidate(class))
+            .position(|class| matches(class) && is_schema_candidate(module, class))
     };
     let uses = imported
-        .iter()
+        .keys()
         .map(|name| (name.clone(), candidate(&|class| class.name == *name)))
         .chain(intended.iter().map(|symbol| {
             (
@@ -469,7 +475,10 @@ pub(crate) fn discover(
             diagnostics.push(diagnostic(
                 "SC1",
                 format!("`{name}` is not a schema"),
-                import_pos.cloned().unwrap_or_else(|| Pos::new("", 1, 1)),
+                imported
+                    .get(&name)
+                    .cloned()
+                    .unwrap_or_else(|| Pos::new("", 1, 1)),
             ));
             continue;
         };

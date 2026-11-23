@@ -2,6 +2,8 @@
 
 use std::collections::BTreeSet;
 
+use crate::registered_library;
+
 use subscript_compiler::hir::{Callee, Expr, ExprKind, Function, Module, Stmt, Symbol};
 use subscript_compiler::{Diagnostic, Pos, RuleCode};
 
@@ -65,11 +67,10 @@ fn generator_diagnostic(message: impl Into<String>, pos: Pos) -> Diagnostic {
 fn library_call(module: &Module, name: &Symbol, expected: &str) -> bool {
     crate::base_name(name) == expected
         && crate::pipeline::function(module, name).is_some_and(|function| {
-            function.pos.file == "typegpu.ts"
-                || function
-                    .params
-                    .first()
-                    .is_some_and(|param| param.pos.file == "typegpu.ts")
+            registered_library(module, &function.pos.file) == Some("typegpu.ts")
+                || function.params.first().is_some_and(|param| {
+                    registered_library(module, &param.pos.file) == Some("typegpu.ts")
+                })
         })
 }
 
@@ -427,7 +428,7 @@ pub(crate) fn discover(module: &Module) -> Result<ShellProgram, Vec<Diagnostic>>
     // First pass: reject a call in a place the rules forbid. The library's own file declares the
     // two functions, so its bodies stay unvisited.
     for function in &module.functions {
-        if function.pos.file != "typegpu.ts" {
+        if registered_library(module, &function.pos.file) != Some("typegpu.ts") {
             visit_statements(
                 module,
                 &function.body,

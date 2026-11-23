@@ -298,3 +298,50 @@ const tri = renderPipelineL<Layout, Vertex, Varyings>(vert, frag, { format: "rgb
         generated.support_module
     );
 }
+
+fn module_path_files() -> Vec<SourceFile> {
+    support::program_files(
+        &support::root().join("crates/typegpu-gen/tests/fixtures/module-paths/sub/render.ts"),
+    )
+}
+
+#[test]
+fn fragment_calls_both_module_helpers_by_key() {
+    let files = module_path_files();
+    let generated = subscript_typegpu_gen::generate(&files).expect("generate render helpers");
+    let wgsl = &generated.pipelines[0].1;
+    for name in ["gain_shared_left", "gain_sub_right"] {
+        assert_eq!(wgsl.matches(&format!("{name}()")).count(), 2, "{wgsl}");
+    }
+    validate(wgsl);
+}
+
+#[test]
+fn entry_and_module_helpers_with_one_source_name_are_rejected() {
+    let mut files = module_path_files();
+    let entry = files.last_mut().expect("entry");
+    entry.source = entry.source.replace("right()", "gain()");
+    entry
+        .source
+        .push_str("\nfunction gain(): f32 { return 1.0; }");
+    let errors = subscript_typegpu_gen::generate(&files).expect_err("entry helper collision");
+    let message = subscript_compiler::render_diagnostics(&files, &errors);
+    eprintln!("{message}");
+    assert!(message.contains("K14: two program declarations share the source name `gain` in one WGSL module (author)"), "{message}");
+}
+
+#[test]
+fn alias_collision_names_the_source_helper_and_both_modules() {
+    let mut files = module_path_files();
+    let entry = files.last_mut().expect("entry");
+    entry.source = entry
+        .source
+        .replace("left()", "left() + gain_shared_left()");
+    entry
+        .source
+        .push_str("\nfunction gain_shared_left(): f32 { return 1.0; }");
+    let errors = subscript_typegpu_gen::generate(&files).expect_err("WGSL alias collision");
+    let message = subscript_compiler::render_diagnostics(&files, &errors);
+    eprintln!("{message}");
+    assert!(message.contains("K14: helper `gain` in module `shared/left` collides with a WGSL declaration from module `sub/render` (author)"), "{message}");
+}

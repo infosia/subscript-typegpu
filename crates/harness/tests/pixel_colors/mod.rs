@@ -8,6 +8,7 @@ use subscript_compiler::hir::{
     AsyncCallee, Callee, Expr, ExprKind, Function, Module, Stmt, TplPart,
 };
 use subscript_compiler::{CheckOptions, Type};
+use subscript_typegpu_gen::registered_library;
 
 const FORMATS: &[&str] = &[
     "rgba8unorm",
@@ -90,7 +91,7 @@ fn descriptor_sets(module: &Module, expression: &Expr, class_name: &str, field: 
     };
     let definition = &module.classes[class.0];
     definition.name == class_name
-        && definition.pos.file == "typegpu.ts"
+        && registered_library(module, &definition.pos.file) == Some("typegpu.ts")
         && definition
             .fields
             .iter()
@@ -131,7 +132,7 @@ fn inspect_expr(
         }
         if let ExprKind::New { class, args } = &expression.kind {
             let definition = &module.classes[class.0];
-            if definition.pos.file == "typegpu-types.ts"
+            if registered_library(module, &definition.pos.file) == Some("typegpu-types.ts")
                 && matches!(definition.name.as_str(), "Vec3f" | "Vec4f")
                 && args
                     .iter()
@@ -368,10 +369,7 @@ fn failure(program: &Path) -> Vec<String> {
         .unwrap_or_else(|error| panic!("load {}: {error}", program.display()));
     let module = subscript_compiler::check_program_with(&files, &CheckOptions::default())
         .unwrap_or_else(|diagnostics| panic!("check {}: {diagnostics:?}", program.display()));
-    let program_name = program
-        .file_name()
-        .and_then(|name| name.to_str())
-        .expect("UTF-8 program name");
+    let program_name = module.entry_pos.file.as_str();
     let inspection = inspect_module(&module, program_name);
     if !inspection.pixel_oracle {
         return Vec::new();

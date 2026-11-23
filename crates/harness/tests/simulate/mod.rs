@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use subscript_compiler::hir::{AsyncCallee, Callee, Expr, ExprKind, Module, Stmt, Symbol, TplPart};
 use subscript_compiler::CheckOptions;
+use subscript_typegpu_gen::registered_library;
 use subscript_typegpu_gen::Generated;
 
 fn repository_root() -> PathBuf {
@@ -77,16 +78,17 @@ fn is_library_simulation(module: &Module, symbol: &Symbol) -> bool {
     simulation_spec_index(symbol).is_some()
         && module.functions.iter().any(|function| {
             function.symbol == *symbol
-                && (function.pos.file == "typegpu.ts"
-                    || function
-                        .params
-                        .iter()
-                        .any(|parameter| parameter.pos.file == "typegpu.ts")
+                && (registered_library(module, &function.pos.file) == Some("typegpu.ts")
+                    || function.params.iter().any(|parameter| {
+                        registered_library(module, &parameter.pos.file) == Some("typegpu.ts")
+                    })
                     || function
                         .body
                         .first()
                         .and_then(statement_pos)
-                        .is_some_and(|pos| pos.file == "typegpu.ts"))
+                        .is_some_and(|pos| {
+                            registered_library(module, &pos.file) == Some("typegpu.ts")
+                        }))
         })
 }
 
@@ -185,13 +187,7 @@ fn assert_pair(
         ));
         return;
     }
-    let support_file = format!(
-        "{}.typegpu.ts",
-        program
-            .file_stem()
-            .and_then(|stem| stem.to_str())
-            .expect("UTF-8 program stem"),
-    );
+    let support = subscript_typegpu_gen::support_module_key(&module.entry_pos.file);
     let Some(global) = module
         .globals
         .iter()
@@ -200,9 +196,9 @@ fn assert_pair(
         failures.push(format!("{call} cannot resolve Global `{expected}`"));
         return;
     };
-    if global.pos.file != support_file {
+    if subscript_compiler::module_key(&global.pos.file) != support {
         failures.push(format!(
-            "{call} resolves `{expected}` from {}, expected {support_file}",
+            "{call} resolves `{expected}` from {}, expected {support}.ts",
             global.pos.file,
         ));
     }
@@ -513,10 +509,7 @@ fn pairing_failures(program: &Path) -> (Vec<String>, usize) {
         .unwrap_or_else(|diagnostics| panic!("generate {}: {diagnostics:?}", program.display()));
     let module = subscript_compiler::check_program_with(&files, &CheckOptions::default())
         .unwrap_or_else(|diagnostics| panic!("check {}: {diagnostics:?}", program.display()));
-    let program_name = program
-        .file_name()
-        .and_then(|name| name.to_str())
-        .expect("UTF-8 program name");
+    let program_name = module.entry_pos.file.as_str();
     let mut failures = Vec::new();
     let mut simulation_calls = 0;
     for global in &module.globals {

@@ -935,6 +935,21 @@ every new rejection with a demonstrated red, the live program of
 slice 2 green on Metal, a 30-frame smoke run of one window example
 after slice 1, and a phase review with no open CRITICAL or MAJOR.
 
+### P19 — module paths (after the pin `ddc0f0e2`)
+
+Subscript §354 closes change request R42: a module is keyed by its
+path, and the compiler exports the resolver. LB5 Rev 2 adopts it.
+The loaders resolve `./` and `../` specifiers against the importer
+with `resolve_module_specifier`, and an application module can sit
+in a subdirectory or outside the entry's directory.
+
+Exit: gate-green with no existing WGSL or `.expected` golden moved,
+`b30-module-paths` byte-identical on both tiers with its WGSL golden,
+each new rejection with a demonstrated red, a measurement of LB5
+rule 7 (two helpers with one name in one kernel), a 30-frame smoke
+run of one window example, and a phase review with no open CRITICAL
+or MAJOR. The record is `specs/tracking/p19-module-paths.md`.
+
 ### U0–U4 — the immediate-mode GUI (branch `imgui`, after P16)
 
 Owner decision 2026-09-05: an immediate-mode GUI authored in

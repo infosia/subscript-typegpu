@@ -2,6 +2,8 @@
 
 use std::collections::BTreeSet;
 
+use crate::registered_library;
+
 use subscript_compiler::hir::{Callee, ClassDef, Expr, ExprKind, Function, Module, Stmt, Symbol};
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
@@ -309,7 +311,7 @@ pub(crate) fn library_class<'a>(
     module
         .classes
         .get(id.0)
-        .filter(|class| class.pos.file == "typegpu.ts")
+        .filter(|class| registered_library(module, &class.pos.file) == Some("typegpu.ts"))
 }
 
 /// Classifies one layout field type as a binding wrapper and returns its item type (PI5, TX1).
@@ -458,8 +460,8 @@ fn allowed_binding_item(module: &Module, ty: &Type, pos: &Pos) -> Result<bool, D
         Type::Class(id) => {
             let class = crate::class(module, id.0, "pipeline::allowed_binding_item", pos)?;
             class.is_value
-                && (class.pos.file != "typegpu.ts")
-                && (class.pos.file != "webgpu.ts")
+                && (registered_library(module, &class.pos.file) != Some("typegpu.ts"))
+                && (registered_library(module, &class.pos.file) != Some("webgpu.ts"))
                 && !crate::schema::is_bool_vector(module, ty, pos)?
         }
         _ => false,
@@ -618,7 +620,10 @@ pub(crate) fn layout(
     let class = crate::class(module, id.0, "pipeline::layout", pos)?;
     // A layout class is a plain class: not `@ValueType`, not `@Descriptor`, and not a library class
     // (PI3). The author never instantiates it.
-    if class.is_value || class.is_descriptor || class.pos.file == "typegpu.ts" {
+    if class.is_value
+        || class.is_descriptor
+        || registered_library(module, &class.pos.file) == Some("typegpu.ts")
+    {
         return Err(diagnostic(
             "PI3",
             format!("`{}` is not a plain layout class", class.name),
@@ -954,7 +959,7 @@ pub(crate) fn callback_type<'a>(
 fn compute_arity(module: &Module, name: &Symbol) -> Option<usize> {
     let base = crate::base_name(name);
     let declaration = function(module, name)?;
-    if declaration.params.first()?.pos.file != "typegpu.ts" {
+    if registered_library(module, &declaration.params.first()?.pos.file) != Some("typegpu.ts") {
         return None;
     }
     Some(match base.as_str() {
@@ -1071,7 +1076,7 @@ pub(crate) fn discover(
     // A declaration is a module-level `const`, because the generator reads it at compile time. A
     // call inside a function body reaches no generated constant (PI1).
     for function in &module.functions {
-        if function.pos.file != "typegpu.ts"
+        if registered_library(module, &function.pos.file) != Some("typegpu.ts")
             && function
                 .body
                 .iter()
@@ -1281,7 +1286,10 @@ pub(crate) fn schema_classes(module: &Module, pipelines: &[Pipeline]) -> BTreeSe
             Type::Class(id) => module.classes.get(id.0),
             _ => None,
         })
-        .filter(|class| class.is_value && class.pos.file != "typegpu-types.ts")
+        .filter(|class| {
+            class.is_value
+                && registered_library(module, &class.pos.file) != Some("typegpu-types.ts")
+        })
         .map(|class| class.symbol.clone())
         .collect()
 }

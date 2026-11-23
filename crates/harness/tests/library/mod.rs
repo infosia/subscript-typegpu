@@ -38,3 +38,51 @@ export function main(): void {
         b"clamp=1\nmix=5\nstep=1\nsmoothstep=0.5\nfract=0.25\nsign=-1\n"
     );
 }
+
+#[test]
+fn module_paths_run_on_both_tiers() {
+    let fixtures = crate::repository_root().join("crates/harness/tests/fixtures/app-modules");
+    for (entry, expected) in [("nested.ts", "4,8\n"), ("sub/main.ts", "7\n")] {
+        let entry = fixtures.join(entry);
+        for tier in ["dev", "ship"] {
+            let run = std::process::Command::new(env!("CARGO_BIN_EXE_subscript-typegpu-harness"))
+                .arg(tier)
+                .arg(&entry)
+                .output()
+                .expect("run module fixture");
+            assert!(
+                run.status.success(),
+                "{} {tier}: {}",
+                entry.display(),
+                String::from_utf8_lossy(&run.stderr)
+            );
+            assert_eq!(
+                run.stdout,
+                expected.as_bytes(),
+                "{} {tier}",
+                entry.display()
+            );
+        }
+    }
+}
+
+#[test]
+fn outside_fixture_uses_one_root_for_all_sources() {
+    let entry =
+        crate::repository_root().join("crates/harness/tests/fixtures/app-modules/sub/main.ts");
+    let files = subscript_typegpu_harness::program_files(&entry).expect("load fixture");
+    let names: Vec<_> = files.iter().map(|file| file.name.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            "sub/subscript-typegpu.generated.d.ts",
+            "sub/wire-enum-aliases.generated.d.ts",
+            "sub/webgpu.ts",
+            "sub/typegpu-types.ts",
+            "sub/typegpu.ts",
+            "shared/x.ts",
+            "sub/main.ts",
+            "sub/main.typegpu.ts",
+        ]
+    );
+}
