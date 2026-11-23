@@ -950,6 +950,29 @@ rule 7 (two helpers with one name in one kernel), a 30-frame smoke
 run of one window example, and a phase review with no open CRITICAL
 or MAJOR. The record is `specs/tracking/p19-module-paths.md`.
 
+### P20 — UI quads write in place (after P19)
+
+A downstream game report (2026-11-23) measured the UI frame builder.
+`UiRenderer.quad` allocates a byte array per quad with
+`Context.bytesOf` and copies it byte by byte. The report measured an
+isolated CPU-only ship-tier test on Apple M2 with 512 quads and 480
+iterations. The median process wall time was 32.2 ms for that path
+and 4.1 ms for `bytesInto` at the quad offset *(reported, not run
+here)*. `ui.md` UI15 Rev 7 is the contract.
+
+Exit:
+
+- gate-green, with no WGSL golden and no existing `b24` output line
+  moved (the vertex checksum proves byte equivalence);
+- a `b24` check that a longer frame grows the retained array to the
+  live size, and that a shorter frame after it keeps the array;
+- a ship-tier timing of the old and the new builder on one large
+  command list, recorded in tracking;
+- a phase review with no open CRITICAL or MAJOR.
+
+The record is
+`specs/tracking/p20-ui-quad-bytes.md`.
+
 ### U0–U4 — the immediate-mode GUI (branch `imgui`, after P16)
 
 Owner decision 2026-09-05: an immediate-mode GUI authored in

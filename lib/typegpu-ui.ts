@@ -1154,14 +1154,14 @@ class UiRendererLayout {
 // `create` is the only creation path, and `dispose()` releases
 // every resource the renderer owns.
 export class UiRenderer {
-  // `build` refreshes these. `vertexBytes` can keep a tail from a longer earlier frame,
-  // which no draw range reaches.
   readonly capacity: u32;
+  // `build` packs quads directly into `vertexBytes`. A shorter frame keeps the tail.
   quadCount: u32 = 0;
   indexCount: u32 = 0;
   rangeCount: i32 = 0;
   vertexBytes: u8[] = [];
   ranges: UiDrawRange[] = [];
+  private quadBytes: u32;
   private queue: GPUQueue;
   private vertices: Buffer<UiVertex>;
   private indices: Buffer<u16>;
@@ -1173,11 +1173,11 @@ export class UiRenderer {
   private pipeline: RenderPipeline;
   private clip: UiRect = uiCopy(UI_UNCLIPPED);
 
-  private constructor(queue: GPUQueue, capacity: u32,
+  private constructor(queue: GPUQueue, capacity: u32, quadBytes: u32,
     vertices: Buffer<UiVertex>, indices: Buffer<u16>, atlas: GPUTexture,
     atlasView: GPUTextureView, nearest: GPUSampler, viewport: Buffer<UiViewport>,
     group: GPUBindGroup, pipeline: RenderPipeline) {
-    this.queue = queue; this.capacity = capacity;
+    this.queue = queue; this.capacity = capacity; this.quadBytes = quadBytes;
     this.vertices = vertices; this.indices = indices; this.atlas = atlas;
     this.atlasView = atlasView; this.nearest = nearest; this.viewport = viewport;
     this.group = group; this.pipeline = pipeline;
@@ -1208,7 +1208,7 @@ export class UiRenderer {
     const group: GPUBindGroup = createBindGroup(device, layout, facts.layout, [
       bufferResource(viewport.handle()), textureResource(atlasView), samplerResource(nearest),
     ]);
-    return new UiRenderer(queue, capacity, vertices, indices, atlas, atlasView,
+    return new UiRenderer(queue, capacity, 4 * resources.vertexStride, vertices, indices, atlas, atlasView,
       nearest, viewport, group, pipeline);
   }
 
@@ -1225,12 +1225,10 @@ export class UiRenderer {
       new UiVertex(new Vec2f((x + w) as f32, (y + h) as f32), new Vec2f(right, bottom), color),
       new UiVertex(new Vec2f(x as f32, (y + h) as f32), new Vec2f(u, bottom), color),
     ];
-    const bytes: u8[] = Context.bytesOf<FixedArray<UiVertex, 4>>(values);
-    const offset: i32 = (this.quadCount as i32) * bytes.length;
-    for (let i: i32 = 0; i < bytes.length; i += 1) {
-      if (offset + i == this.vertexBytes.length) this.vertexBytes.push(bytes[i]);
-      else this.vertexBytes[offset + i] = bytes[i];
-    }
+    const offset: u32 = this.quadCount * this.quadBytes;
+    const end: i32 = (offset + this.quadBytes) as i32;
+    while (this.vertexBytes.length < end) this.vertexBytes.push(0);
+    Context.bytesInto<FixedArray<UiVertex, 4>>(values, this.vertexBytes, offset);
     if (this.rangeCount == 0) this.startRange(this.clip);
     this.ranges[this.rangeCount - 1].count += 6;
     this.quadCount = count;

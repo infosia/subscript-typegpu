@@ -17,4 +17,7 @@ second window true
 empty frame counts true
 empty frame storage true
 frame storage reuse true
+grown frame length true
+grown frame last vertex true
+short frame reuse true
 PASS

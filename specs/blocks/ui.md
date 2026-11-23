@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Rev 9 (branch review: UI4 Rev 3, UI9 Rev 1, UI11, UI12 Rev 2, UI15 Rev 5, UI18, UI20), 2026-09-05. Rev 10 (UI2 Rev 1: the alpha is an array of hex chunks, W8), 2026-09-05. Rev 11 (UI6, UI20 from the comment pass), 2026-09-06. Rev 12 (UI2 Rev 2: one string again), 2026-09-10. Rev 13 (UI15: the checker enforces the private constructor), 2026-10-05. Rev 14 (UI15 Rev 6, UI20: one generic factory), 2026-10-30. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Rev 9 (branch review: UI4 Rev 3, UI9 Rev 1, UI11, UI12 Rev 2, UI15 Rev 5, UI18, UI20), 2026-09-05. Rev 10 (UI2 Rev 1: the alpha is an array of hex chunks, W8), 2026-09-05. Rev 11 (UI6, UI20 from the comment pass), 2026-09-06. Rev 12 (UI2 Rev 2: one string again), 2026-09-10. Rev 13 (UI15: the checker enforces the private constructor), 2026-10-05. Rev 14 (UI15 Rev 6, UI20: one generic factory), 2026-10-30. Rev 15 (UI15 Rev 7: quads write in place), 2026-11-23. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -270,8 +270,15 @@ tiers with no GPU. The renderer is the only GPU code.
   draw range and starts one with the new scissor. The builder keeps
   its vertex byte array and its range records across frames and
   overwrites them in place, as UI4 states for the context. Rev 5:
-  the retained arrays do not grow in a steady frame, and each quad
-  allocates the bytes that `Context.bytesOf` returns.
+  the retained arrays do not grow in a steady frame. Rev 7
+  (2026-11-23, P20): a quad allocates no byte array. The renderer
+  keeps the packed size of four vertices, four times the vertex
+  stride. If the retained array is shorter than the quad offset plus
+  that size, the builder appends zero bytes until it fits. It then
+  writes the four vertices with
+  `Context.bytesInto<FixedArray<UiVertex, 4>>` at the quad offset.
+  The bytes equal the bytes of `Context.bytesOf` for the same values
+  (subscript stdlib §18 rule 4).
   `UiPipelineFacts` exists because LB2 places the pipeline
   declaration in the program, so the program hands the generated
   facts to the library.

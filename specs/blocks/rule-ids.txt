@@ -339,6 +339,8 @@ UI15 Rev 2
 UI15 Rev 3
 UI15 Rev 4
 UI15 Rev 5
+UI15 Rev 6
+UI15 Rev 7
 UI17 Rev 1
 UI18 Rev 1
 EG10 Rev 1

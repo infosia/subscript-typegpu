@@ -35,7 +35,7 @@ function checkColorClip(renderer: UiRenderer, name: string, color: u32, x: i32, 
   unreachable();
 }
 
-function checkFrames(renderer: UiRenderer): void {
+function checkFrames(renderer: UiRenderer, stride: u32): void {
   const ui: UiContext = new UiContext();
   ui.begin();
   ui.pushClip(new UiRect(0, 0, 10, 10));
@@ -103,6 +103,24 @@ function checkFrames(renderer: UiRenderer): void {
     && renderer.ranges[0].first == 0 && renderer.ranges[0].count == 6
     && renderer.quadCount == 1 && renderer.indexCount == 6
     && reused.position.x == 2.0 && reused.color == 0xff000007);
+
+  ui.begin();
+  for (let i: i32 = 0; i < 64; i += 1) {
+    ui.drawRect(new UiRect(i, i + 10, 4, 5), 0xff000000 + (i as u32));
+  }
+  ui.end();
+  renderer.build(ui);
+  const grownLength: i32 = renderer.vertexBytes.length;
+  check("grown frame length", renderer.quadCount == 64 && grownLength > byteCapacity
+    && grownLength == (renderer.quadCount * 4 * stride) as i32);
+  const last: UiVertex = Context.fromBytes<UiVertex>(renderer.vertexBytes, 63 * 4 * stride);
+  check("grown frame last vertex", last.position.x == 63.0 && last.position.y == 73.0 && last.color == 0xff00003f);
+
+  ui.begin(); ui.drawRect(new UiRect(7, 9, 4, 5), 0xff112233); ui.end();
+  renderer.build(ui);
+  const shortFirst: UiVertex = Context.fromBytes<UiVertex>(renderer.vertexBytes, 0);
+  check("short frame reuse", renderer.quadCount == 1 && renderer.vertexBytes.length == grownLength
+    && shortFirst.position.x == 7.0 && shortFirst.position.y == 9.0 && shortFirst.color == 0xff112233);
 }
 
 export async function main(): Promise<void> {
@@ -164,7 +182,7 @@ export async function main(): Promise<void> {
     using command = encoder.finishDefault();
     device.queue.submit([command]);
     if (!await device.queue.onSubmittedWorkDone()) { print("FAIL submit"); return; }
-    checkFrames(renderer);
+    checkFrames(renderer, stride);
   }
   gpu.dispose();
   print("PASS");

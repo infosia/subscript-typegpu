@@ -235,3 +235,14 @@ the coding agent runs targeted tests only, and one full gate runs at
 phase end. Evidence: gate green, 380 passed, 1 ignored, 494 s;
 `triangle` and `ui-demo` smoke-green. Record:
 `specs/tracking/p19-module-paths.md`.
+
+## P20 — UI quads write in place (2026-11-23)
+
+A downstream game report measured a per-quad allocation in
+`UiRenderer.quad`. UI15 Rev 7: the builder grows the retained array
+with zero bytes and writes each quad with `Context.bytesInto`. `b24`
+checks growth and reuse, and its vertex checksum is unchanged. Ship
+tier, 480 frames of 512 rects: median 66 ms before, 29 ms after, with
+identical bytes. Phase review: 1 MAJOR (the evidence), closed, and
+4 MINOR (1 fixed, 3 accepted). Evidence: gate green, 380 passed,
+1 ignored, 479 s. Record: `specs/tracking/p20-ui-quad-bytes.md`.
