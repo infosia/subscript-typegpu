@@ -99,3 +99,54 @@ on `dev` and `ship`. `tools/live.sh` on Metal (yawgpu with
 The gate wall time grew from 590 s to 657 s. The differential module
 took 537 s against 489 s, with one new program on each tier. The
 increase is under the red line.
+
+## Phase review (2026-11-23)
+
+A no-context Opus reviewer read `3761363..00a2c79`: 0 CRITICAL,
+2 MAJOR, 11 MINOR.
+
+- M1: `b29-depth` prints the declared spec, and its error scope
+  covers pipeline creation only. If `renderPipelineDescriptor` drops
+  `depthStencil`, the headless gate stays green. Only the live lane
+  catches it.
+- M2: plan §8 P18 said "relative to the importing file", which
+  contradicts LB5 Rev 1. Fixed in the plan.
+- MINOR 1–3, 11: doc comments on the new loader items, the removed
+  `pub use` comment, the stale `discovery_options` doc, and the
+  public `load_library_files` with no production caller.
+- MINOR 4: LB5 did not state the cycle rule or `../x`. Fixed in LB5
+  rules 4 and 5.
+- MINOR 5, 6: loader error paths without tests, and a test temp
+  directory that a failure leaves behind.
+- MINOR 7, 8, 10: EG11 skips `m` modules, hygiene does not check that
+  a program imports each `m` module, and the `m` headers say
+  `program:`. T1 Rev 1 now states the `module:` header and the import
+  rule.
+- MINOR 9: the T1 Rev 1 revision entry in the `testing.md` header.
+  Fixed.
+
+Fixes (Codex, 2026-11-23). M1: the `b29-depth` validation scope now
+covers the pass, `finishDefault()`, and `submit`, and the program
+drains the uncaptured errors. Demonstrated red: with
+`depthStencil: spec.depthStencil` removed from
+`renderPipelineDescriptor`, `b29-depth` on the Noop backend prints
+`pipeline:invalid`, `FAIL`, and `render pass pipeline attachment
+signature is incompatible` on both tiers. With the line restored, both
+tiers match the golden. A first attempt with two error scopes failed
+the PI14 scope test (`[Push, Creation, Pop, Push, Pop]`). The fix
+extends the one scope. M2 and MINOR 4 and 9: fixed in the specs.
+MINOR 1–3: doc comments added. MINOR 11: `load_library_files` is
+removed, and its tests use `load_program_files`. MINOR 5, 6: loader
+tests for a non-NotFound read error, a parse error, and a two-module
+cycle, with a `Drop` guard for each temporary directory. MINOR 7:
+EG11 checks each `m` file in an entry's file set (red: a temporary
+`set` call in `m28-tile.ts` failed through `b28-app-modules.ts`).
+MINOR 8: hygiene requires an importer with the same id (red:
+`hygiene: no program with id 28 imports programs/m28-orphan.ts`).
+MINOR 10: the `m28` headers say `module:`.
+
+All findings are closed. Evidence: `tools/gate.sh --require-backend`
+green, 555 s, 364 passed, 1 ignored (live).
+
+P18 is COMPLETE. Open outside the phase: R42 (subdirectory imports
+in subscript). When it lands, LB5 Rev 2 adopts its resolver.

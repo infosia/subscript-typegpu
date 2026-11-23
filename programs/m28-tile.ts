@@ -1,4 +1,4 @@
-// program: m28-tile
+// module: m28-tile
 // purpose: compute tile area on the host and in a kernel
 // exercises: LB2, LB5, K2
 // questions: none

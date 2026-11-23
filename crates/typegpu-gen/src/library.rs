@@ -71,27 +71,7 @@ fn read_library_file(directory: &Path, name: &str) -> Result<SourceFile, String>
     })
 }
 
-/// Loads the core sources and the registered modules that the program's imports reach.
-///
-/// The result follows library load order and excludes the program itself.
-/// Unknown module specifiers remain subject to compiler diagnostics.
-///
-/// # Errors
-///
-/// If a required file is unreadable or a source has invalid syntax, returns an error.
-pub fn load_library_files(
-    directory: &Path,
-    program: &SourceFile,
-) -> Result<Vec<SourceFile>, LibraryLoadError> {
-    read_libraries(
-        directory,
-        imports(program)?
-            .iter()
-            .filter_map(|s| registered(s))
-            .collect(),
-    )
-}
-
+/// Parses the import specifiers in source order and retains the source for diagnostics.
 fn imports(file: &SourceFile) -> Result<Vec<String>, LibraryLoadError> {
     parse_import_specifiers(file).map_err(|diagnostics| LibraryLoadError::Parse {
         file: file.clone(),
@@ -99,6 +79,7 @@ fn imports(file: &SourceFile) -> Result<Vec<String>, LibraryLoadError> {
     })
 }
 
+/// Returns the registered library name for a relative import specifier.
 fn registered(specifier: &str) -> Option<&'static str> {
     let stem = specifier.strip_prefix("./")?;
     LIBRARY_ORDER
@@ -106,6 +87,7 @@ fn registered(specifier: &str) -> Option<&'static str> {
         .find(|name| name.strip_suffix(".ts") == Some(stem))
 }
 
+/// Loads the core libraries and transitive registered imports in library order.
 fn read_libraries(
     directory: &Path,
     mut pending: Vec<&'static str>,
@@ -125,15 +107,24 @@ fn read_libraries(
         .collect())
 }
 
+/// The state of the depth-first walk from the entry through its application modules.
 struct ApplicationModules<'a> {
+    /// The entry directory, which contains all application modules.
     directory: &'a Path,
+    /// The import specifier for the entry's generated support module.
     support: String,
+    /// The entry name and each application file name that the walk already reached.
     seen: HashSet<String>,
+    /// The registered library names that the entry and its application modules import.
     libraries: Vec<&'static str>,
+    /// The application sources in post-order, with the entry last.
     files: Vec<SourceFile>,
 }
 
 impl ApplicationModules<'_> {
+    /// Visits imports in source order, then appends their importer (LB5).
+    /// A name enters `seen` before descent, so repeated imports and cycles skip it.
+    /// If a read returns `NotFound`, skips the file so the compiler can diagnose the import.
     fn visit(&mut self, file: SourceFile) -> Result<(), LibraryLoadError> {
         for specifier in imports(&file)? {
             if let Some(name) = registered(&specifier) {

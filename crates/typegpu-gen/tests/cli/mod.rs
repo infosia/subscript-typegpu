@@ -1,29 +1,6 @@
-use std::path::PathBuf;
 use std::process::Command;
 
-use crate::support;
-
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(name: &str) -> Self {
-        let directory = std::env::temp_dir().join(format!(
-            "subscript-typegpu-cli-{name}-{}",
-            std::process::id()
-        ));
-        if directory.exists() {
-            std::fs::remove_dir_all(&directory).expect("remove stale CLI directory");
-        }
-        std::fs::create_dir_all(&directory).expect("create CLI directory");
-        Self(directory)
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
-    }
-}
+use crate::support::{self, TempDir};
 
 #[test]
 fn cli_writes_the_same_support_and_wgsl_as_the_library_for_every_program() {

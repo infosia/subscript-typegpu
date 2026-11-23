@@ -919,9 +919,9 @@ A downstream game report (2026-11-23) measured two blocks at
 `3761363`, both before device creation. The record of the
 reproduction is `specs/tracking/p18-game-integration.md`.
 
-Slice 1 — application modules (`library.md` LB5). The loaders read
-the application modules that the program imports from disk,
-relative to the importing file. A pipeline in the entry module can
+Slice 1 — application modules (`library.md` LB5 Rev 1). The loaders
+read the application modules that the program imports from disk, in
+the entry's directory, as flat `./<name>` specifiers. A pipeline in the entry module can
 call a K2 helper from an application module. A missing module stays
 a diagnostic at the import site.
 

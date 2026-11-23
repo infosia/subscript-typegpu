@@ -116,12 +116,6 @@ export async function main(): Promise<void> {
       [terrain_VERTEX_LAYOUT0],
       terrain,
     );
-    const validationError = await device.popErrorScope();
-    if (validationError != null) {
-      print("pipeline:invalid");
-      print("FAIL");
-      return;
-    }
     using encoder = device.createCommandEncoderDefault();
     using pass = encoder.beginRenderPass({
       colorAttachments: [{
@@ -142,6 +136,21 @@ export async function main(): Promise<void> {
     pass.end();
     using command = encoder.finishDefault();
     device.queue.submit([command]);
+    const validationError = await device.popErrorScope();
+    if (validationError != null) {
+      print("pipeline:invalid");
+      print("FAIL");
+      print(validationError.message.split("\n")[0]);
+      return;
+    }
+    let uncaptured = device.nextUncapturedError();
+    if (uncaptured != null) {
+      while (uncaptured != null) {
+        print(`FAIL ${uncaptured.message.split("\n")[0]}`);
+        uncaptured = device.nextUncapturedError();
+      }
+      return;
+    }
     const state = terrain.depthStencil;
     if (state == null) {
       print("FAIL depth state missing");

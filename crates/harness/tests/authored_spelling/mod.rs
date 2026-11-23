@@ -383,29 +383,30 @@ fn inspect_module(
 }
 
 fn failures(source: &Path) -> Vec<String> {
-    let source_text = std::fs::read_to_string(source)
-        .unwrap_or_else(|error| panic!("read {}: {error}", source.display()));
     let files = subscript_typegpu_harness::program_files(source)
         .unwrap_or_else(|error| panic!("load {}: {error}", source.display()));
     let module = subscript_compiler::check_program_with(&files, &CheckOptions::default())
         .unwrap_or_else(|diagnostics| panic!("check {}: {diagnostics:?}", source.display()));
-    let source_name = source
-        .file_name()
-        .and_then(|name| name.to_str())
-        .expect("UTF-8 source name");
     let root = repository_root();
-    let display_name = source
-        .strip_prefix(&root)
-        .unwrap_or(source)
-        .to_string_lossy();
+    let relative = source.strip_prefix(&root).unwrap_or(source);
     let mut failures = Vec::new();
-    inspect_module(
-        &module,
-        &source_text,
-        source_name,
-        &display_name,
-        &mut failures,
-    );
+    for file in &files {
+        if file.entry
+            || matches!(
+                file.name.as_bytes(),
+                [b'm', b'0'..=b'9', b'0'..=b'9', b'-', ..]
+            )
+        {
+            let path = relative.with_file_name(&file.name);
+            inspect_module(
+                &module,
+                &file.source,
+                &file.name,
+                &path.to_string_lossy(),
+                &mut failures,
+            );
+        }
+    }
     failures
 }
 

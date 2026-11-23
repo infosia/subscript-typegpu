@@ -22,7 +22,8 @@ mod schema;
 mod shell;
 mod ui_atlas;
 
-pub use library::{load_library_files, load_program_files, LibraryLoadError};
+/// `load_program_files` and its library loader `read_libraries` report failures through `LibraryLoadError`.
+pub use library::{load_program_files, LibraryLoadError};
 /// Atlas module generation for the ui library.
 pub use ui_atlas::generate_ui_atlas;
 
@@ -270,13 +271,11 @@ fn is_library_file(name: &str) -> bool {
 
 /// Builds the check options that let the program import a support module that does not exist yet.
 ///
-/// The entry selects the support specifier (SC1a). Without an explicit entry, use the sole
-/// ordinary program source.
+/// An explicit entry selects the support specifier (SC1a). Without one, the sole ordinary source selects it.
 ///
 /// # Errors
 ///
-/// If `files` holds more than one program, returns an SC1 diagnostic. One run generates for one
-/// program.
+/// If no file is the entry and more than one ordinary source exists, returns an SC1 diagnostic.
 fn discovery_options(files: &[SourceFile]) -> Result<CheckOptions, Vec<Diagnostic>> {
     let explicit_entry = files.iter().any(|file| file.entry);
     let mut modules = Vec::new();

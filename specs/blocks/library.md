@@ -38,12 +38,14 @@ module set. Kernel-subset rules are `kernel.md`
   3. A specifier that names a registered module (LB1) or the entry's
      support module `./<stem>.typegpu` never reads the disk. The
      registered module wins over a file with the same name.
-  4. A specifier with a `/` after `./`, or a `<name>.ts` that does
-     not exist, adds no file. The compiler then reports S100 at the
-     import site.
+  4. A specifier that is not of the form `./<name>` (for example
+     `./a/b` or `../x`), or a `<name>.ts` that does not exist, adds
+     no file. The compiler then reports S100 at the import site.
   5. The application modules load after the library modules and
-     before the entry. Each module loads after the modules it
-     imports, so the order is deterministic.
+     before the entry. The order is a depth-first post-order over the
+     import declarations in source order: a module loads after the
+     modules it imports. A module that the walk already reached is
+     not visited again, so an import cycle ends at that module.
   6. The development tier, the shipping tier, the generator CLI, and
      the window host use the same loader.
 

@@ -3,42 +3,28 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use subscript_compiler::SourceFile;
+use subscript_typegpu_gen::{load_program_files, LibraryLoadError};
 
-use crate::support;
+use crate::support::{self, TempDir};
 
 #[test]
 fn application_dependencies_follow_libraries_and_precede_their_importers() {
-    let directory = std::env::temp_dir().join(format!(
-        "subscript-typegpu-app-order-{}",
-        std::process::id()
-    ));
-    std::fs::create_dir_all(&directory).expect("create application directory");
-    let entry = directory.join("main.ts");
-    std::fs::write(
-        &entry,
+    let directory = TempDir::new("app-order");
+    let entry = directory.write(
+        "main.ts",
         r#"
         import { tile } from "./tile";
         import { size } from "./size";
         import { tile_ENTRY } from "./main.typegpu";
     "#,
-    )
-    .expect("write entry");
-    std::fs::write(
-        directory.join("tile.ts"),
-        r#"import { size } from "./size";"#,
-    )
-    .expect("write tile");
-    std::fs::write(
-        directory.join("size.ts"),
-        r#"import { UiContext } from "./typegpu-ui";"#,
-    )
-    .expect("write size");
+    );
+    directory.write("tile.ts", r#"import { size } from "./size";"#);
+    directory.write("size.ts", r#"import { UiContext } from "./typegpu-ui";"#);
     for name in ["typegpu-ui.ts", "main.typegpu.ts"] {
-        std::fs::write(directory.join(name), [0xff]).expect("write unreadable source text");
+        std::fs::write(directory.0.join(name), [0xff]).expect("write unreadable source text");
     }
-    let files = subscript_typegpu_gen::load_program_files(&support::root().join("lib"), &entry)
+    let files = load_program_files(&support::root().join("lib"), &entry)
         .expect("load the registered UI module and skip the support file on disk");
-    std::fs::remove_dir_all(directory).expect("remove application directory");
     assert_eq!(
         files
             .iter()
@@ -68,10 +54,56 @@ fn application_dependencies_follow_libraries_and_precede_their_importers() {
 }
 
 #[test]
+fn application_module_read_error_names_the_path() {
+    let directory = TempDir::new("app-read");
+    let entry = directory.write("main.ts", r#"import { x } from "./x";"#);
+    let path = directory.0.join("x.ts");
+    std::fs::create_dir(&path).expect("create directory in place of module");
+    let error = load_program_files(&support::root().join("lib"), &entry)
+        .expect_err("a directory cannot supply module source");
+    let LibraryLoadError::Read(message) = error else {
+        panic!("expected a read error: {error}");
+    };
+    assert!(
+        message.contains(path.to_string_lossy().as_ref()),
+        "{message}"
+    );
+}
+
+#[test]
+fn application_module_parse_error_reports_the_imported_source() {
+    let directory = TempDir::new("app-parse");
+    let entry = directory.write("main.ts", r#"import { x } from "./x";"#);
+    directory.write("x.ts", "export const x = ;");
+    let error = load_program_files(&support::root().join("lib"), &entry)
+        .expect_err("invalid module syntax must fail");
+    let LibraryLoadError::Parse { file, diagnostics } = error else {
+        panic!("expected a parse error: {error}");
+    };
+    assert_eq!(file.name, "x.ts");
+    assert!(!diagnostics.is_empty());
+}
+
+#[test]
+fn application_import_cycle_loads_each_module_once_in_post_order() {
+    let directory = TempDir::new("app-cycle");
+    let entry = directory.write("main.ts", r#"import { a } from "./a";"#);
+    directory.write("a.ts", r#"import { b } from "./b";"#);
+    directory.write("b.ts", r#"import { a } from "./a";"#);
+    let files = support::program_files(&entry);
+    let names: Vec<_> = files
+        .iter()
+        .skip(5)
+        .map(|file| file.name.as_str())
+        .collect();
+    assert_eq!(names, ["b.ts", "a.ts", "main.ts"]);
+}
+
+#[test]
 fn ui_import_reaches_the_atlas_in_library_order() {
-    let program = SourceFile::new("ui-import.ts", "import { UiContext } from './typegpu-ui';");
-    let files = subscript_typegpu_gen::load_library_files(&support::root().join("lib"), &program)
-        .expect("load transitive UI imports");
+    let directory = TempDir::new("ui-import");
+    let entry = directory.write("ui-import.ts", "import { UiContext } from './typegpu-ui';");
+    let files = support::program_files(&entry);
     assert_eq!(
         files
             .iter()
@@ -85,13 +117,15 @@ fn ui_import_reaches_the_atlas_in_library_order() {
             "typegpu.ts",
             "typegpu-ui-atlas.generated.ts",
             "typegpu-ui.ts",
+            "ui-import.ts",
         ]
     );
 }
 
 #[test]
 fn import_text_in_comments_and_strings_does_not_reach_modules() {
-    let program = SourceFile::new(
+    let directory = TempDir::new("import-text");
+    let entry = directory.write(
         "import-text.ts",
         r#"
 // import { UiContext } from "./typegpu-ui";
@@ -101,19 +135,16 @@ const template: string = `import { bitonicSortStep } from "./typegpu-sort";`;
 import { Missing } from "./unregistered";
 "#,
     );
-    let files = subscript_typegpu_gen::load_library_files(&support::root().join("lib"), &program)
-        .expect("load core sources");
+    let mut files = support::program_files(&entry);
+    assert_eq!(files.pop().expect("entry source").name, "import-text.ts");
     assert_eq!(files.len(), 5);
     assert_eq!(files.last().expect("core source").name, "typegpu.ts");
 }
 
 #[test]
 fn cyclic_imports_load_each_module_once_and_skip_unreached_files() {
-    let directory = std::env::temp_dir().join(format!(
-        "subscript-typegpu-module-cycle-{}",
-        std::process::id()
-    ));
-    std::fs::create_dir_all(&directory).expect("create library directory");
+    let scratch = TempDir::new("library-cycle");
+    let directory = &scratch.0;
     for name in [
         "subscript-typegpu.generated.d.ts",
         "wire-enum-aliases.generated.d.ts",
@@ -134,20 +165,20 @@ fn cyclic_imports_load_each_module_once_and_skip_unreached_files() {
         "import { sort } from './typegpu-sort';",
     )
     .expect("write noise import");
-    let program = SourceFile::new(
+    let entry = scratch.write(
         "cycle.ts",
         "import { sort } from './typegpu-sort';\nimport { noise } from './typegpu-noise';",
     );
-    let files = subscript_typegpu_gen::load_library_files(&directory, &program)
+    let mut files = load_program_files(directory, &entry)
         .expect("load cyclic imports without other optional modules");
+    assert_eq!(files.pop().expect("entry source").name, "cycle.ts");
     assert_eq!(files.len(), 7);
     assert_eq!(files[5].name, "typegpu-noise.ts");
     assert_eq!(files[6].name, "typegpu-sort.ts");
     std::fs::remove_file(directory.join("typegpu-noise.ts")).expect("remove reached module");
-    let error = subscript_typegpu_gen::load_library_files(&directory, &program)
-        .expect_err("missing reached module must fail");
+    let error =
+        load_program_files(directory, &entry).expect_err("missing reached module must fail");
     assert!(error.to_string().contains("typegpu-noise.ts"), "{error}");
-    std::fs::remove_dir_all(directory).expect("remove library directory");
 }
 
 fn validate(wgsl: &str) {
@@ -214,14 +245,9 @@ fn run_host_fixture(runner_body: &str, fixture: &Path) -> Output {
         .file_stem()
         .and_then(|name| name.to_str())
         .expect("fixture has a UTF-8 file stem");
-    let scratch = std::env::temp_dir().join(format!(
-        "subscript-typegpu-host-{fixture_name}-{}",
-        std::process::id()
-    ));
-    std::fs::create_dir_all(&scratch)
-        .unwrap_or_else(|error| panic!("create {}: {error}", scratch.display()));
-    let source_path = scratch.join("runner.rs");
-    let binary_path = scratch.join(if cfg!(windows) {
+    let scratch = TempDir::new(fixture_name);
+    let source_path = scratch.0.join("runner.rs");
+    let binary_path = scratch.0.join(if cfg!(windows) {
         "runner.exe"
     } else {
         "runner"
@@ -274,8 +300,6 @@ fn main() {{
         .arg(fixture)
         .output()
         .expect("run host fixture");
-    std::fs::remove_dir_all(&scratch)
-        .unwrap_or_else(|error| panic!("remove {}: {error}", scratch.display()));
     assert!(
         run.status.success(),
         "host runner failed:\n{}\n{}",

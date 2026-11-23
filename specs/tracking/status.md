@@ -208,3 +208,16 @@ MINOR recorded open. Evidence: gate green, 349 passed, 1 ignored,
 Open: the contextual result-type inference request to subscript (the
 `createBuffer<T, D>` call sites). Record:
 `specs/tracking/p17-kernel-forms.md`.
+
+## P18 — application modules and typed depth state (2026-11-23)
+
+A downstream game report found two blocks before device creation.
+Slice 1 (LB5 Rev 1): the loaders read `./<name>` application modules
+from the entry's directory for both tiers, the generator CLI, and the
+window host, with `b28-app-modules` and its `m28` modules. Subscript
+keys modules in one flat namespace, so subdirectory imports wait on
+change request R42. Slice 2 (RN22): `RenderPipelineSpec` carries
+`depthStencil`, with `b29-depth` and the live `x27-live-depth`. Phase
+review: 2 MAJOR and 11 MINOR, all closed. Evidence: gate green, 364
+passed, 1 ignored, 555 s; live lane green on Metal; `triangle` and
+`ui-demo` smoke-green. Record: `specs/tracking/p18-game-integration.md`.
