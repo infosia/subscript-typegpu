@@ -2120,7 +2120,7 @@ checksum = "6637bab7722d379c8b41ba849228d680cc12d0a45ba1fa2b48f2a30577a06731"
 [[package]]
 name = "subscript-bindgen"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=d7ecb78a#d7ecb78a4d265dcb65d6ba69aa1166aef1dc5abb"
+source = "git+https://github.com/infosia/subscript.git?rev=36c9e11b#36c9e11be4c51e89f829784288940557e5031090"
 dependencies = [
  "clang-sys",
  "subscript-boundary",
@@ -2129,12 +2129,12 @@ dependencies = [
 [[package]]
 name = "subscript-boundary"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=d7ecb78a#d7ecb78a4d265dcb65d6ba69aa1166aef1dc5abb"
+source = "git+https://github.com/infosia/subscript.git?rev=36c9e11b#36c9e11be4c51e89f829784288940557e5031090"
 
 [[package]]
 name = "subscript-codegen"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=d7ecb78a#d7ecb78a4d265dcb65d6ba69aa1166aef1dc5abb"
+source = "git+https://github.com/infosia/subscript.git?rev=36c9e11b#36c9e11be4c51e89f829784288940557e5031090"
 dependencies = [
  "cc",
  "cranelift-codegen",
@@ -2152,7 +2152,7 @@ dependencies = [
 [[package]]
 name = "subscript-compiler"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=d7ecb78a#d7ecb78a4d265dcb65d6ba69aa1166aef1dc5abb"
+source = "git+https://github.com/infosia/subscript.git?rev=36c9e11b#36c9e11be4c51e89f829784288940557e5031090"
 dependencies = [
  "oxc_allocator",
  "oxc_ast",
@@ -2167,7 +2167,7 @@ dependencies = [
 [[package]]
 name = "subscript-runtime"
 version = "0.1.0"
-source = "git+https://github.com/infosia/subscript.git?rev=d7ecb78a#d7ecb78a4d265dcb65d6ba69aa1166aef1dc5abb"
+source = "git+https://github.com/infosia/subscript.git?rev=36c9e11b#36c9e11be4c51e89f829784288940557e5031090"
 dependencies = [
  "icu_normalizer",
  "num-bigint 0.4.8",

@@ -884,3 +884,15 @@ subscript packages.
 Evidence: `tools/gate.sh --require-backend` green, 521 s, 384 passed,
 1 ignored (live). The `api/mod.rs` panics are the expected panics of
 the trap tests.
+
+### Re-pin to `36c9e11b` (2026-11-25)
+
+Two crate-changing subscript commits. §356 runs the mark of a
+collection in steps, and §357 runs the sweep of a collection in steps.
+The changes are in `runtime` and `codegen`: the ship-tier C gains mark
+barrier points. The compiler and the bindgen crates do not change, so
+no source change is needed here. The `Cargo.lock` diff moves only the
+five subscript packages.
+Evidence: `tools/gate.sh --require-backend` green, 515 s, 384 passed,
+1 ignored (live). The `error[S100]` lines and the `api/mod.rs` panics
+in the log come from the tests that expect a red.
