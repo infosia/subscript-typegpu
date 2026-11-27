@@ -896,3 +896,13 @@ five subscript packages.
 Evidence: `tools/gate.sh --require-backend` green, 515 s, 384 passed,
 1 ignored (live). The `error[S100]` lines and the `api/mod.rs` panics
 in the log come from the tests that expect a red.
+
+### Re-pin to `9b8e2d15` (2026-11-27)
+
+Two crate-changing subscript sections. §358 lets `Context.free`
+release an array. §359 makes a filter of a new array write into the
+buffer of that array. Both sections add behavior, and no source change
+is needed here. The `Cargo.lock` diff moves only the five subscript
+packages.
+Evidence: `tools/gate.sh --require-backend` green, 521 s, 384 passed,
+1 ignored (live).
