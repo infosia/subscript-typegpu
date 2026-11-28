@@ -1005,6 +1005,38 @@ Exit:
 - the owner's visual check of `ui-demo` at scale 1 and 2;
 - a phase review with no open CRITICAL or MAJOR.
 
+### P22 — parameter propagation (after the pin `9b8e2d15`)
+
+An audit at `e758f5d` (2026-11-28) traced values from each public
+entry to their use. It reproduced seven defects and listed three
+open candidates. The record is
+`specs/tracking/p22-parameter-propagation.md`.
+
+Slice 1 — module validity and the mapped read (`kernel.md` K14
+Rev 10, K34, `pipeline.md` PI6 Rev 1, `buffer.md` BF3 Rev 1).
+
+Slice 2 — the evaluation order (`kernel.md` K35).
+
+Slice 3 — the owner decisions of 2026-11-28 (`ui.md` UI15 Rev 10,
+UI17 Rev 3, `window.md` W3 Rev 4): one `render` per renderer per
+submit as a contract, and the wheel delta in surface pixels. The
+sampler LOD clamp candidate gets a two-level GPU comparison in the
+live run, and its result decides the disposition.
+
+Exit:
+
+- gate-green, with an existing WGSL golden moved only where its
+  source holds a K35 conflict, each move listed in tracking;
+- a recorded red at `e758f5d` for each of the seven defects, through
+  the test that the phase adds;
+- `naga` validation of each new module, the decoded value at index
+  1 on both tiers for the mapped read, and one counter per
+  evaluation-order case with its expected value;
+- a live run on Metal that compares the GPU result of the
+  evaluation-order kernel with the host result;
+- a 30-frame `ui-demo` window run after the wheel change;
+- a phase review with no open CRITICAL or MAJOR.
+
 ### U0–U4 — the immediate-mode GUI (branch `imgui`, after P16)
 
 Owner decision 2026-09-05: an immediate-mode GUI authored in

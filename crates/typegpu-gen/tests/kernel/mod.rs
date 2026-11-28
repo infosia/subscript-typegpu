@@ -2033,3 +2033,171 @@ const pipe = computePipeline<Layout>(kernel, {{ name: "pipe", workgroupSize: [1,
         );
     }
 }
+
+const CALL_KERNEL: &str = r#"
+import { ComputePipelineSpec, MutStorage, computePipeline } from "./typegpu";
+class Layout { constructor(public output: MutStorage<u32>) {} }
+DECLARATIONS
+function kernel(res: Layout): void { BODY }
+const pipeline: ComputePipelineSpec = computePipeline(kernel, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#;
+
+fn check_calls(declarations: &str, body: &str, expected: &[&str]) {
+    let source = CALL_KERNEL
+        .replace("DECLARATIONS", declarations)
+        .replace("BODY", body);
+    let wgsl = &generate(&source).pipelines[0].1;
+    validate(wgsl);
+    for text in expected {
+        assert!(wgsl.contains(text), "missing {text} in {wgsl}");
+    }
+}
+
+#[test]
+fn call_shapes_helper_default_and_explicit_zero() {
+    check_calls(
+        "function pair(a: u32, b: u32 = 7): u32 { return a + b; }",
+        "res.output[0] = pair(2); res.output[1] = pair(2, 0);",
+        &["pair(2u, 7u)", "pair(2u, 0u)"],
+    );
+}
+
+#[test]
+fn call_shapes_generic_and_local_defaults() {
+    check_calls(
+        "function choose<T>(x: T, b: u32 = 7): u32 { return b; }",
+        "function inner(b: u32 = 7): u32 { return b; } res.output[0] = choose<u32>(1) + inner();",
+        &["choose_u32(1u, 7u)", "inner(7u)"],
+    );
+}
+
+#[test]
+fn call_shapes_method_and_constructor_defaults() {
+    check_calls("@ValueType class Sample { constructor(public value: u32 = 7) {} plus(b: u32 = 7): u32 { return this.value + b; } }",
+        "const s = new Sample(); res.output[0] = s.plus();", &["Sample(7u)", "Sample_plus(s, 7u)"]);
+}
+
+#[test]
+fn call_shapes_default_reaches_helper_and_global() {
+    check_calls("const bias: u32 = 5; function offset(): u32 { return 2; } function pair(b: u32 = offset() + bias): u32 { return b; }",
+        "res.output[0] = pair();", &["pair(offset() + bias)"]);
+}
+
+const BATCH_TYPES: &str = r#"
+@ValueType class Item { constructor(public value: u32) {} }
+@ValueType class Batch { constructor(public slots: FixedArray<Item, 2>, public scale: f32) {} }
+"#;
+
+fn check_batch(types: &str, source: &str) {
+    let wgsl = &generate(&source.replace("TYPES", types)).pipelines[0].1;
+    validate(wgsl);
+    assert_eq!(wgsl.matches("struct Item {").count(), 1);
+}
+
+const COPY_BATCH: &str = r#"
+import { MutStorage, ComputePipelineSpec, computePipeline } from "./typegpu";
+TYPES
+class Layout { constructor(public data: MutStorage<Batch>) {} }
+function copy(res: Layout): void { res.data[1] = res.data[0]; }
+const pipeline: ComputePipelineSpec = computePipeline(copy, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#;
+
+#[test]
+fn call_shapes_array_child_compute() {
+    check_batch(BATCH_TYPES, COPY_BATCH);
+}
+
+#[test]
+fn compute_struct_order_follows_members_through_arrays() {
+    let types = r#"
+@ValueType class B { constructor(public value: u32) {} }
+@ValueType class C { constructor(public value: u32) {} }
+@ValueType class Inner { constructor(public value: u32) {} }
+@ValueType class A { constructor(public items: FixedArray<Inner, 2>, public c: C, public b: B) {} }
+"#;
+    let source = COPY_BATCH
+        .replace("MutStorage<Batch>", "MutStorage<A>")
+        .replace("TYPES", types);
+    let wgsl = &generate(&source).pipelines[0].1;
+    let structs: Vec<_> = wgsl
+        .lines()
+        .filter_map(|line| line.strip_prefix("struct "))
+        .collect();
+    assert_eq!(structs, ["A {", "Inner {", "C {", "B {"]);
+    validate(wgsl);
+}
+
+#[test]
+fn call_shapes_nested_array_child() {
+    check_batch(
+        &BATCH_TYPES.replace("FixedArray<Item, 2>", "FixedArray<FixedArray<Item, 2>, 2>"),
+        COPY_BATCH,
+    );
+}
+
+#[test]
+fn call_shapes_array_child_render() {
+    check_batch(
+        BATCH_TYPES,
+        r#"
+import { Storage, RenderPipelineSpec, renderPipelineL } from "./typegpu";
+import { Vec2f, Vec4f } from "./typegpu-types";
+TYPES
+@ValueType class Vertex { constructor(public xy: Vec2f) {} }
+@ValueType class Varyings { constructor(public position: Vec4f) {} }
+class Layout { constructor(public data: Storage<Batch>) {} }
+function vert(res: Layout, vertex: Vertex): Varyings { return new Varyings(new Vec4f(vertex.xy.x, vertex.xy.y, 0.0, 1.0)); }
+function frag(res: Layout, input: Varyings): Vec4f { return new Vec4f(res.data[0].scale, 0.0, 0.0, 1.0); }
+const pipeline: RenderPipelineSpec = renderPipelineL(vert, frag, { format: "rgba8unorm" });
+"#,
+    );
+}
+
+const COPY_PIXELS: &str = r#"
+import { Storage, MutStorage, ComputePipelineSpec, computePipeline2 } from "./typegpu";
+class A { constructor(public pixels: Storage<u32>) {} }
+class B { constructor(public pixels: MutStorage<u32>) {} }
+function copy(a: A, b: B): void { b.pixels[0] = a.pixels[0]; }
+const pipeline: ComputePipelineSpec = computePipeline2<A, B>(copy, { name: "pipeline", workgroupSize: [1, 1, 1] });
+"#;
+
+fn check_pixels(source: &str, read_name: &str, access: &str) {
+    let wgsl = &generate(source).pipelines[0].1;
+    validate(wgsl);
+    for text in [
+        format!("@group(0u) @binding(0u) var<storage, {access}> {read_name}:"),
+        "@group(1u) @binding(0u) var<storage, read_write> pixels_1:".to_owned(),
+        format!("pixels_1[0u] = {read_name}[0u];"),
+    ] {
+        assert!(wgsl.contains(&text), "missing {text} in {wgsl}");
+    }
+}
+
+#[test]
+fn call_shapes_shared_fields() {
+    check_pixels(COPY_PIXELS, "pixels_0", "read");
+}
+
+#[test]
+fn call_shapes_repeated_layout() {
+    check_pixels(
+        &COPY_PIXELS
+            .replace("a: A", "a: B")
+            .replace("<A, B>", "<B, B>"),
+        "pixels_0",
+        "read_write",
+    );
+}
+
+#[test]
+fn call_shapes_generated_binding_collision() {
+    let source = COPY_PIXELS
+        .replace(
+            "function copy",
+            "function pixels_0(): u32 { return 1; } function copy",
+        )
+        .replace("= a.pixels[0];", "= a.pixels[0]; b.pixels[1] = pixels_0();");
+    check_pixels(&source, "pixels_0_", "read");
+}
+
+mod evaluation_order;

@@ -239,8 +239,8 @@ impl FutureKind {
 
 /// One queued input event that the host delivers before the next frame (W3 Rev 2).
 ///
-/// `Wheel` carries pixel deltas. `KeyDown` and `KeyUp` carry one modifier bit. `Text` carries one
-/// Unicode scalar.
+/// `Wheel` carries deltas in surface pixels. `KeyDown` and `KeyUp` carry one modifier bit.
+/// `Text` carries one Unicode scalar.
 enum InputEvent {
     Wheel(f32, f32),
     KeyDown(u32),
@@ -738,9 +738,13 @@ impl ApplicationHandler for Host {
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
-                // W3 Rev 2: one line is 30 pixels, and a pixel delta passes as is.
+                // One line spans 30 logical pixels. Pixel deltas already use surface pixels.
                 let (x, y) = match delta {
-                    MouseScrollDelta::LineDelta(x, y) => (x * 30.0, y * 30.0),
+                    MouseScrollDelta::LineDelta(x, y) => {
+                        let factor =
+                            self.window.as_ref().expect("window stored").scale_factor() as f32;
+                        (x * 30.0 * factor, y * 30.0 * factor)
+                    }
                     MouseScrollDelta::PixelDelta(position) => {
                         (position.x as f32, position.y as f32)
                     }

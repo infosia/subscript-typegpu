@@ -136,7 +136,8 @@ A windowed program exports three functions the host calls: `init`
 once, `frame` once per displayed frame (with the size, one key
 scalar, and the pointer), and `shutdown` once. A program that also
 exports `wheel`, `keyDown`, `keyUp`, or `textInput` receives queued
-input before each frame. The fifth optional entry, `scale`, receives
+input before each frame. Wheel deltas use surface pixels. One wheel line spans
+30 logical pixels. The fifth optional entry, `scale`, receives
 the window's scale factor after `init` and any change before the next
 frame's queued input.
 

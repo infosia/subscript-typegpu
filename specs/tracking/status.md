@@ -259,3 +259,21 @@ string has no measurable compile cost. Phase review: 2 MAJOR and
 1 ignored, 499 s; live green on Metal, 196 s; the owner's window run
 on a scale-2 display. Open: scale 1 visual check, Windows
 regeneration. Record: `specs/tracking/p21-sharp-ui-text.md`.
+
+## P22 — parameter propagation (2026-11-28)
+
+An audit at `e758f5d` traced values from each public entry to their
+use and listed ten candidates. Seven were generator or library
+defects: a default parameter lost at the call (K34), a struct behind
+a `FixedArray` not declared (K14 Rev 10), one field name in two
+groups (PI6 Rev 1), a mapped read at an offset that is not a
+multiple of 8 (BF3 Rev 1), and three evaluation-order cases (K35).
+Owner decisions: one `render` per renderer per submit is a contract
+(UI15 Rev 10), and a wheel delta is in surface pixels (W3 Rev 4,
+UI17 Rev 3). The sampler LOD clamp is not a defect on a one-level
+host texture (CL5 Rev 2, `x29`). No existing WGSL golden moved.
+Phase review: 2 MAJOR, 1 unverified, and 9 MINOR. The MAJOR findings
+and 8 MINOR are closed. Evidence: gate green, 417 passed, 1 ignored,
+525 s; live green on Metal, 207 s; `ui-demo` smoke-green. Open: a
+helper that assigns to a parameter. Record:
+`specs/tracking/p22-parameter-propagation.md`.

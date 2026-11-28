@@ -9,7 +9,8 @@ Rev 3 from the U3 review), 2026-09-05. Rev 7 (W5 Rev 1, W9 Rev 2 from the
 comment pass), 2026-09-07. Rev 8 (W2 Rev 4: the static factory
 `GPUHostOwnedDevice.create`), 2026-10-27. Rev 9 (W2 Rev 5: the
 host-owned device caches its queue), 2026-10-30. Rev 10 (W2 Rev 6,
-W13 Rev 4: the scale entry), 2026-11-23. Plan §8 P9 and
+W13 Rev 4: the scale entry), 2026-11-23. Rev 11 (W3 Rev 4: the
+wheel unit), 2026-11-28. Plan §8 P9 and
 §8 U3 govern this block. The
 facade side is `facade.md` L14 and `facade-generator.md` F23. The
 script side is the API layer (`api-layer.md`) and the TypeGPU layer.
@@ -75,6 +76,11 @@ script side is the API layer (`api-layer.md`) and the TypeGPU layer.
   delivers them through the W2 Rev 3 entries the script exports,
   then clears the queue. A wheel event carries pixel deltas: a
   line delta is 30 pixels per line, and a pixel delta passes as is.
+  Rev 4 (2026-11-28, owner decision): a wheel delta is in surface
+  pixels, the unit of the pointer position. A pixel delta passes as
+  is. A line delta is 30 logical pixels per line, so the host
+  multiplies it by 30 and by the scale factor. A script that lays
+  out in logical pixels divides the delta by the factor.
   A key event for shift, control, alt, backspace, or return carries
   its bit (1, 2, 4, 8, 16) to `keyDown` on press and to `keyUp` on
   release, and a repeat counts as a press. A character key press

@@ -128,7 +128,7 @@ is this host's choice, and the three lists below separate the two.
   `onStart` and `onTick`.
 - `winit`, a 960 by 640 window, and the Fifo present mode.
 - The format preference, `bgra8unorm` before the first listed format.
-- One key scalar per frame, three button bits, and 30 pixels per wheel line.
+- One key scalar per frame, three button bits, and 30 logical pixels per wheel line.
 - The five optional entries for input and scale, the `--frames` limit, and the
   `window:frames=<n>` line.
 
@@ -724,7 +724,7 @@ returns.
 | `ScaleFactorChanged` | stores the latest factor for delivery before the next frame's queued input |
 | `KeyboardInput`, press | stores the key scalar, queues a modifier bit and the produced text |
 | `KeyboardInput`, release | queues the modifier bit for `keyUp` |
-| `MouseWheel` | queues a wheel delta, 30 pixels per line |
+| `MouseWheel` | queues pixel deltas in surface pixels and multiplies line deltas by 30 and the scale factor |
 | `CursorMoved` | stores the pointer position in surface pixels |
 | `MouseInput` | sets or clears one button bit |
 | `RedrawRequested` | encodes and presents one frame, then asks for the next |
@@ -829,7 +829,7 @@ delivers queued wheel, key, and text events in order through their respective en
 
 | Entry | Signature | Carries |
 |---|---|---|
-| `wheel` | `(deltaX: f32, deltaY: f32): void` | pixel deltas, 30 pixels per line |
+| `wheel` | `(deltaX: f32, deltaY: f32): void` | deltas in surface pixels |
 | `keyDown` | `(key: u32): void` | shift 1, control 2, alt 4, backspace 8, return 16 |
 | `keyUp` | `(key: u32): void` | the same bits on release |
 | `textInput` | `(codePoint: u32): void` | one Unicode scalar of produced text |
@@ -837,9 +837,8 @@ delivers queued wheel, key, and text events in order through their respective en
 
 If a script exports `scale`, the host calls it after `init` and before the first
 `frame`. When the factor changes, the host delivers the latest value before the
-next frame's queued input. The `frame` width, height, and pointer coordinates
-use surface pixels. A script that lays out in logical pixels divides each of
-those values by the factor.
+next frame's queued input. The frame size, pointer coordinates, and wheel deltas
+use surface pixels. A script that uses logical pixels divides these values by the factor.
 
 `examples/ui-demo` exports all five entries. It passes the surface size and the
 factor to `UiRenderer.render`, which computes the logical viewport. The renderer

@@ -6,7 +6,7 @@ use crate::TryAny;
 use std::collections::{BTreeMap, BTreeSet};
 
 use subscript_compiler::hir::{
-    BinOp, Callee, Expr, ExprKind, ForOfKind, Function, Module, Stmt, Symbol, UnOp,
+    BinOp, Callee, Expr, ExprKind, ForOfKind, Function, HirChild, Module, Param, Stmt, Symbol, UnOp,
 };
 use subscript_compiler::{Diagnostic, Pos, RuleCode, Type};
 
@@ -142,11 +142,72 @@ fn logical_assignment(expr: &Expr) -> Option<(&Expr, &Expr, bool)> {
     None
 }
 
-/// Statements that must run before an expression, each with its indent relative to the statement.
-///
-/// A lowered conditional puts its `if`/`else` here, so both sides keep short-circuit evaluation
-/// (K9).
+/// A write also counts as a read (K35).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+enum Effect {
+    #[default]
+    Pure,
+    Read,
+    Write,
+}
+
+impl Effect {
+    fn conflicts(self, other: Self) -> bool {
+        self != Self::Pure && other != Self::Pure && self.max(other) == Self::Write
+    }
+}
+
 type Prelude = Vec<(usize, String)>;
+
+/// WGSL operand order for a source expression.
+enum OperandOrder<'a> {
+    Source,
+    ReceiverLast,
+    Fields {
+        order: &'a [usize],
+        args: &'a [Expr],
+    },
+}
+
+impl OperandOrder<'_> {
+    fn crosses(&self, index: usize, parts: &[Snippet], effect: Effect) -> bool {
+        match self {
+            Self::Source => false,
+            Self::ReceiverLast => {
+                index == 0
+                    && parts
+                        .iter()
+                        .skip(1)
+                        .any(|part| effect.conflicts(part.eval.inline))
+            }
+            Self::Fields { order, .. } => order
+                .iter()
+                .copied()
+                .take_while(|source| *source != index)
+                .filter(|source| *source > index)
+                .filter_map(|source| parts.get(source))
+                .any(|part| effect.conflicts(part.eval.inline)),
+        }
+    }
+}
+
+/// Keep the effects of the statements separate from the effects of the expression text.
+#[derive(Debug, Clone, Default)]
+struct Evaluation {
+    prelude: Prelude,
+    before: Effect,
+    inline: Effect,
+}
+
+impl Evaluation {
+    fn expression(self, text: String, precedence: u8) -> Snippet {
+        Snippet {
+            text,
+            precedence,
+            eval: self,
+        }
+    }
+}
 
 /// One author-WGSL line range inside an emitted module (K31).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -177,7 +238,7 @@ pub(crate) struct Snippet {
     /// The WGSL expression text.
     pub(crate) text: String,
     precedence: u8,
-    prelude: Prelude,
+    eval: Evaluation,
 }
 
 impl Snippet {
@@ -187,13 +248,34 @@ impl Snippet {
         Self {
             text,
             precedence,
-            prelude: Vec::new(),
+            eval: Evaluation::default(),
         }
     }
 
     /// Builds a snippet that never needs parentheses, such as a literal, a name, or a call.
     fn atom(text: String) -> Self {
         Self::new(text, 10)
+    }
+}
+
+/// Each index has its own expression. Fields after that index form its suffix.
+#[derive(Default)]
+struct Place {
+    root: String,
+    indices: Vec<Snippet>,
+    suffixes: Vec<String>,
+}
+
+impl Place {
+    fn index(&mut self, index: Snippet) {
+        self.indices.push(index);
+        self.suffixes.push(String::new());
+    }
+
+    fn field(&mut self, name: &str) {
+        let suffix = self.suffixes.last_mut().unwrap_or(&mut self.root);
+        suffix.push('.');
+        suffix.push_str(&mapping::ident(name));
     }
 }
 
@@ -442,151 +524,185 @@ struct KernelGlobal {
     pos: Pos,
 }
 
-/// Collects the declaration symbols of the module-level declarations that `expr` reads.
-fn global_names_expr(expr: &Expr, out: &mut BTreeSet<Symbol>) {
-    if let ExprKind::Global(name, _) = &expr.kind {
-        out.insert(name.clone());
-    }
-    match &expr.kind {
-        ExprKind::Seq { effects, value } => {
-            for item in effects.iter().chain(std::iter::once(value.as_ref())) {
-                global_names_expr(item, out);
-            }
-        }
-        ExprKind::AbsenceTest { value: operand, .. }
-        | ExprKind::Unary { operand, .. }
-        | ExprKind::Cast(operand)
-        | ExprKind::Length(operand)
-        | ExprKind::Field { obj: operand, .. } => global_names_expr(operand, out),
-        ExprKind::Binary { left, right, .. }
-        | ExprKind::Assign {
-            target: left,
-            value: right,
-            ..
+/// Returns the declaration and the explicit argument count of a kernel call.
+fn declared_call<'a>(module: &'a Module, expr: &Expr) -> Option<(&'a Function, usize)> {
+    let (function, count) = match &expr.kind {
+        ExprKind::Call {
+            callee: Callee::Func(name),
+            args,
+        } => (crate::pipeline::function(module, name)?, args.len()),
+        ExprKind::Call {
+            callee: Callee::Method { recv, name },
+            args,
         } => {
-            global_names_expr(left, out);
-            global_names_expr(right, out);
-        }
-        ExprKind::Call { callee, args } => {
-            if let Callee::Value(value) = callee {
-                global_names_expr(value, out);
+            let Type::Class(id) = recv.ty else {
+                return None;
+            };
+            let class = module.classes.get(id.0)?;
+            if !class.is_value {
+                return None;
             }
-            if let Callee::Method { recv, .. } = callee {
-                global_names_expr(recv, out);
-            }
-            for arg in args {
-                global_names_expr(arg, out);
-            }
+            (
+                class.methods.iter().find(|method| method.symbol == *name)?,
+                args.len(),
+            )
         }
-        ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => {
-            for arg in args {
-                global_names_expr(arg, out);
-            }
-        }
-        ExprKind::DescriptorLit { fields, .. } => {
-            for value in fields.iter().flatten() {
-                global_names_expr(value, out);
-            }
-        }
-        ExprKind::Index { obj, index, .. } => {
-            global_names_expr(obj, out);
-            global_names_expr(index, out);
-        }
-        ExprKind::Cond { cond, then, els } => {
-            global_names_expr(cond, out);
-            global_names_expr(then, out);
-            global_names_expr(els, out);
-        }
-        _ => {}
+        ExprKind::New { class, args } => (module.classes.get(class.0)?.ctor.as_ref()?, args.len()),
+        _ => return None,
+    };
+    if matches!(
+        registered_library(module, &function.pos.file),
+        Some("typegpu-types.ts" | "typegpu.ts")
+    ) {
+        return None;
     }
+    Some((function, count))
 }
 
-/// Runs `global_names_expr` over every expression the statement holds, nested bodies included.
-fn global_names_stmt(statement: &Stmt, out: &mut BTreeSet<Symbol>) {
-    match statement {
-        Stmt::Let { init, .. } | Stmt::Expr(init) => global_names_expr(init, out),
-        Stmt::Return {
-            value: Some(value), ..
-        } => global_names_expr(value, out),
-        Stmt::Return { value: None, .. } => {}
-        Stmt::If {
-            cond, then, els, ..
-        } => {
-            global_names_expr(cond, out);
-            for statement in then {
-                global_names_stmt(statement, out);
-            }
-            if let Some(els) = els {
-                for statement in els {
-                    global_names_stmt(statement, out);
-                }
-            }
-        }
-        Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
-            global_names_expr(cond, out);
-            for statement in body {
-                global_names_stmt(statement, out);
-            }
-        }
-        Stmt::For {
-            init,
-            cond,
-            step,
-            body,
-            ..
-        } => {
-            if let Some(init) = init {
-                global_names_stmt(init, out);
-            }
-            if let Some(cond) = cond {
-                global_names_expr(cond, out);
-            }
-            for item in step {
-                global_names_stmt(item, out);
-            }
-            for statement in body {
-                global_names_stmt(statement, out);
-            }
-        }
-        Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
-            global_names_expr(subject, out);
-            for statement in body {
-                global_names_stmt(statement, out);
-            }
-        }
-        Stmt::Switch { disc, cases, .. } => {
-            global_names_expr(disc, out);
-            for case in cases {
-                if let Some(test) = &case.test {
-                    global_names_expr(test, out);
-                }
-                for statement in &case.body {
-                    global_names_stmt(statement, out);
-                }
-            }
-        }
-        Stmt::Block(body) => {
-            for statement in body {
-                global_names_stmt(statement, out);
-            }
-        }
-        Stmt::Using {
-            body, finalizer, ..
-        } => {
-            for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
-                for statement in body {
-                    global_names_stmt(statement, out);
-                }
-            }
-        }
-        Stmt::Try { body, handler, .. } => {
-            for statement in body.iter().chain(handler) {
-                global_names_stmt(statement, out);
-            }
-        }
-        Stmt::Throw { value, .. } => global_names_expr(value, out),
-        Stmt::Break(_) | Stmt::Continue(_) => {}
+/// Supplies the trailing arguments before the emitter applies the call or constructor rules.
+fn expanded_call(module: &Module, expr: &Expr) -> Option<Expr> {
+    let (function, count) = declared_call(module, expr)?;
+    if count >= function.params.len() {
+        return None;
     }
+    let mut call = expr.clone();
+    let (ExprKind::Call { args, .. } | ExprKind::New { args, .. }) = &mut call.kind else {
+        return None;
+    };
+    args.extend(
+        function
+            .params
+            .iter()
+            .skip(count)
+            .filter_map(|param| param.default.clone()),
+    );
+    Some(call)
+}
+
+fn invalid_default(
+    module: &Module,
+    function: &Function,
+    param: &Param,
+    reason: &str,
+) -> Diagnostic {
+    let owner = module.classes.iter().find(|class| {
+        class
+            .ctor
+            .iter()
+            .chain(&class.methods)
+            .any(|member| std::ptr::eq(member, function))
+    });
+    let name = owner.map_or_else(
+        || function.name.clone(),
+        |class| format!("{}.{}", class.name, function.name),
+    );
+    diagnostic(
+        "K34",
+        format!(
+            "default for parameter `{}` of `{name}` {reason}",
+            param.name
+        ),
+        param.pos.clone(),
+    )
+}
+
+/// Checks a declared default against the same expression rules as an explicit argument.
+fn validate_call_defaults(module: &Module, expr: &Expr) -> Result<(), Diagnostic> {
+    let Some((function, _)) = declared_call(module, expr) else {
+        return Ok(());
+    };
+    for param in &function.params {
+        let Some(default) = &param.default else {
+            continue;
+        };
+        let mut reached = BTreeSet::new();
+        visit_call_expressions(
+            module,
+            HirChild::Expr(default),
+            &mut Vec::new(),
+            &mut |value| {
+                match &value.kind {
+                    ExprKind::Local(..) | ExprKind::This => {
+                        return Err(invalid_default(
+                            module,
+                            function,
+                            param,
+                            "reads a parameter or receiver",
+                        ))
+                    }
+                    ExprKind::Global(symbol, _) => {
+                        reached.insert(symbol.clone());
+                    }
+                    _ => {}
+                }
+                Ok(())
+            },
+        )?;
+        let globals = globals_for_symbols(module, &reached)
+            .map_err(|_| invalid_default(module, function, param, "uses an unsupported global"))?;
+        let names = ModuleNames::default();
+        Emitter::helper(module, function, &globals, &names)
+            .snippet(default)
+            .map_err(|_| {
+                invalid_default(
+                    module,
+                    function,
+                    param,
+                    "contains an unsupported expression",
+                )
+            })?;
+    }
+    Ok(())
+}
+
+/// Visits explicit expressions and the defaults that the caller evaluates.
+fn visit_call_expressions<'a>(
+    module: &'a Module,
+    node: HirChild<'a>,
+    active: &mut Vec<&'a Expr>,
+    visit: &mut impl FnMut(&'a Expr) -> Result<(), Diagnostic>,
+) -> Result<(), Diagnostic> {
+    let children = match node {
+        HirChild::Expr(expr) => {
+            visit(expr)?;
+            if let Some((function, count)) = declared_call(module, expr) {
+                for param in function.params.iter().skip(count) {
+                    if let Some(default) = &param.default {
+                        if active.iter().any(|prior| std::ptr::eq(*prior, default)) {
+                            return Err(invalid_default(
+                                module,
+                                function,
+                                param,
+                                "recursively requires itself",
+                            ));
+                        }
+                        active.push(default);
+                        visit_call_expressions(module, HirChild::Expr(default), active, visit)?;
+                        active.pop();
+                    }
+                }
+            }
+            expr.children()
+        }
+        HirChild::Stmt(stmt) => stmt.children(),
+    };
+    for child in children {
+        visit_call_expressions(module, child, active, visit)?;
+    }
+    Ok(())
+}
+
+fn global_names(
+    module: &Module,
+    node: HirChild<'_>,
+    out: &mut BTreeSet<Symbol>,
+) -> Result<(), Diagnostic> {
+    visit_call_expressions(module, node, &mut Vec::new(), &mut |expr| {
+        if let ExprKind::Global(name, _) = &expr.kind {
+            out.insert(name.clone());
+        }
+        Ok(())
+    })
 }
 
 /// Returns the `T` that a library wrapper class carries in its host-body field.
@@ -632,12 +748,12 @@ fn kernel_globals(
     let helpers = dependencies(module, kernel, shells)?;
     let mut reached = BTreeSet::new();
     for statement in &kernel.body {
-        global_names_stmt(statement, &mut reached);
+        global_names(module, HirChild::Stmt(statement), &mut reached)?;
     }
     for helper in helpers {
         if let Some(function) = function(module, &helper) {
             for statement in &function.body {
-                global_names_stmt(statement, &mut reached);
+                global_names(module, HirChild::Stmt(statement), &mut reached)?;
             }
         }
     }
@@ -647,7 +763,7 @@ fn kernel_globals(
         let before = reached.len();
         for global in &module.globals {
             if reached.contains(&global.symbol) {
-                global_names_expr(&global.init, &mut reached);
+                global_names(module, HirChild::Expr(&global.init), &mut reached)?;
             }
         }
         if reached.len() == before {
@@ -655,6 +771,13 @@ fn kernel_globals(
         }
     }
 
+    globals_for_symbols(module, &reached)
+}
+
+fn globals_for_symbols(
+    module: &Module,
+    reached: &BTreeSet<Symbol>,
+) -> Result<Vec<KernelGlobal>, Diagnostic> {
     let mut globals = Vec::new();
     for global in module
         .globals
@@ -821,6 +944,8 @@ pub(crate) fn reached_render_global_names(
 ///
 /// If a receiver type names a class the module does not hold, returns an internal diagnostic.
 fn expression_blocks_host(module: &Module, expression: &Expr) -> Result<bool, Diagnostic> {
+    let expanded = expanded_call(module, expression);
+    let expression = expanded.as_ref().unwrap_or(expression);
     Ok(match &expression.kind {
         ExprKind::Seq { effects, value } => effects
             .iter()
@@ -1115,8 +1240,9 @@ fn binding_declaration(
     module: &Module,
     group: u32,
     binding: &crate::pipeline::Binding,
+    names: &ModuleNames,
 ) -> Result<String, Diagnostic> {
-    let name = mapping::ident(&binding.name);
+    let name = names.binding_name(group, binding);
     let declaration = match binding.kind {
         BindingKind::Uniform => format!(
             "var<uniform> {name}: {};",
@@ -1542,6 +1668,9 @@ fn fold_constant_expr(
     visiting: &mut BTreeSet<Symbol>,
     expr: &Expr,
 ) -> Result<FoldedConstant, Diagnostic> {
+    validate_call_defaults(module, expr)?;
+    let expanded = expanded_call(module, expr);
+    let expr = expanded.as_ref().unwrap_or(expr);
     match &expr.kind {
         ExprKind::Int(value) => match expr.ty {
             Type::I32 => i32::try_from(*value)
@@ -1733,6 +1862,9 @@ fn constant_snippet(
     globals: &BTreeMap<Symbol, KernelGlobal>,
     expr: &Expr,
 ) -> Result<Snippet, Diagnostic> {
+    validate_call_defaults(module, expr)?;
+    let expanded = expanded_call(module, expr);
+    let expr = expanded.as_ref().unwrap_or(expr);
     match &expr.kind {
         ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_) => {
             Ok(Snippet::atom(literal(expr)?))
@@ -2144,14 +2276,24 @@ fn local_names(function: &Function, module_names: &BTreeSet<String>) -> BTreeMap
 }
 
 /// Names shared by the declarations and call sites of one WGSL module.
+#[derive(Default)]
 struct ModuleNames {
     /// WGSL identifiers that a parameter or local must avoid.
     reserved: BTreeSet<String>,
+    /// Generated names for fields that several groups share.
+    binding_aliases: BTreeMap<(u32, u32), String>,
     /// Each reached function's name before WGSL identifier mapping.
     functions: BTreeMap<Symbol, String>,
 }
 
 impl ModuleNames {
+    fn binding_name(&self, group: u32, binding: &crate::pipeline::Binding) -> String {
+        self.binding_aliases
+            .get(&(group, binding.index))
+            .cloned()
+            .unwrap_or_else(|| mapping::ident(&binding.name))
+    }
+
     /// Returns the selected helper name for a declaration or call site.
     fn function_name(&self, symbol: &Symbol) -> String {
         self.functions
@@ -2240,6 +2382,10 @@ struct Emitter<'a> {
     used_builtins: BTreeSet<String>,
     /// The counter behind each lowered conditional's placeholder name (K9).
     conditional_index: u32,
+    operand_index: usize,
+    logic_index: usize,
+    /// Local effects in lexical declaration order.
+    local_effects: Vec<(String, Effect)>,
     /// The enclosing loop count, which `break` and `continue` need (K18).
     loop_depth: u32,
     /// The enclosing switch count, which `break` needs (K18).
@@ -2286,7 +2432,7 @@ impl<'a> Emitter<'a> {
                 bindings.insert(
                     (group, binding.name.clone()),
                     BindingRef {
-                        name: mapping::ident(&binding.name),
+                        name: module_names.binding_name(layout.group, binding),
                         kind: binding.kind,
                         item_ty: binding.item_ty.clone(),
                     },
@@ -2315,6 +2461,9 @@ impl<'a> Emitter<'a> {
             receiver_name: None,
             used_builtins: BTreeSet::new(),
             conditional_index: 0,
+            operand_index: 0,
+            logic_index: 0,
+            local_effects: Vec::new(),
             loop_depth: 0,
             switch_depth: 0,
             in_helper: false,
@@ -2355,6 +2504,9 @@ impl<'a> Emitter<'a> {
             receiver_name,
             used_builtins: BTreeSet::new(),
             conditional_index: 0,
+            operand_index: 0,
+            logic_index: 0,
+            local_effects: Vec::new(),
             loop_depth: 0,
             switch_depth: 0,
             in_helper: true,
@@ -2443,6 +2595,76 @@ impl<'a> Emitter<'a> {
         })
     }
 
+    fn check_field_type(obj: &Expr, field: &Expr) -> Result<(), Diagnostic> {
+        if obj.ty == Type::F16 || field.ty == Type::F16 {
+            return Err(diagnostic(
+                "K4",
+                "f16 field access is not admitted in a kernel",
+                field.pos.clone(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn place(&mut self, expr: &Expr) -> Result<Place, Diagnostic> {
+        let root = match &expr.kind {
+            ExprKind::Field { .. } if self.binding_ref(expr).is_some() => self.snippet(expr)?.text,
+            ExprKind::Field { obj, name } => {
+                Self::check_field_type(obj, expr)?;
+                let mut place = self.place(obj)?;
+                place.field(name);
+                return Ok(place);
+            }
+            ExprKind::Index { obj, index, .. } => {
+                let mut place = self.place(obj)?;
+                place.index(self.snippet(index)?);
+                return Ok(place);
+            }
+            ExprKind::Call {
+                callee: Callee::Method { recv, name },
+                args,
+            } if self.binding_ref(recv).is_some() || self.wrapper_ref(recv).is_some() => {
+                match (name.source_name().as_str(), args.as_slice()) {
+                    ("$", []) => return self.place(recv),
+                    ("get", [arg]) => {
+                        let mut place = self.place(recv)?;
+                        place.index(self.snippet(arg)?);
+                        return Ok(place);
+                    }
+                    _ => {
+                        return Err(diagnostic(
+                            "K9",
+                            "invalid assignment target",
+                            expr.pos.clone(),
+                        ))
+                    }
+                }
+            }
+            ExprKind::Local(..) | ExprKind::Global(..) => self.snippet(expr)?.text,
+            _ => {
+                return Err(diagnostic(
+                    "K9",
+                    "invalid assignment target",
+                    expr.pos.clone(),
+                ))
+            }
+        };
+        Ok(Place {
+            root,
+            ..Place::default()
+        })
+    }
+
+    /// Capture the indices that must precede the next prelude. Keep the destination writable.
+    fn place_text(&mut self, mut place: Place, following: Effect) -> Snippet {
+        let eval = self.order(&mut place.indices, OperandOrder::Source, following);
+        let mut text = place.root;
+        for (index, suffix) in place.indices.into_iter().zip(place.suffixes) {
+            text.push_str(&format!("[{}]{suffix}", index.text));
+        }
+        eval.expression(text, 10)
+    }
+
     /// Returns the emitted place of an atomic method receiver, which the builtin takes by pointer.
     ///
     /// # Errors
@@ -2450,7 +2672,7 @@ impl<'a> Emitter<'a> {
     /// Returns a K21 diagnostic when the receiver sits behind a uniform or read-only storage
     /// binding. A receiver that is neither a storage place nor a workgroup place gives the same
     /// diagnostic, because an atomic on a local has no address to take.
-    fn atomic_place(&mut self, recv: &Expr) -> Result<Snippet, Diagnostic> {
+    fn atomic_place(&mut self, recv: &Expr) -> Result<Place, Diagnostic> {
         let binding = self.binding_root(recv);
         if binding
             .as_ref()
@@ -2476,34 +2698,121 @@ impl<'a> Emitter<'a> {
                 recv.pos.clone(),
             ));
         }
-        if let ExprKind::Call {
-            callee: Callee::Method { recv, name },
-            args,
-        } = &recv.kind
-        {
-            if name.source_name() == "$" && args.is_empty() {
-                if let Some(global) = self.wrapper_ref(recv) {
-                    return Ok(Snippet::atom(mapping::ident(&global.name)));
-                }
-            }
-        }
-        self.snippet(recv)
+        self.place(recv)
     }
 
-    /// Emits every argument and returns their texts with one merged prelude, in argument order.
-    ///
-    /// # Errors
-    ///
-    /// Returns the first diagnostic that an argument gives.
-    fn snippets(&mut self, args: &[Expr]) -> Result<(Vec<String>, Prelude), Diagnostic> {
-        let mut texts = Vec::with_capacity(args.len());
-        let mut prelude = Vec::new();
-        for arg in args {
-            let value = self.snippet(arg)?;
-            prelude.extend(value.prelude);
-            texts.push(value.text);
+    /// Combine the parts in source order.
+    /// A capture also moves ahead of every earlier text that remains inline.
+    fn order(
+        &mut self,
+        parts: &mut [Snippet],
+        order: OperandOrder,
+        mut following: Effect,
+    ) -> Evaluation {
+        let mut capture = Vec::with_capacity(parts.len());
+        for (index, part) in parts.iter().enumerate().rev() {
+            let effect = part.eval.inline;
+            let store = effect.conflicts(following) || order.crosses(index, parts, effect);
+            if store {
+                following = following.max(part.eval.inline);
+            }
+            capture.push(store);
+            following = following.max(part.eval.before);
         }
-        Ok((texts, prelude))
+        let mut eval = Evaluation::default();
+        // If the field order needs no operand capture, give each nonliteral argument a constructor name.
+        let constructor_args = match order {
+            OperandOrder::Fields { args, .. } if !capture.contains(&true) => args,
+            _ => &[],
+        };
+        for (index, (part, store)) in parts.iter_mut().zip(capture.into_iter().rev()).enumerate() {
+            eval.prelude.append(&mut part.eval.prelude);
+            eval.before = eval.before.max(part.eval.before);
+            let name = if store {
+                let name = format!("_g_operand_{}", self.operand_index);
+                self.operand_index += 1;
+                Some(name)
+            } else if constructor_args.get(index).is_some_and(|arg| {
+                !matches!(
+                    arg.kind,
+                    ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_)
+                )
+            }) {
+                let name = format!("_g_constructor_{}", self.conditional_index);
+                self.conditional_index += 1;
+                Some(name)
+            } else {
+                None
+            };
+            if let Some(name) = name {
+                eval.prelude
+                    .push((0, format!("let {name} = {};", part.text)));
+                eval.before = eval.before.max(part.eval.inline);
+                *part = Snippet::atom(name);
+            } else {
+                eval.inline = eval.inline.max(part.eval.inline);
+            }
+        }
+        eval
+    }
+
+    fn snippets(&mut self, args: &[Expr]) -> Result<Vec<Snippet>, Diagnostic> {
+        args.iter().map(|arg| self.snippet(arg)).collect()
+    }
+
+    fn arguments(&mut self, args: &[Expr]) -> Result<(Vec<String>, Evaluation), Diagnostic> {
+        let mut parts = self.snippets(args)?;
+        let eval = self.order(&mut parts, OperandOrder::Source, Effect::Pure);
+        Ok((parts.into_iter().map(|arg| arg.text).collect(), eval))
+    }
+
+    fn binary(
+        &mut self,
+        op: BinOp,
+        left: Snippet,
+        right: Snippet,
+        mixed: [bool; 2],
+        spelling: &str,
+    ) -> Snippet {
+        if matches!(op, BinOp::And | BinOp::Or) && !right.eval.prelude.is_empty() {
+            let name = format!("_g_logic_{}", self.logic_index);
+            self.logic_index += 1;
+            let mut prelude = left.eval.prelude;
+            prelude.push((0, format!("var {name}: bool = {};", left.text)));
+            let negation = if op == BinOp::Or { "!" } else { "" };
+            prelude.push((0, format!("if ({negation}{name}) {{")));
+            prelude.extend(
+                right
+                    .eval
+                    .prelude
+                    .into_iter()
+                    .map(|(indent, text)| (indent + 1, text)),
+            );
+            prelude.push((1, format!("{name} = {};", right.text)));
+            prelude.push((0, "}".to_owned()));
+            let before = left
+                .eval
+                .before
+                .max(left.eval.inline)
+                .max(right.eval.before)
+                .max(right.eval.inline);
+            return Evaluation {
+                prelude,
+                before,
+                inline: Effect::Pure,
+            }
+            .expression(name, 10);
+        }
+        let mut parts = [left, right];
+        let eval = self.order(&mut parts, OperandOrder::Source, Effect::Pure);
+        let [left, right] = parts;
+        let precedence = binary_precedence(op);
+        let text = format!(
+            "{} {spelling} {}",
+            binary_operand(&left, precedence, false, mixed[0]),
+            binary_operand(&right, precedence, true, mixed[1])
+        );
+        eval.expression(text, precedence)
     }
 
     /// Emits the argument of a `Math.fround` call, which lowers to the argument alone (K11).
@@ -2533,19 +2842,7 @@ impl<'a> Emitter<'a> {
                 let right_mixed = mixed_bitwise_chain(*op, right);
                 let left = self.fround_argument(left)?;
                 let right = self.fround_argument(right)?;
-                let precedence = binary_precedence(*op);
-                let text = format!(
-                    "{} {spelling} {}",
-                    binary_operand(&left, precedence, false, left_mixed),
-                    binary_operand(&right, precedence, true, right_mixed)
-                );
-                let mut prelude = left.prelude;
-                prelude.extend(right.prelude);
-                Ok(Snippet {
-                    text,
-                    precedence,
-                    prelude,
-                })
+                Ok(self.binary(*op, left, right, [left_mixed, right_mixed], spelling))
             }
             _ => self.snippet(expr),
         }
@@ -2573,9 +2870,7 @@ impl<'a> Emitter<'a> {
 
     /// Emits one expression as a WGSL snippet (K9).
     ///
-    /// The returned prelude holds the statements that must precede the expression, which only a
-    /// lowered conditional produces. The caller writes them at the place the expression is
-    /// evaluated, so both sides keep short-circuit evaluation.
+    /// The caller emits the prelude at the source position of the expression.
     ///
     /// # Errors
     ///
@@ -2584,6 +2879,79 @@ impl<'a> Emitter<'a> {
     /// an increment, or a decrement gives a K7 diagnostic, because it is legal only in statement
     /// position ([`Self::statement_snippet`]).
     fn snippet(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
+        let expanded = expanded_call(self.module, expr);
+        let expr = expanded.as_ref().unwrap_or(expr);
+        let mut part = self.expression(expr)?;
+        part.eval.inline = part.eval.inline.max(self.direct_effect(expr)?);
+        Ok(part)
+    }
+
+    /// The children contribute their own effects through their snippets.
+    fn direct_effect(&self, expr: &Expr) -> Result<Effect, Diagnostic> {
+        Ok(match &expr.kind {
+            ExprKind::Assign { .. } => Effect::Write,
+            ExprKind::Local(name, ..) => self
+                .local_effects
+                .iter()
+                .rev()
+                .find(|(local, _)| local == name)
+                .map(|(_, effect)| *effect)
+                .unwrap_or_default(),
+            ExprKind::Global(..) if self.wrapper_ref(expr).is_some() => Effect::Read,
+            ExprKind::Field { .. }
+                if self.binding_ref(expr).is_some_and(|binding| {
+                    matches!(
+                        binding.kind,
+                        BindingKind::Uniform
+                            | BindingKind::Storage
+                            | BindingKind::MutStorage
+                            | BindingKind::Guard
+                    )
+                }) =>
+            {
+                Effect::Read
+            }
+            ExprKind::Call {
+                callee: Callee::Func(symbol),
+                ..
+            } => {
+                if function_declared_in(self.module, symbol, "typegpu-types.ts")
+                    && mapping::free_function(&crate::base_name(symbol)).is_some()
+                {
+                    Effect::Pure
+                } else {
+                    Effect::Write
+                }
+            }
+            ExprKind::Call {
+                callee: Callee::Method { recv, name },
+                ..
+            } => {
+                let name = name.source_name();
+                if self.wrapper_ref(recv).is_some() || self.binding_ref(recv).is_some() {
+                    if matches!(name.as_str(), "$=" | "set" | "store") {
+                        Effect::Write
+                    } else {
+                        Effect::Read
+                    }
+                } else if atomic_scalar(self.module, &recv.ty, &expr.pos)?.is_some() {
+                    if name == "load" {
+                        Effect::Read
+                    } else {
+                        Effect::Write
+                    }
+                } else if matches!(&recv.ty, Type::Class(id) if self.module.classes.get(id.0).is_some_and(|class| registered_library(self.module, &class.pos.file) == Some("typegpu-types.ts")))
+                {
+                    Effect::Pure
+                } else {
+                    Effect::Write
+                }
+            }
+            _ => Effect::Pure,
+        })
+    }
+
+    fn expression(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
         reject_non_finite(expr)?;
         if let ExprKind::Cast(value) = &expr.kind {
             reject_non_finite(value)?;
@@ -2692,7 +3060,7 @@ impl<'a> Emitter<'a> {
                 Ok(Snippet {
                     text: format!("{spelling}{text}"),
                     precedence: 9,
-                    prelude: value.prelude,
+                    eval: value.eval,
                 })
             }
             ExprKind::Binary { op, left, right } => {
@@ -2707,19 +3075,7 @@ impl<'a> Emitter<'a> {
                 let right_mixed = mixed_bitwise_chain(*op, right);
                 let left = self.snippet(left)?;
                 let right = self.snippet(right)?;
-                let precedence = binary_precedence(*op);
-                let text = format!(
-                    "{} {spelling} {}",
-                    binary_operand(&left, precedence, false, left_mixed),
-                    binary_operand(&right, precedence, true, right_mixed)
-                );
-                let mut prelude = left.prelude;
-                prelude.extend(right.prelude);
-                Ok(Snippet {
-                    text,
-                    precedence,
-                    prelude,
-                })
+                Ok(self.binary(*op, left, right, [left_mixed, right_mixed], spelling))
             }
             ExprKind::Assign { update, .. } => Err(diagnostic(
                 "K7",
@@ -2749,7 +3105,7 @@ impl<'a> Emitter<'a> {
                 Ok(Snippet {
                     text: format!("{}({})", ty, value.text),
                     precedence: 10,
-                    prelude: value.prelude,
+                    eval: value.eval,
                 })
             }
             ExprKind::Field { obj, name } => {
@@ -2777,13 +3133,7 @@ impl<'a> Emitter<'a> {
                     self.used_builtins.insert(builtin.to_owned());
                     return Ok(Snippet::atom(builtin.to_owned()));
                 }
-                if obj.ty == Type::F16 || expr.ty == Type::F16 {
-                    return Err(diagnostic(
-                        "K4",
-                        "f16 field access is not admitted in a kernel",
-                        expr.pos.clone(),
-                    ));
-                }
+                Self::check_field_type(obj, expr)?;
                 let object = self.snippet(obj)?;
                 let object_text = if object.precedence < 10 {
                     format!("({})", object.text)
@@ -2793,23 +3143,23 @@ impl<'a> Emitter<'a> {
                 Ok(Snippet {
                     text: format!("{object_text}.{}", mapping::ident(name)),
                     precedence: 10,
-                    prelude: object.prelude,
+                    eval: object.eval,
                 })
             }
             ExprKind::Index { obj, index, .. } => {
                 let object = self.snippet(obj)?;
-                let index = self.snippet(index)?;
+                let mut parts = [object, self.snippet(index)?];
+                let eval = self.order(&mut parts, OperandOrder::Source, Effect::Pure);
+                let [object, index] = parts;
                 let object_text = if object.precedence < 10 {
                     format!("({})", object.text)
                 } else {
                     object.text.clone()
                 };
-                let mut prelude = object.prelude;
-                prelude.extend(index.prelude);
                 Ok(Snippet {
                     text: format!("{object_text}[{}]", index.text),
                     precedence: 10,
-                    prelude,
+                    eval,
                 })
             }
             ExprKind::Call { callee, args } => self.call(expr, callee, args),
@@ -2823,30 +3173,17 @@ impl<'a> Emitter<'a> {
                     ));
                 }
                 let order = constructor_order(self.module, class, args.len(), &expr.pos)?;
-                let reordered = order
-                    .iter()
-                    .enumerate()
-                    .any(|(index, source)| index != *source);
-                let mut prelude = Vec::new();
-                let mut texts = Vec::new();
-                for arg in args {
-                    let value = self.snippet(arg)?;
-                    prelude.extend(value.prelude);
-                    if reordered
-                        && !matches!(
-                            arg.kind,
-                            ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::Bool(_)
-                        )
-                    {
-                        // Capture each argument before the field order changes its evaluation order.
-                        let name = format!("_g_constructor_{}", self.conditional_index);
-                        self.conditional_index += 1;
-                        prelude.push((0, format!("let {name} = {};", value.text)));
-                        texts.push(name);
-                    } else {
-                        texts.push(value.text);
+                let mut parts = self.snippets(args)?;
+                let text_order = if order.iter().copied().ne(0..args.len()) {
+                    OperandOrder::Fields {
+                        order: &order,
+                        args,
                     }
-                }
+                } else {
+                    OperandOrder::Source
+                };
+                let eval = self.order(&mut parts, text_order, Effect::Pure);
+                let texts: Vec<_> = parts.into_iter().map(|part| part.text).collect();
                 Ok(Snippet {
                     text: format!(
                         "{}({})",
@@ -2854,7 +3191,7 @@ impl<'a> Emitter<'a> {
                         constructor_arguments(&texts, &order, &expr.pos)?.join(", ")
                     ),
                     precedence: 10,
-                    prelude,
+                    eval,
                 })
             }
             ExprKind::Cond { cond, then, els } => {
@@ -2867,18 +3204,25 @@ impl<'a> Emitter<'a> {
                 // collides with the placeholder (K14).
                 let result = format!("_g_conditional_{}", self.conditional_index);
                 self.conditional_index += 1;
-                let mut prelude = cond.prelude;
+                let before = [&cond, &then, &els]
+                    .into_iter()
+                    .map(|part| part.eval.before.max(part.eval.inline))
+                    .max()
+                    .unwrap_or_default();
+                let mut prelude = cond.eval.prelude;
                 prelude.push((0, format!("var {result}: {ty};")));
                 prelude.push((0, format!("if ({}) {{", cond.text)));
                 prelude.extend(
-                    then.prelude
+                    then.eval
+                        .prelude
                         .into_iter()
                         .map(|(relative, text)| (relative + 1, text)),
                 );
                 prelude.push((1, format!("{result} = {};", then.text)));
                 prelude.push((0, "} else {".to_owned()));
                 prelude.extend(
-                    els.prelude
+                    els.eval
+                        .prelude
                         .into_iter()
                         .map(|(relative, text)| (relative + 1, text)),
                 );
@@ -2887,7 +3231,11 @@ impl<'a> Emitter<'a> {
                 Ok(Snippet {
                     text: result,
                     precedence: 10,
-                    prelude,
+                    eval: Evaluation {
+                        prelude,
+                        before,
+                        inline: Effect::Pure,
+                    },
                 })
             }
             ExprKind::Seq { .. } => Err(diagnostic(
@@ -2963,26 +3311,33 @@ impl<'a> Emitter<'a> {
                 target.pos.clone(),
             ));
         }
-        let target = self.snippet(target)?;
+        let place = self.place(target)?;
+        let right_mixed = op.is_some_and(|op| mixed_bitwise_chain(op, value));
         let value = self.snippet(value)?;
-        let spelling = match op {
-            None => "=".to_owned(),
-            Some(op) => format!(
-                "{}=",
-                binop(*op).ok_or_else(|| diagnostic(
-                    "K9",
-                    "assignment operator is outside K9",
-                    expr.pos.clone()
-                ))?
-            ),
+        let mut target = self.place_text(place, value.eval.before);
+        let destination = target.text.clone();
+        if op.is_some() {
+            target.eval.inline = target.eval.inline.max(Effect::Read);
+        }
+        let mut parts = [target, value];
+        let mut eval = self.order(&mut parts, OperandOrder::Source, Effect::Pure);
+        let [target, value] = parts;
+        let text = if let Some(op) = op {
+            let spelling = binop(*op).ok_or_else(|| {
+                diagnostic("K9", "assignment operator is outside K9", expr.pos.clone())
+            })?;
+            if target.text == destination {
+                format!("{destination} {spelling}= {}", value.text)
+            } else {
+                // Parentheses protect a compound right operand after the load moves.
+                let right = binary_operand(&value, binary_precedence(*op), true, right_mixed);
+                format!("{destination} = {} {spelling} {right}", target.text)
+            }
+        } else {
+            format!("{destination} = {}", value.text)
         };
-        let mut prelude = target.prelude;
-        prelude.extend(value.prelude);
-        Ok(Snippet {
-            text: format!("{} {spelling} {}", target.text, value.text),
-            precedence: 0,
-            prelude,
-        })
+        eval.inline = self.direct_effect(expr)?;
+        Ok(eval.expression(text, 0))
     }
 
     /// Emits one call (K10, K11, K21, PI6, TX3).
@@ -3026,17 +3381,16 @@ impl<'a> Emitter<'a> {
                         crate::internal("kernel::call", "missing fround argument", &expr.pos)
                     })?);
                 }
-                let mut texts = Vec::with_capacity(args.len());
-                let mut prelude = Vec::new();
-                for arg in args {
-                    let value = self.math_argument(arg)?;
-                    prelude.extend(value.prelude);
-                    texts.push(value.text);
-                }
+                let mut parts = args
+                    .iter()
+                    .map(|arg| self.math_argument(arg))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let eval = self.order(&mut parts, OperandOrder::Source, Effect::Pure);
+                let texts: Vec<_> = parts.into_iter().map(|part| part.text).collect();
                 Ok(Snippet {
                     text: format!("{name}({})", texts.join(", ")),
                     precedence: 10,
-                    prelude,
+                    eval,
                 })
             }
             Callee::Func(name) => {
@@ -3058,11 +3412,11 @@ impl<'a> Emitter<'a> {
                     Some(mapped) => mapped.to_owned(),
                     None => mapping::ident(&self.names.function_name(name)),
                 };
-                let (args, prelude) = self.snippets(args)?;
+                let (args, eval) = self.arguments(args)?;
                 Ok(Snippet {
                     text: format!("{called}({})", args.join(", ")),
                     precedence: 10,
-                    prelude,
+                    eval,
                 })
             }
             Callee::Method { recv, name } => {
@@ -3078,15 +3432,14 @@ impl<'a> Emitter<'a> {
                             let called = mapping::ident(
                                 &self.names.function_name(&method_symbol(class, method)),
                             );
-                            let receiver = self.snippet(recv)?;
-                            let (mut texts, prelude) = self.snippets(args)?;
-                            texts.insert(0, receiver.text);
-                            let mut receiver_prelude = receiver.prelude;
-                            receiver_prelude.extend(prelude);
+                            let mut parts = vec![self.snippet(recv)?];
+                            parts.extend(self.snippets(args)?);
+                            let eval = self.order(&mut parts, OperandOrder::Source, Effect::Pure);
+                            let texts: Vec<_> = parts.into_iter().map(|part| part.text).collect();
                             return Ok(Snippet {
                                 text: format!("{called}({})", texts.join(", ")),
                                 precedence: 10,
-                                prelude: receiver_prelude,
+                                eval,
                             });
                         }
                     }
@@ -3094,9 +3447,12 @@ impl<'a> Emitter<'a> {
                 let name = name.source_name();
                 if atomic_scalar(self.module, &recv.ty, &expr.pos)?.is_some() {
                     let place = self.atomic_place(recv)?;
-                    let (args, args_prelude) = self.snippets(args)?;
-                    let mut prelude = place.prelude;
-                    prelude.extend(args_prelude);
+                    let (args, arg_eval) = self.arguments(args)?;
+                    let place = self.place_text(place, arg_eval.before);
+                    let mut eval = place.eval;
+                    eval.prelude.extend(arg_eval.prelude);
+                    eval.before = eval.before.max(arg_eval.before);
+                    eval.inline = eval.inline.max(arg_eval.inline);
                     let receiver = class_name(self.module, &recv.ty).ok_or_else(|| {
                         crate::internal(
                             "kernel::call",
@@ -3130,11 +3486,11 @@ impl<'a> Emitter<'a> {
                     return Ok(Snippet {
                         text,
                         precedence: 10,
-                        prelude,
+                        eval,
                     });
                 }
                 if let Some(global) = self.wrapper_ref(recv) {
-                    let (args, prelude) = self.snippets(args)?;
+                    let (args, eval) = self.arguments(args)?;
                     let target = mapping::ident(&global.name);
                     let text = match (&global.kind, name.as_str(), args.as_slice()) {
                         (KernelGlobalKind::Private(_), "$", [])
@@ -3182,11 +3538,11 @@ impl<'a> Emitter<'a> {
                     return Ok(Snippet {
                         text,
                         precedence,
-                        prelude,
+                        eval,
                     });
                 }
                 if let Some(binding) = self.binding_ref(recv) {
-                    let (args, prelude) = self.snippets(args)?;
+                    let (args, eval) = self.arguments(args)?;
                     let text = match (binding.kind, name.as_str(), args.as_slice()) {
                         (BindingKind::Uniform, "$", []) => binding.name,
                         (BindingKind::Storage | BindingKind::MutStorage, "get", [index]) => {
@@ -3364,7 +3720,7 @@ impl<'a> Emitter<'a> {
                     return Ok(Snippet {
                         text,
                         precedence,
-                        prelude,
+                        eval,
                     });
                 }
                 let recv_value = self.snippet(recv)?;
@@ -3390,10 +3746,17 @@ impl<'a> Emitter<'a> {
                         expr.pos.clone(),
                     ));
                 };
-                let arg_values = args
-                    .iter()
-                    .map(|arg| self.snippet(arg))
-                    .collect::<Result<Vec<_>, _>>()?;
+                let mut parts = vec![recv_value];
+                parts.extend(self.snippets(args)?);
+                let order = if matches!(emission, MethodEmission::BuiltinReceiverLast(_)) {
+                    OperandOrder::ReceiverLast
+                } else {
+                    OperandOrder::Source
+                };
+                let eval = self.order(&mut parts, order, Effect::Pure);
+                let (recv_value, arg_values) = parts.split_first().ok_or_else(|| {
+                    crate::internal("kernel::call", "missing method receiver", &expr.pos)
+                })?;
                 let (text, precedence) = match emission {
                     MethodEmission::Binary(op) if arg_values.len() == 1 => {
                         let precedence = match op {
@@ -3402,7 +3765,7 @@ impl<'a> Emitter<'a> {
                             "<" | "<=" | ">" | ">=" | "==" | "!=" => 5,
                             _ => 0,
                         };
-                        let recv = binary_operand(&recv_value, precedence, false, false);
+                        let recv = binary_operand(recv_value, precedence, false, false);
                         let arg = binary_operand(
                             arg_values.first().ok_or_else(|| {
                                 crate::internal("kernel::call", "missing binary operand", &expr.pos)
@@ -3456,14 +3819,10 @@ impl<'a> Emitter<'a> {
                         ))
                     }
                 };
-                let mut prelude = recv_value.prelude;
-                for arg in arg_values {
-                    prelude.extend(arg.prelude);
-                }
                 Ok(Snippet {
                     text,
                     precedence,
-                    prelude,
+                    eval,
                 })
             }
             Callee::Value(_) => Err(diagnostic(
@@ -3479,6 +3838,16 @@ impl<'a> Emitter<'a> {
         }
     }
 
+    fn local_declaration(&mut self, name: &str, variable: bool) -> &'static str {
+        let (keyword, effect) = if variable {
+            ("var", Effect::Read)
+        } else {
+            ("let", Effect::Pure)
+        };
+        self.local_effects.push((name.to_owned(), effect));
+        keyword
+    }
+
     /// Emits a statement list at `indent`, in order.
     ///
     /// # Errors
@@ -3490,9 +3859,11 @@ impl<'a> Emitter<'a> {
         indent: usize,
         out: &mut String,
     ) -> Result<(), Diagnostic> {
+        let scope = self.local_effects.len();
         for statement in statements {
             self.statement(statement, indent, out)?;
         }
+        self.local_effects.truncate(scope);
         Ok(())
     }
 
@@ -3563,6 +3934,7 @@ impl<'a> Emitter<'a> {
                 if matches!(init.kind, ExprKind::Unassigned) {
                     // A WGSL function-scope `var` without an initializer holds the zero value.
                     let wgsl = wgsl_type(self.module, ty, pos)?;
+                    self.local_declaration(name, true);
                     Self::line(
                         out,
                         indent,
@@ -3572,13 +3944,9 @@ impl<'a> Emitter<'a> {
                 }
                 let value = self.snippet(init)?;
                 let _ = wgsl_type(self.module, ty, pos)?;
-                Self::emit_prelude(out, indent, value.prelude);
+                Self::emit_prelude(out, indent, value.eval.prelude);
                 let value_class = matches!(ty, Type::Class(id) if crate::class(self.module, id.0, "kernel::statement", pos)?.is_value);
-                let declaration = if *mutable || value_class {
-                    "var"
-                } else {
-                    "let"
-                };
+                let declaration = self.local_declaration(name, *mutable || value_class);
                 Self::line(
                     out,
                     indent,
@@ -3599,7 +3967,7 @@ impl<'a> Emitter<'a> {
                 }
                 if let Some((condition, assignment, negated)) = logical_assignment(expr) {
                     let condition = self.snippet(condition)?;
-                    Self::emit_prelude(out, indent, condition.prelude);
+                    Self::emit_prelude(out, indent, condition.eval.prelude);
                     let text = if negated {
                         format!("!({})", condition.text)
                     } else {
@@ -3607,19 +3975,19 @@ impl<'a> Emitter<'a> {
                     };
                     Self::line(out, indent, &format!("if ({text}) {{"));
                     let assignment = self.statement_snippet(assignment)?;
-                    Self::emit_prelude(out, indent + 1, assignment.prelude);
+                    Self::emit_prelude(out, indent + 1, assignment.eval.prelude);
                     Self::line(out, indent + 1, &format!("{};", assignment.text));
                     Self::line(out, indent, "}");
                     return Ok(());
                 }
                 let value = self.statement_snippet(expr)?;
-                Self::emit_prelude(out, indent, value.prelude);
+                Self::emit_prelude(out, indent, value.eval.prelude);
                 Self::line(out, indent, &format!("{};", value.text));
             }
             Stmt::Return { value, .. } => {
                 if let Some(value) = value {
                     let value = self.snippet(value)?;
-                    Self::emit_prelude(out, indent, value.prelude);
+                    Self::emit_prelude(out, indent, value.eval.prelude);
                     Self::line(out, indent, &format!("return {};", value.text));
                 } else {
                     Self::line(out, indent, "return;");
@@ -3629,7 +3997,7 @@ impl<'a> Emitter<'a> {
                 cond, then, els, ..
             } => {
                 let cond = self.snippet(cond)?;
-                Self::emit_prelude(out, indent, cond.prelude);
+                Self::emit_prelude(out, indent, cond.eval.prelude);
                 Self::line(out, indent, &format!("if ({}) {{", cond.text));
                 self.statements(then, indent + 1, out)?;
                 if let Some(els) = els {
@@ -3646,7 +4014,7 @@ impl<'a> Emitter<'a> {
                 self.loop_depth -= 1;
                 result?;
                 Self::line(out, indent + 1, "continuing {");
-                Self::emit_prelude(out, indent + 2, cond.prelude);
+                Self::emit_prelude(out, indent + 2, cond.eval.prelude);
                 Self::line(out, indent + 2, &format!("break if !({});", cond.text));
                 Self::line(out, indent + 1, "}");
                 Self::line(out, indent, "}");
@@ -3656,7 +4024,7 @@ impl<'a> Emitter<'a> {
                 // WGSL `while` header holds no statements. The `loop` form with an explicit
                 // `break` gives the same semantics.
                 let cond = self.snippet(cond)?;
-                if cond.prelude.is_empty() {
+                if cond.eval.prelude.is_empty() {
                     Self::line(out, indent, &format!("while ({}) {{", cond.text));
                     self.loop_depth += 1;
                     let result = self.statements(body, indent + 1, out);
@@ -3665,7 +4033,7 @@ impl<'a> Emitter<'a> {
                     Self::line(out, indent, "}");
                 } else {
                     Self::line(out, indent, "loop {");
-                    Self::emit_prelude(out, indent + 1, cond.prelude);
+                    Self::emit_prelude(out, indent + 1, cond.eval.prelude);
                     Self::line(out, indent + 1, &format!("if (!({})) {{", cond.text));
                     Self::line(out, indent + 2, "break;");
                     Self::line(out, indent + 1, "}");
@@ -3683,6 +4051,7 @@ impl<'a> Emitter<'a> {
                 body,
                 pos,
             } => {
+                let scope = self.local_effects.len();
                 let (init, init_prelude) = match init.as_deref() {
                     Some(Stmt::Let {
                         name,
@@ -3710,20 +4079,16 @@ impl<'a> Emitter<'a> {
                         }
                         let value = self.snippet(init)?;
                         let value_class = matches!(ty, Type::Class(id) if crate::class(self.module, id.0, "kernel::statement", pos)?.is_value);
-                        let declaration = if *mutable || value_class {
-                            "var"
-                        } else {
-                            "let"
-                        };
+                        let declaration = self.local_declaration(name, *mutable || value_class);
                         let _ = wgsl_type(self.module, ty, pos)?;
                         (
                             format!("{} {} = {}", declaration, self.local_name(name), value.text),
-                            value.prelude,
+                            value.eval.prelude,
                         )
                     }
                     Some(Stmt::Expr(expr)) => {
                         let value = self.statement_snippet(expr)?;
-                        (value.text, value.prelude)
+                        (value.text, value.eval.prelude)
                     }
                     None => (String::new(), Vec::new()),
                     _ => {
@@ -3748,8 +4113,12 @@ impl<'a> Emitter<'a> {
                 };
                 // A `for` header holds no statements either, so a condition or a step with a
                 // prelude takes the `loop` form. The outer block scopes the initializer.
-                let loop_prelude = cond.as_ref().is_some_and(|value| !value.prelude.is_empty())
-                    || step.as_ref().is_some_and(|value| !value.prelude.is_empty());
+                let loop_prelude = cond
+                    .as_ref()
+                    .is_some_and(|value| !value.eval.prelude.is_empty())
+                    || step
+                        .as_ref()
+                        .is_some_and(|value| !value.eval.prelude.is_empty());
                 if loop_prelude {
                     Self::line(out, indent, "{");
                     Self::emit_prelude(out, indent + 1, init_prelude);
@@ -3758,7 +4127,7 @@ impl<'a> Emitter<'a> {
                     }
                     Self::line(out, indent + 1, "loop {");
                     if let Some(cond) = cond {
-                        Self::emit_prelude(out, indent + 2, cond.prelude);
+                        Self::emit_prelude(out, indent + 2, cond.eval.prelude);
                         Self::line(out, indent + 2, &format!("if (!({})) {{", cond.text));
                         Self::line(out, indent + 3, "break;");
                         Self::line(out, indent + 2, "}");
@@ -3769,7 +4138,7 @@ impl<'a> Emitter<'a> {
                     result?;
                     if let Some(step) = step {
                         Self::line(out, indent + 2, "continuing {");
-                        Self::emit_prelude(out, indent + 3, step.prelude);
+                        Self::emit_prelude(out, indent + 3, step.eval.prelude);
                         Self::line(out, indent + 3, &format!("{};", step.text));
                         Self::line(out, indent + 2, "}");
                     }
@@ -3786,6 +4155,7 @@ impl<'a> Emitter<'a> {
                     result?;
                     Self::line(out, indent, "}");
                 }
+                self.local_effects.truncate(scope);
             }
             Stmt::ForOf {
                 name,
@@ -3803,7 +4173,7 @@ impl<'a> Emitter<'a> {
                     ));
                 };
                 let subject = self.snippet(subject)?;
-                Self::emit_prelude(out, indent, subject.prelude);
+                Self::emit_prelude(out, indent, subject.eval.prelude);
                 let index = format!("_g_{}_index", self.local_name(name));
                 Self::line(
                     out,
@@ -3818,9 +4188,12 @@ impl<'a> Emitter<'a> {
                     &format!("let {} = {}[{index}];", self.local_name(name), subject.text),
                 );
                 let _ = wgsl_type(self.module, ty, pos)?;
+                let scope = self.local_effects.len();
+                self.local_declaration(name, false);
                 self.loop_depth += 1;
                 let result = self.statements(body, indent + 1, out);
                 self.loop_depth -= 1;
+                self.local_effects.truncate(scope);
                 result?;
                 Self::line(out, indent, "}");
             }
@@ -3867,7 +4240,7 @@ impl<'a> Emitter<'a> {
                     return Err(diagnostic("K18", "switch has no default case", pos.clone()));
                 }
                 let disc = self.snippet(disc)?;
-                Self::emit_prelude(out, indent, disc.prelude);
+                Self::emit_prelude(out, indent, disc.eval.prelude);
                 Self::line(out, indent, &format!("switch ({}) {{", disc.text));
                 // An empty case shares the next case's body, which WGSL writes as one selector
                 // with several values. The labels accumulate until a body arrives (K18).
@@ -3903,7 +4276,7 @@ impl<'a> Emitter<'a> {
                             ));
                         }
                         let value = self.snippet(test)?;
-                        if !value.prelude.is_empty() {
+                        if !value.eval.prelude.is_empty() {
                             return Err(diagnostic(
                                 "K18",
                                 "switch case label is not constant",
@@ -4083,6 +4456,8 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
     /// A builtin, a storage read, a variable read, and a helper result are non-uniform. A local
     /// takes the taint the collect pass recorded, and an unknown local is non-uniform.
     fn expression(&self, expr: &Expr) -> UniformityTaint {
+        let expanded = expanded_call(self.emitter.module, expr);
+        let expr = expanded.as_ref().unwrap_or(expr);
         match &expr.kind {
             ExprKind::Seq { effects, value } => {
                 self.expressions(effects).merge(self.expression(value))
@@ -4815,158 +5190,37 @@ fn last_barrier_position(module: &Module, statements: &[Stmt]) -> Option<(u32, u
     last
 }
 
-/// Collects the names of the functions that `expr` calls directly.
-fn called_functions_expr(module: &Module, expr: &Expr, out: &mut BTreeSet<Symbol>) {
-    match &expr.kind {
-        ExprKind::Seq { effects, value } => {
-            for item in effects.iter().chain(std::iter::once(value.as_ref())) {
-                called_functions_expr(module, item, out);
-            }
-        }
-        ExprKind::Call { callee, args } => {
-            if let Callee::Func(name) = callee {
-                out.insert(name.clone());
-            }
-            if let Callee::Value(value) = callee {
-                called_functions_expr(module, value, out);
-            }
-            if let Callee::Method { recv, name } = callee {
-                if let Type::Class(id) = recv.ty {
-                    if let Some(class) = module.classes.get(id.0).filter(|class| {
-                        class.is_value
-                            && registered_library(module, &class.pos.file)
-                                != Some("typegpu-types.ts")
-                    }) {
-                        if let Some(method) =
-                            class.methods.iter().find(|method| method.symbol == *name)
-                        {
-                            out.insert(method_symbol(class, method));
+/// Returns the symbols of the functions that the body and its default arguments call.
+fn called_functions(module: &Module, function: &Function) -> Result<BTreeSet<Symbol>, Diagnostic> {
+    let mut calls = BTreeSet::new();
+    for stmt in &function.body {
+        visit_call_expressions(module, HirChild::Stmt(stmt), &mut Vec::new(), &mut |expr| {
+            validate_call_defaults(module, expr)?;
+            match &expr.kind {
+                ExprKind::Call {
+                    callee: Callee::Func(name),
+                    ..
+                } => {
+                    calls.insert(name.clone());
+                }
+                ExprKind::Call {
+                    callee: Callee::Method { recv, .. },
+                    ..
+                } => {
+                    if let Type::Class(id) = recv.ty {
+                        if let Some((method, _)) = declared_call(module, expr) {
+                            if let Some(class) = module.classes.get(id.0) {
+                                calls.insert(method_symbol(class, method));
+                            }
                         }
                     }
                 }
-                called_functions_expr(module, recv, out);
+                _ => {}
             }
-            for arg in args {
-                called_functions_expr(module, arg, out);
-            }
-        }
-        ExprKind::AbsenceTest { value: operand, .. }
-        | ExprKind::Unary { operand, .. }
-        | ExprKind::Cast(operand)
-        | ExprKind::Length(operand)
-        | ExprKind::Field { obj: operand, .. } => called_functions_expr(module, operand, out),
-        ExprKind::Binary { left, right, .. } => {
-            called_functions_expr(module, left, out);
-            called_functions_expr(module, right, out);
-        }
-        ExprKind::Assign { target, value, .. } => {
-            called_functions_expr(module, target, out);
-            called_functions_expr(module, value, out);
-        }
-        ExprKind::New { args, .. } | ExprKind::ArrayLit(args) => {
-            for arg in args {
-                called_functions_expr(module, arg, out);
-            }
-        }
-        ExprKind::DescriptorLit { fields, .. } => {
-            for field in fields.iter().flatten() {
-                called_functions_expr(module, field, out);
-            }
-        }
-        ExprKind::Index { obj, index, .. } => {
-            called_functions_expr(module, obj, out);
-            called_functions_expr(module, index, out);
-        }
-        ExprKind::Cond { cond, then, els } => {
-            called_functions_expr(module, cond, out);
-            called_functions_expr(module, then, out);
-            called_functions_expr(module, els, out);
-        }
-        _ => {}
+            Ok(())
+        })?;
     }
-}
-
-/// Runs `called_functions_expr` over every expression the statement holds, nested bodies included.
-fn called_functions_stmt(module: &Module, stmt: &Stmt, out: &mut BTreeSet<Symbol>) {
-    match stmt {
-        Stmt::Let { init, .. } | Stmt::Expr(init) => called_functions_expr(module, init, out),
-        Stmt::Return {
-            value: Some(value), ..
-        } => called_functions_expr(module, value, out),
-        Stmt::Return { value: None, .. } => {}
-        Stmt::If {
-            cond, then, els, ..
-        } => {
-            called_functions_expr(module, cond, out);
-            for stmt in then {
-                called_functions_stmt(module, stmt, out);
-            }
-            if let Some(els) = els {
-                for stmt in els {
-                    called_functions_stmt(module, stmt, out);
-                }
-            }
-        }
-        Stmt::While { cond, body, .. } | Stmt::DoWhile { cond, body, .. } => {
-            called_functions_expr(module, cond, out);
-            for stmt in body {
-                called_functions_stmt(module, stmt, out);
-            }
-        }
-        Stmt::For {
-            init,
-            cond,
-            step,
-            body,
-            ..
-        } => {
-            if let Some(init) = init {
-                called_functions_stmt(module, init, out);
-            }
-            if let Some(cond) = cond {
-                called_functions_expr(module, cond, out);
-            }
-            for item in step {
-                called_functions_stmt(module, item, out);
-            }
-            for stmt in body {
-                called_functions_stmt(module, stmt, out);
-            }
-        }
-        Stmt::ForOf { subject, body, .. } | Stmt::GeneratorForOf { subject, body, .. } => {
-            called_functions_expr(module, subject, out);
-            for stmt in body {
-                called_functions_stmt(module, stmt, out);
-            }
-        }
-        Stmt::Switch { disc, cases, .. } => {
-            called_functions_expr(module, disc, out);
-            for stmt in cases.iter().flat_map(|case| &case.body) {
-                called_functions_stmt(module, stmt, out);
-            }
-        }
-        Stmt::Block(body) => {
-            for stmt in body {
-                called_functions_stmt(module, stmt, out);
-            }
-        }
-        Stmt::Using {
-            body, finalizer, ..
-        } => {
-            for body in [Some(body), finalizer.as_ref()].into_iter().flatten() {
-                for stmt in body {
-                    called_functions_stmt(module, stmt, out);
-                }
-            }
-        }
-        Stmt::Try { body, handler, .. } => {
-            for stmt in body.iter().chain(handler) {
-                called_functions_stmt(module, stmt, out);
-            }
-        }
-        Stmt::Throw { value, .. } => called_functions_expr(module, value, out),
-        Stmt::Break(_) | Stmt::Continue(_) => {}
-    }
+    Ok(calls)
 }
 
 /// Appends the declaration symbol of the schema class that `ty` names to `out`, once, in
@@ -5016,6 +5270,8 @@ fn collect_schema_expr(
     seen: &mut BTreeSet<Symbol>,
     out: &mut Vec<Symbol>,
 ) -> Result<(), Diagnostic> {
+    let expanded = expanded_call(module, expr);
+    let expr = expanded.as_ref().unwrap_or(expr);
     collect_schema_type(module, &expr.ty, seen, out, &expr.pos)?;
     match &expr.kind {
         ExprKind::Seq { effects, value } => {
@@ -5261,7 +5517,7 @@ fn source_order(symbols: BTreeSet<Symbol>) -> Vec<Symbol> {
 /// Returns a K14 diagnostic that names the shared source name.
 fn validate_unique_sources(
     module: &Module,
-    functions: &BTreeMap<Symbol, String>,
+    names: &ModuleNames,
     globals: &[KernelGlobal],
     structs: &[(String, String)],
     layouts: &[crate::pipeline::Layout],
@@ -5272,7 +5528,7 @@ fn validate_unique_sources(
     let declarations = globals
         .iter()
         .map(|global| (&global.name, &global.symbol, &global.pos));
-    let helpers = functions.iter().map(|(symbol, name)| {
+    let helpers = names.functions.iter().map(|(symbol, name)| {
         (
             name,
             symbol,
@@ -5287,7 +5543,7 @@ fn validate_unique_sources(
         )
     };
     for (name, symbol, origin) in helpers.chain(declarations) {
-        let alias = functions.contains_key(symbol) && *name != helper_name(symbol);
+        let alias = names.functions.contains_key(symbol) && *name != helper_name(symbol);
         if let Some((previous, previous_pos, previous_alias)) =
             owners.insert(mapping::ident(name), (symbol, origin, alias))
         {
@@ -5324,7 +5580,13 @@ fn validate_unique_sources(
         });
     let bindings = layouts
         .iter()
-        .flat_map(|layout| &layout.bindings)
+        .flat_map(|layout| {
+            layout.bindings.iter().filter(|binding| {
+                !names
+                    .binding_aliases
+                    .contains_key(&(layout.group, binding.index))
+            })
+        })
         .map(|binding| (&binding.name, &binding.pos));
     for (name, origin) in classes.chain(bindings) {
         if let Some((symbol, helper_pos, alias)) = owners.get(&mapping::ident(name)) {
@@ -5397,10 +5659,7 @@ fn dependencies(
             return Ok(());
         }
         stack.push(name.clone());
-        let mut calls = BTreeSet::new();
-        for stmt in &function.body {
-            called_functions_stmt(module, stmt, &mut calls);
-        }
+        let calls = called_functions(module, function)?;
         for called in source_order(calls) {
             visit(module, &called, shells, stack, done, order, &function.pos)?;
         }
@@ -5409,10 +5668,7 @@ fn dependencies(
         order.push(name.clone());
         Ok(())
     }
-    let mut calls = BTreeSet::new();
-    for stmt in &kernel.body {
-        called_functions_stmt(module, stmt, &mut calls);
-    }
+    let calls = called_functions(module, kernel)?;
     let mut order = Vec::new();
     let mut done = BTreeSet::new();
     for called in source_order(calls) {
@@ -5457,16 +5713,20 @@ fn module_scope_names(
     structs: &[(String, String)],
     layouts: &[crate::pipeline::Layout],
     globals: &[KernelGlobal],
+    interface_names: &[String],
     declaration_names: Option<&BTreeSet<String>>,
 ) -> ModuleNames {
     let mut names = structs
         .iter()
         .map(|(name, _)| mapping::ident(name))
         .collect::<BTreeSet<_>>();
+    let shared = crate::pipeline::shared_binding_fields(layouts);
+    names.extend(interface_names.iter().map(|name| mapping::ident(name)));
     names.extend(
         layouts
             .iter()
             .flat_map(|layout| &layout.bindings)
+            .filter(|binding| !shared.contains(binding.name.as_str()))
             .map(|binding| mapping::ident(&binding.name)),
     );
     names.extend(globals.iter().map(|global| mapping::ident(&global.name)));
@@ -5486,7 +5746,20 @@ fn module_scope_names(
         .into_iter()
         .map(str::to_owned),
     );
+    let mut binding_aliases = BTreeMap::new();
+    for layout in layouts {
+        for binding in &layout.bindings {
+            if shared.contains(binding.name.as_str()) {
+                let mut name = mapping::ident(&format!("{}_{}", binding.name, layout.group));
+                while !names.insert(name.clone()) {
+                    name.push('_');
+                }
+                binding_aliases.insert((layout.group, binding.index), name);
+            }
+        }
+    }
     ModuleNames {
+        binding_aliases,
         reserved: names,
         functions,
     }
@@ -5625,6 +5898,7 @@ pub(crate) fn emit(
         structs,
         &pipeline.layouts,
         &globals,
+        &[],
         shells.declarations.as_ref().map(|item| &item.names),
     );
     validate_statement_subset(&kernel.body)?;
@@ -5730,6 +6004,7 @@ pub(crate) fn emit(
                     .bindings
                     .iter()
                     .find(|binding| binding.kind == BindingKind::Guard)
+                    .map(|binding| module_names.binding_name(layout.group, binding))
             })
             .ok_or_else(|| {
                 generator_diagnostic(
@@ -5739,7 +6014,6 @@ pub(crate) fn emit(
             })?;
         entry_body.push_str(&format!(
             "  if (globalId.x < {guard}.x && globalId.y < {guard}.y && globalId.z < {guard}.z) {{\n",
-            guard = mapping::ident(&guard.name),
         ));
         emitter.statements(&kernel.body, 2, &mut entry_body)?;
         entry_body.push_str("  }\n");
@@ -5751,7 +6025,7 @@ pub(crate) fn emit(
     BarrierValidator::new(&emitter, kernel).validate(kernel)?;
     validate_unique_sources(
         module,
-        &module_names.functions,
+        &module_names,
         &globals,
         structs,
         &pipeline.layouts,
@@ -5794,7 +6068,12 @@ pub(crate) fn emit(
     }
     for layout in &pipeline.layouts {
         for binding in &layout.bindings {
-            out.push_str(&binding_declaration(module, layout.group, binding)?);
+            out.push_str(&binding_declaration(
+                module,
+                layout.group,
+                binding,
+                &module_names,
+            )?);
         }
     }
     out.push('\n');
@@ -6107,7 +6386,13 @@ pub(crate) fn emit_render(
             }
         }
     }
-    let mut module_names = module_scope_names(
+    let interface_names = pipeline
+        .vertex_buffers
+        .iter()
+        .map(|buffer| buffer.schema.clone())
+        .chain(std::iter::once(pipeline.varyings_name.clone()))
+        .collect::<Vec<_>>();
+    let module_names = module_scope_names(
         module_function_names(
             module,
             &helper_names,
@@ -6118,17 +6403,9 @@ pub(crate) fn emit_render(
         structs,
         &pipeline.layouts,
         &globals,
+        &interface_names,
         shells.declarations.as_ref().map(|item| &item.names),
     );
-    let interface_names = pipeline
-        .vertex_buffers
-        .iter()
-        .map(|buffer| buffer.schema.clone())
-        .chain(std::iter::once(pipeline.varyings_name.clone()))
-        .collect::<Vec<_>>();
-    module_names
-        .reserved
-        .extend(interface_names.iter().map(|name| mapping::ident(name)));
     let layout_count = pipeline.layouts.len();
     let vertex_value_count = pipeline.vertex_buffers.len();
     let mut vertex_emitter = Emitter::entry(
@@ -6208,7 +6485,12 @@ pub(crate) fn emit_render(
     }
     for layout in &pipeline.layouts {
         for binding in &layout.bindings {
-            out.push_str(&binding_declaration(module, layout.group, binding)?);
+            out.push_str(&binding_declaration(
+                module,
+                layout.group,
+                binding,
+                &module_names,
+            )?);
         }
     }
     if !pipeline.layouts.is_empty() {
@@ -6225,7 +6507,7 @@ pub(crate) fn emit_render(
     )?);
     validate_unique_sources(
         module,
-        &module_names.functions,
+        &module_names,
         &globals,
         structs,
         &pipeline.layouts,

@@ -1,3 +1,10 @@
 roundtrip:match
 particle2=-2,8,0.25,2.5
+word0=11
+word1=22
+word2=33
+word3=44
+middle=22,33
+subrange word3=44
+empty bytes=0
 PASS

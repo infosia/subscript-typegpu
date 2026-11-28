@@ -2,7 +2,8 @@
 
 P1 slice 2 contract. Rev 0, 2026-08-22. Rev 1 (BF9–BF11), 2026-08-23.
 Rev 2 (BF9 Rev 1, the R36 pin `ac9436f`), 2026-08-23. Rev 3 (BF2
-Rev 1 four-byte alignment), 2026-08-23.
+Rev 1 four-byte alignment), 2026-08-23. Rev 4 (BF3 Rev 1 aligned
+mapped reads), 2026-11-28.
 Plan §3 D4 and §4 govern
 this block. The byte path is subscript R34 at `bb9dadc`
 (stdlib.md §18 there): `Context.bytesOf<T>`, `bytesInto<T>`,
@@ -43,6 +44,16 @@ this block. The byte path is subscript R34 at `bb9dadc`
   mapped `MAP_READ` buffer the caller mapped (`mapAsync` stays in
   the program, because it awaits). The caller decodes with
   `Context.fromBytes<FixedArray<Particle, 64>>(bytes, 0)`.
+  Rev 1, 2026-11-28: `readBuffer` and `readOne` return the bytes of
+  every in-range element. WebGPU requires a mapped-range offset that
+  is a multiple of 8 and a size that is a multiple of 4 *(docs)*.
+  The functions read the smallest range with that alignment that
+  holds the request, and return the requested bytes from it. That
+  range stays inside the range the caller mapped, because `mapAsync`
+  takes the same alignment. Measured at `e758f5d` on yawgpu: with
+  all 16 bytes of a `Buffer<u32>` mapped, `readOne(b, 1)` and
+  `readBuffer(b, 1, 1)` returned zero bytes, and indices 0 and 2
+  returned four bytes each.
   `Buffer<T>` offers `copyTo(encoder, target: Buffer<T>,
   elementIndex, elementCount)` sized in elements.
 - **BF4 — Sizes are elements.** Every `Buffer<T>` method counts

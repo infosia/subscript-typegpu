@@ -1322,6 +1322,9 @@ export class UiRenderer {
   // Builds the frame, writes the buffers, and records one scissored draw per range into
   // `pass`. The target size is in physical pixels. The viewport is in logical pixels.
   // The method restores the full-target scissor before it returns.
+  // A renderer serves one `render` call per submit. The method writes the viewport buffer
+  // and the vertex buffer on the queue, and a draw reads the last write before its submit.
+  // A program that draws two UI frames in one submit creates two renderers.
   render(context: UiContext, pass: GPURenderPassEncoder, width: u32, height: u32, scale: f32 = 1): void {
     uiValidateScale(scale, "UiRenderer.render");
     this.build(context);

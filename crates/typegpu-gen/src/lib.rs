@@ -377,6 +377,56 @@ fn support_export_names(source: &str) -> BTreeSet<&str> {
         .collect()
 }
 
+/// Selects each struct once. Direct struct members follow their parent in compute modules.
+/// Render modules declare their directly referenced schemas first.
+fn struct_closure(
+    references: &[Symbol],
+    schemas: &[schema::Schema],
+    structs: &[(String, String)],
+    render: Option<&render::RenderPipeline>,
+) -> Vec<(String, String)> {
+    let mut pending: std::collections::VecDeque<_> = references
+        .iter()
+        .filter_map(|symbol| {
+            schemas
+                .iter()
+                .find(|schema| schema.symbol == *symbol)
+                .map(|schema| &schema.tree)
+        })
+        .collect();
+    let mut seen = BTreeSet::new();
+    if let Some(pipeline) = render {
+        seen.insert(pipeline.varyings_name.as_str());
+        seen.extend(
+            pipeline
+                .vertex_buffers
+                .iter()
+                .map(|buffer| buffer.schema.as_str()),
+        );
+    }
+    let mut selected = Vec::new();
+    while let Some(tree) = pending.pop_front() {
+        match tree {
+            TypeTree::Array(element, _) if render.is_none() => pending.push_front(element),
+            TypeTree::Array(element, _) => pending.push_back(element),
+            TypeTree::Struct(structure) if seen.insert(&structure.name) => {
+                if let Some(text) = structs.iter().find(|(name, _)| *name == structure.name) {
+                    selected.push(text.clone());
+                }
+                if render.is_some() {
+                    pending.extend(structure.members.iter().map(|member| &member.ty));
+                } else {
+                    for member in structure.members.iter().rev() {
+                        pending.push_front(&member.ty);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    selected
+}
+
 /// Checks source files and generates schema support.
 ///
 /// # Errors
@@ -489,18 +539,20 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
             base_name(&pipeline.fragment_entry),
         ]
     }));
-    generated_names.extend(
-        pipeline_definitions
-            .iter()
-            .flat_map(|pipeline| &pipeline.layouts)
-            .chain(
-                render_definitions
-                    .iter()
-                    .flat_map(|pipeline| &pipeline.layouts),
-            )
-            .flat_map(|layout| &layout.bindings)
-            .map(|binding| binding.name.clone()),
-    );
+    for layouts in pipeline_definitions
+        .iter()
+        .map(|pipeline| &pipeline.layouts)
+        .chain(render_definitions.iter().map(|pipeline| &pipeline.layouts))
+    {
+        let shared = pipeline::shared_binding_fields(layouts);
+        generated_names.extend(
+            layouts
+                .iter()
+                .flat_map(|layout| &layout.bindings)
+                .filter(|binding| !shared.contains(binding.name.as_str()))
+                .map(|binding| binding.name.clone()),
+        );
+    }
     for pipeline in &pipeline_definitions {
         generated_names.extend(
             kernel::reached_global_names(&module, pipeline, &shell_program)
@@ -538,43 +590,12 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
     let emitted_compute = pipeline_definitions
         .iter()
         .map(|pipeline| {
-            /// Appends `tree`'s struct name and its nested struct names to `names`, outermost
-            /// first, with no repeat. `seen` carries the names already appended.
-            fn append_tree(tree: &TypeTree, names: &mut Vec<String>, seen: &mut BTreeSet<String>) {
-                let TypeTree::Struct(structure) = tree else {
-                    return;
-                };
-                if seen.insert(structure.name.clone()) {
-                    names.push(structure.name.clone());
-                }
-                for member in &structure.members {
-                    append_tree(&member.ty, names, seen);
-                }
-            }
-            // Only the structs this module references reach its text, in first-use order (K14). A
-            // referenced struct pulls in the structs its members name.
             let references = kernel::referenced_schema_classes(&module, pipeline, &shell_program)?;
-            let mut names = Vec::new();
-            let mut seen = BTreeSet::new();
-            for symbol in references {
-                if let Some(schema) = schemas.iter().find(|schema| schema.symbol == symbol) {
-                    append_tree(&schema.tree, &mut names, &mut seen);
-                }
-            }
-            let selected_structs = names
-                .iter()
-                .filter_map(|name| {
-                    wgsl_structs
-                        .iter()
-                        .find(|(schema, _)| schema == name)
-                        .cloned()
-                })
-                .collect::<Vec<_>>();
-            let uses_f16 = names.iter().any(|name| {
+            let selected_structs = struct_closure(&references, &schemas, &wgsl_structs, None);
+            let uses_f16 = references.iter().any(|symbol| {
                 schemas
                     .iter()
-                    .find(|schema| &schema.name == name)
-                    .is_some_and(|schema| emit::uses_f16(&schema.tree))
+                    .any(|schema| schema.symbol == *symbol && emit::uses_f16(&schema.tree))
             });
             let emitted = kernel::emit(
                 &module,
@@ -592,17 +613,8 @@ pub fn generate(files: &[SourceFile]) -> Result<Generated, Vec<Diagnostic>> {
         .map(|pipeline| {
             let references =
                 kernel::referenced_render_schema_classes(&module, pipeline, &shell_program)?;
-            // `wgsl_structs` holds one entry per schema, in schema order.
-            let selected_structs = references
-                .iter()
-                .filter_map(|symbol| {
-                    schemas
-                        .iter()
-                        .position(|schema| schema.symbol == *symbol)
-                        .and_then(|index| wgsl_structs.get(index))
-                        .cloned()
-                })
-                .collect::<Vec<_>>();
+            let selected_structs =
+                struct_closure(&references, &schemas, &wgsl_structs, Some(pipeline));
             let emitted = kernel::emit_render(
                 &module,
                 pipeline,

@@ -679,10 +679,14 @@ export function readBuffer<T>(
   if (elementIndex > readback.count || elementCount > readback.count - elementIndex) {
     authorTrap("BF8", "readBuffer", `elementIndex=${elementIndex} elementCount=${elementCount} count=${readback.count}`);
   }
-  return readback.buffer.readMappedRange(
-    (elementIndex as u64) * (readback.elementSize as u64),
-    (elementCount as u64) * (readback.elementSize as u64),
-  );
+  if (elementCount == 0) return [];
+  const offset = (elementIndex as u64) * (readback.elementSize as u64);
+  const length = (elementCount as u64) * (readback.elementSize as u64);
+  const prefix = offset % 8;
+  const size = ((prefix + length + 3) / 4) * 4;
+  const bytes = readback.buffer.readMappedRange(offset - prefix, size);
+  if (prefix == 0 && size == length) return bytes;
+  return bytes.slice(prefix as i32, (prefix + length) as i32);
 }
 
 /**
@@ -693,10 +697,7 @@ export function readOne<T>(readback: Buffer<T>, elementIndex: u32): u8[] {
   if (elementIndex >= readback.count) {
     authorTrap("BF8", "readOne", `elementIndex=${elementIndex} elementCount=1 count=${readback.count}`);
   }
-  return readback.buffer.readMappedRange(
-    (elementIndex as u64) * (readback.elementSize as u64),
-    readback.elementSize as u64,
-  );
+  return readBuffer(readback, elementIndex, 1);
 }
 
 /**

@@ -5,7 +5,8 @@ indirect), 2026-08-23. Rev 6 (PI15 Rev 1, PI18 Rev 1), 2026-08-23. Rev 7 (PI15 R
 wrapper identity), 2026-08-24. Rev 8 (PI3 Rev 1, the layout
 constructor), 2026-09-12. Rev 9 (PI2 Rev 1 inferred type arguments,
 PI3 Rev 2 parameter properties), 2026-10-27. Rev 10 (the guard queue
-Rev 3: always borrowed), 2026-10-30. Plan §3 D1, D3, D10 and §4 govern
+Rev 3: always borrowed), 2026-10-30. Rev 11 (PI6 Rev 1 shared field
+names), 2026-11-28. Plan §3 D1, D3, D10 and §4 govern
 this block. Kernels are `kernel.md`. The runtime classes live in
 `lib/typegpu.ts`.
 
@@ -92,6 +93,18 @@ this block. Kernels are `kernel.md`. The runtime classes live in
   `res.particles.length()` → `arrayLength(&particles)`. `res` itself
   never appears in WGSL. A layout class passed anywhere but the
   kernel's parameter is a diagnostic.
+  Rev 1, 2026-11-28: a field name that two or more groups of one
+  module share emits as `<field>_<group index>` in each of those
+  groups, on the declaration and on every access. A field name that
+  one group holds keeps its source name. A generated name that
+  equals another module-scope name gets a `_` suffix, repeated until
+  the name is free. The support module and the layout facts keep the
+  source field names. A WGSL shell body (K29) names a shared field
+  by its generated name. The rule
+  covers every pipeline form with more than one group. Measured at
+  `e758f5d`: `computePipeline2` over two layouts with a `pixels`
+  field emitted two globals named `pixels`, and `naga` gave
+  `redefinition of pixels`.
 - **PI7 — Uniform schemas.** A schema behind `Uniform<T>` obeys
   LY11 (SC10). The generator runs the uniform check on every such
   schema.

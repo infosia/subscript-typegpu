@@ -143,6 +143,48 @@ fn window_example_has_exact_host_entry_signatures() {
 }
 
 #[test]
+fn ui_demo_wheel_scrolls_in_logical_pixels() {
+    use subscript_typegpu_harness::{facade_library, program_files, EntryArg, ReloadSession};
+
+    let mut files = program_files(&root().join("examples/ui-demo/main.ts")).expect("load ui-demo");
+    let entry = files
+        .iter_mut()
+        .find(|file| file.entry)
+        .expect("ui-demo entry");
+    entry.source.push_str(
+        r#"
+export function readScroll(): void {
+  print(`${ui.scrollX},${ui.scrollY}`);
+  ui.begin();
+  ui.end();
+}
+"#,
+    );
+    let mut session = ReloadSession::new_with_native_libraries(&files, &[facade_library()])
+        .expect("compile ui-demo");
+    for (factor, events) in [
+        (2.0, &[(20.0, -12.0, "-10,6\n")][..]),
+        (1.0, &[(20.0, -12.0, "-20,12\n")][..]),
+        (2.0, &[(3.0, -3.0, "-1,1\n"), (3.0, -3.0, "-2,2\n")][..]),
+    ] {
+        session
+            .call_export_with("scale", &[EntryArg::F32(factor)])
+            .expect("scale");
+        for &(dx, dy, expected) in events {
+            session
+                .call_export_with("wheel", &[EntryArg::F32(dx), EntryArg::F32(dy)])
+                .expect("wheel");
+            session.call_export("readScroll").expect("read scroll");
+            assert_eq!(
+                session.take_output(),
+                expected.as_bytes(),
+                "scale {factor}, wheel ({dx}, {dy})"
+            );
+        }
+    }
+}
+
+#[test]
 fn host_signature_rejections_name_the_invalid_entry() {
     let program = root().join("examples/window-triangle/main.ts");
     let original = checked_example(&program);

@@ -15,7 +15,8 @@ expressions), 2026-10-30. Rev 19 (K7 the loop-form step, K9 Rev 2
 schema construction), 2026-10-30. Rev 20 (P17 slice 2: K7 Rev 20,
 K11 Rev 1, K32, K33), 2026-10-30. Rev 21 (P17 review: K18 Rev 1,
 K11 Rev 1 one argument and the domain, K33 `self_`), 2026-10-30. Rev 22 (K1 Rev 1 fewer
-parameters), 2026-11-09. Plan §3 D2, D3, D7, D9 and §4
+parameters), 2026-11-09. Rev 23 (K14 Rev 10 the struct closure,
+K34, K35), 2026-11-28. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -503,6 +504,72 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   declaration's name is the K14 Rev 9 diagnostic. A call through an
   interface constraint `T extends I` resolves to the method of the
   type argument and is named by this rule.
+
+## Calls and evaluation order (P22)
+
+- **K14 Rev 10 — The struct closure.** 2026-11-28. A module declares
+  every struct that a referenced struct names, through any depth of
+  struct members and `FixedArray` elements. The closure is the same
+  for a compute module and a render module. A compute module keeps
+  first-use order, with an array element in the position of its
+  member. A render module keeps its Rev 9 order and appends the
+  closure. Measured at `e758f5d`: a
+  `FixedArray<Item, 2>` field emitted `array<Item, 2u>` with no
+  declaration of `Item`, and `naga` gave `no definition in scope for
+  identifier: Item`.
+- **K34 — Default parameter values.** Rev 0, 2026-11-28. A helper
+  parameter can declare a default value. A call that omits the
+  argument emits the default expression at the call site, in the
+  position of the parameter. The WGSL function declares every
+  parameter. An explicit argument always wins: `pair(a, 0)` passes
+  `0`. The default expression is in the K9 set and reads no
+  parameter. Any other default is a K34 diagnostic that names the
+  helper and the parameter. The generator checks every default of a
+  called helper at each call, with or without an explicit argument.
+  The rule covers every call form with
+  declared parameters: a helper function, an instance of a generic
+  helper, a method of a `@ValueType` class, a local function, and a
+  schema constructor. Measured at `e758f5d`: `pair(tick())` against
+  `pair(a: u32, b: u32 = 7)` emitted one argument, and `naga` gave
+  `ArgumentCount { required: 2, seen: 1 }`.
+- **K35 — The evaluation order is the source order.** Rev 0,
+  2026-11-28. The emitted WGSL evaluates the parts of an expression
+  in the subscript order. A receiver comes before its arguments.
+  Arguments go left to right. A left operand comes before a right
+  operand. The right operand of `&&` or `||` runs only when the left
+  operand does not decide the result. WGSL evaluates the text it
+  receives in the same order *(docs)*.
+
+  Three emissions move a part away from its source position: a
+  prelude (K9 lowers `?:` to statements before the expression), a
+  builtin whose WGSL operand order differs from the method order
+  (`step` and `smoothstep`, K25 Rev 1), and a schema construction
+  that passes the arguments in field order (K9 Rev 2). The emitter
+  finds every such emission through two facts per part. A part
+  *writes* when it holds a helper call, a shell call, an atomic
+  write, a texture store, an assignment, or an update. A part
+  *reads* when it reads a `var` local, a binding, a private or
+  workgroup variable, or when it writes.
+
+  Rule 1: part A precedes part B in the source, and the emission of
+  B runs before the text of A. If A writes and B reads, or A reads
+  and B writes, the emitter stores A in `let _g_operand_<n>` in the
+  prelude, before the statements of B, and uses the name in place of
+  A. The index counts from 0 in each function. The emitter never
+  stores a texture or a sampler, because a WGSL `let` takes a
+  constructible type *(docs)*. A binding field of those kinds is
+  pure.
+
+  Rule 2: if the right operand of `&&` or `||` has a prelude, the
+  emitter lowers the operator to `var _g_logic_<n>: bool = <left>;`
+  and an `if` on `_g_logic_<n>` (`!_g_logic_<n>` for `||`) that
+  holds the prelude and the assignment of the right operand.
+
+  An expression with no such conflict emits the same text as before
+  this rule. Measured at `e758f5d`: `pair(tick(), k == 0 ? tick() :
+  0)` ran the second `tick()` first, `nextVec().step(edgeVec())` ran
+  `edgeVec()` first, and `k != 0 && (k == 0 ? tick() > 0 : false)`
+  ran `tick()` at `k == 0`.
 
 ## Diagnostics
 

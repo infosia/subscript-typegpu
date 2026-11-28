@@ -298,3 +298,33 @@ fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
         assert_site(&runtime, line_index + 1, rule, &allowed, &fixtures);
     }
 }
+
+#[test]
+fn call_shapes_rejects_invalid_defaults() {
+    for fixture in [
+        "k34-parameter-default.ts",
+        "k34-recursive-default.ts",
+        "k34-global-default.ts",
+        "k34-expression-default.ts",
+    ] {
+        let source = read(
+            &root()
+                .join("crates/typegpu-gen/tests/fixtures/reject")
+                .join(fixture),
+        );
+        let reason = source
+            .lines()
+            .find_map(|line| line.strip_prefix("// expected-message: "))
+            .expect("expected message");
+        let mut files = crate::support::b01_files();
+        files.pop();
+        files.push(subscript_compiler::SourceFile::entry(fixture, &source));
+        let errors = subscript_typegpu_gen::generate(&files).expect_err("invalid default");
+        assert_eq!(errors.len(), 1, "{fixture}: {errors:?}");
+        let message = &errors[0].message;
+        assert!(
+            message.starts_with("K34:") && message.contains(reason),
+            "{fixture}: {message}"
+        );
+    }
+}

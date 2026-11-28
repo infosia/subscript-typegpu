@@ -1,0 +1,3 @@
+host:batch=11,22,0.5
+host:pixels=8,2
+fragment=0.5

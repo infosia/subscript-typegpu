@@ -215,8 +215,8 @@ export function scale(factor: f32): void { scaleFactor = factor; }
 
 export function wheel(deltaX: f32, deltaY: f32): void {
   // Host wheel deltas describe motion. The UI scroll offset moves in the opposite direction.
-  wheelX -= deltaX;
-  wheelY -= deltaY;
+  wheelX -= deltaX / scaleFactor;
+  wheelY -= deltaY / scaleFactor;
   // The UI takes whole pixels, so the fraction stays in the accumulator for the next event.
   const x: i32 = wheelX as i32;
   const y: i32 = wheelY as i32;

@@ -1,6 +1,7 @@
 # Block: the CPU lane (CL-rules)
 
-P7 contract. Rev 0, 2026-08-23. The owner decided on 2026-08-23 to
+P7 contract. Rev 0, 2026-08-23. Rev 1 (CL5 Rev 1 address modes),
+2026-11-13. Rev 2 (CL5 Rev 2 LOD clamps), 2026-11-28. The owner decided on 2026-08-23 to
 run P7.
 
 ## What the lane is
@@ -67,6 +68,15 @@ run P7.
   sampler that traps with `TX3` on a sample call. No descriptor field
   that changes a level-zero nearest sample becomes a different host
   behavior without a trap.
+  Rev 2, 2026-11-28: `lodMinClamp` and `lodMaxClamp` change no host
+  sample and need no trap. The host `Texture2d` holds one mip level,
+  and a clamp above the last level selects that level. Measured on
+  Metal with `x29-live-sampler-lod`: on a one-level texture, a
+  sampler with both clamps at 1 gave the same texel on the device
+  and on the host (`0,1,1,1`). On a two-level device texture the
+  same sampler gave the level 1 color (`0,0,1,1`) at explicit level
+  0, so a host texture with more than one level requires the clamp
+  in the host sampler.
 - **CL6 — The analysis has a red per branch.** Emitter tests assert
   `<name>_HOST_RUNNABLE` false for a kernel that reaches only a
   barrier, only an atomic on a storage schema, only a written

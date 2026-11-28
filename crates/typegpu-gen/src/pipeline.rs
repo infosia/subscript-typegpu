@@ -176,7 +176,7 @@ impl BindingKind {
 /// One binding of a layout class.
 #[derive(Debug, Clone)]
 pub(crate) struct Binding {
-    /// The layout field name, which is also the emitted WGSL variable name.
+    /// The source name of the layout field.
     pub(crate) name: String,
     /// The binding index, which is the field's declaration position from 0 (PI3).
     pub(crate) index: u32,
@@ -199,6 +199,17 @@ pub(crate) struct Layout {
     pub(crate) group: u32,
     /// The bindings, in field declaration order. A guarded declaration appends its guard last.
     pub(crate) bindings: Vec<Binding>,
+}
+
+/// Returns the fields that occur in more than one group of a module.
+pub(crate) fn shared_binding_fields(layouts: &[Layout]) -> BTreeSet<&str> {
+    let mut seen = BTreeSet::new();
+    layouts
+        .iter()
+        .flat_map(|layout| &layout.bindings)
+        .map(|binding| binding.name.as_str())
+        .filter(|name| !seen.insert(*name))
+        .collect()
 }
 
 /// One compute pipeline declaration (PI1).

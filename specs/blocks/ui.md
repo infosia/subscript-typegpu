@@ -1,6 +1,6 @@
 # Block: ui (UI-rules)
 
-U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Rev 9 (branch review: UI4 Rev 3, UI9 Rev 1, UI11, UI12 Rev 2, UI15 Rev 5, UI18, UI20), 2026-09-05. Rev 10 (UI2 Rev 1: the alpha is an array of hex chunks, W8), 2026-09-05. Rev 11 (UI6, UI20 from the comment pass), 2026-09-06. Rev 12 (UI2 Rev 2: one string again), 2026-09-10. Rev 13 (UI15: the checker enforces the private constructor), 2026-10-05. Rev 14 (UI15 Rev 6, UI20: one generic factory), 2026-10-30. Rev 15 (UI15 Rev 7: quads write in place), 2026-11-23. Rev 16 (UI15 Rev 8, UI17 Rev 2, UI20: logical pixels and the scale), 2026-11-23. Rev 17 (UI1 Rev 1, UI2 Rev 3, UI10 Rev 1, UI14 Rev 3, UI15 Rev 9: the Roboto atlas), 2026-11-23. Plan §8 U-phases govern this block.
+U0 contract. Rev 0, 2026-09-05. Rev 1 (UI4: records reused across frames, UI13: no-root dump), 2026-09-05. Rev 2 (UI4: growth to a maximum, UI11: nested roots, UI18: UIT4), 2026-09-05. Rev 3 (phase review: UI6 microui's focus order, UI7 extent, UI9 centered numbers, UI10, UI12, UI13), 2026-09-05. Rev 4 (UI17: the W2 Rev 3 entries), 2026-09-05. Rev 5 (U2 review: UI12 unbounded reset, UI14 the program declares the pipeline, UI15 facts and capacity), 2026-09-05. Rev 6 (U2 phase review: UI11 root primitive, UI14 Rev 2 the spec is read and the alpha pair, UI15 Rev 2 facts and scissor, UI18 UIT1), 2026-09-05. Rev 7 (UI15 Rev 3: the two factories, host-owned device), 2026-09-05. Rev 8 (U3 phase review: UI8 Rev 1 `currentContainer`, UI15 Rev 4 private constructor), 2026-09-05. Rev 9 (branch review: UI4 Rev 3, UI9 Rev 1, UI11, UI12 Rev 2, UI15 Rev 5, UI18, UI20), 2026-09-05. Rev 10 (UI2 Rev 1: the alpha is an array of hex chunks, W8), 2026-09-05. Rev 11 (UI6, UI20 from the comment pass), 2026-09-06. Rev 12 (UI2 Rev 2: one string again), 2026-09-10. Rev 13 (UI15: the checker enforces the private constructor), 2026-10-05. Rev 14 (UI15 Rev 6, UI20: one generic factory), 2026-10-30. Rev 15 (UI15 Rev 7: quads write in place), 2026-11-23. Rev 16 (UI15 Rev 8, UI17 Rev 2, UI20: logical pixels and the scale), 2026-11-23. Rev 17 (UI1 Rev 1, UI2 Rev 3, UI10 Rev 1, UI14 Rev 3, UI15 Rev 9: the Roboto atlas), 2026-11-23. Rev 18 (UI15 Rev 10: one render per submit, UI17 Rev 3: the wheel unit), 2026-11-28. Plan §8 U-phases govern this block.
 `specs/tracking/imgui-survey.md` records the route decision. Render
 rules are `render.md`, textures `texture.md`, buffers `buffer.md`,
 the window host `window.md`, modules `library.md`.
@@ -364,6 +364,13 @@ tiers with no GPU. The renderer is the only GPU code.
   divided by `UI_ATLAS_SCALE`. A rect quad uses the center of the
   white rect as the UV of all four vertices, so a linear sample
   reads alpha 255.
+  Rev 10 (2026-11-28, owner decision): a renderer serves one
+  `render` call per submit. `render` writes the viewport buffer and
+  the vertex buffer of the renderer on the queue, and a draw reads
+  the last write before its submit. A program that draws two UI
+  frames in one submit creates two renderers. The doc comment of
+  `render` states the rule. The renderer does not detect a second
+  call.
 - **UI16 — The pixel oracle.** A live program draws one window
   with microui's default colors into an offscreen `rgba8unorm`
   target and reads back pixels inside filled rects, where alpha is
@@ -382,7 +389,11 @@ tiers with no GPU. The renderer is the only GPU code.
   `key` parameter of `frame`. Rev 2 (2026-11-23, P21): the example also exports `scale` (W2
   Rev 6). It divides the pointer position by the factor before
   `inputMouseMove`, `inputMouseDown`, and `inputMouseUp`, and passes
-  the factor to `render`.
+  the factor to `render`. Rev 3 (2026-11-28, owner decision): the
+  example divides the wheel delta by the factor (W3 Rev 4) before it
+  accumulates the scroll offset, and the fraction stays in the
+  accumulator. A 20-pixel delta at scale 2 scrolls 10 logical
+  pixels.
 
 ## Traps
 
