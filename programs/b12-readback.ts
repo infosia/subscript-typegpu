@@ -77,8 +77,8 @@ export async function main(): Promise<void> {
     for (let i: u32 = 0; i < 4; i++) {
       const word = readOne(mapped, i);
       if (word.length == 4) {
-        const decodedWord = Context.fromBytes<FixedArray<u32, 1>>(word, 0);
-        print(`word${i}=${decodedWord[0]}`);
+        const decodedWord = Context.fromBytes<u32>(word, 0);
+        print(`word${i}=${decodedWord}`);
       } else {
         complete = false;
         print(`FAIL word${i} bytes=${word.length}`);
@@ -105,8 +105,8 @@ export async function main(): Promise<void> {
       print(`FAIL subrange bytes=${last.length} empty bytes=${empty.length}`);
       return;
     }
-    const lastWord = Context.fromBytes<FixedArray<u32, 1>>(last, 0);
-    if (lastWord[0] != words[3]) {
+    const lastWord = Context.fromBytes<u32>(last, 0);
+    if (lastWord != words[3]) {
       print("FAIL subrange word");
       return;
     }

@@ -150,7 +150,7 @@ function shuffledValueBytes(): u8[] {
   while (index < VALUE_COUNT) {
     const sample: RandomF32 = randF32(randomState);
     randomState = sample.state;
-    appendBitonicBytes(bytes, Context.bytesOf<FixedArray<u32, 1>>([sample.state]));
+    appendBitonicBytes(bytes, Context.bytesOf<u32>(sample.state));
     index += 1;
   }
   return bytes;

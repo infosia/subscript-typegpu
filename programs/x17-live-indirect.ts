@@ -240,7 +240,7 @@ export async function main(): Promise<void> {
       return;
     }
     const outputBytes: u8[] = await output.read(device, 0, 1);
-    const gpuValues: FixedArray<u32, 1> = Context.fromBytes<FixedArray<u32, 1>>(
+    const gpuValue: u32 = Context.fromBytes<u32>(
       outputBytes,
       0,
     );
@@ -252,7 +252,7 @@ export async function main(): Promise<void> {
       [1, 1, 1],
       indirectCompute_HOST_RUNNABLE,
     );
-    if (gpuValues[0] != host.output[0]) {
+    if (gpuValue != host.output[0]) {
       print("FAIL compute");
       return;
     }

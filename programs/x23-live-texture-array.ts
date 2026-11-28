@@ -115,7 +115,7 @@ function zeroPayload(): Vec4f[] {
 }
 
 function appendHalf(bytes: u8[], value: f32): void {
-  const encoded: u8[] = Context.bytesOf<FixedArray<f16, 1>>([value as f16]);
+  const encoded: u8[] = Context.bytesOf<f16>(value as f16);
   bytes.push(encoded[0]);
   bytes.push(encoded[1]);
 }

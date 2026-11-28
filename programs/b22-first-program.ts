@@ -126,7 +126,7 @@ export async function main(): Promise<void> {
       device.queue,
       0,
       State_OFFSET_incrementBy,
-      Context.bytesOf<FixedArray<u32, 1>>([25]),
+      Context.bytesOf<u32>(25),
     );
 
     using secondEncoder = device.createCommandEncoderDefault();

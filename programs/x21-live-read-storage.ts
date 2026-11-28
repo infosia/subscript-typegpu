@@ -223,13 +223,13 @@ export async function main(): Promise<void> {
     while (y < HEIGHT) {
       let x: u32 = 0;
       while (x < WIDTH) {
-        const actual: FixedArray<f32, 1> = Context.fromBytes<FixedArray<f32, 1>>(
+        const actual: f32 = Context.fromBytes<f32>(
           bytes,
           y * 256 + x * 4,
         );
         const expected: f32 = hostA[(y * WIDTH + x) as i32].x;
-        if (!close(actual[0], expected)) {
-          print(`FAIL x=${x} y=${y} expected=${expected} actual=${actual[0]}`);
+        if (!close(actual, expected)) {
+          print(`FAIL x=${x} y=${y} expected=${expected} actual=${actual}`);
           return;
         }
         x += 1;

@@ -906,3 +906,27 @@ is needed here. The `Cargo.lock` diff moves only the five subscript
 packages.
 Evidence: `tools/gate.sh --require-backend` green, 521 s, 384 passed,
 1 ignored (live).
+
+### Re-pin to `9033a2dd` (2026-11-28)
+
+One crate-changing subscript section. §360 lets the type argument of
+`Context.bytesOf`, `Context.bytesInto`, and `Context.fromBytes` be a
+scalar. The section answers a proposal from this project of the same
+day: at `9b8e2d15` the checker rejected `Context.fromBytes<u32>` with
+S100, and a program wrapped one scalar in `FixedArray<S, 1>`.
+
+Source change: 12 calls in 10 files take the scalar form (7
+`bytesOf`, 5 `fromBytes`, over `u32`, `f32`, and `f16`):
+`lib/typegpu.ts`, `programs/b12-readback.ts`,
+`programs/b22-first-program.ts`, `programs/x15-live-shell.ts`,
+`programs/x17-live-indirect.ts`, `programs/x21-live-read-storage.ts`,
+`programs/x23-live-texture-array.ts`, `examples/bitonic-sort/main.ts`,
+`examples/prefix-scan/main.ts`, and the quote in
+`docs/first-gpu-program.md`. The other 91 calls with a `FixedArray`
+type argument hold more than one element or a class element. No
+output golden and no WGSL golden moved. No test held the old S100
+text. The `Cargo.lock` diff moves only the five subscript packages.
+Evidence: `tools/gate.sh --require-backend` green, 677 s, 450 passed,
+1 ignored (live). The previous row is 536 s. The run compiled the
+subscript crates at the new pin, and a second cargo process ran at
+its start. `tools/live.sh` on Metal: 1 passed, 221 s.

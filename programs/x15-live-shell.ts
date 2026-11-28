@@ -117,8 +117,7 @@ export async function main(): Promise<void> {
     using command = encoder.finishDefault();
     device.queue.submit([command]);
     const bytes: u8[] = await output.read(device, 0, 1);
-    const gpuValues: FixedArray<u32, 1> = Context.fromBytes<FixedArray<u32, 1>>(bytes, 0);
-    const gpuValue: u32 = gpuValues[0];
+    const gpuValue: u32 = Context.fromBytes<u32>(bytes, 0);
     const host = new ShellLayout(new MutStorage([0]));
     simulateCompute(
       shellKernel,

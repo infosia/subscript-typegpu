@@ -75,7 +75,7 @@ function f32Bytes(values: f32[]): u8[] {
   const bytes: u8[] = [];
   let index: i32 = 0;
   while (index < values.length) {
-    appendScanBytes(bytes, Context.bytesOf<FixedArray<f32, 1>>([values[index]]));
+    appendScanBytes(bytes, Context.bytesOf<f32>(values[index]));
     index += 1;
   }
   return bytes;

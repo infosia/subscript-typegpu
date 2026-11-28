@@ -65,10 +65,10 @@ function appendTextureComponent(bytes: u8[], format: GPUTextureFormat, value: f3
     return;
   }
   if (format == "rgba16float") {
-    appendBytes(bytes, Context.bytesOf<FixedArray<f16, 1>>([value as f16]));
+    appendBytes(bytes, Context.bytesOf<f16>(value as f16));
     return;
   }
-  appendBytes(bytes, Context.bytesOf<FixedArray<f32, 1>>([value]));
+  appendBytes(bytes, Context.bytesOf<f32>(value));
 }
 
 /**
