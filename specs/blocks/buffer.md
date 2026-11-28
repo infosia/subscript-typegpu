@@ -3,7 +3,7 @@
 P1 slice 2 contract. Rev 0, 2026-08-22. Rev 1 (BF9–BF11), 2026-08-23.
 Rev 2 (BF9 Rev 1, the R36 pin `ac9436f`), 2026-08-23. Rev 3 (BF2
 Rev 1 four-byte alignment), 2026-08-23. Rev 4 (BF3 Rev 1 aligned
-mapped reads), 2026-11-28.
+mapped reads), 2026-11-28. Rev 5 (BF3 Rev 2 element sizes), 2026-11-28.
 Plan §3 D4 and §4 govern
 this block. The byte path is subscript R34 at `bb9dadc`
 (stdlib.md §18 there): `Context.bytesOf<T>`, `bytesInto<T>`,
@@ -54,6 +54,19 @@ this block. The byte path is subscript R34 at `bb9dadc`
   all 16 bytes of a `Buffer<u32>` mapped, `readOne(b, 1)` and
   `readBuffer(b, 1, 1)` returned zero bytes, and indices 0 and 2
   returned four bytes each.
+  Rev 2, 2026-11-28: the rule holds for an element size that is not
+  a multiple of 4. `b12-readback` reads each element of a
+  `Buffer<u16>` of 6 elements and of a buffer of two 6-byte
+  elements. A buffer whose byte size is not a multiple of 4 cannot
+  map its last bytes, because `mapAsync` takes a size that is a
+  multiple of 4. Measured on yawgpu (Noop) with a `Buffer<u16>` of 5
+  elements: `mapAsync(READ, 0, 10)` failed with `map size must be
+  4-byte aligned`, `mapAsync(READ, 0, 8)` passed, elements 0 to 3
+  returned two bytes each, and element 4 returned zero bytes. A read
+  outside the mapped range returns zero bytes, as `readMappedRange`
+  does.
+  `b12-readback` holds this case with no validation scope, because
+  a program with no shader module and no pipeline has none (PI14).
   `Buffer<T>` offers `copyTo(encoder, target: Buffer<T>,
   elementIndex, elementCount)` sized in elements.
 - **BF4 — Sizes are elements.** Every `Buffer<T>` method counts

@@ -383,3 +383,4 @@ UI15 Rev 10
 UI17 Rev 3
 K8 Rev 1
 K36
+BF3 Rev 2

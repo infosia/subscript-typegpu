@@ -112,6 +112,80 @@ export async function main(): Promise<void> {
     }
     print(`subrange word3=${words[3]}`);
     print(`empty bytes=${empty.length}`);
+
+    const readbackUsage = GPUBufferUsage.MAP_READ + GPUBufferUsage.COPY_DST;
+    const halves: FixedArray<u16, 6> = [101, 202, 303, 404, 505, 606];
+    using halfBuffer: Buffer<u16> = createBuffer(device, 2, 6, readbackUsage, "b12-halves");
+    halfBuffer.write(device.queue, 0, Context.bytesOf<FixedArray<u16, 6>>(halves));
+    if (!await halfBuffer.handle().mapAsync(GPUMapMode.READ, 0, 12)) {
+      print("FAIL halves map");
+      return;
+    }
+    for (let i: u32 = 0; i < 6; i++) {
+      const half = readOne(halfBuffer, i);
+      if (half.length != 2) {
+        print(`FAIL half${i} bytes=${half.length}`);
+        halfBuffer.handle().unmap();
+        return;
+      }
+      const value = Context.fromBytes<u16>(half, 0);
+      print(`half${i}=${value}`);
+    }
+    for (let start: u32 = 1; start <= 3; start += 2) {
+      const range = readBuffer(halfBuffer, start, 3);
+      if (range.length != 6) {
+        print(`FAIL halves${start} bytes=${range.length}`);
+        halfBuffer.handle().unmap();
+        return;
+      }
+      const values = Context.fromBytes<FixedArray<u16, 3>>(range, 0);
+      print(`halves${start}=${values[0]},${values[1]},${values[2]}`);
+    }
+    halfBuffer.handle().unmap();
+
+    using triples: Buffer<FixedArray<u16, 3>> = createBuffer(device, 6, 2, readbackUsage, "b12-triples");
+    triples.write(device.queue, 0, Context.bytesOf<FixedArray<u16, 6>>([1, 2, 3, 4, 5, 6]));
+    if (!await triples.handle().mapAsync(GPUMapMode.READ, 0, 12)) {
+      print("FAIL triples map");
+      return;
+    }
+    for (let i: u32 = 0; i < 2; i++) {
+      const triple = readOne(triples, i);
+      if (triple.length != 6) {
+        print(`FAIL triple${i} bytes=${triple.length}`);
+        triples.handle().unmap();
+        return;
+      }
+      const values = Context.fromBytes<FixedArray<u16, 3>>(triple, 0);
+      print(`triple${i}=${values[0]},${values[1]},${values[2]}`);
+    }
+    const both = readBuffer(triples, 0, 2);
+    triples.handle().unmap();
+    if (both.length != 12) {
+      print(`FAIL triples bytes=${both.length}`);
+      return;
+    }
+    const values = Context.fromBytes<FixedArray<u16, 6>>(both, 0);
+    print(`triples=${values[0]},${values[1]},${values[2]},${values[3]},${values[4]},${values[5]}`);
+
+    using partial: Buffer<u16> = createBuffer(device, 2, 5, readbackUsage, "b12-partial");
+    const fullMap = await partial.handle().mapAsync(GPUMapMode.READ, 0, 10);
+    print(`map10=${fullMap}`);
+    if (fullMap) {
+      print("FAIL map10 validation");
+      return;
+    }
+    const partialMap = await partial.handle().mapAsync(GPUMapMode.READ, 0, 8);
+    print(`map8=${partialMap}`);
+    if (!partialMap) {
+      print("FAIL map8");
+      return;
+    }
+    for (let i: u32 = 0; i < 5; i++) {
+      const half = readOne(partial, i);
+      print(`partial${i} bytes=${half.length}`);
+    }
+    partial.handle().unmap();
   }
   gpu.dispose();
   print("PASS");

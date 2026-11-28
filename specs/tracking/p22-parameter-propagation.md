@@ -196,3 +196,24 @@ Open:
   WGSL with no diagnostic;
 - the subscript checker rejects `Context.fromBytes<u32>` with S100,
   so a program decodes one word as `FixedArray<u32, 1>`.
+
+## Follow-up: element sizes (2026-11-28)
+
+Review MINOR 7 left one case open: a mapped read of an element whose
+size is not a multiple of 4. `b12-readback` now holds three cases
+(BF3 Rev 2): a `Buffer<u16>` of 6 elements, a buffer of two 6-byte
+elements, and a `Buffer<u16>` of 5 elements (10 bytes). The library
+did not change. The first two cases return every element. In the
+third, `mapAsync(READ, 0, 10)` returns false, `mapAsync(READ, 0, 8)`
+returns true, and element 4 returns zero bytes.
+
+The first gate run was red: 51 passed, 1 failed, 514.33 s.
+`scopes::every_program_scopes_exactly_its_shader_and_pipeline_creation_calls`
+gave `b12-readback.ts: expected no validation scope without a
+creation call, found [Push, Pop]`. The program wrapped the 10-byte
+map in a validation scope. The scope is removed. Both tiers print
+the same lines with no scope and exit 0.
+
+Gate: `tools/gate.sh --require-backend` on yawgpu (Noop),
+2026-11-28: green, 450 passed, 1 ignored, 524.46 s wall. The
+previous row is 677 s, a run with a second cargo process.
