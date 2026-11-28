@@ -1037,6 +1037,21 @@ Exit:
 - a 30-frame `ui-demo` window run after the wheel change;
 - a phase review with no open CRITICAL or MAJOR.
 
+### P23 — written parameters (after P22)
+
+The P22 phase review found that a helper that assigns to a parameter
+emits invalid WGSL with no diagnostic. `kernel.md` K8 Rev 1 is the
+contract. The record is `specs/tracking/p23-written-parameters.md`.
+
+Exit:
+
+- gate-green, with no existing WGSL golden moved;
+- a recorded red at `ef54ad6` through the tests that the phase adds,
+  and `naga` validation of each new module;
+- a program that prints the host result of a helper that writes its
+  parameters, and a live run that compares the device result;
+- a phase review with no open CRITICAL or MAJOR.
+
 ### U0–U4 — the immediate-mode GUI (branch `imgui`, after P16)
 
 Owner decision 2026-09-05: an immediate-mode GUI authored in

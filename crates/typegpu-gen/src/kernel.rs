@@ -2376,6 +2376,8 @@ struct Emitter<'a> {
     globals: BTreeMap<Symbol, KernelGlobal>,
     /// The emitted name of each parameter and local (K14).
     local_names: BTreeMap<String, String>,
+    /// Parameter roots of assignments in this body, in source names.
+    written_parameters: BTreeSet<String>,
     /// The value-method receiver name, distinct from module and local names (K14, K33).
     receiver_name: Option<String>,
     /// The builtins the body reads. The entry point declares these parameters and no other (PI4).
@@ -2458,6 +2460,7 @@ impl<'a> Emitter<'a> {
                 .map(|global| (global.symbol.clone(), global.clone()))
                 .collect(),
             local_names,
+            written_parameters: BTreeSet::new(),
             receiver_name: None,
             used_builtins: BTreeSet::new(),
             conditional_index: 0,
@@ -2501,6 +2504,7 @@ impl<'a> Emitter<'a> {
                 .map(|global| (global.symbol.clone(), global.clone()))
                 .collect(),
             local_names: local_names(helper, &reserved),
+            written_parameters: BTreeSet::new(),
             receiver_name,
             used_builtins: BTreeSet::new(),
             conditional_index: 0,
@@ -2511,6 +2515,77 @@ impl<'a> Emitter<'a> {
             switch_depth: 0,
             in_helper: true,
         }
+    }
+
+    /// Emits the body and declares a local copy for each parameter that the body writes (K8).
+    ///
+    /// # Errors
+    ///
+    /// Returns diagnostics from the parameter types and the body.
+    fn parameters_and_body<'p>(
+        &mut self,
+        function: &Function,
+        parameters: impl Iterator<Item = &'p Param>,
+    ) -> Result<(Vec<String>, String), Diagnostic> {
+        let mut body = String::new();
+        self.statements(&function.body, 1, &mut body)?;
+        let mut declarations = Vec::new();
+        let mut copies = String::new();
+        let mut inputs = BTreeSet::new();
+        for param in parameters {
+            let local = self.local_name(&param.name);
+            let ty = wgsl_type(self.module, &param.ty, &param.pos)?;
+            let name = if self.written_parameters.contains(&param.name) {
+                let mut name = format!("_g_parameter_{local}");
+                while self.names.reserved.contains(&name)
+                    || self.local_names.values().any(|local| local == &name)
+                    || inputs.contains(&name)
+                {
+                    name.push('_');
+                }
+                inputs.insert(name.clone());
+                Self::line(&mut copies, 1, &format!("var {local} = {name};"));
+                name
+            } else {
+                local
+            };
+            declarations.push(format!("{name}: {ty}"));
+        }
+        if !copies.is_empty() {
+            copies.push_str(&body);
+            body = copies;
+        }
+        Ok((declarations, body))
+    }
+
+    /// Emits the WGSL function for a helper.
+    ///
+    /// # Errors
+    ///
+    /// Returns diagnostics from the return type, the parameter types, and the body.
+    fn emit_helper(
+        &mut self,
+        helper: &Function,
+        symbol: &Symbol,
+        out: &mut String,
+    ) -> Result<(), Diagnostic> {
+        let result = if helper.ret == Type::Void {
+            String::new()
+        } else {
+            format!(" -> {}", wgsl_type(self.module, &helper.ret, &helper.pos)?)
+        };
+        let (mut params, body) = self.parameters_and_body(helper, helper.params.iter())?;
+        if let Some(receiver) = self.receiver_parameter(helper) {
+            params.insert(0, receiver);
+        }
+        out.push_str(&format!(
+            "fn {}({}){result} {{\n",
+            mapping::ident(&self.names.function_name(symbol)),
+            params.join(", ")
+        ));
+        out.push_str(&body);
+        out.push_str("}\n\n");
+        Ok(())
     }
 
     /// Returns the first parameter of a value-method helper (K33).
@@ -3279,8 +3354,8 @@ impl<'a> Emitter<'a> {
     ///
     /// # Errors
     ///
-    /// Returns the diagnostics of [`Self::snippet`], and a K21 diagnostic for a whole-value write
-    /// to an atomic.
+    /// A write to an invocation builtin gives a K8 diagnostic. A write to the receiver gives a K33
+    /// diagnostic. A whole-value write to an atomic gives a K21 diagnostic.
     fn statement_snippet(&mut self, expr: &Expr) -> Result<Snippet, Diagnostic> {
         let ExprKind::Assign {
             op, target, value, ..
@@ -3288,14 +3363,8 @@ impl<'a> Emitter<'a> {
         else {
             return self.snippet(expr);
         };
-        fn this_field(expr: &Expr) -> bool {
-            match &expr.kind {
-                ExprKind::This => true,
-                ExprKind::Field { obj, .. } | ExprKind::Index { obj, .. } => this_field(obj),
-                _ => false,
-            }
-        }
-        if this_field(target) {
+        let (root, field) = assignment_root(target);
+        if matches!(root.kind, ExprKind::This) {
             return Err(diagnostic(
                 "K33",
                 "a value method cannot write a field of this",
@@ -3310,6 +3379,21 @@ impl<'a> Emitter<'a> {
                 "an atomic value or schema cannot be written as a whole",
                 target.pos.clone(),
             ));
+        }
+        if let ExprKind::Local(name, _, _) = &root.kind {
+            // A block local can shadow a parameter with the same source name.
+            if !self.local_effects.iter().any(|(local, _)| local == name) {
+                if name == &self.invocation_param {
+                    let builtin =
+                        field.map_or_else(|| name.clone(), |field| format!("{name}.{field}"));
+                    return Err(diagnostic(
+                        "K8",
+                        format!("a kernel cannot write an invocation builtin `{builtin}`"),
+                        target.pos.clone(),
+                    ));
+                }
+                self.written_parameters.insert(name.to_owned());
+            }
         }
         let place = self.place(target)?;
         let right_mixed = op.is_some_and(|op| mixed_bitwise_chain(op, value));
@@ -5026,11 +5110,28 @@ impl<'emitter, 'module> BarrierValidator<'emitter, 'module> {
     }
 }
 
+/// Returns the root of an assignment target and the name of its first field, if present.
+fn assignment_root(mut expr: &Expr) -> (&Expr, Option<&str>) {
+    let mut field = None;
+    loop {
+        match &expr.kind {
+            ExprKind::Field { obj, name } => {
+                field = Some(name.as_str());
+                expr = obj;
+            }
+            ExprKind::Index { obj, .. } => {
+                field = None;
+                expr = obj;
+            }
+            _ => return (expr, field),
+        }
+    }
+}
+
 /// Returns the local name at the root of an assignment target, and `None` for every other target.
 fn assigned_local(expr: &Expr) -> Option<&str> {
-    match &expr.kind {
+    match &assignment_root(expr).0.kind {
         ExprKind::Local(name, _, _) => Some(name),
-        ExprKind::Field { obj, .. } | ExprKind::Index { obj, .. } => assigned_local(obj),
         _ => None,
     }
 }
@@ -5963,32 +6064,7 @@ pub(crate) fn emit(
             let _ = wgsl_type(module, &param.ty, &param.pos)?;
         }
         let mut helper_emitter = Emitter::helper(module, helper, &globals, &module_names);
-        let mut params = helper
-            .params
-            .iter()
-            .map(|param| {
-                Ok(format!(
-                    "{}: {}",
-                    helper_emitter.local_name(&param.name),
-                    wgsl_type(module, &param.ty, &param.pos)?
-                ))
-            })
-            .collect::<Result<Vec<_>, Diagnostic>>()?;
-        if let Some(receiver) = helper_emitter.receiver_parameter(helper) {
-            params.insert(0, receiver);
-        }
-        let result = if helper.ret == Type::Void {
-            String::new()
-        } else {
-            format!(" -> {}", wgsl_type(module, &helper.ret, &helper.pos)?)
-        };
-        helper_text.push_str(&format!(
-            "fn {}({}){result} {{\n",
-            mapping::ident(&module_names.function_name(name)),
-            params.join(", ")
-        ));
-        helper_emitter.statements(&helper.body, 1, &mut helper_text)?;
-        helper_text.push_str("}\n\n");
+        helper_emitter.emit_helper(helper, name, &mut helper_text)?;
     }
     // The body is emitted before the module text, because the walk records which builtins the
     // entry point declares and which locals took a mangled name (K14).
@@ -6323,32 +6399,7 @@ fn render_helpers(
             let _ = wgsl_type(module, &param.ty, &param.pos)?;
         }
         let mut emitter = Emitter::helper(module, helper, globals, module_names);
-        let mut params = helper
-            .params
-            .iter()
-            .map(|param| {
-                Ok(format!(
-                    "{}: {}",
-                    emitter.local_name(&param.name),
-                    wgsl_type(module, &param.ty, &param.pos)?
-                ))
-            })
-            .collect::<Result<Vec<_>, Diagnostic>>()?;
-        if let Some(receiver) = emitter.receiver_parameter(helper) {
-            params.insert(0, receiver);
-        }
-        let result = if helper.ret == Type::Void {
-            String::new()
-        } else {
-            format!(" -> {}", wgsl_type(module, &helper.ret, &helper.pos)?)
-        };
-        out.push_str(&format!(
-            "fn {}({}){result} {{\n",
-            mapping::ident(&module_names.function_name(&name)),
-            params.join(", ")
-        ));
-        emitter.statements(&helper.body, 1, &mut out)?;
-        out.push_str("}\n\n");
+        emitter.emit_helper(helper, &name, &mut out)?;
     }
     Ok(out)
 }
@@ -6428,10 +6479,16 @@ pub(crate) fn emit_render(
     );
     // Both bodies are emitted before the module text, because each walk records the builtins its
     // entry point declares (RN3).
-    let mut vertex_body = String::new();
-    vertex_emitter.statements(&vertex.body, 1, &mut vertex_body)?;
-    let mut fragment_body = String::new();
-    fragment_emitter.statements(&fragment.body, 1, &mut fragment_body)?;
+    let (mut vertex_parameters, vertex_body) = vertex_emitter.parameters_and_body(
+        vertex,
+        vertex
+            .params
+            .iter()
+            .skip(layout_count)
+            .take(vertex_value_count),
+    )?;
+    let (mut fragment_parameters, fragment_body) = fragment_emitter
+        .parameters_and_body(fragment, fragment.params.get(layout_count).into_iter())?;
 
     let selected_names = structs
         .iter()
@@ -6515,19 +6572,6 @@ pub(crate) fn emit_render(
         &pipeline.pos,
     )?;
 
-    let mut vertex_parameters = vertex
-        .params
-        .iter()
-        .skip(layout_count)
-        .take(vertex_value_count)
-        .map(|param| {
-            Ok(format!(
-                "{}: {}",
-                vertex_emitter.local_name(&param.name),
-                wgsl_type(module, &param.ty, &param.pos)?
-            ))
-        })
-        .collect::<Result<Vec<_>, Diagnostic>>()?;
     vertex_parameters.extend(
         ["vertexIndex", "instanceIndex"]
             .into_iter()
@@ -6546,19 +6590,6 @@ pub(crate) fn emit_render(
     out.push_str(&vertex_body);
     out.push_str("}\n\n");
 
-    let mut fragment_parameters = fragment
-        .params
-        .get(layout_count)
-        .map(|input| {
-            Ok(format!(
-                "{}: {}",
-                fragment_emitter.local_name(&input.name),
-                wgsl_type(module, &input.ty, &input.pos)?
-            ))
-        })
-        .transpose()?
-        .into_iter()
-        .collect::<Vec<_>>();
     fragment_parameters.extend(
         ["frontFacing"]
             .into_iter()

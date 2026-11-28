@@ -81,7 +81,10 @@ import { Vec2f, Vec2u, Vec4f } from "./typegpu-types";
 @ValueType class Vertex { position: Vec2f; constructor(position: Vec2f) { this.position = position; } }
 @ValueType class Instance { offset: Vec2f; constructor(offset: Vec2f) { this.offset = offset; } }
 @ValueType class Varyings { position: Vec4f; id: Vec2u; constructor(position: Vec4f, id: Vec2u) { this.position = position; this.id = id; } }
-function vert(value: Vertex, instance: Instance, ctx: VertexInvocation): Varyings { return new Varyings(new Vec4f(value.position.x + instance.offset.x, value.position.y + instance.offset.y, 0.0, 1.0), new Vec2u(ctx.vertexIndex, ctx.instanceIndex)); }
+function vert(value: Vertex, instance: Instance, ctx: VertexInvocation): Varyings {
+  instance.offset.x += 1.0;
+  return new Varyings(new Vec4f(value.position.x + instance.offset.x, value.position.y + instance.offset.y, 0.0, 1.0), new Vec2u(ctx.vertexIndex, ctx.instanceIndex));
+}
 function frag(input: Varyings, ctx: FragmentInvocation): Vec4f { return new Vec4f(input.id.x as f32, input.position.y, 0.0, ctx.frontFacing ? 1.0 : 0.0); }
 const instanced: RenderPipelineSpec = renderPipelineInstanced<Vertex, Instance, Varyings>(vert, frag, { format: "rgba8unorm" });
 "#,
@@ -93,6 +96,7 @@ const instanced: RenderPipelineSpec = renderPipelineInstanced<Vertex, Instance, 
         "@builtin(vertex_index) vertexIndex: u32",
         "@builtin(instance_index) instanceIndex: u32",
         "@builtin(front_facing) frontFacing: bool",
+        "var instance = _g_parameter_instance;\n  instance.offset.x += 1.0f;",
     ] {
         assert!(wgsl.contains(expected), "missing `{expected}` in:\n{wgsl}");
     }

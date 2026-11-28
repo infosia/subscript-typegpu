@@ -16,7 +16,8 @@ schema construction), 2026-10-30. Rev 20 (P17 slice 2: K7 Rev 20,
 K11 Rev 1, K32, K33), 2026-10-30. Rev 21 (P17 review: K18 Rev 1,
 K11 Rev 1 one argument and the domain, K33 `self_`), 2026-10-30. Rev 22 (K1 Rev 1 fewer
 parameters), 2026-11-09. Rev 23 (K14 Rev 10 the struct closure,
-K34, K35), 2026-11-28. Plan §3 D2, D3, D7, D9 and §4
+K34, K35), 2026-11-28. Rev 24 (K8 Rev 1 written parameters),
+2026-11-28. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -110,6 +111,26 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   `const` binding emits a WGSL `let`. A subscript `let` binding emits
   a WGSL `var`. A value class local is always `var`, because the
   kernel assigns its fields.
+  Rev 1, 2026-11-28: a parameter that the body writes becomes a
+  `var`. A WGSL parameter is immutable *(docs)*. A write is an
+  assignment, an update, or a write to a field or an element of the
+  parameter. The WGSL function declares a written parameter as
+  `_g_parameter_<name>`. It starts with `var <name> =
+  _g_parameter_<name>;` for each one, in parameter order. `<name>`
+  is the K14 name, and a generated name that is not free gets a `_`
+  suffix. A parameter that the body only reads keeps its name and
+  gets no `var`. The caller's value does not change (K13). The rule
+  covers a helper, an instance of a generic helper, a method of a
+  `@ValueType` class, a local function, and the value inputs of a
+  render entry. A write to the receiver of a method stays the K33
+  diagnostic. A write to an invocation builtin (a field of
+  `ComputeInvocation`, `VertexInvocation`, or `FragmentInvocation`)
+  is a K8 diagnostic, because a WGSL builtin input is immutable.
+  subscript rejects a local function that writes a parameter of its
+  enclosing function (S100). Measured at
+  `ef54ad6`: `function bump(x: u32, v: Vec2f)` with `x = x + 1;`
+  and `v.x = 2.0;` emitted `x = x + 1u;` and `v.x = 2.0f;` with no
+  diagnostic.
 
 ## Expressions
 
@@ -549,7 +570,10 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   *writes* when it holds a helper call, a shell call, an atomic
   write, a texture store, an assignment, or an update. A part
   *reads* when it reads a `var` local, a binding, a private or
-  workgroup variable, or when it writes.
+  workgroup variable, or when it writes. Rev 1, 2026-11-28: a read
+  of a written parameter (K8 Rev 1) stays in place. No part of one
+  expression can write a function local, because K7 admits no
+  assignment as a value and a helper takes its arguments by value.
 
   Rule 1: part A precedes part B in the source, and the emission of
   B runs before the text of A. If A writes and B reads, or A reads

@@ -300,6 +300,27 @@ fn every_diagnostic_and_trap_has_a_rule_owner_and_fixture() {
 }
 
 #[test]
+fn invocation_builtin_writes() {
+    for (fixture, builtin) in [
+        ("k8-compute-builtin-write.ts", "ctx.globalId"),
+        ("k8-vertex-builtin-write.ts", "ctx.instanceIndex"),
+        ("k8-fragment-builtin-write.ts", "ctx.frontFacing"),
+    ] {
+        let path = root()
+            .join("crates/typegpu-gen/tests/fixtures/reject")
+            .join(fixture);
+        let files = crate::support::program_files(&path);
+        let errors = subscript_typegpu_gen::generate(&files).expect_err("invocation builtin write");
+        assert_eq!(errors.len(), 1, "{fixture}: {errors:?}");
+        assert_eq!(
+            errors[0].message,
+            format!("K8: a kernel cannot write an invocation builtin `{builtin}` (author)"),
+            "{fixture}"
+        );
+    }
+}
+
+#[test]
 fn call_shapes_rejects_invalid_defaults() {
     for fixture in [
         "k34-parameter-default.ts",

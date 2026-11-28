@@ -277,3 +277,14 @@ and 8 MINOR are closed. Evidence: gate green, 417 passed, 1 ignored,
 525 s; live green on Metal, 207 s; `ui-demo` smoke-green. Open: a
 helper that assigns to a parameter. Record:
 `specs/tracking/p22-parameter-propagation.md`.
+
+## P23 — written parameters (2026-11-28)
+
+A helper that wrote a parameter emitted a write to an immutable WGSL
+parameter with no diagnostic. K8 Rev 1: a written parameter emits as
+`_g_parameter_<name>` and a `var` copy at the start of the function.
+A write to an invocation builtin is a K8 diagnostic. No existing
+WGSL golden moved. Phase review: 3 MAJOR and 5 MINOR, all closed.
+Evidence: gate green, 434 passed, 1 ignored, 547 s; live green on
+Metal, 218 s. Open: a `Mat2x2f` field emits as a WGSL member. Record:
+`specs/tracking/p23-written-parameters.md`.
