@@ -67,6 +67,8 @@ this block. The byte path is subscript R34 at `bb9dadc`
   does.
   `b12-readback` holds this case with no validation scope, because
   a program with no shader module and no pipeline has none (PI14).
+  Owner decision, 2026-11-28: `createBuffer` does not trap for a
+  byte size that is not a multiple of 4. WebGPU accepts the size.
   `Buffer<T>` offers `copyTo(encoder, target: Buffer<T>,
   elementIndex, elementCount)` sized in elements.
 - **BF4 — Sizes are elements.** Every `Buffer<T>` method counts
