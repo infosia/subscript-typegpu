@@ -272,10 +272,12 @@ impl Place {
         self.suffixes.push(String::new());
     }
 
-    fn field(&mut self, name: &str) {
-        let suffix = self.suffixes.last_mut().unwrap_or(&mut self.root);
-        suffix.push('.');
-        suffix.push_str(&mapping::ident(name));
+    /// Appends the suffix after the last index or directly to the root.
+    fn push_suffix(&mut self, suffix: &str) {
+        self.suffixes
+            .last_mut()
+            .unwrap_or(&mut self.root)
+            .push_str(suffix);
     }
 }
 
@@ -2670,7 +2672,13 @@ impl<'a> Emitter<'a> {
         })
     }
 
-    fn check_field_type(obj: &Expr, field: &Expr) -> Result<(), Diagnostic> {
+    /// Returns `[<i>u]` for column `c<i>` of a library matrix (K36) and `.<name>` for other fields.
+    ///
+    /// # Errors
+    ///
+    /// If the object or field has type `f16`, returns a K4 diagnostic.
+    /// If the module lacks the class for a possible matrix column, returns a generator diagnostic.
+    fn field_suffix(&self, obj: &Expr, name: &str, field: &Expr) -> Result<String, Diagnostic> {
         if obj.ty == Type::F16 || field.ty == Type::F16 {
             return Err(diagnostic(
                 "K4",
@@ -2678,16 +2686,27 @@ impl<'a> Emitter<'a> {
                 field.pos.clone(),
             ));
         }
-        Ok(())
+        let column = ["c0", "c1", "c2", "c3"]
+            .iter()
+            .position(|&column_name| column_name == name);
+        if let (Type::Class(id), Some(index)) = (&obj.ty, column) {
+            let class = crate::class(self.module, id.0, "kernel::field_suffix", &obj.pos)?;
+            if registered_library(self.module, &class.pos.file) == Some("typegpu-types.ts")
+                && mapping::MATRICES.contains(&class.name.as_str())
+            {
+                return Ok(format!("[{}]", crate::wgsl_u32_literal(index)));
+            }
+        }
+        Ok(format!(".{}", mapping::ident(name)))
     }
 
     fn place(&mut self, expr: &Expr) -> Result<Place, Diagnostic> {
         let root = match &expr.kind {
             ExprKind::Field { .. } if self.binding_ref(expr).is_some() => self.snippet(expr)?.text,
             ExprKind::Field { obj, name } => {
-                Self::check_field_type(obj, expr)?;
+                let suffix = self.field_suffix(obj, name, expr)?;
                 let mut place = self.place(obj)?;
-                place.field(name);
+                place.push_suffix(&suffix);
                 return Ok(place);
             }
             ExprKind::Index { obj, index, .. } => {
@@ -3208,7 +3227,7 @@ impl<'a> Emitter<'a> {
                     self.used_builtins.insert(builtin.to_owned());
                     return Ok(Snippet::atom(builtin.to_owned()));
                 }
-                Self::check_field_type(obj, expr)?;
+                let suffix = self.field_suffix(obj, name, expr)?;
                 let object = self.snippet(obj)?;
                 let object_text = if object.precedence < 10 {
                     format!("({})", object.text)
@@ -3216,7 +3235,7 @@ impl<'a> Emitter<'a> {
                     object.text
                 };
                 Ok(Snippet {
-                    text: format!("{object_text}.{}", mapping::ident(name)),
+                    text: format!("{object_text}{suffix}"),
                     precedence: 10,
                     eval: object.eval,
                 })

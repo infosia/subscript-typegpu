@@ -2201,4 +2201,5 @@ fn call_shapes_generated_binding_collision() {
 }
 
 mod evaluation_order;
+mod matrix_columns;
 mod written_parameters;

@@ -1052,6 +1052,23 @@ Exit:
   parameters, and a live run that compares the device result;
 - a phase review with no open CRITICAL or MAJOR.
 
+### P24 — matrix columns (after P23)
+
+The P23 phase review found that a field of a library matrix emits as
+a WGSL member. `kernel.md` K36 is the contract. The record is
+`specs/tracking/p24-matrix-columns.md`.
+
+Exit:
+
+- gate-green, with no existing WGSL golden moved;
+- a recorded red at `0cff83e` through the tests that the phase adds
+  (the `naga` diagnostic for a column read and for a column write),
+  and `naga` validation of each new module;
+- a program that prints the host result of column reads and writes
+  for the three matrix classes, and a live run that compares the
+  device result;
+- a phase review with no open CRITICAL or MAJOR.
+
 ### U0–U4 — the immediate-mode GUI (branch `imgui`, after P16)
 
 Owner decision 2026-09-05: an immediate-mode GUI authored in

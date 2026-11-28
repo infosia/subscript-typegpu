@@ -17,7 +17,7 @@ K11 Rev 1, K32, K33), 2026-10-30. Rev 21 (P17 review: K18 Rev 1,
 K11 Rev 1 one argument and the domain, K33 `self_`), 2026-10-30. Rev 22 (K1 Rev 1 fewer
 parameters), 2026-11-09. Rev 23 (K14 Rev 10 the struct closure,
 K34, K35), 2026-11-28. Rev 24 (K8 Rev 1 written parameters),
-2026-11-28. Plan §3 D2, D3, D7, D9 and §4
+2026-11-28. Rev 25 (K36 matrix columns), 2026-11-28. Plan §3 D2, D3, D7, D9 and §4
 govern this block. The pipeline declaration, the layout classes,
 and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
 `schema.md`.
@@ -594,6 +594,21 @@ and the binding wrappers are `pipeline.md` (PI-rules). Schemas are
   0)` ran the second `tick()` first, `nextVec().step(edgeVec())` ran
   `edgeVec()` first, and `k != 0 && (k == 0 ? tick() > 0 : false)`
   ran `tick()` at `k == 0`.
+- **K36 — Matrix columns.** Rev 0, 2026-11-28. `Mat2x2f`,
+  `Mat3x3f`, and `Mat4x4f` hold their columns as the fields `c0` to
+  `c3` (SC5). A WGSL matrix has no named member, and a column is
+  `m[i]`. A read or a write of the field `c<i>` of a library matrix
+  emits `<matrix>[<i>u]`, through any depth: `m.c1.y` emits
+  `m[1u].y`, and `n.c0 = v` emits `n[0u] = v;`. The emitter decides
+  by the class (SC5), never by the field name. The rule covers each
+  root that holds a matrix: a local, a parameter, a schema field, a
+  `FixedArray` element, a binding, a module constant, a private or
+  workgroup variable, and a call or method result (`(m * m)[0u]`).
+  subscript rejects a column write through a binding element or an
+  accessor (S100, a write through a copy). Measured at `0cff83e`:
+  `n.c0.x = 9.0;` and `m.c0.x + n.c1.y` emitted `n.c0.x = 9.0f;`
+  and `m.c0.x + n.c1.y`, the generator exited 0, and `naga` gave
+  `invalid field accessor`.
 
 ## Diagnostics
 

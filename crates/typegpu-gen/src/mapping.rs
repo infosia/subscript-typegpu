@@ -484,7 +484,7 @@ const FLOAT_VECTORS: &[&str] = &["Vec2f", "Vec3f", "Vec4f"];
 const SIGNED_VECTORS: &[&str] = &["Vec2i", "Vec3i", "Vec4i"];
 const UNSIGNED_VECTORS: &[&str] = &["Vec2u", "Vec3u", "Vec4u"];
 const BOOL_VECTORS: &[&str] = &["Vec2b", "Vec3b", "Vec4b"];
-const MATRICES: &[&str] = &["Mat2x2f", "Mat3x3f", "Mat4x4f"];
+pub(crate) const MATRICES: &[&str] = &["Mat2x2f", "Mat3x3f", "Mat4x4f"];
 
 /// The arithmetic methods that every float, signed, and unsigned vector carries (K10).
 const VECTOR_BASE: &[(&str, MethodEmission)] = &[

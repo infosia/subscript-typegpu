@@ -288,3 +288,13 @@ WGSL golden moved. Phase review: 3 MAJOR and 5 MINOR, all closed.
 Evidence: gate green, 434 passed, 1 ignored, 547 s; live green on
 Metal, 218 s. Open: a `Mat2x2f` field emits as a WGSL member. Record:
 `specs/tracking/p23-written-parameters.md`.
+
+## P24 — matrix columns (2026-11-28)
+
+A field `c<i>` of a library matrix emitted as a WGSL member, and
+`naga` rejects it with `invalid field accessor`. K36: the field
+emits as `<matrix>[<i>u]`, for a read and for a write. No committed
+program held the form, and no existing WGSL golden moved. Phase
+review: 1 MAJOR and 6 MINOR, all closed. Evidence: gate green, 450
+passed, 1 ignored, 536 s; live green on Metal, 221 s. Record:
+`specs/tracking/p24-matrix-columns.md`.
